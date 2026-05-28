@@ -1,9 +1,9 @@
 {
 	"id": "tag-lens",
 	"name": "Tag Lens",
-	"version": "0.1.1",
+	"version": "0.2.0",
 	"minAppVersion": "1.5.0",
-	"description": "Lightweight tag-membership visualisations: connection matrix, tag co-occurrence heatmap, UpSet, bipartite tag graph.",
+	"description": "Lightweight tag-membership visualisations: connection matrix, tag co-occurrence heatmap, UpSet, intersection lattice, bipartite tag graph.",
 	"author": "laximgqozaZZZYT",
 	"authorUrl": "https://github.com/laximgqozaZZZYT",
 	"isDesktopOnly": false

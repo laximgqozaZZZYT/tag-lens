@@ -54,6 +54,14 @@ import {
 import { drawMatrix, matrixGeom, MATRIX_BADGE_W } from "./draw-matrix";
 import type { MatrixLine } from "./draw-matrix";
 import { drawHeatmap, heatmapGeom } from "./draw-heatmap";
+import {
+	drawLattice,
+	latticeCellAt,
+	latticeHeaderCheckboxHit,
+	latticeNamedRowAt,
+	TIER_GUTTER as LATTICE_TIER_GUTTER,
+} from "./draw-lattice";
+import { latticeNodeAt } from "./lattice-layout";
 import { drawCard as drawCardFn } from "./draw-card";
 import {
 	hitTest as hitTestFn,
@@ -149,6 +157,39 @@ export class MiniGraphView extends ItemView {
 	private cardCache: Map<string, CardContent> = new Map();
 	private rebuildGen = 0;
 	private clusterLabels: Map<string, string> = new Map();
+	// Shared text-width measurer for `layoutLattice` — runs in the same 2D
+	// context that the renderer will eventually paint with, so the layout's
+	// "longest line" sizing matches what `drawHeader` renders pixel-for-pixel.
+	// Arrow form to keep `this` bound when passed through layout options.
+	private measureLatticeText = (text: string, fontPx: number): number => {
+		this.ctx.save();
+		this.ctx.font = `600 ${fontPx}px sans-serif`;
+		const w = this.ctx.measureText(text).width;
+		this.ctx.restore();
+		return w;
+	};
+
+	// Resolve {nodeKey → basename[]} for every currently-named lattice node,
+	// driven by the LAST laid layout. The layout step needs these strings
+	// to measure widths and grow each named node so labels don't truncate.
+	// Vault lookup lives here (view only); the layout module stays DOM-free.
+	private buildLatticeNamedLabels(): Record<string, string[]> {
+		const out: Record<string, string[]> = {};
+		const meta = this.laid?.lattice;
+		if (!meta || this.latticeNamedKeys.size === 0) return out;
+		const max = Math.max(1, this.settings.latticeNamedMax);
+		for (const node of meta.nodes) {
+			if (!this.latticeNamedKeys.has(node.key)) continue;
+			const ids = node.nodeIds.slice(0, max);
+			out[node.key] = ids.map((id) => {
+				const sep = id.indexOf("\t");
+				const path = sep >= 0 ? id.slice(sep + 1) : id;
+				const f = this.app.vault.getAbstractFileByPath(path);
+				return f instanceof TFile ? f.basename : path;
+			});
+		}
+		return out;
+	}
 	private whereError = "";
 	private groupByError = "";
 	private havingError = "";
@@ -189,6 +230,15 @@ export class MiniGraphView extends ItemView {
 	// Bipartite mode: id of the SET node whose neighbours are PINNED-
 	// highlighted by a click (persists across hover). null = none.
 	private pinnedSet: string | null = null;
+	// Lattice mode: selected / hovered node key (signature key) for highlight
+	// and the floating note-list overlay. Cleared when the selected key no
+	// longer exists after a relayout (clearStaleSelection).
+	private latticeSelectedKey: string | null = null;
+	private latticeHoverKey: string | null = null;
+	// Lattice: keys of nodes whose body is expanded into a list of file
+	// names (header checkbox checked). Transient — relayout prunes keys
+	// whose node no longer exists.
+	private latticeNamedKeys: Set<string> = new Set();
 	// Heatmap mode: selected cell (tag i × tag j) → detail overlay; hovered
 	// row/col for the crosshair (-1 = none). detailEl = the overlay element.
 	private heatmapSelected: { i: number; j: number } | null = null;
@@ -443,8 +493,10 @@ export class MiniGraphView extends ItemView {
 	private renderAllTab(el: HTMLElement): void {
 		const isMatrix = this.settings.viewMode === "matrix";
 		const isHeatmap = this.settings.viewMode === "heatmap";
+		const isLattice = this.settings.viewMode === "lattice";
 		this.renderViewModeSection(el);
 		if (this.settings.viewMode === "bipartite") this.renderBipartiteSection(el);
+		if (isLattice) this.renderLatticeSection(el);
 		this.renderExprSection(el, "WHERE", this.settings.where, this.whereError, {
 			autoKey: "whereAuto",
 		});
@@ -470,10 +522,11 @@ export class MiniGraphView extends ItemView {
 			placeholder: "limit 10 / brief 30",
 			autoKey: "limitAuto",
 		});
-		// Matrix dots / heatmap cells are drawn at a FIXED size (presence /
-		// co-occurrence, not degree), independent of NODE DISPLAY. Hide that
-		// section so Size by / m×n can't imply they affect the cells.
-		if (!isMatrix && !isHeatmap) this.renderNodeDisplaySection(el);
+		// Matrix dots / heatmap cells / lattice nodes are drawn at sizes
+		// driven by their own intrinsic metrics (presence / co-occurrence /
+		// intersection-count), independent of NODE DISPLAY. Hide that section
+		// so Size by / m×n can't imply they affect those views.
+		if (!isMatrix && !isHeatmap && !isLattice) this.renderNodeDisplaySection(el);
 		this.renderMinFontSection(el);
 		const gdSection = this.renderToggleSection(el, "Graph display", [
 			{ key: "showNodes", label: "Show nodes" },
@@ -936,6 +989,109 @@ export class MiniGraphView extends ItemView {
 		row.createSpan({ text: "Jaccard color scale" });
 	}
 
+	// Lattice (intersection lattice) mode settings — degree-tier layout,
+	// LOD, per-tier cap, and the subset-link back layer. Mirrors the
+	// renderBipartiteSection shape (own panel section).
+	private renderLatticeSection(parent: HTMLElement): void {
+		const section = parent.createDiv({ cls: "gim-panel-section" });
+		section.createEl("h4", { text: "Lattice" });
+
+		// LOD mode (auto / overview / density / individual).
+		const lodRow = section.createDiv({ cls: "gim-row" });
+		lodRow.createSpan({ text: "Node LOD" });
+		const lodSel = lodRow.createEl("select") as HTMLSelectElement;
+		const lodOpts: Array<[string, string]> = [
+			["auto", "Auto (zoom-based)"],
+			["overview", "Overview"],
+			["density", "Density"],
+			["individual", "Individual"],
+		];
+		for (const [v, label] of lodOpts) {
+			const o = lodSel.createEl("option", { text: label });
+			o.value = v;
+			if (this.settings.latticeNodeLOD === v) o.selected = true;
+		}
+		lodSel.addEventListener("change", () => {
+			this.settings.latticeNodeLOD = lodSel.value as MiniSettings["latticeNodeLOD"];
+			void this.save();
+			void this.rebuild();
+		});
+
+		// Min size cull — drop intersections below this count entirely.
+		const minRow = section.createDiv({ cls: "gim-row" });
+		minRow.createSpan({ text: "Min intersection size" });
+		const minIn = minRow.createEl("input", {
+			type: "number",
+			attr: { min: "1", step: "1" },
+		}) as HTMLInputElement;
+		minIn.value = String(this.settings.latticeMinNodeSize);
+		minIn.style.width = "60px";
+		minIn.addEventListener("change", () => {
+			const v = Math.max(1, Math.floor(Number(minIn.value) || 1));
+			this.settings.latticeMinNodeSize = v;
+			minIn.value = String(v);
+			void this.save();
+			void this.rebuild();
+		});
+
+		// Per-tier cap — beyond this, the rest collapse into "Other (×M)".
+		const capRow = section.createDiv({ cls: "gim-row" });
+		capRow.createSpan({ text: "Max nodes per tier" });
+		const capIn = capRow.createEl("input", {
+			type: "number",
+			attr: { min: "1", step: "1" },
+		}) as HTMLInputElement;
+		capIn.value = String(this.settings.latticeMaxNodesPerTier);
+		capIn.style.width = "60px";
+		capIn.addEventListener("change", () => {
+			const v = Math.max(1, Math.floor(Number(capIn.value) || 1));
+			this.settings.latticeMaxNodesPerTier = v;
+			capIn.value = String(v);
+			void this.save();
+			void this.rebuild();
+		});
+
+		// Max names per node — drives the per-node "show names" checkbox.
+		// Higher = more rows visible inside each expanded card before "+N".
+		const namedRow = section.createDiv({ cls: "gim-row" });
+		namedRow.createSpan({ text: "Max names per node" });
+		const namedIn = namedRow.createEl("input", {
+			type: "number",
+			attr: { min: "1", step: "1" },
+		}) as HTMLInputElement;
+		namedIn.value = String(this.settings.latticeNamedMax);
+		namedIn.style.width = "60px";
+		namedIn.addEventListener("change", () => {
+			const v = Math.max(1, Math.floor(Number(namedIn.value) || 1));
+			this.settings.latticeNamedMax = v;
+			namedIn.value = String(v);
+			void this.save();
+			void this.rebuild();
+		});
+
+		// Subset links (display-only — DISPLAY_ONLY_KEYS skips relayout).
+		const linkRow = section.createEl("label", { cls: "gim-toggle-row" });
+		const linkCb = linkRow.createEl("input", { type: "checkbox" });
+		linkCb.checked = this.settings.latticeShowSubsetLinks;
+		linkCb.addEventListener("change", () => {
+			this.settings.latticeShowSubsetLinks = linkCb.checked;
+			void this.save();
+			this.requestDraw();
+		});
+		linkRow.createSpan({ text: "Show subset links" });
+
+		// Tier orientation — most specific on top vs bottom.
+		const topRow = section.createEl("label", { cls: "gim-toggle-row" });
+		const topCb = topRow.createEl("input", { type: "checkbox" });
+		topCb.checked = this.settings.latticeSpecificTop;
+		topCb.addEventListener("change", () => {
+			this.settings.latticeSpecificTop = topCb.checked;
+			void this.save();
+			void this.rebuild();
+		});
+		topRow.createSpan({ text: "Most-specific tier on top" });
+	}
+
 	// One radio row for a view mode. Shared by the stable list and the
 	// collapsible Experimental list — the only difference is a "(beta)" tag.
 	private renderViewModeOption(
@@ -1144,6 +1300,9 @@ export class MiniGraphView extends ItemView {
 		"matrixCollapseGroups",
 		// Heatmap colour scale (Jaccard vs raw) only changes cell shading.
 		"heatmapJaccard",
+		// Lattice subset links only affect the back-layer of drawLattice —
+		// toggling repaints without re-bucketing intersections.
+		"latticeShowSubsetLinks",
 	]);
 
 	private layoutSignature(s: MiniSettings): string {
@@ -1190,12 +1349,26 @@ export class MiniGraphView extends ItemView {
 		// Stage 1b: HAVING runs AFTER buildGraph so auto thresholds can scale
 		// with the produced node count, then drops the resulting clusters
 		// from each node's memberships + the cluster-label map.
+		// Lattice mode is the ONE view whose value comes from DEEP intersections
+		// (3-way, 4-way, …). Auto-HAVING's TOP_K=20 long-tail drop strips
+		// rare tags from every note's memberships, so any 3rd+ tag on a note
+		// vanishes upstream of layoutLattice and the lattice can only ever
+		// show degree ≤ 2. Skip AUTO entirely for lattice — manual HAVING
+		// expressions still run, and the lattice's own `Min intersection
+		// size` / `Max nodes per tier` controls handle clutter. Other modes
+		// keep AUTO unchanged.
+		const effHavingAuto =
+			this.settings.viewMode === "lattice" ? false : this.settings.havingAuto;
 		const effHaving = resolveEffectiveHaving(
 			this.settings.having,
-			this.settings.havingAuto,
+			effHavingAuto,
 			data.nodes.length,
 		);
-		const dropped = this.computeDroppedClusters(data.nodes, effHaving);
+		const dropped = this.computeDroppedClusters(
+			data.nodes,
+			effHaving,
+			effHavingAuto,
+		);
 		if (dropped.size > 0) {
 			data = filterMemberships(data, dropped);
 			clusterLabels = filterLabels(clusterLabels, dropped);
@@ -1277,6 +1450,28 @@ export class MiniGraphView extends ItemView {
 			matrixSortDir: this.settings.matrixSortDir,
 			bipartiteMaxTags: this.settings.bipartiteMaxTags,
 			bipartiteLayout: this.settings.bipartiteLayout,
+			latticeNodeLOD: this.settings.latticeNodeLOD,
+			latticeIndividualMax: this.settings.latticeIndividualMax,
+			latticeDensityMax: this.settings.latticeDensityMax,
+			latticeDensityCells: this.settings.latticeDensityCells,
+			latticeMinNodeSize: this.settings.latticeMinNodeSize,
+			latticeMaxNodesPerTier: this.settings.latticeMaxNodesPerTier,
+			latticeShowSubsetLinks: this.settings.latticeShowSubsetLinks,
+			latticeSpecificTop: this.settings.latticeSpecificTop,
+			// Per-node "show names" checkbox state — layout uses it to expand
+			// each checked node so its name rows fit. Spread to a plain array
+			// so the LayoutOptions payload stays JSON-safe. The labels map
+			// carries the actual basenames so the layout can MEASURE them
+			// (no DOM access inside the layout module).
+			latticeNamedKeys: [...this.latticeNamedKeys],
+			latticeNamedMax: this.settings.latticeNamedMax,
+			latticeNamedLabels: this.buildLatticeNamedLabels(),
+			// Real ctx.measureText for the lattice's per-node header sizing.
+			// Without this the layout falls back to a CJK-aware character-
+			// width estimate, which is fine but less tight; the bundled hidden
+			// canvas's 2D context gives pixel-accurate widths in the same
+			// font family the renderer will eventually use.
+			latticeMeasureText: this.measureLatticeText,
 			bipartitePrev,
 		});
 		// Stage 5: id → incident-edge-index adjacency for hover lookups.
@@ -1355,11 +1550,17 @@ export class MiniGraphView extends ItemView {
 	private computeDroppedClusters(
 		nodes: GraphNode[],
 		rawRows: string[],
+		// Optional override so the rebuild() pipeline can SUPPRESS auto-drop
+		// for lattice mode (where TOP_K=20 long-tail dropping cuts off any
+		// 3rd+ tag on a note and collapses the intersection lattice to
+		// degree ≤ 2). Falls back to settings.havingAuto for every other
+		// mode, preserving prior behaviour.
+		havingAutoOverride?: boolean,
 	): Set<string> {
 		const { dropped, errors } = computeDroppedClustersFn(
 			nodes,
 			rawRows,
-			this.settings.havingAuto,
+			havingAutoOverride ?? this.settings.havingAuto,
 		);
 		this.havingError = errors.length > 0 ? errors.join("; ") : "";
 		return dropped;
@@ -1538,6 +1739,7 @@ export class MiniGraphView extends ItemView {
 			this.laid.upset ||
 			this.laid.matrix ||
 			this.laid.heatmap ||
+			this.laid.lattice ||
 			this.laid.setNodeIds
 		)
 			return false;
@@ -1625,6 +1827,40 @@ export class MiniGraphView extends ItemView {
 			this.zoom = Math.min(1.2, Math.max(0.2, avail / Math.max(1, colsW)));
 			this.panX = g.labelBand;
 			this.panY = matrixGeom(m, this.zoom, this.canvas.clientWidth).headerH;
+			this.requestDraw();
+			return;
+		}
+		if (this.laid.lattice) {
+			// World-space tiered grid with a SCREEN-FIXED tier-label gutter on
+			// the left. Strategy: fit vertically so every tier is visible (the
+			// lattice's value is the tier comparison) AND take the horizontal
+			// fit only when it doesn't push nodes below a readable size. The
+			// initial panX anchors the leftmost node just past the gutter so
+			// the gutter never overlaps any node at default zoom.
+			const L = this.laid.lattice;
+			const panelW =
+				this.settings.panelVisible && this.panelEl ? this.panelEl.offsetWidth : 0;
+			const visW = Math.max(1, this.canvas.clientWidth - panelW);
+			const visH = Math.max(1, this.canvas.clientHeight);
+			const pad = 8;
+			const usableW = Math.max(1, visW - LATTICE_TIER_GUTTER - pad);
+			const zoomY = (visH - pad * 2) / Math.max(1, L.worldHeight);
+			const zoomX = usableW / Math.max(1, L.worldWidth);
+			// Floor below which header text would shrink below ~10 screen px
+			// (HEADER_H = 22 world × 0.45 ≈ 10 px).
+			const MIN_READABLE = 0.45;
+			const zoom = Math.min(2, Math.max(MIN_READABLE, Math.min(zoomY, zoomX)));
+			this.zoom = zoom;
+			// PinPin the leftmost node just past the gutter. Centre on the
+			// gutter-right side when the whole lattice fits horizontally.
+			const worldShownW = L.worldWidth * zoom;
+			this.panX = worldShownW <= usableW
+				? LATTICE_TIER_GUTTER + (usableW - worldShownW) / 2
+				: LATTICE_TIER_GUTTER;
+			const worldShownH = L.worldHeight * zoom;
+			this.panY = worldShownH <= visH - pad * 2
+				? pad + (visH - pad * 2 - worldShownH) / 2
+				: pad;
 			this.requestDraw();
 			return;
 		}
@@ -1780,6 +2016,39 @@ export class MiniGraphView extends ItemView {
 			});
 			return;
 		}
+		// Intersection lattice: world-space tier grid + subset links. drawLattice
+		// applies its own dpr/zoom/pan transform; we draw and return.
+		if (this.laid.lattice && this.laid.lattice.nodes.length > 0) {
+			drawLattice(ctx, this.laid.lattice, {
+				zoom: this.zoom,
+				panX: this.panX,
+				panY: this.panY,
+				canvas: this.canvas,
+				dpr,
+				minFontPx: this.settings.minFontPx,
+				settings: {
+					latticeNodeLOD: this.settings.latticeNodeLOD,
+					latticeIndividualMax: this.settings.latticeIndividualMax,
+					latticeDensityMax: this.settings.latticeDensityMax,
+					latticeDensityCells: this.settings.latticeDensityCells,
+					latticeShowSubsetLinks: this.settings.latticeShowSubsetLinks,
+				},
+				selectedKey: this.latticeSelectedKey,
+				hoverKey: this.latticeHoverKey,
+				namedKeys: this.latticeNamedKeys,
+				namedMax: this.settings.latticeNamedMax,
+				// Closure: id → file basename via the live vault. Falls back
+				// to a path-tail strip inside draw-lattice when omitted, so
+				// unit tests / probes still work without a vault.
+				nameOf: (id: string) => {
+					const sep = id.indexOf("\t");
+					const path = sep >= 0 ? id.slice(sep + 1) : id;
+					const f = this.app.vault.getAbstractFileByPath(path);
+					return f instanceof TFile ? f.basename : path;
+				},
+			});
+			return;
+		}
 		// Tag co-occurrence heatmap: screen-space frozen-pane cell grid.
 		if (this.laid.heatmap && this.laid.heatmap.n > 0) {
 			drawHeatmap(ctx, this.laid.heatmap, {
@@ -1798,11 +2067,13 @@ export class MiniGraphView extends ItemView {
 		const upsetHasColumns = (this.laid.upset?.columns.length ?? 0) > 0;
 		const matrixHasRows = (this.laid.matrix?.rows.length ?? 0) > 0;
 		const heatmapHasCells = (this.laid.heatmap?.n ?? 0) > 0;
+		const latticeHasNodes = (this.laid.lattice?.nodes.length ?? 0) > 0;
 		if (
 			this.laid.nodes.length === 0 &&
 			!upsetHasColumns &&
 			!matrixHasRows &&
-			!heatmapHasCells
+			!heatmapHasCells &&
+			!latticeHasNodes
 		) {
 			ctx.fillStyle = "#7a8aa0";
 			ctx.font = `${14 * dpr}px sans-serif`;
@@ -2159,7 +2430,6 @@ export class MiniGraphView extends ItemView {
 	private openHeatmapDetail(i: number, j: number, sx: number, sy: number): void {
 		const h = this.laid.heatmap;
 		if (!h) return;
-		this.closeDetail();
 		const a = h.nodeIds[i] ?? [];
 		let ids: string[];
 		if (i === j) {
@@ -2171,7 +2441,45 @@ export class MiniGraphView extends ItemView {
 		ids = [...new Set(ids)];
 		const ti = h.tags[i].label;
 		const tj = h.tags[j].label;
+		const title = i === j ? `${ti} (${ids.length})` : `${ti} × ${tj} (${ids.length})`;
+		this.showNodeListOverlay(title, ids, sx, sy, () => {
+			this.heatmapSelected = null;
+		});
+	}
 
+	// Lattice node click (header / overview / density / Other) → same overlay
+	// as heatmap: a floating list of every note in that exact intersection.
+	// `node.nodeIds` is the precomputed sorted list (see lattice-layout step
+	// 4 for Other bundles), so we just pass through to the generic overlay.
+	private openLatticeDetail(
+		node: import("./layout").LatticeNodeMeta,
+		sx: number,
+		sy: number,
+	): void {
+		const sigTitle = node.isOther
+			? `その他 (×${node.signature.length || node.count})`
+			: node.displayTags.length
+				? node.displayTags.map((s) => `#${s}`).join(" ∩ ")
+				: "(no tags)";
+		const title = `${sigTitle} (${node.nodeIds.length})`;
+		this.showNodeListOverlay(title, node.nodeIds, sx, sy, () => {
+			this.latticeSelectedKey = null;
+		});
+	}
+
+	// Generic floating note-list overlay. Used by both heatmap (tag×tag) and
+	// lattice (intersection signature) clicks: title is caller-formatted, ids
+	// are the file-path tokens to list, (sx, sy) is the click point used by
+	// positionDetail, and onCloseSelection clears the caller's selection
+	// state when the panel's × is pressed.
+	private showNodeListOverlay(
+		title: string,
+		ids: string[],
+		sx: number,
+		sy: number,
+		onCloseSelection?: () => void,
+	): void {
+		this.closeDetail();
 		const panel = this.root.createDiv({ cls: "gim-detail-panel" });
 		Object.assign(panel.style, {
 			position: "absolute",
@@ -2197,9 +2505,7 @@ export class MiniGraphView extends ItemView {
 			borderBottom: "1px solid #2a3447",
 			fontWeight: "700",
 		} as Partial<CSSStyleDeclaration>);
-		head.createSpan({
-			text: i === j ? `${ti} (${ids.length})` : `${ti} × ${tj} (${ids.length})`,
-		});
+		head.createSpan({ text: title });
 		const close = head.createEl("button", { text: "×" });
 		Object.assign(close.style, {
 			background: "transparent",
@@ -2209,7 +2515,7 @@ export class MiniGraphView extends ItemView {
 			fontSize: "16px",
 		} as Partial<CSSStyleDeclaration>);
 		close.addEventListener("click", () => {
-			this.heatmapSelected = null;
+			if (onCloseSelection) onCloseSelection();
 			this.closeDetail();
 			this.requestDraw();
 		});
@@ -2349,6 +2655,21 @@ export class MiniGraphView extends ItemView {
 			this.heatmapSelected = null;
 			this.closeDetail();
 		}
+		// Lattice: a relayout re-buckets intersections; selected key may no
+		// longer exist. Clear and close any open list overlay tied to it.
+		const latticeKeys = new Set(this.laid.lattice?.nodes.map((n) => n.key) ?? []);
+		this.latticeHoverKey = null;
+		// Prune named-checkbox keys for nodes that no longer exist after the
+		// relayout (e.g. a tier was culled by Min intersection size, or the
+		// signature was top-N collapsed into an "Other" bundle whose key
+		// differs). Keeps `latticeNamedKeys` from growing unboundedly.
+		for (const k of [...this.latticeNamedKeys]) {
+			if (!latticeKeys.has(k)) this.latticeNamedKeys.delete(k);
+		}
+		if (this.latticeSelectedKey && !latticeKeys.has(this.latticeSelectedKey)) {
+			this.latticeSelectedKey = null;
+			this.closeDetail();
+		}
 	}
 
 	private onPointerMove(e: MouseEvent): void {
@@ -2384,6 +2705,32 @@ export class MiniGraphView extends ItemView {
 				if (target) this.scheduleHover(target, sx, sy);
 			} else if (this.tipEl) {
 				this.positionTip(sx, sy, this.tipEl);
+			}
+			return;
+		}
+		if (this.laid.lattice) {
+			// World-space hit-test (lattice has its own per-cell hit test
+			// when zoomed into individual LOD; otherwise the whole node box).
+			// The screen-fixed tier-label gutter covers x ∈ [0, TIER_GUTTER),
+			// so pointer activity inside the gutter must never resolve to a
+			// node behind it.
+			const w = this.screenToWorld(sx, sy);
+			const meta = this.laid.lattice;
+			const hitNode = sx < LATTICE_TIER_GUTTER
+				? null
+				: latticeNodeAt(meta, w.x, w.y);
+			const key = hitNode?.key ?? null;
+			if (key !== this.latticeHoverKey) {
+				this.latticeHoverKey = key;
+				this.requestDraw();
+			}
+			// Tooltip: per-node summary (signature × N). Reuse the generic
+			// hover-target dispatch — a future "latticeNode" target could
+			// add a richer tip; for now we just clear/skip to keep this
+			// non-blocking.
+			if (this.hoverTarget) {
+				this.cancelHover();
+				this.hoverTarget = null;
 			}
 			return;
 		}
@@ -2696,6 +3043,96 @@ export class MiniGraphView extends ItemView {
 				}
 				return;
 			}
+			if (this.laid.lattice) {
+				// World-space click. Order of resolution:
+				//   1. Header checkbox (sits ON the card, regardless of pan)
+				//      — toggles `latticeNamedKeys` + re-layouts so the body
+				//      switches to / from the name list.
+				//   2. Tier gutter early-return (opaque sticky-left band).
+				//   3. Named row click → open that note directly.
+				//   4. Per-individual-cell click → open that note.
+				//   5. Anywhere else on the node → list-overlay.
+				const wpt = this.screenToWorld(sx, sy);
+				const meta = this.laid.lattice;
+				const cbHit = latticeNodeAt(meta, wpt.x, wpt.y);
+				if (cbHit && latticeHeaderCheckboxHit(cbHit, wpt.x, wpt.y)) {
+					if (this.latticeNamedKeys.has(cbHit.key))
+						this.latticeNamedKeys.delete(cbHit.key);
+					else this.latticeNamedKeys.add(cbHit.key);
+					void this.rebuild(); // re-layout: enlarge / shrink this node
+					return;
+				}
+				// Clicks inside the screen-fixed tier-label gutter are ignored
+				// (the gutter is opaque; any node "behind" it is not user-
+				// reachable from there — pan first to bring it into the open
+				// area). Checked AFTER the checkbox so a card whose left edge
+				// pokes past the gutter still has a clickable box on screen.
+				if (sx < LATTICE_TIER_GUTTER) {
+					this.latticeSelectedKey = null;
+					this.closeDetail();
+					this.requestDraw();
+					return;
+				}
+				const hitNode = cbHit;
+				if (!hitNode) {
+					this.latticeSelectedKey = null;
+					this.closeDetail();
+					this.requestDraw();
+					return;
+				}
+				// Named row click → open that note directly. Only applies when
+				// the node's body is in name-list mode.
+				if (hitNode.named) {
+					const rowIdx = latticeNamedRowAt(
+						hitNode,
+						wpt.x,
+						wpt.y,
+						this.settings.latticeNamedMax,
+					);
+					if (rowIdx >= 0) {
+						const id = hitNode.nodeIds[rowIdx];
+						if (id) {
+							this.openFile(id);
+							return;
+						}
+					}
+					// Fall through to the list-overlay below for clicks on the
+					// header area / "+N" residual row of a named node.
+				}
+				// Try a per-cell hit first (only meaningful in individual LOD).
+				const cellIdx = latticeCellAt(
+					hitNode,
+					wpt.x,
+					wpt.y,
+					this.settings.minFontPx,
+					this.zoom,
+					{
+						latticeNodeLOD: this.settings.latticeNodeLOD,
+						latticeIndividualMax: this.settings.latticeIndividualMax,
+						latticeDensityMax: this.settings.latticeDensityMax,
+						latticeDensityCells: this.settings.latticeDensityCells,
+					},
+				);
+				if (cellIdx >= 0) {
+					const cellId = hitNode.nodeIds[cellIdx];
+					if (cellId) {
+						this.openFile(cellId);
+						return;
+					}
+				}
+				// Header / aggregate click → list overlay. Use the node label
+				// as title; "Other (×M)" buckets fall back to the literal label
+				// since their nodeIds are already a flat union.
+				this.latticeSelectedKey = hitNode.key;
+				this.requestDraw();
+				// "Other (×M)" bundle nodes have no concrete signature — the
+				// signature array is empty by construction in lattice-layout.
+				// Render their title as "その他 (×M)" with the count; concrete
+				// intersections show the DISPLAY tag list joined by " ∩ " (same
+				// resolution the header uses).
+				this.openLatticeDetail(hitNode, sx, sy);
+				return;
+			}
 			const w = this.screenToWorld(sx, sy);
 			const hit = this.hitTest(w.x, w.y);
 			if (hit?.kind === "node") {
@@ -2722,12 +3159,14 @@ export class MiniGraphView extends ItemView {
 				this.matrixHoverLine !== -1 ||
 				this.matrixHoverCol !== -1 ||
 				this.heatmapHoverRow !== -1 ||
-				this.heatmapHoverCol !== -1
+				this.heatmapHoverCol !== -1 ||
+				this.latticeHoverKey !== null
 			) {
 				this.matrixHoverLine = -1;
 				this.matrixHoverCol = -1;
 				this.heatmapHoverRow = -1;
 				this.heatmapHoverCol = -1;
+				this.latticeHoverKey = null;
 				this.requestDraw();
 			}
 		});

@@ -164,6 +164,24 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		// never picked a mode land on a working view. A user who deliberately
 		// selects a beta mode from the Experimental section still keeps it.
 		if (merged.viewMode === "euler") merged.viewMode = "matrix";
+		// --- lattice (intersection lattice) settings ---
+		const latticeLODs = ["auto", "overview", "density", "individual"];
+		if (!latticeLODs.includes(merged.latticeNodeLOD as string))
+			merged.latticeNodeLOD = "auto";
+		const intPositive = (v: unknown, fallback: number, min = 1): number =>
+			typeof v === "number" && Number.isFinite(v) && v >= min
+				? Math.floor(v)
+				: fallback;
+		merged.latticeIndividualMax = intPositive(merged.latticeIndividualMax, 60);
+		merged.latticeDensityMax = intPositive(merged.latticeDensityMax, 2000);
+		merged.latticeDensityCells = intPositive(merged.latticeDensityCells, 100, 4);
+		merged.latticeMinNodeSize = intPositive(merged.latticeMinNodeSize, 1);
+		merged.latticeMaxNodesPerTier = intPositive(merged.latticeMaxNodesPerTier, 24, 1);
+		if (typeof merged.latticeShowSubsetLinks !== "boolean")
+			merged.latticeShowSubsetLinks = true;
+		if (typeof merged.latticeSpecificTop !== "boolean")
+			merged.latticeSpecificTop = true;
+		merged.latticeNamedMax = intPositive(merged.latticeNamedMax, 12, 1);
 		if (typeof merged.showNodes !== "boolean") merged.showNodes = true;
 		if (typeof merged.showEnclosures !== "boolean") merged.showEnclosures = true;
 		if (typeof merged.showEdges !== "boolean") merged.showEdges = true;

@@ -141,6 +141,35 @@ export interface MiniSettings {
 	// first drops singleton + giant (>40% of notes) tags, then keeps the
 	// top-N by size. Caps hub fan-out so a sparse vault stays operable.
 	bipartiteMaxTags: number;
+	// Intersection lattice: per-node level-of-detail. "auto" picks one of
+	// overview / density / individual from count and the current zoom; the
+	// explicit values force a single LOD regardless.
+	latticeNodeLOD: "auto" | "overview" | "density" | "individual";
+	// auto-LOD thresholds (effective count = count / zoom):
+	//   eff ≤ individualMax → individual (1 note = 1 cell)
+	//   eff ≤ densityMax    → density   (fixed grid of bins, count-independent)
+	//   else                → overview  (header + bar + number)
+	latticeIndividualMax: number;
+	latticeDensityMax: number;
+	// Number of cells per density block — the render cost of a "density" node
+	// is bounded by this, so a 500-note intersection doesn't draw 500 cells.
+	latticeDensityCells: number;
+	// Drop tier nodes whose count is below this. Same idea as upsetMinColumnSize.
+	latticeMinNodeSize: number;
+	// Per-tier cap: keep top-N nodes on each degree row; everything else is
+	// bundled into a single "Other (×M)" aggregated node so wide tiers don't
+	// blow the canvas width up.
+	latticeMaxNodesPerTier: number;
+	// Draw the subset links (this intersection → the smaller intersection that
+	// keeps one tag less). Pure draw toggle; the structure is always computed.
+	latticeShowSubsetLinks: boolean;
+	// Tier stacking direction. true = higher degree on top (specific on top),
+	// false = lower degree on top (general on top).
+	latticeSpecificTop: boolean;
+	// lattice: max note NAMES shown inside a checked node before "+N". Driver
+	// for the per-node "show names" checkbox — toggling that checkbox swaps
+	// the node body for a list of basenames truncated to this many rows.
+	latticeNamedMax: number;
 	// Bipartite node placement: "force" (spring embedder, default) or
 	// "concentric" (tags inner ring, notes outer ring(s), Jaccard-seriated).
 	// Topology is identical — only positions change.
@@ -161,6 +190,7 @@ export type ViewMode =
 	| "matrix"
 	| "bipartite"
 	| "heatmap"
+	| "lattice"
 	| "upset";
 
 export interface ViewModeOption {
@@ -241,6 +271,16 @@ export const VIEW_MODES: ViewModeOption[] = [
 		description: "Tag×tag co-occurrence grid; cell shade = shared note count (Jaccard)",
 	},
 	{
+		// Intersection lattice: degree-tiered Hasse-style layout of exact
+		// intersections with subset links between tiers. Each node represents
+		// one exact intersection and auto-switches between overview / density /
+		// individual rendering by count + zoom, so a single intersection with
+		// hundreds of notes doesn't stall the view the way an UpSet stack would.
+		id: "lattice",
+		label: "交差格子図 (lattice)",
+		description: "次数段組みの格子 + 部分集合リンク。ノードは件数で概要/密度/個別に自動切替",
+	},
+	{
 		id: "upset",
 		label: "UpSet plot",
 		description: "Stack of cards per intersection + dot matrix (handles ≥4-way intersections)",
@@ -295,6 +335,15 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	heatmapJaccard: true,
 	bipartiteMaxTags: 80,
 	bipartiteLayout: "force",
+	latticeNodeLOD: "auto",
+	latticeIndividualMax: 60,
+	latticeDensityMax: 2000,
+	latticeDensityCells: 100,
+	latticeMinNodeSize: 1,
+	latticeMaxNodesPerTier: 24,
+	latticeShowSubsetLinks: true,
+	latticeSpecificTop: true,
+	latticeNamedMax: 12,
 	minFontPx: 8,
 };
 
