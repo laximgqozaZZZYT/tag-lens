@@ -126,7 +126,6 @@
 	gap: 4px;
 	max-height: 180px;
 	overflow-y: auto;
-	scrollbar-width: thin;
 }
 
 .gim-panel-tab {
@@ -197,7 +196,6 @@
 	border-radius: 4px;
 	padding: 4px;
 	background: var(--background-primary);
-	scrollbar-width: thin;
 }
 
 .gim-layer-cards .gim-toggle-row {

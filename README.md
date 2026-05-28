@@ -75,6 +75,15 @@ npm run build
   `Show grid`. Matrix mode adds `Group identical rows` / `Collapse groups`.
   Heatmap mode adds `Jaccard color scale`.
 
+## Privacy & data access
+
+Tag Lens reads the **tags** (frontmatter `tags` and inline `#tag` markers) and
+basic metadata (path, basename, frontmatter fields used by WHERE / GROUP_BY /
+ORDER_BY) of **every Markdown note in the current vault** so it can build the
+matrix / heatmap / UpSet / tag-graph visualisations. This is required for the
+plugin's core purpose. The reads happen entirely **locally** — the plugin makes
+**no network requests** and sends nothing to any server.
+
 ## Compatibility
 
 Requires Obsidian **1.5.0** or later. Works on desktop and mobile (the heavy
