@@ -1,0 +1,9 @@
+node_modules/
+main.js
+*.log
+.DS_Store
+
+# Local dev tools / specs — contain absolute paths and are not part of the
+# distributable plugin. Kept locally only.
+scripts/
+docs/
