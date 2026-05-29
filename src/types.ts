@@ -240,6 +240,37 @@ export const VIEW_MODES: ViewModeOption[] = [
 		experimental: true,
 	},
 	{
+		// Bipartite tag graph: note nodes + set (tag) nodes, joined by an edge
+		// per membership. Closest to Obsidian's native tag graph. Note click
+		// → open file; set click → highlight neighbours.
+		//
+		// Demoted to Experimental in v0.2.x: the "clustered" layout pins
+		// multi-membership notes to a single tag island instead of placing
+		// them BETWEEN tags (the Obsidian Graph experience the mode is named
+		// for), and the giant-tag / max-tag heuristics are still unvalidated
+		// on real vaults. Will return to GA once placement + thresholds are
+		// settled. Existing users keep their saved `viewMode: "bipartite"`.
+		id: "bipartite",
+		label: "Tag graph",
+		description: "Notes + tag nodes joined by membership edges (native-style graph)",
+		experimental: true,
+	},
+	{
+		// Connection matrix: rows = notes, columns = unique membership values,
+		// a dot marks membership. One row holds all of a note's tags.
+		//
+		// Demoted to Experimental in v0.2.x: the row-per-note model scales
+		// poorly on vaults with thousands of files (long vertical scroll,
+		// hard to grasp at a glance), and its analytical role overlaps with
+		// the heatmap / UpSet / lattice family. Will return to GA once row
+		// summarisation / collapsed signature blocks settle the readability
+		// gap. Existing users keep their saved `viewMode: "matrix"`.
+		id: "matrix",
+		label: "Connection matrix",
+		description: "Rows = notes, columns = tags; a dot marks membership",
+		experimental: true,
+	},
+	{
 		// Reuses the Containment-map layout but draws each set as concentric
 		// rectangular iso-contours ("bubbles"), evoking BubbleSets while
 		// keeping nodes and contours quadrilateral.
@@ -248,27 +279,12 @@ export const VIEW_MODES: ViewModeOption[] = [
 		description: "Containment layout drawn as rectangular iso-contour bubbles",
 	},
 	{
-		// Connection matrix: rows = notes, columns = unique membership values,
-		// a dot marks membership. One row holds all of a note's tags.
-		id: "matrix",
-		label: "接続行列 (matrix)",
-		description: "Rows = notes, columns = tags; a dot marks membership",
-	},
-	{
-		// Bipartite tag graph: note nodes + set (tag) nodes, joined by an edge
-		// per membership. Closest to Obsidian's native tag graph. Note click →
-		// open file; set click → highlight neighbours.
-		id: "bipartite",
-		label: "タググラフ (bipartite)",
-		description: "Notes + tag nodes joined by membership edges (native-style graph)",
-	},
-	{
 		// Symmetric tag×tag co-occurrence heatmap: cell shade = how many notes
 		// share two tags; diagonal = tag size. Cell click → the intersection's
 		// note list. Pairwise only (matrix/UpSet cover 3-way+).
 		id: "heatmap",
-		label: "交差ヒートマップ (heatmap)",
-		description: "Tag×tag co-occurrence grid; cell shade = shared note count (Jaccard)",
+		label: "Co-occurrence heatmap",
+		description: "Tag × tag co-occurrence grid; cell shade = shared note count (Jaccard)",
 	},
 	{
 		// Intersection lattice: degree-tiered Hasse-style layout of exact
@@ -277,8 +293,8 @@ export const VIEW_MODES: ViewModeOption[] = [
 		// individual rendering by count + zoom, so a single intersection with
 		// hundreds of notes doesn't stall the view the way an UpSet stack would.
 		id: "lattice",
-		label: "交差格子図 (lattice)",
-		description: "次数段組みの格子 + 部分集合リンク。ノードは件数で概要/密度/個別に自動切替",
+		label: "Intersection lattice",
+		description: "Degree-tiered Hasse layout + subset links; each node auto-switches between overview / density / individual rendering by count",
 	},
 	{
 		id: "upset",
@@ -317,10 +333,14 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	panelVisible: false,
 	clusterOffsets: {},
 	nodeOffsets: {},
-	// Default is a STABLE mode (the Nested-set / Containment-map experimentals
-	// are beta-segregated). Existing users keep their saved viewMode — this
-	// default only applies on first load / when no viewMode is persisted.
-	viewMode: "matrix",
+	// Default is a STABLE mode (the Nested-set / Containment-map / タググラフ /
+	// 接続行列 experimentals are beta-segregated). Heatmap was picked as the
+	// new-user default because its grid of tag × tag co-occurrence cells is
+	// the most self-explanatory introduction to what the plugin does — every
+	// cell is one fact ("these two tags share N notes"). Existing users keep
+	// their saved viewMode — this default only applies on first load / when
+	// no viewMode is persisted.
+	viewMode: "heatmap",
 	upsetColumnSort: "size",
 	upsetMinColumnSize: 1,
 	matrixSort: "cooccurrence",

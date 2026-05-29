@@ -226,18 +226,18 @@ function drawTierLabels(
 		// Skip if the tier is offscreen — quick cull.
 		if (yMid < -50 || yMid > visH + 50) continue;
 
-		// Line 1 — "次数 N". Always fits (very short).
+		// Line 1 — "Degree N". Always fits (very short).
 		ctx.font = `700 ${l1Font}px sans-serif`;
 		ctx.fillStyle = "#e6edf3";
 		const l1Y = yMid - (l1Font + l2Font + TIER_GUTTER_LINE_GAP) / 2 + l1Font / 2;
-		ctx.fillText(`次数 ${band.degree}`, TIER_GUTTER_PAD_X, l1Y);
+		ctx.fillText(`Degree ${band.degree}`, TIER_GUTTER_PAD_X, l1Y);
 
-		// Line 2 — "{M}交差 / {S}件". If it doesn't fit, drop the "交差" / "件"
-		// units before letting truncateToWidth introduce a "…" — the digits
-		// matter more than the unit suffix.
+		// Line 2 — "{M} intersections / {S} notes". If it doesn't fit, drop
+		// the unit words before letting truncateToWidth introduce a "…" —
+		// the digits matter more than the suffix.
 		ctx.font = `${l2Font}px sans-serif`;
 		ctx.fillStyle = "#9eb0c4";
-		const full = `${band.intersectionCount}交差 / ${band.noteSum}件`;
+		const full = `${band.intersectionCount} intersections / ${band.noteSum} notes`;
 		const numeric = `${band.intersectionCount} / ${band.noteSum}`;
 		let l2 = full;
 		if (ctx.measureText(full).width > labelMaxW) {
@@ -657,7 +657,7 @@ function drawOverview(
 	ctx.fillStyle = "#c8d4e4";
 	ctx.textAlign = "end";
 	ctx.textBaseline = "middle";
-	ctx.fillText(`${node.count} 件`, bodyLeft + bodyW, barY + barH / 2);
+	ctx.fillText(`${node.count} notes`, bodyLeft + bodyW, barY + barH / 2);
 	ctx.textAlign = "start";
 }
 
@@ -701,7 +701,7 @@ function drawDensity(
 			ctx.fillRect(cx, cy, cellSize, cellSize);
 		}
 	}
-	// Footer: "1マス ≈ M 件" when perCell > 1 (otherwise redundant with count).
+	// Footer: "1 cell ≈ M notes" when perCell > 1 (otherwise redundant).
 	if (perCell > 1) {
 		const footFont = floorWorldFontPx(FOOTER_FONT_PX, minFont, z);
 		const footY = bodyTop + yOffset + m.bodyH + 3;
@@ -709,7 +709,7 @@ function drawDensity(
 			ctx.font = `${footFont}px sans-serif`;
 			ctx.fillStyle = "#9eb0c4";
 			ctx.textBaseline = "top";
-			ctx.fillText(`1マス ≈ ${perCell} 件`, bodyLeft, footY);
+			ctx.fillText(`1 cell ≈ ${perCell} notes`, bodyLeft, footY);
 		}
 	}
 }

@@ -430,7 +430,7 @@ export class MiniGraphView extends ItemView {
 		}
 
 		const chipsEl = tabBar.createDiv({ cls: "gim-panel-tabs-chips" });
-		this.renderTabButton(chipsEl, "__all__", "全体", null, null);
+		this.renderTabButton(chipsEl, "__all__", "All", null, null);
 		for (const c of this.laid.clusters) {
 			const labelText = `${c.label} (${c.memberCount})`;
 			this.renderTabButton(chipsEl, c.groupKey, labelText, clusterHue(c.groupKey), c.label);
@@ -2457,7 +2457,7 @@ export class MiniGraphView extends ItemView {
 		sy: number,
 	): void {
 		const sigTitle = node.isOther
-			? `その他 (×${node.signature.length || node.count})`
+			? `Other (×${node.signature.length || node.count})`
 			: node.displayTags.length
 				? node.displayTags.map((s) => `#${s}`).join(" ∩ ")
 				: "(no tags)";
@@ -2857,7 +2857,7 @@ export class MiniGraphView extends ItemView {
 			const cnt = h.counts[target.i * h.n + target.j];
 			if (target.i === target.j) {
 				tip.createSpan({ cls: "gim-tip-title", text: ti.label });
-				tip.createSpan({ cls: "gim-tip-sub", text: `${ti.size}件` });
+				tip.createSpan({ cls: "gim-tip-sub", text: `${ti.size} notes` });
 			} else {
 				// Raw intersection count + the Jaccard ratio so both the absolute
 				// and the normalised strength are readable, independent of the
@@ -2865,7 +2865,7 @@ export class MiniGraphView extends ItemView {
 				const uni = ti.size + tj.size - cnt;
 				const jac = uni > 0 ? (cnt / uni).toFixed(2) : "0.00";
 				tip.createSpan({ cls: "gim-tip-title", text: `${ti.label} ∩ ${tj.label}` });
-				tip.createSpan({ cls: "gim-tip-sub", text: `${cnt}件 (Jaccard ${jac})` });
+				tip.createSpan({ cls: "gim-tip-sub", text: `${cnt} notes (Jaccard ${jac})` });
 			}
 			this.root.appendChild(tip);
 			this.tipEl = tip;

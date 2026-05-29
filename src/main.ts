@@ -163,7 +163,14 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		// (Nested set) — fall it back to the stable matrix so old configs that
 		// never picked a mode land on a working view. A user who deliberately
 		// selects a beta mode from the Experimental section still keeps it.
-		if (merged.viewMode === "euler") merged.viewMode = "matrix";
+		// Legacy migration: euler used to be the default before it was demoted
+		// to Experimental. Fall it back to the CURRENT stable default
+		// (heatmap, as of v0.2.x — was matrix until matrix was likewise
+		// demoted) so an old saved config doesn't land on a beta mode by
+		// surprise. A user who deliberately re-selects euler from the
+		// Experimental list still keeps it (this only fires on the literal
+		// id "euler" which is its OLD default-state value).
+		if (merged.viewMode === "euler") merged.viewMode = "heatmap";
 		// --- lattice (intersection lattice) settings ---
 		const latticeLODs = ["auto", "overview", "density", "individual"];
 		if (!latticeLODs.includes(merged.latticeNodeLOD as string))
