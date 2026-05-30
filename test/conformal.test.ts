@@ -1,5 +1,5 @@
 import { approx } from "./assert";
-import { drosteForward, drosteInverseBranch, type DrosteParams } from "../src/conformal";
+import { drosteForward, drosteInverseBranch, subdivideSegment, type DrosteParams } from "../src/conformal";
 
 const P: DrosteParams = { k: 2.5, twistDir: 1, R0: 100 };
 
@@ -30,4 +30,13 @@ for (const twistDir of [1, -1] as const) {
 		approx(Math.min(d, 2 * Math.PI - d), 0, 1e-9,
 			`angle closes mod 2π (twist=${twistDir}, u=${u}, v=${v})`);
 	}
+}
+
+{
+	const pts = subdivideSegment({ u: 0, v: 0 }, { u: 1, v: 2 }, 4);
+	approx(pts.length, 5, 0, "subdivide n=4 yields n+1 points");
+	approx(pts[0].u, 0, 1e-12, "first point = start");
+	approx(pts[4].v, 2, 1e-12, "last point = end");
+	approx(pts[2].u, 0.5, 1e-12, "midpoint u interpolated");
+	approx(pts[2].v, 1.0, 1e-12, "midpoint v interpolated");
 }

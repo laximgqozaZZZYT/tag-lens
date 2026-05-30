@@ -47,3 +47,21 @@ export function drosteInverseBranch(
 	const vRaw = (wIm * gRe - wRe * gIm) / g2;
 	return { u, vRaw };
 }
+
+export interface StripPoint {
+	u: number;
+	v: number;
+}
+
+// Split a strip-space segment into `n` equal pieces → n+1 points. The renderer
+// maps each point through drosteForward so a straight strip edge becomes a
+// smooth spiral polyline on screen.
+export function subdivideSegment(a: StripPoint, b: StripPoint, n: number): StripPoint[] {
+	const steps = Math.max(1, Math.floor(n));
+	const out: StripPoint[] = [];
+	for (let i = 0; i <= steps; i++) {
+		const t = i / steps;
+		out.push({ u: a.u + (b.u - a.u) * t, v: a.v + (b.v - a.v) * t });
+	}
+	return out;
+}
