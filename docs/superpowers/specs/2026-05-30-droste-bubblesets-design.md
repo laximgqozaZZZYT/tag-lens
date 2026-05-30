@@ -119,13 +119,21 @@ not the square tiles of Escher's *Print Gallery*.
 - **Why `Δu = Δv` specifically:** a ζ-cell's on-screen size is `≈ |γz|·Δu` along the
   u-edge and `≈ |γz|·Δv` along the v-edge (conformal scale is isotropic). Equal steps
   ⇒ equal on-screen edges ⇒ square. Unequal steps ⇒ slivers (the bug).
-- **Grid construction:** `v ∈ [0, 2π)` is split into the 4 hierarchy quadrants (§1);
-  each quadrant is filled with a `cols × rows` block of `Δ × Δ` cells. `Δ = (π/2)/cols`
-  (so a quadrant holds exactly `cols` columns), and `rows` cells stack along `u` with
-  the **same** `Δ`. One element per cell, in reading order. A level showing more
-  elements than `cols × rows` is capped (overflow folded into a final "+N" cell), which
-  also bounds render cost. One full turn (`v: 0→2π`) is still one Droste period (×k);
-  `drosteCopies` repeats it at successive scales via the renderer's `v += 2π·m`.
+- **Grid construction — contiguous compact bands (revision 2026-05-30d):** fixed
+  π/2 quadrants are NOT used. Square cells (`Δu = Δv`, §2.1) and a gap-free ring and
+  fixed π/2 boundaries cannot all hold at once — a quadrant with few elements would
+  leave a large empty arc (the bug that made the spiral read as scattered fragments).
+  So each turn instead **packs its cells contiguously around the full `[0, 2π)` with a
+  per-turn uniform cell `Δ_m = 2π / N_m`** (`N_m` = cells in that turn), one row in `u`.
+  The cells are still squares (`Δu = Δv = Δ_m`); only the *size* varies per turn. The
+  four roles keep their **order** — ① sibling notes, ② focus cluster(s), ③ sibling
+  clusters, ④ bridge — laid as **contiguous bands** whose angular widths are
+  proportional to each role's (capped) element count (≈ quarters when balanced, but the
+  boundaries float with content, NOT pinned to π/2). `N` (the focus node) is still the
+  first cell ⇒ sits at `v = 0` (bottom-left corner). Each role is capped (notes / sibling
+  clusters ≤ 12) with a final "+N" overflow cell, bounding `N_m` and render cost.
+  The **recursion is in the turns**: turn `m` draws hierarchy slice `m` (see §4), and
+  `drosteCopies` turns are drawn at successive scales via the renderer's `v += 2π·m`.
 - Rejected **Approach A** (warp `v→θ` so the *outline* is a polar square
   `r(θ)=R/max(|cosθ|,|sinθ|)`): lighter and keeps straight outer edges, but fights the
   conformal map — interior cells distort and angle-preservation is lost, so it is not a
@@ -137,9 +145,16 @@ not the square tiles of Escher's *Print Gallery*.
 2. For each bubble contour, card frame, and edge: subdivide into `drosteSubdiv`
    segments, map every vertex through `project`, stroke/fill the resulting polyline.
    Fill hues reuse the existing `clusterHue(groupKey)`.
-3. **Recursion tiling**: draw `drosteCopies` scale copies (`v` shifted by `−2π·m`,
-   equivalently `z·k^−m`) **back-to-front: outer/large/coarse first, inner/small/fine
-   last (on top)**. This draw order is also the hit-test priority (§5).
+3. **Recursion tiling**: the layout emits one element array per turn (`slices[]`, §4).
+   Draw `drosteCopies` turns **back-to-front (outer/large/coarse first, inner/small/fine
+   last on top)**; turn `m` draws `slices[m mod L]` mapped at `v += 2π·m` (scale `k^m`).
+   `m mod L` wraps when the focus chain is shorter than the copy count, closing the
+   Droste loop self-referentially. This draw order is also the hit-test priority (§5).
+   **Seam continuity**: because every turn uses the same `[0, 2π)` parametrisation and
+   `z(ζ+2πi) = k·z(ζ)`, turn `m`'s `v=2π⁻` boundary and turn `m+1`'s `v=0⁺` boundary land
+   on the same screen point — the tile boundaries are continuous even though the cell
+   *content* changes per turn (the Print Gallery effect). Each turn fills `[0, 2π)`
+   contiguously (§2.1), so no empty arc breaks the spiral.
 4. **Card text**: frame is warped, but the **title is drawn horizontally (upright)** at
    the mapped centroid, sized by local scale, hidden by the existing `minFontPx` floor
    when too small. Overflow is clamped to band width with `…` truncation.
@@ -147,13 +162,28 @@ not the square tiles of Escher's *Print Gallery*.
 
 ## 4. Data sourcing (reuse existing pipeline)
 
-Use the post-`rebuild` `laid.nodes` / `laid.clusters` directly — no new query logic.
-Focus node `N` (`drosteFocus`, empty ⇒ first node). From `N.memberships`:
-① sibling notes in N's cluster, ② N's cluster(s), ③ other clusters.
+Use the post-`rebuild` graph directly — no new query logic. Focus node `N`
+(`drosteFocus`, else first node with a real non-NONE membership, else first node).
 
-**Data depth is finite** (notes + clusters = ~2 real tiers). The recursion therefore
-repeats the **same 4-band template at successive scales** — *representational*
-self-similarity, which is itself Escher-like self-reference and acceptable for beta.
+**The recursion lives in the turns (revision 2026-05-30d).** The layout builds a finite
+focus chain and emits one hierarchy slice per turn (`slices[]`):
+
+- **Turn 0** — focus = node `N`. ① `N` + its sibling notes, ② `N`'s cluster(s),
+  ③ `N`'s sibling clusters, ④ a `↻` bridge to the next turn's focus.
+- **Turn s+1** — re-roots on a cluster taken from turn `s`'s ③: ① that cluster's member
+  notes, ② the cluster, ③ its sibling clusters, ④ bridge.
+- **③ ordering (A):** sibling clusters = those **co-occurring** with the focus cluster
+  (sharing ≥1 note) are shown **first**; only when that set is empty does it **fall back**
+  to other (unvisited) clusters. The next turn's focus is the first *unvisited* entry of
+  this same ordered list — so "③ → next N" climbs through genuinely related clusters and
+  only degrades gracefully on a disconnected focus.
+- The chain is finite (clusters run out — depth is ~2 real tiers, notes + clusters);
+  the renderer cycles `slices[m mod L]` and the last turn's ④ bridge points back to `N`
+  (`chain[(i+1) mod L]`) — a **self-referential Droste loop** (termination option (b)).
+  Empty vault ⇒ `slices = []` (renderer draws nothing; no divide-by-`L`).
+
+Each slice is laid out as contiguous compact square bands per §2.1 (role order ①②③④
+preserved; widths ∝ capped counts; `N` at `v = 0`).
 
 ## 5. Hit-testing & interaction
 

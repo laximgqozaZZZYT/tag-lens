@@ -1965,12 +1965,20 @@ export class MiniGraphView extends ItemView {
 			return;
 		}
 		if (this.laid.droste) {
-			// Droste leaves nodes/clusters empty; the renderer centres the
-			// spiral at the canvas middle (R0 = min(w,h)/(4·dpr)), so a reset
-			// camera (zoom 1, no pan) frames the whole spiral. Without this,
-			// switching INTO droste from a zoomed-out mode leaves stale
-			// zoom/pan and the spiral renders microscopically.
-			this.zoom = 1;
+			// Frame ~N turns of the spiral. The renderer centres z at the canvas
+			// middle with R0 = min(w,h)/(4·dpr); turn m's outer radius ≈
+			// R0·exp(uBase)·k^m. Solving |z|_outer·zoom ≤ 0.45·min(w,h) (device px)
+			// gives zoom = 1.8 / (exp(uBase)·k^N). N = min(copies, 3) keeps the
+			// inner turns legible while letting outer turns spill (Droste is
+			// infinite anyway). pan = 0 (z already centred).
+			const dd = this.laid.droste;
+			if (dd.slices.length === 0) {
+				this.zoom = 1;
+			} else {
+				const N = Math.min(this.settings.drosteCopies, 3);
+				const k = this.settings.drosteZoom;
+				this.zoom = 1.8 / (Math.exp(dd.uBase) * Math.pow(k, N));
+			}
 			this.panX = 0;
 			this.panY = 0;
 			this.requestDraw();
