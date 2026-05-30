@@ -180,6 +180,18 @@ export interface MiniSettings {
 	// shrink past this floor under heavy zoom-out get their world
 	// units bumped up so the rendered screen size stays ≥ minFontPx.
 	minFontPx: number;
+	// --- Print Gallery (Escher / Droste) view mode ---
+	// Scale factor per perimeter loop (k). Kept gentle by default so inner
+	// recursion copies survive the minFontPx floor (k=8×copies=4 ⇒ 512× span).
+	drosteZoom: number;
+	// Spiral chirality: "ccw" (|z| ×k as v increases) or "cw".
+	drosteTwistDir: "ccw" | "cw";
+	// Number of recursion copies drawn (back-to-front).
+	drosteCopies: number;
+	// Segments per edge when subdividing for the conformal warp.
+	drosteSubdiv: number;
+	// Focus node id placed at the bottom-left (v=0). "" ⇒ first node.
+	drosteFocus: string;
 }
 
 export type ViewMode =
@@ -191,7 +203,8 @@ export type ViewMode =
 	| "bipartite"
 	| "heatmap"
 	| "lattice"
-	| "upset";
+	| "upset"
+	| "droste";
 
 export interface ViewModeOption {
 	id: ViewMode;
@@ -301,6 +314,17 @@ export const VIEW_MODES: ViewModeOption[] = [
 		label: "UpSet plot",
 		description: "Stack of cards per intersection + dot matrix (handles ≥4-way intersections)",
 	},
+	{
+		// Escher "Print Gallery": the membership hierarchy laid around a square
+		// perimeter (focus node → node-peers → containing group → peer groups)
+		// and warped by the Droste conformal map so it spirals into itself.
+		// Beta: cards become quadrilaterals; text is drawn upright (a known
+		// readability compromise — see the spec §7).
+		id: "droste",
+		label: "Print Gallery (Escher)",
+		description: "Droste conformal map (z = R₀·exp(γζ)); hierarchy spirals into itself",
+		experimental: true,
+	},
 ];
 
 export const DEFAULT_SETTINGS: MiniSettings = {
@@ -365,6 +389,11 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	latticeSpecificTop: true,
 	latticeNamedMax: 12,
 	minFontPx: 8,
+	drosteZoom: 2.5,
+	drosteTwistDir: "ccw",
+	drosteCopies: 4,
+	drosteSubdiv: 24,
+	drosteFocus: "",
 };
 
 export const NONE_BUCKET = "(none)";
