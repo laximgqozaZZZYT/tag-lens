@@ -2,5 +2,6 @@
 import { summary } from "./assert";
 
 // (test files imported below as they are added)
+import "./conformal.test";
 
 summary();
