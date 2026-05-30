@@ -38,46 +38,60 @@ function roleColor(role: 1 | 2 | 3 | 4): { h: number; s: number; l: number } {
 	}
 }
 
-// Plain orthogonal render of the source plane: fit the bbox to the canvas and draw
-// each shape rect (card filled / frame stroked) + label, no warp/grid/nesting.
+// Orthogonal render = plain POLAR (NO exp(γζ) twist): radius = u (depth), angle = v.
+// Shows ① ∈ ② ∈ ③ ∈ ④ as concentric ring-sectors (containment visible) without the
+// conformal spiral. Each shape's source rect → (u,v) via drosteUV → ring sector.
 function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
 	const b = meta.bbox;
-	const W = b.maxX - b.minX || 1;
-	const H = b.maxY - b.minY || 1;
-	const cw = o.canvas.width, ch = o.canvas.height, pad = 0.06;
-	const s = Math.min((cw * (1 - pad)) / W, (ch * (1 - pad)) / H);
-	const ox = (cw - W * s) / 2, oy = (ch - H * s) / 2;
-	const X = (x: number) => ox + (x - b.minX) * s;
-	const Y = (y: number) => oy + (y - b.minY) * s;
+	const cx = o.canvas.width / 2, cy = o.canvas.height / 2;
+	const maxR = Math.min(cx, cy) * 0.92;
+	const innerR = maxR * 0.1;
+	// u range of the plane (drosteUV maps y∈[minY,maxY] → [DROSTE_UBASE, +uH]).
+	const uLo = drosteUV(b, b.minX, b.minY).u;
+	const uHi = drosteUV(b, b.minX, b.maxY).u;
+	const radOf = (u: number) => innerR + ((u - uLo) / (uHi - uLo || 1)) * (maxR - innerR);
+	const pt = (x: number, y: number): Pt => {
+		const { u, v } = drosteUV(b, x, y);
+		const r = radOf(u);
+		return { x: cx + r * Math.cos(v), y: cy + r * Math.sin(v) };
+	};
+	// Ring-sector path: outer arc (subdivided in v) + inner arc back.
+	const ringPath = (e: DrosteShape): void => {
+		const N = 24;
+		ctx.beginPath();
+		for (let i = 0; i <= N; i++) { const x = e.x0 + ((e.x1 - e.x0) * i) / N; const d = pt(x, e.y0); i ? ctx.lineTo(d.x, d.y) : ctx.moveTo(d.x, d.y); }
+		for (let i = N; i >= 0; i--) { const x = e.x0 + ((e.x1 - e.x0) * i) / N; const d = pt(x, e.y1); ctx.lineTo(d.x, d.y); }
+		ctx.closePath();
+	};
 	for (const e of meta.shapes) {
 		const rc = roleColor(e.role);
-		const x = X(e.x0), y = Y(e.y0), w = (e.x1 - e.x0) * s, h = (e.y1 - e.y0) * s;
+		ringPath(e);
 		if (e.kind === "card") {
 			ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.42)`;
-			ctx.fillRect(x, y, w, h);
+			ctx.fill();
 			ctx.lineWidth = (e.id === o.hoverId ? 3 : 1.6) * o.dpr;
 			ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 15, 85)}%)`;
-			ctx.strokeRect(x, y, w, h);
+			ctx.stroke();
 		} else {
-			ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.22)`;
-			ctx.fillRect(x, y, w, h);
+			ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.20)`;
+			ctx.fill();
 			ctx.lineWidth = (e.id === o.hoverId ? 4 : 3) * o.dpr;
 			ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 12, 82)}%)`;
-			ctx.strokeRect(x, y, w, h);
+			ctx.stroke();
 		}
+		// Upright label at the sector centroid.
+		const c = pt((e.x0 + e.x1) / 2, (e.y0 + e.y1) / 2);
+		const band = radOf(drosteUV(b, b.minX, e.y1).u) - radOf(drosteUV(b, b.minX, e.y0).u);
 		ctx.fillStyle = "#e6ecf5";
-		ctx.font = `${Math.min(h * 0.32, 13 * o.dpr)}px sans-serif`;
+		ctx.font = `${Math.min(Math.abs(band) * 0.3, 13 * o.dpr)}px sans-serif`;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
-		ctx.fillText(truncateToWidth(ctx, e.label, w * 0.92), x + w / 2, y + h / 2);
+		ctx.fillText(truncateToWidth(ctx, e.label, Math.abs(band) * 0.95), c.x, c.y);
 		if (e.id === o.focusId) {
 			ctx.beginPath();
-			ctx.arc(x + w / 2, y + h / 2, Math.max(3 * o.dpr, Math.min(w, h) * 0.18), 0, 2 * Math.PI);
-			ctx.fillStyle = "#ffd35c";
-			ctx.fill();
-			ctx.lineWidth = 1.5 * o.dpr;
-			ctx.strokeStyle = "#1a1c22";
-			ctx.stroke();
+			ctx.arc(c.x, c.y, Math.max(3 * o.dpr, Math.abs(band) * 0.18), 0, 2 * Math.PI);
+			ctx.fillStyle = "#ffd35c"; ctx.fill();
+			ctx.lineWidth = 1.5 * o.dpr; ctx.strokeStyle = "#1a1c22"; ctx.stroke();
 		}
 	}
 }

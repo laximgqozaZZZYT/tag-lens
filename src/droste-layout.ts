@@ -129,26 +129,27 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 	}));
 	if (overflow) band4.push({ id: "__more", role: 4, kind: "frame", label: `+${sigInfo.size - (cap - 1)}`, hueKey: "more" });
 
-	// Place each band in its OWN X-quartile [b/4, (b+1)/4); stack items in Y within
-	// the band (full band height ÷ count). NO cross-band grid packing, so the X
-	// axis (=v after wrapping) cleanly reads ① → ② → ③ → ④ left to right and N
-	// sits alone at v=0.
-	const WB = 180; // band width
-	const HT = 600; // plane height
+	// CONCENTRIC nesting (spec 2026-05-31): ① ∈ ② ∈ ③ ∈ ④. The depth is u (radial,
+	// y here ⇒ drosteUV maps y→u): ① innermost band, ④ outermost. Each level's
+	// elements spread over v (angle, x here ⇒ x→v, full width). After the warp
+	// these become concentric rings; ④'s outer ring ×k-fits the next turn's ①.
+	const WT = 800; // plane width  → v (angle): full [0, 2π)
+	const HB = 150; // per-depth band height → u (radial) thickness of one level
 	const shapes: DrosteShape[] = [];
-	const placeBand = (band: Item[], b: number): void => {
-		const nrow = Math.max(1, band.length);
-		const hc = HT / nrow;
-		band.forEach((it, row) => {
-			shapes.push({ ...it, x0: b * WB, y0: row * hc, x1: b * WB + WB, y1: row * hc + hc });
+	// band index 0..3 = depth ① (inner) … ④ (outer); items split the full width.
+	const placeRing = (band: Item[], depth: number): void => {
+		const ncol = Math.max(1, band.length);
+		const wc = WT / ncol;
+		band.forEach((it, col) => {
+			shapes.push({ ...it, x0: col * wc, y0: depth * HB, x1: col * wc + wc, y1: depth * HB + HB });
 		});
 	};
-	placeBand(band1, 0);
-	placeBand(band2, 1);
-	placeBand(band3, 2);
-	placeBand(band4, 3);
+	placeRing(band1, 0); // ① innermost
+	placeRing(band2, 1); // ②
+	placeRing(band3, 2); // ③
+	placeRing(band4, 3); // ④ outermost
 
-	return { shapes, bbox: { minX: 0, minY: 0, maxX: 4 * WB, maxY: HT }, focusId };
+	return { shapes, bbox: { minX: 0, minY: 0, maxX: WT, maxY: 4 * HB }, focusId };
 }
 
 // Test/inspection helper: the ①②③④ shapes grouped by role (data correctness).
