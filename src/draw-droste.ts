@@ -88,8 +88,14 @@ export function drawDroste(
 	};
 	ctx.lineJoin = "round";
 	ctx.lineCap = "round";
-	// Back-to-front: outer (large/coarse) first, inner (small/fine) last on top.
+	const L = meta.slices.length;
+	if (L === 0) return;
+	// Back-to-front: outer (large/coarse) turn first, inner (small/fine) last.
+	// Turn m draws hierarchy slice (m mod L) at scale k^m — the recursion lives
+	// in the turns. When the focus chain is shorter than the copy count it wraps
+	// (slices[m mod L]), closing the Droste loop self-referentially.
 	for (let m = o.copies - 1; m >= 0; m--) {
-		for (const e of meta.elements) strokeElement(ctx, e, m, p, o);
+		const slice = meta.slices[m % L];
+		for (const e of slice) strokeElement(ctx, e, m, p, o);
 	}
 }

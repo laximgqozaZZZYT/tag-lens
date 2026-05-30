@@ -2148,7 +2148,7 @@ export class MiniGraphView extends ItemView {
 			return;
 		}
 		// Print Gallery (Escher): conformal Droste warp of the strip layout.
-		if (this.laid.droste && this.laid.droste.elements.length > 0) {
+		if (this.laid.droste && this.laid.droste.slices.length > 0) {
 			drawDroste(ctx, this.laid.droste, {
 				zoom: this.zoom,
 				panX: this.panX,
@@ -2565,10 +2565,13 @@ export class MiniGraphView extends ItemView {
 			im: ((sy * dpr - cy) / dpr - this.panY) / this.zoom,
 		};
 		// Front-most first (largest m = innermost/finest). Restrict to drawn copies.
+		// Turn m drew hierarchy slice (m mod L), so hit-test the SAME slice.
+		const L = d.slices.length;
+		if (L === 0) return null;
 		for (let m = this.settings.drosteCopies - 1; m >= 0; m--) {
 			const { u, vRaw } = drosteInverseBranch(z, p, m);
 			const v = ((vRaw % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-			for (const e of d.elements) {
+			for (const e of d.slices[m % L]) {
 				if (u >= e.u0 && u <= e.u1 && v >= e.v0 && v < e.v1) return e.id;
 			}
 		}
@@ -3303,8 +3306,10 @@ export class MiniGraphView extends ItemView {
 				// this is a relayout). Cluster bands have no file to open and
 				// re-rooting is node-only, so they're ignored.
 				const id = this.drosteHitTest(sx, sy);
-				if (id) {
-					const el = this.laid.droste.elements.find((e) => e.id === id);
+				// Synthetic cells (↻ bridge "__loop_*", "+N" overflow "__more_*")
+				// have no backing file — ignore them for open / re-root.
+				if (id && !id.startsWith("__")) {
+					const el = this.laid.droste.slices.flat().find((e) => e.id === id);
 					if (el && el.kind === "node") {
 						this.openFile(id);
 						this.settings.drosteFocus = id;
