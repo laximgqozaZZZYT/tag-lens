@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFile } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, debounce } from "obsidian";
 import { buildGraph } from "./parser";
 import {
 	layout,
@@ -133,6 +133,16 @@ export class MiniGraphView extends ItemView {
 	private downY = 0;
 	private pointerMoved = false;
 	private rafId = 0;
+	// High-frequency vault/metadata events (metadataCache "resolved" bursts at
+	// startup, plus Sync-driven create/modify/delete/rename floods) must not
+	// each trigger a full rebuild() — its synchronous prefix (buildGraph scans
+	// every markdown file twice, then layout()) would pile up back-to-back and
+	// starve the main thread on large vaults. Coalesce a burst into ONE rebuild
+	// 250 ms after the first event (resetTimer=false). Cache invalidation in the
+	// handlers stays immediate; only the rebuild call is debounced.
+	private scheduleRebuild = debounce(() => {
+		void this.rebuild();
+	}, 250, false);
 	private resizeObs?: ResizeObserver;
 	private hoverTimer = 0;
 	private hoverTarget: HoverTarget = null;
@@ -319,11 +329,11 @@ export class MiniGraphView extends ItemView {
 		this.resizeObs = new ResizeObserver(() => this.resize());
 		this.resizeObs.observe(root);
 
-		this.registerEvent(this.app.metadataCache.on("resolved", () => this.rebuild()));
+		this.registerEvent(this.app.metadataCache.on("resolved", () => this.scheduleRebuild()));
 		this.registerEvent(
 			this.app.vault.on("create", (f) => {
 				if (!(f instanceof TFile)) return;
-				this.rebuild();
+				this.scheduleRebuild();
 			}),
 		);
 		this.registerEvent(
@@ -331,7 +341,7 @@ export class MiniGraphView extends ItemView {
 				if (!(f instanceof TFile)) return;
 				this.bodyCache.delete(f.path);
 				this.cardCache.delete(f.path);
-				this.rebuild();
+				this.scheduleRebuild();
 			}),
 		);
 		this.registerEvent(
@@ -339,7 +349,7 @@ export class MiniGraphView extends ItemView {
 				if (!(f instanceof TFile)) return;
 				this.bodyCache.delete(oldPath);
 				this.cardCache.delete(oldPath);
-				this.rebuild();
+				this.scheduleRebuild();
 			}),
 		);
 		this.registerEvent(
@@ -347,7 +357,7 @@ export class MiniGraphView extends ItemView {
 				if (!(f instanceof TFile)) return;
 				this.bodyCache.delete(f.path);
 				this.cardCache.delete(f.path);
-				this.rebuild();
+				this.scheduleRebuild();
 			}),
 		);
 
