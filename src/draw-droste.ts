@@ -1,6 +1,6 @@
 import { drosteForward, type DrosteParams } from "./conformal";
 import { drosteUV, type DrosteMeta, type DrosteShape, type DrosteBBox } from "./droste-layout";
-import { clusterHue, truncateToWidth } from "./canvas-utils";
+import { truncateToWidth } from "./canvas-utils";
 
 export interface DrawDrosteOpts {
 	zoom: number;
@@ -26,6 +26,18 @@ const DROSTE_ORTHO = true;
 
 type Pt = { x: number; y: number };
 
+// Clear per-ROLE palette so ①②③④ are visually distinct at a glance
+// (① focus = blue, ② exact-T notes = amber, ③ T-enclosure = purple,
+// ④ subset enclosures = green). fillA = stronger fill so roles read clearly.
+function roleColor(role: 1 | 2 | 3 | 4): { h: number; s: number; l: number } {
+	switch (role) {
+		case 1: return { h: 205, s: 90, l: 60 }; // ① blue
+		case 2: return { h: 45, s: 95, l: 60 }; // ② amber
+		case 3: return { h: 265, s: 80, l: 68 }; // ③ purple
+		default: return { h: 130, s: 65, l: 58 }; // ④ green
+	}
+}
+
 // Plain orthogonal render of the source plane: fit the bbox to the canvas and draw
 // each shape rect (card filled / frame stroked) + label, no warp/grid/nesting.
 function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
@@ -38,19 +50,19 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	const X = (x: number) => ox + (x - b.minX) * s;
 	const Y = (y: number) => oy + (y - b.minY) * s;
 	for (const e of meta.shapes) {
-		const hue = clusterHue(e.hueKey);
+		const rc = roleColor(e.role);
 		const x = X(e.x0), y = Y(e.y0), w = (e.x1 - e.x0) * s, h = (e.y1 - e.y0) * s;
 		if (e.kind === "card") {
-			ctx.fillStyle = `hsla(${hue}, 60%, 55%, 0.32)`;
+			ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.42)`;
 			ctx.fillRect(x, y, w, h);
-			ctx.lineWidth = (e.id === o.hoverId ? 2.4 : 1.2) * o.dpr;
-			ctx.strokeStyle = `hsla(${hue}, 70%, 72%, 0.9)`;
+			ctx.lineWidth = (e.id === o.hoverId ? 3 : 1.6) * o.dpr;
+			ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 15, 85)}%)`;
 			ctx.strokeRect(x, y, w, h);
 		} else {
-			ctx.fillStyle = `hsla(${hue}, 55%, 50%, 0.12)`;
+			ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.22)`;
 			ctx.fillRect(x, y, w, h);
-			ctx.lineWidth = (e.id === o.hoverId ? 3 : 2) * o.dpr;
-			ctx.strokeStyle = `hsla(${hue}, 65%, 65%, 0.85)`;
+			ctx.lineWidth = (e.id === o.hoverId ? 4 : 3) * o.dpr;
+			ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 12, 82)}%)`;
 			ctx.strokeRect(x, y, w, h);
 		}
 		ctx.fillStyle = "#e6ecf5";
@@ -101,20 +113,20 @@ function shapePath(ctx: CanvasRenderingContext2D, b: DrosteBBox, e: DrosteShape,
 }
 
 function drawShape(ctx: CanvasRenderingContext2D, b: DrosteBBox, e: DrosteShape, m: number, p: DrosteParams, o: DrawDrosteOpts): void {
-	const hue = clusterHue(e.hueKey);
+	const rc = roleColor(e.role);
 	shapePath(ctx, b, e, m, p, o);
 	if (e.kind === "card") {
-		ctx.fillStyle = `hsla(${hue}, 60%, 55%, 0.32)`;
+		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.42)`;
 		ctx.fill();
-		ctx.lineWidth = (e.id === o.hoverId ? 2.4 : 1.2) * o.dpr;
-		ctx.strokeStyle = `hsla(${hue}, 70%, 72%, 0.9)`;
+		ctx.lineWidth = (e.id === o.hoverId ? 3 : 1.6) * o.dpr;
+		ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 15, 85)}%)`;
 		ctx.stroke();
 	} else {
 		// Group enclosure frame (BubbleSets style): faint fill + bold contour.
-		ctx.fillStyle = `hsla(${hue}, 55%, 50%, 0.12)`;
+		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.22)`;
 		ctx.fill();
-		ctx.lineWidth = (e.id === o.hoverId ? 3 : 2) * o.dpr;
-		ctx.strokeStyle = `hsla(${hue}, 65%, 65%, 0.85)`;
+		ctx.lineWidth = (e.id === o.hoverId ? 4 : 3) * o.dpr;
+		ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 12, 82)}%)`;
 		ctx.stroke();
 	}
 	// Upright label at the warped centroid, clamped to the cell's angular width.
