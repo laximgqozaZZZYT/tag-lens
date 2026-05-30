@@ -30,7 +30,11 @@ each role's (capped) element count (§2.1, "compact contiguous bands"):
      N at v=0                    bridge → next focus
 ```
 
-- **`v = 0`** = focus `N` (the first cell; bottom-left, smallest scale).
+- **`v = 0`** = focus `N` (the first cell, smallest scale). The map sends `v=0` to
+  screen **angle ≈ 0 (right of centre / 3 o'clock)** — `arg z = −U_BASE·(ln k/2π) ≈ 0`
+  — at the innermost radius `≈ R₀·e^{U_BASE}`, NOT the bottom-left (that was a leftover
+  from the square-perimeter model; the conformal map `z=exp(γζ)` puts `v=0` on the +x
+  ray). A focus marker (§5) is drawn there so the entry is findable in the core.
 - **① sibling notes** → **② N's cluster(s)** → **③ sibling clusters** (co-occurring
   first, else other clusters) → **④ `↻` bridge** to the next turn's focus. The angular
   order encodes the abstraction climb; because `ln|z| = u + (ln k/2π)·v`, this angular
@@ -130,7 +134,8 @@ not the square tiles of Escher's *Print Gallery*.
   clusters, ④ bridge — laid as **contiguous bands** whose angular widths are
   proportional to each role's (capped) element count (≈ quarters when balanced, but the
   boundaries float with content, NOT pinned to π/2). `N` (the focus node) is still the
-  first cell ⇒ sits at `v = 0` (bottom-left corner). Each role is capped (notes / sibling
+  first cell ⇒ sits at `v = 0`, which the map sends to screen angle ≈ 0 (right of
+  centre), innermost radius — see §5. Each role is capped (notes / sibling
   clusters ≤ 12) with a final "+N" overflow cell, bounding `N_m` and render cost.
   The **recursion is in the turns**: turn `m` draws hierarchy slice `m` (see §4), and
   `drosteCopies` turns are drawn at successive scales via the renderer's `v += 2π·m`.
@@ -157,8 +162,11 @@ not the square tiles of Escher's *Print Gallery*.
    contiguously (§2.1), so no empty arc breaks the spiral.
 4. **Card text**: frame is warped, but the **title is drawn horizontally (upright)** at
    the mapped centroid, sized by local scale, hidden by the existing `minFontPx` floor
-   when too small. Overflow is clamped to band width with `…` truncation.
-   → see §7 for the known compromise and the v1.1 follow-up.
+   when too small. **Implemented (2026-05-30d):** the label is clamped to the cell's
+   *angular screen width* via `truncateToWidth(ctx, label, cellW·0.9)` (with `…`), and
+   suppressed when that width `< minFontPx`, so long note names can't spill into
+   neighbouring cells. `cellW = |project(uMid, v1) − project(uMid, v0)|`.
+   → see §7 for the remaining text-orientation compromise (v1.1 follow-up).
 
 ## 4. Data sourcing (reuse existing pipeline)
 
@@ -194,8 +202,18 @@ preserved; widths ∝ capped counts; `N` at `v = 0`).
   pick the **front-most** (last drawn = innermost/finest), matching the §3 draw order.
 - Click on a node → open the file. Click on empty area → no hit.
 - Click to **re-root focus N** to the front-most node (self-similar dive). This is a
-  headline interaction, so it relies on the precise resolution rule above.
-- Zoom: standard fit/zoom in v1. Seamless `×k` wrap-around zoom is v1.1.
+  headline interaction, so it relies on the precise resolution rule above. Synthetic
+  cells (`__loop_*` bridge, `__more_*` overflow) are ignored on click.
+- **Focus N marker**: the renderer draws a bright dot+ring on N's innermost (`m=0`)
+  cell so the spiral's root/entry is findable in the central core (N is at angle ≈ 0,
+  innermost — §1).
+- **Content-following fit (revision 2026-05-30d)**: `fitToView` frames ~`N = min(copies,3)`
+  turns. The renderer centres `z` at the canvas middle with `R₀ = min(w,h)/(4·dpr)`;
+  turn `m`'s outer radius `≈ R₀·e^{U_BASE}·k^m`, so `zoom = 1.8 / (e^{U_BASE}·k^N)`,
+  `pan = 0`. Inner turns stay legible while outer turns spill (Droste is infinite). The
+  central hollow is `≈ 0.45/k^N` of the min canvas dim (inherent to the spiral's limit
+  point — the focus marker compensates). `U_BASE = 0.04` keeps the innermost cell tight
+  to the core. Seamless `×k` wrap-around zoom is still v1.1.
 
 ## 6. Settings (add `MiniSettings` field + `DEFAULT_SETTINGS` + `loadSettings` validation — all three)
 
