@@ -1963,6 +1963,7 @@ export class MiniGraphView extends ItemView {
 			this.zoom = 1;
 			this.panX = 0;
 			this.panY = 0;
+			this.requestDraw();
 			return;
 		}
 		const hasContent =
