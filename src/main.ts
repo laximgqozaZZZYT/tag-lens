@@ -226,6 +226,20 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		) {
 			merged.anchorPlacement = "concentric";
 		}
+		// --- droste (Print Gallery) validation ---
+		if (
+			typeof merged.drosteZoom !== "number" ||
+			!Number.isFinite(merged.drosteZoom) ||
+			(merged.drosteZoom as number) <= 1
+		) {
+			merged.drosteZoom = 2.5;
+		}
+		if (merged.drosteTwistDir !== "ccw" && merged.drosteTwistDir !== "cw") {
+			merged.drosteTwistDir = "ccw";
+		}
+		merged.drosteCopies = intPositive(merged.drosteCopies, 4, 1);
+		merged.drosteSubdiv = intPositive(merged.drosteSubdiv, 24, 1);
+		if (typeof merged.drosteFocus !== "string") merged.drosteFocus = "";
 		this.settings = merged as unknown as MiniSettings;
 	}
 
