@@ -46,7 +46,7 @@ export interface DrosteLayoutOpts {
 }
 
 const TWO_PI = 2 * Math.PI;
-const U_BASE = 0.15; // inner u offset (fixed; Δ now varies per turn)
+const U_BASE = 0.04; // inner u offset — small so the central core/hollow stays tight
 
 interface Item {
 	id: string;

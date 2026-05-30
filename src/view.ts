@@ -2169,6 +2169,7 @@ export class MiniGraphView extends ItemView {
 				subdiv: this.settings.drosteSubdiv,
 				minFontPx: this.settings.minFontPx,
 				hoverId: this.hoveredNodeId,
+				focusId: this.laid.droste.focusId,
 			});
 			return;
 		}

@@ -15,29 +15,29 @@ picture spirals seamlessly into itself (the signature Escher twist).
 
 The mode does **not** touch any existing stable/beta mode; it is additive.
 
-### Hierarchy → perimeter mapping (counter-clockwise from bottom-left)
+### Hierarchy → one turn (contiguous bands; revision 2026-05-30d)
+
+One turn (`v: 0 → 2π`) is one hierarchy slice. The four roles are laid as **contiguous
+bands in order**, NOT pinned to fixed π/2 quadrants — band widths are proportional to
+each role's (capped) element count (§2.1, "compact contiguous bands"):
 
 ```
-   top-left ←──────────────── top-right
-    │  ④ peer groups            ↑
-    │     (other clusters)      │ ③ containing group
-    │                           │    (the cluster/tag)
-    ↓  (left edge = seam/       │
-    │   transition that closes  │
-    │   the loop into next      │
-   bottom-left ───────────────→ bottom-right
-   ① focus       ② node-peers
-     node N         (sibling notes in N's cluster)
+   v=0 ──①──▶──②──▶──③──▶──④──▶ v=2π  (≡ next turn's v=0, scaled ×k)
+   ┌──────────┬─────┬──────────┬──┐
+   │ ① sibling│ ② N's│ ③ sibling│④ │   widths ∝ #cells per role
+   │   notes  │clust.│ clusters │↻ │   (≈ quarters only when balanced)
+   └──────────┴─────┴──────────┴──┘
+     N at v=0                    bridge → next focus
 ```
 
-- **bottom-left corner** = focus node `N` (smallest scale, `v = 0`)
-- **bottom edge** (`v ∈ [0, π/2)`) = ① notes sharing N's cluster
-- **right edge** (`v ∈ [π/2, π)`) = ② the cluster(s) containing them
-- **top edge** (`v ∈ [π, 3π/2)`) = ③ other clusters peer to that cluster
-- **left edge** (`v ∈ [3π/2, 2π)`) = ④ transition band that morphs level ③ into the
-  next loop's level ① so the seam closes
-- One full perimeter loop (`v: 0 → 2π`) scales the whole picture by `k` and is
-  self-similar — the recursion repeats the same 4-band template at successive scales.
+- **`v = 0`** = focus `N` (the first cell; bottom-left, smallest scale).
+- **① sibling notes** → **② N's cluster(s)** → **③ sibling clusters** (co-occurring
+  first, else other clusters) → **④ `↻` bridge** to the next turn's focus. The angular
+  order encodes the abstraction climb; because `ln|z| = u + (ln k/2π)·v`, this angular
+  order also maps to an inner→outer **radial** climb over the turn.
+- The recursion is in the TURNS (§4): turn `s+1` re-roots on an unvisited sibling
+  cluster of turn `s`; the chain is finite and the last turn's ④ wraps back to `N`
+  (self-referential Droste loop). One full turn scales the picture by `k`.
 
 ### Architecture decisions (confirmed, not revisited)
 

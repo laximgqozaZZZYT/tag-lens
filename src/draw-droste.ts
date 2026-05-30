@@ -1,6 +1,6 @@
 import type { DrosteMeta, DrosteBandElement } from "./droste-layout";
 import { drosteForward, subdivideSegment, type DrosteParams, type StripPoint } from "./conformal";
-import { clusterHue } from "./canvas-utils";
+import { clusterHue, truncateToWidth } from "./canvas-utils";
 
 export interface DrawDrosteOpts {
 	zoom: number;
@@ -14,6 +14,7 @@ export interface DrawDrosteOpts {
 	subdiv: number;
 	minFontPx: number;
 	hoverId: string | null;
+	focusId: string; // the spiral's root node — marked at its innermost (m=0) cell
 }
 
 // Project a strip point (with a copy offset m on v) to device pixels.
@@ -66,12 +67,29 @@ function strokeElement(
 	// Local scale ≈ |γ|·|z|·zoom; hide below the font floor.
 	const scaleSample = project({ u: e.u0, v: (e.v0 + e.v1) / 2 }, m, p, o);
 	const localPx = Math.hypot(c.x - scaleSample.x, c.y - scaleSample.y);
-	if (localPx >= o.minFontPx * o.dpr) {
+	// Cell's angular screen width — clamp the label to it + ellipsis (spec §3/§6)
+	// so long note names can't spill into neighbouring cells.
+	const eMid0 = project({ u: (e.u0 + e.u1) / 2, v: e.v0 }, m, p, o);
+	const eMid1 = project({ u: (e.u0 + e.u1) / 2, v: e.v1 }, m, p, o);
+	const cellW = Math.hypot(eMid1.x - eMid0.x, eMid1.y - eMid0.y);
+	if (localPx >= o.minFontPx * o.dpr && cellW >= o.minFontPx * o.dpr) {
 		ctx.fillStyle = "#e6ecf5";
 		ctx.font = `${Math.min(localPx * 0.5, 16 * o.dpr)}px sans-serif`;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
-		ctx.fillText(e.label, c.x, c.y);
+		ctx.fillText(truncateToWidth(ctx, e.label, cellW * 0.9), c.x, c.y);
+	}
+	// Focus N entry marker: a bright dot+ring on the innermost (m=0) N cell, so
+	// the spiral's root is findable in the central core.
+	if (e.id === o.focusId && m === 0) {
+		const r = Math.max(3 * o.dpr, Math.min(cellW, localPx) * 0.3);
+		ctx.beginPath();
+		ctx.arc(c.x, c.y, r, 0, 2 * Math.PI);
+		ctx.fillStyle = "#ffd35c";
+		ctx.fill();
+		ctx.lineWidth = 1.5 * o.dpr;
+		ctx.strokeStyle = "#1a1c22";
+		ctx.stroke();
 	}
 }
 
