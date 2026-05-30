@@ -1,150 +1,145 @@
 import type { GraphData, GraphNode } from "./types";
-import { NONE_BUCKET } from "./types";
+import { NONE_BUCKET, CARD_CELL_W, CARD_CELL_H } from "./types";
 
-// Print Gallery TRUE self-similarity (spec §4, revision 2026-05-31). There is ONE
-// hierarchy slice. The renderer draws it at m = 0, 1, 2, … via `v += 2π·m`, each
-// copy a ×k reduction of the SAME picture nested inside the last — the Escher
-// "image contains itself" structure. `z(ζ+2πi) = k·z(ζ)` makes the outer slice and
-// its nested copies continuous. No per-turn re-rooting / drill-down (that was the
-// round-6 mistake: it nested a DIFFERENT picture, not a self-similar one).
+// Print Gallery source plane (spec §2/§3, FINAL). We do NOT hand-build tiles. We
+// reorder the BubbleSets-style geometry into the ①②③④ containment-zoom order from
+// the focus node N, as a continuous SOURCE PLANE (cards + group enclosure frames in
+// world coords). draw-droste wraps this plane onto ζ and warps it with exp(γζ).
 //
-// The single slice fills the full ring with contiguous square bands (§2.1):
-//   ① focus N + its sibling notes   (kind: node; N is the first cell ⇒ v = 0)
-//   ② N's cluster(s)                (kind: cluster)
-//   ③ the other clusters            (kind: cluster; capped → "+N")
-//   ④ "↻ N" bridge                  (self-reference: the nested copy is N again)
-export interface DrosteBandElement {
+// T = the focus node N's membership cluster-key set (the GROUP_BY intersection).
+//   ① v=0          : node N
+//   ② [0,π/2)      : nodes whose membership set EXACTLY equals T (incl. N)
+//   ③ [π/2,π)      : those nodes as ONE T-enclosure frame
+//   ④ [π,3π/2)     : ③ + groups whose signature is a PROPER SUBSET of T (zoom-out)
+//   ④→ [3π/2,2π)   : transition; ×k self-similar nesting (handled by the renderer)
+export interface DrosteShape {
 	id: string;
-	kind: "node" | "cluster";
+	role: 1 | 2 | 3 | 4;
+	kind: "card" | "frame"; // card = node (filled); frame = group enclosure (stroked)
 	label: string;
-	hueKey: string; // key for clusterHue()
-	level: 1 | 2 | 3 | 4;
-	u0: number;
-	u1: number;
-	v0: number;
-	v1: number;
+	hueKey: string;
+	// Source-plane axis-aligned rect (world coords).
+	x0: number;
+	y0: number;
+	x1: number;
+	y1: number;
+}
+
+export interface DrosteBBox {
+	minX: number;
+	minY: number;
+	maxX: number;
+	maxY: number;
 }
 
 export interface DrosteMeta {
-	// The single hierarchy slice repeated by the renderer as slices[m mod 1] at
-	// scale k^m. (Kept as a one-element array so draw-droste / hit-test, which
-	// already cycle `slices[m mod L]`, need no change.)
-	slices: DrosteBandElement[][];
+	shapes: DrosteShape[];
+	bbox: DrosteBBox;
 	focusId: string;
-	uBase: number; // inner u offset of the cell row (fit reference)
 }
 
 export interface DrosteLayoutOpts {
 	focusId?: string;
-	labels?: Map<string, string>; // cluster key → human label
-	cols?: number; // per-role cap (cells per role before "+N" overflow)
+	labels?: Map<string, string>;
+	cols?: number; // cap on ② cards and ④ subset frames before "+N"
 }
 
+export const DROSTE_UBASE = 0.04; // inner u offset (tight central core)
 const TWO_PI = 2 * Math.PI;
-const U_BASE = 0.04; // inner u offset — small so the central core/hollow stays tight
 
-interface Item {
-	id: string;
-	label: string;
-	hueKey: string;
-	kind: "node" | "cluster";
+// Source(x,y) → strip ζ=(u,v). X→angle (full circle), Y→radial band; uH chosen so
+// the warp stays locally isotropic (square-ish grid). Shared by renderer + hit-test.
+export function drosteUV(b: DrosteBBox, x: number, y: number): { u: number; v: number } {
+	const W = b.maxX - b.minX || 1;
+	const H = b.maxY - b.minY || 1;
+	const uH = TWO_PI * (H / W);
+	return { u: DROSTE_UBASE + ((y - b.minY) / H) * uH, v: TWO_PI * ((x - b.minX) / W) };
 }
+
+// Inverse: strip (u, v∈[0,2π)) → source(x,y). For hit-testing.
+export function drosteInvSource(b: DrosteBBox, u: number, v: number): { x: number; y: number } {
+	const W = b.maxX - b.minX || 1;
+	const H = b.maxY - b.minY || 1;
+	const uH = TWO_PI * (H / W);
+	return { x: b.minX + (v / TWO_PI) * W, y: b.minY + ((u - DROSTE_UBASE) / uH) * H };
+}
+
+const sigOf = (n: GraphNode): string => [...n.memberships].sort().join("");
 
 export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): DrosteMeta {
 	const cap = Math.max(1, Math.floor(opts.cols ?? 8));
 	const labels = opts.labels ?? new Map<string, string>();
-	const clusterLabel = (key: string): string => labels.get(key) ?? key;
+	const clusterLabel = (k: string): string => labels.get(k) ?? k;
+	const sigLabel = (keys: string[]): string => keys.map(clusterLabel).join(" ∩ ");
 	const nodes = data.nodes;
 
-	// Focus N: drosteFocus if valid; else first node with a real (non-NONE)
-	// membership; else first node. (Click-to-re-root just sets drosteFocus and
-	// rebuilds — re-centres the whole self-similar spiral on the new N; §5.)
 	let focusId = opts.focusId && nodes.some((n) => n.id === opts.focusId) ? opts.focusId : "";
 	if (!focusId) {
 		const tagged = nodes.find((n) => n.memberships.some((m) => m !== NONE_BUCKET));
 		focusId = (tagged ?? nodes[0])?.id ?? "";
 	}
 	const focusNode = nodes.find((n) => n.id === focusId);
-	if (!focusNode) return { slices: [], focusId, uBase: U_BASE };
+	const empty: DrosteMeta = { shapes: [], bbox: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, focusId };
+	if (!focusNode) return empty;
 
-	const noteItem = (n: GraphNode): Item => ({ id: n.id, label: n.label, hueKey: n.memberships[0] ?? n.id, kind: "node" });
-	const clusItem = (c: string): Item => ({ id: c, label: clusterLabel(c), hueKey: c, kind: "cluster" });
+	// T = N's membership set (drop NONE unless that's all it has).
+	let tKeys = focusNode.memberships.filter((m) => m !== NONE_BUCKET);
+	if (tKeys.length === 0) tKeys = [...focusNode.memberships];
+	const T = new Set(tKeys);
+	const Tsig = [...tKeys].sort().join("");
 
-	// Classify from N's memberships (no recursion / visited / fallback needed).
-	let fc = focusNode.memberships.filter((m) => m !== NONE_BUCKET);
-	if (fc.length === 0) fc = [...focusNode.memberships];
-	const focusClusters = new Set(fc);
-	const peers = nodes.filter((n) => n.id === focusId || n.memberships.some((m) => focusClusters.has(m)));
-	const allClusters: string[] = [];
-	const seenC = new Set<string>();
-	for (const n of nodes) for (const m of n.memberships) if (!seenC.has(m)) { seenC.add(m); allClusters.push(m); }
-	const otherClusters = allClusters.filter((c) => !focusClusters.has(c));
+	// ② exact-T nodes (membership set === T), N first.
+	const exact = nodes.filter((n) => sigOf(n) === Tsig);
+	const exactOrdered = [focusNode, ...exact.filter((n) => n.id !== focusId)];
 
-	// ① focus + sibling notes (N first ⇒ v=0), ② N's clusters, ③ other clusters.
-	const ones: Item[] = [noteItem(focusNode), ...peers.filter((n) => n.id !== focusId).map(noteItem)];
-	const twos: Item[] = fc.map(clusItem);
-	const threes: Item[] = otherClusters.map(clusItem);
+	// ④ proper-subset signatures present in the data, ordered |sig| desc then count desc.
+	const sigInfo = new Map<string, { keys: string[]; count: number }>();
+	for (const n of nodes) {
+		const keys = [...n.memberships].sort();
+		const subset = keys.length < T.size && keys.every((k) => T.has(k)); // proper ⊊ T
+		if (!subset) continue;
+		const sig = keys.join("");
+		const e = sigInfo.get(sig);
+		if (e) e.count++;
+		else sigInfo.set(sig, { keys, count: 1 });
+	}
+	let subsetSigs = [...sigInfo.entries()].sort((a, b) =>
+		b[1].keys.length - a[1].keys.length || b[1].count - a[1].count,
+	);
+	const overflow = subsetSigs.length > cap;
+	if (overflow) subsetSigs = subsetSigs.slice(0, cap - 1);
 
-	// Cap a role to `cap` cells (overflow → "+N"), tagging each with its level.
-	const capRole = (items: Item[], level: 1 | 2 | 3, tag: string): (Item & { level: 1 | 2 | 3 | 4 })[] => {
-		let shown = items;
-		if (items.length > cap) {
-			shown = [...items.slice(0, cap - 1), { id: `__more_${tag}`, label: `+${items.length - cap + 1}`, hueKey: "more", kind: "cluster" }];
-		}
-		return shown.map((it) => ({ ...it, level }));
+	// Lay shapes left→right in ①②③④ order, one cell (W×H) per item, single row.
+	const W = CARD_CELL_W;
+	const H = CARD_CELL_H;
+	const shapes: DrosteShape[] = [];
+	let col = 0;
+	const put = (id: string, role: 1 | 2 | 3 | 4, kind: "card" | "frame", label: string, hueKey: string): void => {
+		shapes.push({ id, role, kind, label, hueKey, x0: col * W, y0: 0, x1: col * W + W, y1: H });
+		col++;
 	};
 
-	// Compact contiguous fill (§2.1): roles in order ①②③④ as N_m equal Δ square
-	// cells around the full [0, 2π); ④ is a self-referential "↻ N" bridge.
-	const seq: (Item & { level: 1 | 2 | 3 | 4 })[] = [
-		...capRole(ones, 1, "n"),
-		...capRole(twos, 2, "c"),
-		...capRole(threes, 3, "s"),
-		{ id: "__loop", label: `↻ ${focusNode.label}`, hueKey: focusNode.memberships[0] ?? focusId, kind: "node", level: 4 },
-	];
-	const d = TWO_PI / seq.length;
-	const slice: DrosteBandElement[] = seq.map((s, j) => ({
-		id: s.id,
-		kind: s.kind,
-		label: s.label,
-		hueKey: s.hueKey,
-		level: s.level,
-		u0: U_BASE,
-		u1: U_BASE + d,
-		v0: j * d,
-		v1: (j + 1) * d,
-	}));
+	// ① N (also the first ② card) at v=0.
+	put(focusNode.id, 1, "card", focusNode.label, focusNode.memberships[0] ?? focusId);
+	// ② the remaining exact-T cards.
+	for (const n of exactOrdered.slice(1).slice(0, cap)) {
+		put(n.id, 2, "card", n.label, n.memberships[0] ?? n.id);
+	}
+	// ③ the T-enclosure frame.
+	put("__T", 3, "frame", sigLabel(tKeys) || "(all)", Tsig || "T");
+	// ④ subset enclosure frames (broader), then "+N" if capped.
+	for (const [sig, info] of subsetSigs) {
+		put(`__sub_${sig}`, 4, "frame", sigLabel(info.keys), sig);
+	}
+	if (overflow) put("__more", 4, "frame", `+${sigInfo.size - (cap - 1)}`, "more");
 
-	return { slices: [slice], focusId, uBase: U_BASE };
+	return { shapes, bbox: { minX: 0, minY: 0, maxX: Math.max(W, col * W), maxY: H }, focusId };
 }
 
-// Invariant (spec §2.1): every tile is a SQUARE in ζ-space (Δu = Δv) and lies in
-// [0, 2π). maxAspectGap = 0 ⇒ perfectly square cells.
-export function assertCellsSquare(meta: DrosteMeta): {
-	maxAspectGap: number;
-	allWithinPeriod: boolean;
-} {
-	let maxAspectGap = 0;
-	let allWithinPeriod = true;
-	for (const slice of meta.slices) {
-		for (const e of slice) {
-			maxAspectGap = Math.max(maxAspectGap, Math.abs((e.u1 - e.u0) - (e.v1 - e.v0)));
-			if (e.v0 < 0 || e.v1 > TWO_PI + 1e-9) allWithinPeriod = false;
-		}
-	}
-	return { maxAspectGap, allWithinPeriod };
-}
-
-// Visual-seam check (spec §3): the slice must fill [0, 2π) CONTIGUOUSLY so no empty
-// arc breaks the spiral and the nested ×k copies abut. maxGap = 0 ⇒ gap-free.
-export function assertTurnsFilled(meta: DrosteMeta): { maxGap: number } {
-	let maxGap = 0;
-	for (const slice of meta.slices) {
-		if (slice.length === 0) continue;
-		const sorted = [...slice].sort((a, b) => a.v0 - b.v0);
-		maxGap = Math.max(maxGap, Math.abs(sorted[0].v0 - 0));
-		for (let i = 1; i < sorted.length; i++) maxGap = Math.max(maxGap, Math.abs(sorted[i].v0 - sorted[i - 1].v1));
-		maxGap = Math.max(maxGap, Math.abs(TWO_PI - sorted[sorted.length - 1].v1));
-	}
-	return { maxGap };
+// Test/inspection helper: the ①②③④ shapes grouped by role (data correctness).
+export function drosteRoles(meta: DrosteMeta): { role: number; ids: string[]; labels: string[] }[] {
+	return [1, 2, 3, 4].map((role) => {
+		const s = meta.shapes.filter((e) => e.role === role);
+		return { role, ids: s.map((e) => e.id), labels: s.map((e) => e.label) };
+	});
 }

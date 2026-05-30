@@ -56,6 +56,7 @@ import type { MatrixLine } from "./draw-matrix";
 import { drawHeatmap, heatmapGeom } from "./draw-heatmap";
 import { drawDroste } from "./draw-droste";
 import { drosteInverseBranch } from "./conformal";
+import { drosteInvSource, DROSTE_UBASE } from "./droste-layout";
 import {
 	drawLattice,
 	latticeCellAt,
@@ -1972,12 +1973,12 @@ export class MiniGraphView extends ItemView {
 			// inner turns legible while letting outer turns spill (Droste is
 			// infinite anyway). pan = 0 (z already centred).
 			const dd = this.laid.droste;
-			if (dd.slices.length === 0) {
+			if (dd.shapes.length === 0) {
 				this.zoom = 1;
 			} else {
 				const N = Math.min(this.settings.drosteCopies, 3);
 				const k = this.settings.drosteZoom;
-				this.zoom = 1.8 / (Math.exp(dd.uBase) * Math.pow(k, N));
+				this.zoom = 1.8 / (Math.exp(DROSTE_UBASE) * Math.pow(k, N));
 			}
 			this.panX = 0;
 			this.panY = 0;
@@ -2156,7 +2157,7 @@ export class MiniGraphView extends ItemView {
 			return;
 		}
 		// Print Gallery (Escher): conformal Droste warp of the strip layout.
-		if (this.laid.droste && this.laid.droste.slices.length > 0) {
+		if (this.laid.droste && this.laid.droste.shapes.length > 0) {
 			drawDroste(ctx, this.laid.droste, {
 				zoom: this.zoom,
 				panX: this.panX,
@@ -2573,15 +2574,16 @@ export class MiniGraphView extends ItemView {
 			re: ((sx * dpr - cx) / dpr - this.panX) / this.zoom,
 			im: ((sy * dpr - cy) / dpr - this.panY) / this.zoom,
 		};
-		// Front-most first (largest m = innermost/finest). Restrict to drawn copies.
-		// Turn m drew hierarchy slice (m mod L), so hit-test the SAME slice.
-		const L = d.slices.length;
-		if (L === 0) return null;
+		// Front-most first (largest m = innermost/finest). Invert ζ → source(x,y)
+		// and return the CARD shape (node) containing it; every copy is the same
+		// source plane, so the id is identical across m.
+		if (d.shapes.length === 0) return null;
 		for (let m = this.settings.drosteCopies - 1; m >= 0; m--) {
 			const { u, vRaw } = drosteInverseBranch(z, p, m);
 			const v = ((vRaw % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-			for (const e of d.slices[m % L]) {
-				if (u >= e.u0 && u <= e.u1 && v >= e.v0 && v < e.v1) return e.id;
+			const src = drosteInvSource(d.bbox, u, v);
+			for (const e of d.shapes) {
+				if (e.kind === "card" && src.x >= e.x0 && src.x <= e.x1 && src.y >= e.y0 && src.y <= e.y1) return e.id;
 			}
 		}
 		return null;
@@ -3318,8 +3320,8 @@ export class MiniGraphView extends ItemView {
 				// Synthetic cells (↻ bridge "__loop_*", "+N" overflow "__more_*")
 				// have no backing file — ignore them for open / re-root.
 				if (id && !id.startsWith("__")) {
-					const el = this.laid.droste.slices.flat().find((e) => e.id === id);
-					if (el && el.kind === "node") {
+					const el = this.laid.droste.shapes.find((e) => e.id === id);
+					if (el && el.kind === "card") {
 						this.openFile(id);
 						this.settings.drosteFocus = id;
 						void this.save();

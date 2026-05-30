@@ -1,5 +1,5 @@
-import type { DrosteMeta, DrosteBandElement } from "./droste-layout";
-import { drosteForward, subdivideSegment, type DrosteParams, type StripPoint } from "./conformal";
+import { drosteForward, type DrosteParams } from "./conformal";
+import { drosteUV, type DrosteMeta, type DrosteShape, type DrosteBBox } from "./droste-layout";
 import { clusterHue, truncateToWidth } from "./canvas-utils";
 
 export interface DrawDrosteOpts {
@@ -14,64 +14,67 @@ export interface DrawDrosteOpts {
 	subdiv: number;
 	minFontPx: number;
 	hoverId: string | null;
-	focusId: string; // the spiral's root node — marked at its innermost (m=0) cell
+	focusId: string;
+	gridV?: number; // red-grid vertical line count (default 16)
+	gridH?: number; // red-grid horizontal line count (default 8)
 }
 
-// Project a strip point (with a copy offset m on v) to device pixels.
-function project(
-	pt: StripPoint, m: number, p: DrosteParams, o: DrawDrosteOpts,
-): { x: number; y: number } {
-	const z = drosteForward(pt.u, pt.v + 2 * Math.PI * m, p);
-	// world → screen → device. Centre z at the canvas middle.
+type Pt = { x: number; y: number };
+
+// source(x,y) → strip ζ (drosteUV) → plane z=R₀·exp(γ(ζ + i·2π·m)) → device px.
+function project(b: DrosteBBox, x: number, y: number, m: number, p: DrosteParams, o: DrawDrosteOpts): Pt {
+	const { u, v } = drosteUV(b, x, y);
+	const z = drosteForward(u, v + 2 * Math.PI * m, p);
 	const cx = o.canvas.width / 2;
 	const cy = o.canvas.height / 2;
-	return {
-		x: cx + (z.re * o.zoom + o.panX) * o.dpr,
-		y: cy + (z.im * o.zoom + o.panY) * o.dpr,
-	};
+	return { x: cx + (z.re * o.zoom + o.panX) * o.dpr, y: cy + (z.im * o.zoom + o.panY) * o.dpr };
 }
 
-function polyline(
-	ctx: CanvasRenderingContext2D, a: StripPoint, b: StripPoint, m: number,
-	p: DrosteParams, o: DrawDrosteOpts,
-): void {
-	const pts = subdivideSegment(a, b, o.subdiv);
-	pts.forEach((sp, i) => {
-		const d = project(sp, m, p, o);
+// Map a straight source segment to a subdivided warped polyline (append to path).
+function seg(ctx: CanvasRenderingContext2D, b: DrosteBBox, a: Pt, c: Pt, m: number, p: DrosteParams, o: DrawDrosteOpts, first: boolean): void {
+	const n = Math.max(1, o.subdiv);
+	for (let i = first ? 0 : 1; i <= n; i++) {
+		const t = i / n;
+		const d = project(b, a.x + (c.x - a.x) * t, a.y + (c.y - a.y) * t, m, p, o);
 		if (i === 0) ctx.moveTo(d.x, d.y);
 		else ctx.lineTo(d.x, d.y);
-	});
+	}
 }
 
-// One band element = a strip-space rectangle [u0,u1]×[v0,v1] → warped quad.
-function strokeElement(
-	ctx: CanvasRenderingContext2D, e: DrosteBandElement, m: number,
-	p: DrosteParams, o: DrawDrosteOpts,
-): void {
-	const hue = clusterHue(e.hueKey);
+function shapePath(ctx: CanvasRenderingContext2D, b: DrosteBBox, e: DrosteShape, m: number, p: DrosteParams, o: DrawDrosteOpts): void {
+	const tl = { x: e.x0, y: e.y0 }, tr = { x: e.x1, y: e.y0 }, br = { x: e.x1, y: e.y1 }, bl = { x: e.x0, y: e.y1 };
 	ctx.beginPath();
-	polyline(ctx, { u: e.u0, v: e.v0 }, { u: e.u1, v: e.v0 }, m, p, o);
-	polyline(ctx, { u: e.u1, v: e.v0 }, { u: e.u1, v: e.v1 }, m, p, o);
-	polyline(ctx, { u: e.u1, v: e.v1 }, { u: e.u0, v: e.v1 }, m, p, o);
-	polyline(ctx, { u: e.u0, v: e.v1 }, { u: e.u0, v: e.v0 }, m, p, o);
+	seg(ctx, b, tl, tr, m, p, o, true);
+	seg(ctx, b, tr, br, m, p, o, false);
+	seg(ctx, b, br, bl, m, p, o, false);
+	seg(ctx, b, bl, tl, m, p, o, false);
 	ctx.closePath();
-	ctx.fillStyle = e.kind === "cluster"
-		? `hsla(${hue}, 60%, 50%, 0.18)`
-		: `hsla(${hue}, 60%, 55%, 0.32)`;
-	ctx.fill();
-	ctx.lineWidth = (e.id === o.hoverId ? 2.4 : 1.2) * o.dpr;
-	ctx.strokeStyle = `hsla(${hue}, 70%, 70%, 0.9)`;
-	ctx.stroke();
-	// Upright label at the warped centroid (spec §7 — known compromise).
-	const c = project({ u: (e.u0 + e.u1) / 2, v: (e.v0 + e.v1) / 2 }, m, p, o);
-	// Local scale ≈ |γ|·|z|·zoom; hide below the font floor.
-	const scaleSample = project({ u: e.u0, v: (e.v0 + e.v1) / 2 }, m, p, o);
-	const localPx = Math.hypot(c.x - scaleSample.x, c.y - scaleSample.y);
-	// Cell's angular screen width — clamp the label to it + ellipsis (spec §3/§6)
-	// so long note names can't spill into neighbouring cells.
-	const eMid0 = project({ u: (e.u0 + e.u1) / 2, v: e.v0 }, m, p, o);
-	const eMid1 = project({ u: (e.u0 + e.u1) / 2, v: e.v1 }, m, p, o);
-	const cellW = Math.hypot(eMid1.x - eMid0.x, eMid1.y - eMid0.y);
+}
+
+function drawShape(ctx: CanvasRenderingContext2D, b: DrosteBBox, e: DrosteShape, m: number, p: DrosteParams, o: DrawDrosteOpts): void {
+	const hue = clusterHue(e.hueKey);
+	shapePath(ctx, b, e, m, p, o);
+	if (e.kind === "card") {
+		ctx.fillStyle = `hsla(${hue}, 60%, 55%, 0.32)`;
+		ctx.fill();
+		ctx.lineWidth = (e.id === o.hoverId ? 2.4 : 1.2) * o.dpr;
+		ctx.strokeStyle = `hsla(${hue}, 70%, 72%, 0.9)`;
+		ctx.stroke();
+	} else {
+		// Group enclosure frame (BubbleSets style): faint fill + bold contour.
+		ctx.fillStyle = `hsla(${hue}, 55%, 50%, 0.12)`;
+		ctx.fill();
+		ctx.lineWidth = (e.id === o.hoverId ? 3 : 2) * o.dpr;
+		ctx.strokeStyle = `hsla(${hue}, 65%, 65%, 0.85)`;
+		ctx.stroke();
+	}
+	// Upright label at the warped centroid, clamped to the cell's angular width.
+	const c = project(b, (e.x0 + e.x1) / 2, (e.y0 + e.y1) / 2, m, p, o);
+	const a0 = project(b, (e.x0 + e.x1) / 2, e.y0, m, p, o);
+	const a1 = project(b, (e.x0 + e.x1) / 2, e.y1, m, p, o);
+	const w0 = project(b, e.x0, (e.y0 + e.y1) / 2, m, p, o);
+	const cellW = Math.hypot(a1.x - a0.x, a1.y - a0.y);
+	const localPx = Math.hypot(c.x - w0.x, c.y - w0.y);
 	if (localPx >= o.minFontPx * o.dpr && cellW >= o.minFontPx * o.dpr) {
 		ctx.fillStyle = "#e6ecf5";
 		ctx.font = `${Math.min(localPx * 0.5, 16 * o.dpr)}px sans-serif`;
@@ -79,8 +82,7 @@ function strokeElement(
 		ctx.textBaseline = "middle";
 		ctx.fillText(truncateToWidth(ctx, e.label, cellW * 0.9), c.x, c.y);
 	}
-	// Focus N entry marker: a bright dot+ring on the innermost (m=0) N cell, so
-	// the spiral's root is findable in the central core.
+	// Focus N marker on its innermost (m=0) card.
 	if (e.id === o.focusId && m === 0) {
 		const r = Math.max(3 * o.dpr, Math.min(cellW, localPx) * 0.3);
 		ctx.beginPath();
@@ -93,12 +95,32 @@ function strokeElement(
 	}
 }
 
-export function drawDroste(
-	ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts,
-): void {
+// Red coordinate grid: the source orthogonal grid mapped through the same warp
+// (const-X → radial spiral, const-Y → ring) — the Print Gallery red grid.
+function drawRedGrid(ctx: CanvasRenderingContext2D, b: DrosteBBox, m: number, p: DrosteParams, o: DrawDrosteOpts): void {
+	const nv = Math.max(2, o.gridV ?? 16);
+	const nh = Math.max(2, o.gridH ?? 8);
+	ctx.strokeStyle = "rgba(220, 60, 60, 0.55)";
+	ctx.lineWidth = 1 * o.dpr;
+	for (let i = 0; i <= nv; i++) {
+		const x = b.minX + (i / nv) * (b.maxX - b.minX);
+		ctx.beginPath();
+		seg(ctx, b, { x, y: b.minY }, { x, y: b.maxY }, m, p, o, true);
+		ctx.stroke();
+	}
+	for (let j = 0; j <= nh; j++) {
+		const y = b.minY + (j / nh) * (b.maxY - b.minY);
+		ctx.beginPath();
+		seg(ctx, b, { x: b.minX, y }, { x: b.maxX, y }, m, p, o, true);
+		ctx.stroke();
+	}
+}
+
+export function drawDroste(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
 	ctx.fillStyle = "#0f1116";
 	ctx.fillRect(0, 0, o.canvas.width, o.canvas.height);
+	if (meta.shapes.length === 0) return;
 	const p: DrosteParams = {
 		k: o.k,
 		twistDir: o.twistDir === "ccw" ? 1 : -1,
@@ -106,14 +128,11 @@ export function drawDroste(
 	};
 	ctx.lineJoin = "round";
 	ctx.lineCap = "round";
-	const L = meta.slices.length;
-	if (L === 0) return;
-	// Back-to-front: outer (large/coarse) turn first, inner (small/fine) last.
-	// Turn m draws hierarchy slice (m mod L) at scale k^m — the recursion lives
-	// in the turns. When the focus chain is shorter than the copy count it wraps
-	// (slices[m mod L]), closing the Droste loop self-referentially.
+	const b = meta.bbox;
+	// Back-to-front: outer (large) copy first, inner (small) last on top. Each copy
+	// is the SAME source plane reduced ×k and nested (self-similar Print Gallery).
 	for (let m = o.copies - 1; m >= 0; m--) {
-		const slice = meta.slices[m % L];
-		for (const e of slice) strokeElement(ctx, e, m, p, o);
+		for (const e of meta.shapes) drawShape(ctx, b, e, m, p, o);
+		drawRedGrid(ctx, b, m, p, o);
 	}
 }
