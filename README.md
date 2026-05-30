@@ -16,7 +16,7 @@ question.
 | **UpSet plot** | Stack of cards per intersection signature + dot matrix at the bottom — handles ≥ 4-way intersections that diagrams can't draw. |
 | **Bipartite tag graph** | Notes and tags are both nodes; an edge marks membership. Three placements: `Force` (spring embedder, default), `Concentric` (tags on an inner ring, notes on outer ring(s) with arc edges), `Clustered` (one main tag per note; notes packed in concentric rings around their main tag's "island"). |
 | **BubbleSets** | Containment layout drawn as rectangular iso-contour bubbles. |
-| Experimental (beta) | Nested set diagram / Containment map / Euler diagram — region/containment views that break on giant-tag, hierarchy-less vaults but are kept selectable. |
+| Experimental (beta) | Nested set diagram / Containment map / Euler diagram — region/containment views that break on giant-tag, hierarchy-less vaults but are kept selectable; **Print Gallery (Escher)** — the membership hierarchy laid around a square perimeter and warped by the Droste conformal map so it spirals into itself (each loop zooms by a factor k). |
 
 The settings panel (the sliders icon in the view's toolbar) is shared by every
 mode: WHERE / GROUP_BY / HAVING / ORDER_BY / LIMIT expressions filter the data;
