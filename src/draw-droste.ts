@@ -19,7 +19,56 @@ export interface DrawDrosteOpts {
 	gridH?: number; // red-grid horizontal line count (default 8)
 }
 
+// TEMPORARY: when true, skip the conformal warp / red grid / self-similar nesting
+// and draw the source plane (reordered BubbleSets shapes) in plain orthogonal
+// coordinates (linear x,y → screen). Flip back to false to re-enable exp(γζ).
+const DROSTE_ORTHO = true;
+
 type Pt = { x: number; y: number };
+
+// Plain orthogonal render of the source plane: fit the bbox to the canvas and draw
+// each shape rect (card filled / frame stroked) + label, no warp/grid/nesting.
+function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
+	const b = meta.bbox;
+	const W = b.maxX - b.minX || 1;
+	const H = b.maxY - b.minY || 1;
+	const cw = o.canvas.width, ch = o.canvas.height, pad = 0.06;
+	const s = Math.min((cw * (1 - pad)) / W, (ch * (1 - pad)) / H);
+	const ox = (cw - W * s) / 2, oy = (ch - H * s) / 2;
+	const X = (x: number) => ox + (x - b.minX) * s;
+	const Y = (y: number) => oy + (y - b.minY) * s;
+	for (const e of meta.shapes) {
+		const hue = clusterHue(e.hueKey);
+		const x = X(e.x0), y = Y(e.y0), w = (e.x1 - e.x0) * s, h = (e.y1 - e.y0) * s;
+		if (e.kind === "card") {
+			ctx.fillStyle = `hsla(${hue}, 60%, 55%, 0.32)`;
+			ctx.fillRect(x, y, w, h);
+			ctx.lineWidth = (e.id === o.hoverId ? 2.4 : 1.2) * o.dpr;
+			ctx.strokeStyle = `hsla(${hue}, 70%, 72%, 0.9)`;
+			ctx.strokeRect(x, y, w, h);
+		} else {
+			ctx.fillStyle = `hsla(${hue}, 55%, 50%, 0.12)`;
+			ctx.fillRect(x, y, w, h);
+			ctx.lineWidth = (e.id === o.hoverId ? 3 : 2) * o.dpr;
+			ctx.strokeStyle = `hsla(${hue}, 65%, 65%, 0.85)`;
+			ctx.strokeRect(x, y, w, h);
+		}
+		ctx.fillStyle = "#e6ecf5";
+		ctx.font = `${Math.min(h * 0.32, 13 * o.dpr)}px sans-serif`;
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
+		ctx.fillText(truncateToWidth(ctx, e.label, w * 0.92), x + w / 2, y + h / 2);
+		if (e.id === o.focusId) {
+			ctx.beginPath();
+			ctx.arc(x + w / 2, y + h / 2, Math.max(3 * o.dpr, Math.min(w, h) * 0.18), 0, 2 * Math.PI);
+			ctx.fillStyle = "#ffd35c";
+			ctx.fill();
+			ctx.lineWidth = 1.5 * o.dpr;
+			ctx.strokeStyle = "#1a1c22";
+			ctx.stroke();
+		}
+	}
+}
 
 // source(x,y) → strip ζ (drosteUV) → plane z=R₀·exp(γ(ζ + i·2π·m)) → device px.
 function project(b: DrosteBBox, x: number, y: number, m: number, p: DrosteParams, o: DrawDrosteOpts): Pt {
@@ -121,6 +170,10 @@ export function drawDroste(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: D
 	ctx.fillStyle = "#0f1116";
 	ctx.fillRect(0, 0, o.canvas.width, o.canvas.height);
 	if (meta.shapes.length === 0) return;
+	if (DROSTE_ORTHO) {
+		drawOrtho(ctx, meta, o);
+		return;
+	}
 	const p: DrosteParams = {
 		k: o.k,
 		twistDir: o.twistDir === "ccw" ? 1 : -1,
