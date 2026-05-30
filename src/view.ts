@@ -54,6 +54,8 @@ import {
 import { drawMatrix, matrixGeom, MATRIX_BADGE_W } from "./draw-matrix";
 import type { MatrixLine } from "./draw-matrix";
 import { drawHeatmap, heatmapGeom } from "./draw-heatmap";
+import { drawDroste } from "./draw-droste";
+import { drosteInverseBranch } from "./conformal";
 import {
 	drawLattice,
 	latticeCellAt,
@@ -494,9 +496,11 @@ export class MiniGraphView extends ItemView {
 		const isMatrix = this.settings.viewMode === "matrix";
 		const isHeatmap = this.settings.viewMode === "heatmap";
 		const isLattice = this.settings.viewMode === "lattice";
+		const isDroste = this.settings.viewMode === "droste";
 		this.renderViewModeSection(el);
 		if (this.settings.viewMode === "bipartite") this.renderBipartiteSection(el);
 		if (isLattice) this.renderLatticeSection(el);
+		if (isDroste) this.renderDrosteSection(el);
 		this.renderExprSection(el, "WHERE", this.settings.where, this.whereError, {
 			autoKey: "whereAuto",
 		});
@@ -1092,6 +1096,70 @@ export class MiniGraphView extends ItemView {
 		topRow.createSpan({ text: "Most-specific tier on top" });
 	}
 
+	// Print Gallery (Escher) mode settings — the four conformal-warp draw
+	// parameters. All are pure repaint params (consumed directly by
+	// drawDroste), so each persists via save() and repaints via requestDraw()
+	// without a relayout. drosteFocus (the spiral root) is set by clicking a
+	// node in the view, not here.
+	private renderDrosteSection(parent: HTMLElement): void {
+		const section = parent.createDiv({ cls: "gim-panel-section" });
+		section.createEl("h4", { text: "Print Gallery" });
+
+		// Scale per loop (k) — how much |z| grows over one 2π turn.
+		const kRow = section.createDiv({ cls: "gim-row" });
+		kRow.createSpan({ text: "Scale per loop (k)" });
+		const kIn = kRow.createEl("input", {
+			type: "range",
+			attr: { min: "1.5", max: "16", step: "0.5" },
+		}) as HTMLInputElement;
+		kIn.value = String(this.settings.drosteZoom);
+		kIn.addEventListener("input", () => {
+			this.settings.drosteZoom = Number(kIn.value);
+			void this.save();
+			this.requestDraw();
+		});
+
+		// Recursion copies — how many back-to-front spiral repeats are drawn.
+		const copiesRow = section.createDiv({ cls: "gim-row" });
+		copiesRow.createSpan({ text: "Recursion copies" });
+		const copiesIn = copiesRow.createEl("input", {
+			type: "range",
+			attr: { min: "1", max: "8", step: "1" },
+		}) as HTMLInputElement;
+		copiesIn.value = String(this.settings.drosteCopies);
+		copiesIn.addEventListener("input", () => {
+			this.settings.drosteCopies = Math.round(Number(copiesIn.value));
+			void this.save();
+			this.requestDraw();
+		});
+
+		// Edge subdivision — straight strip edges become smooth spiral
+		// polylines; more segments = smoother curves (costlier draw).
+		const subdivRow = section.createDiv({ cls: "gim-row" });
+		subdivRow.createSpan({ text: "Edge subdivision" });
+		const subdivIn = subdivRow.createEl("input", {
+			type: "range",
+			attr: { min: "4", max: "64", step: "4" },
+		}) as HTMLInputElement;
+		subdivIn.value = String(this.settings.drosteSubdiv);
+		subdivIn.addEventListener("input", () => {
+			this.settings.drosteSubdiv = Math.round(Number(subdivIn.value));
+			void this.save();
+			this.requestDraw();
+		});
+
+		// Twist direction — clockwise vs counter-clockwise spiral.
+		const twistRow = section.createEl("label", { cls: "gim-toggle-row" });
+		const twistCb = twistRow.createEl("input", { type: "checkbox" });
+		twistCb.checked = this.settings.drosteTwistDir === "cw";
+		twistCb.addEventListener("change", () => {
+			this.settings.drosteTwistDir = twistCb.checked ? "cw" : "ccw";
+			void this.save();
+			this.requestDraw();
+		});
+		twistRow.createSpan({ text: "Clockwise twist" });
+	}
+
 	// One radio row for a view mode. Shared by the stable list and the
 	// collapsible Experimental list — the only difference is a "(beta)" tag.
 	private renderViewModeOption(
@@ -1303,6 +1371,13 @@ export class MiniGraphView extends ItemView {
 		// Lattice subset links only affect the back-layer of drawLattice —
 		// toggling repaints without re-bucketing intersections.
 		"latticeShowSubsetLinks",
+		// Droste warp params are consumed directly by drawDroste — changing
+		// them repaints the spiral without re-running layoutDroste. (drosteFocus
+		// is intentionally NOT here: re-rooting the spiral IS a relayout.)
+		"drosteZoom",
+		"drosteTwistDir",
+		"drosteCopies",
+		"drosteSubdiv",
 	]);
 
 	private layoutSignature(s: MiniSettings): string {
@@ -1458,6 +1533,7 @@ export class MiniGraphView extends ItemView {
 			latticeMaxNodesPerTier: this.settings.latticeMaxNodesPerTier,
 			latticeShowSubsetLinks: this.settings.latticeShowSubsetLinks,
 			latticeSpecificTop: this.settings.latticeSpecificTop,
+			drosteFocus: this.settings.drosteFocus,
 			// Per-node "show names" checkbox state — layout uses it to expand
 			// each checked node so its name rows fit. Spread to a plain array
 			// so the LayoutOptions payload stays JSON-safe. The labels map
@@ -2049,6 +2125,23 @@ export class MiniGraphView extends ItemView {
 			});
 			return;
 		}
+		// Print Gallery (Escher): conformal Droste warp of the strip layout.
+		if (this.laid.droste && this.laid.droste.elements.length > 0) {
+			drawDroste(ctx, this.laid.droste, {
+				zoom: this.zoom,
+				panX: this.panX,
+				panY: this.panY,
+				canvas: this.canvas,
+				dpr,
+				k: this.settings.drosteZoom,
+				twistDir: this.settings.drosteTwistDir,
+				copies: this.settings.drosteCopies,
+				subdiv: this.settings.drosteSubdiv,
+				minFontPx: this.settings.minFontPx,
+				hoverId: this.hoveredNodeId,
+			});
+			return;
+		}
 		// Tag co-occurrence heatmap: screen-space frozen-pane cell grid.
 		if (this.laid.heatmap && this.laid.heatmap.n > 0) {
 			drawHeatmap(ctx, this.laid.heatmap, {
@@ -2424,6 +2517,42 @@ export class MiniGraphView extends ItemView {
 		this.app.workspace.openLinkText(path, "", false);
 	}
 
+	// Inverse-map a pointer position (CSS px, as every other hit path here
+	// receives — see screenToWorld / onPointerMove which pass e.clientX-rect.left)
+	// back to a strip-space (u, v) and resolve the band element under it. This
+	// inverts draw-droste's project(): forward does
+	//   x_dev = cx + (z.re·zoom + panX)·dpr,   cx = canvas.width/2 (device px)
+	// so for a CSS-pixel sx the device X is sx·dpr and
+	//   z.re = ((sx·dpr − cx)/dpr − panX)/zoom.
+	// Keeping sx in CSS px makes panX/zoom match the same units screenToWorld
+	// uses (it does NOT multiply by dpr), so hover/click land correctly.
+	private drosteHitTest(sx: number, sy: number): string | null {
+		const d = this.laid.droste;
+		if (!d) return null;
+		const dpr = window.devicePixelRatio || 1;
+		const R0 = Math.min(this.canvas.width, this.canvas.height) / (4 * dpr);
+		const p = {
+			k: this.settings.drosteZoom,
+			twistDir: (this.settings.drosteTwistDir === "ccw" ? 1 : -1) as 1 | -1,
+			R0,
+		};
+		// device pixel → world complex z (inverse of draw-droste project()).
+		const cx = this.canvas.width / 2, cy = this.canvas.height / 2;
+		const z = {
+			re: ((sx * dpr - cx) / dpr - this.panX) / this.zoom,
+			im: ((sy * dpr - cy) / dpr - this.panY) / this.zoom,
+		};
+		// Front-most first (largest m = innermost/finest). Restrict to drawn copies.
+		for (let m = this.settings.drosteCopies - 1; m >= 0; m--) {
+			const { u, vRaw } = drosteInverseBranch(z, p, m);
+			const v = ((vRaw % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+			for (const e of d.elements) {
+				if (u >= e.u0 && u <= e.u1 && v >= e.v0 && v < e.v1) return e.id;
+			}
+		}
+		return null;
+	}
+
 	// Heatmap cell click → a floating overlay listing the notes shared by the
 	// tag pair (or, on the diagonal, all notes of the tag). Each row opens the
 	// file. Reuses openFile; styled inline so it works without extra CSS.
@@ -2751,6 +2880,19 @@ export class MiniGraphView extends ItemView {
 				if (target) this.scheduleHover(target, sx, sy);
 			} else if (this.tipEl) {
 				this.positionTip(sx, sy, this.tipEl);
+			}
+			return;
+		}
+		if (this.laid.droste) {
+			// Conformal inverse-map: hover-highlight the band under the cursor.
+			const id = this.drosteHitTest(sx, sy);
+			if (id !== this.hoveredNodeId) {
+				this.hoveredNodeId = id;
+				this.requestDraw();
+			}
+			if (this.hoverTarget) {
+				this.cancelHover();
+				this.hoverTarget = null;
 			}
 			return;
 		}
@@ -3133,6 +3275,23 @@ export class MiniGraphView extends ItemView {
 				this.openLatticeDetail(hitNode, sx, sy);
 				return;
 			}
+			if (this.laid.droste) {
+				// Conformal inverse-map click. A NODE band → open the file AND
+				// re-root the spiral on it (drosteFocus drives layoutDroste, so
+				// this is a relayout). Cluster bands have no file to open and
+				// re-rooting is node-only, so they're ignored.
+				const id = this.drosteHitTest(sx, sy);
+				if (id) {
+					const el = this.laid.droste.elements.find((e) => e.id === id);
+					if (el && el.kind === "node") {
+						this.openFile(id);
+						this.settings.drosteFocus = id;
+						void this.save();
+						void this.rebuild();
+					}
+				}
+				return;
+			}
 			const w = this.screenToWorld(sx, sy);
 			const hit = this.hitTest(w.x, w.y);
 			if (hit?.kind === "node") {
@@ -3155,7 +3314,12 @@ export class MiniGraphView extends ItemView {
 		c.addEventListener("mousemove", (e) => this.onPointerMove(e));
 		c.addEventListener("mouseleave", () => {
 			this.cancelHover();
+			// Droste mode tracks hover via hoveredNodeId (no matrix/lattice
+			// crosshair state) — clear it so no band stays lit after exit.
+			const drosteHovered = this.laid.droste != null && this.hoveredNodeId !== null;
+			if (drosteHovered) this.hoveredNodeId = null;
 			if (
+				drosteHovered ||
 				this.matrixHoverLine !== -1 ||
 				this.matrixHoverCol !== -1 ||
 				this.heatmapHoverRow !== -1 ||
