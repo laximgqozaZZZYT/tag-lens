@@ -1,5 +1,5 @@
 import type { GraphData, GraphNode } from "./types";
-import { NONE_BUCKET, CARD_CELL_W } from "./types";
+import { NONE_BUCKET } from "./types";
 
 // Print Gallery source plane (spec §2/§3, FINAL). We do NOT hand-build tiles. We
 // reorder the BubbleSets-style geometry into the ①②③④ containment-zoom order from
@@ -109,37 +109,46 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 	const overflow = subsetSigs.length > cap;
 	if (overflow) subsetSigs = subsetSigs.slice(0, cap - 1);
 
-	// Collect items in ①②③④ order (no positions yet).
+	// Build the FOUR bands (spec §2) as separate item lists.
 	type Item = { id: string; role: 1 | 2 | 3 | 4; kind: "card" | "frame"; label: string; hueKey: string };
-	const items: Item[] = [];
-	// ① N at v=0 (the first item).
-	items.push({ id: focusNode.id, role: 1, kind: "card", label: focusNode.label, hueKey: focusNode.memberships[0] ?? focusId });
-	// ② the remaining exact-T cards.
-	for (const n of exactOrdered.slice(1).slice(0, cap)) {
-		items.push({ id: n.id, role: 2, kind: "card", label: n.label, hueKey: n.memberships[0] ?? n.id });
-	}
-	// ③ the T-enclosure frame.
-	items.push({ id: "__T", role: 3, kind: "frame", label: sigLabel(tKeys) || "(all)", hueKey: Tsig || "T" });
-	// ④ subset enclosure frames (broader), then "+N" if capped.
-	for (const [sig, info] of subsetSigs) {
-		items.push({ id: `__sub_${sig}`, role: 4, kind: "frame", label: sigLabel(info.keys), hueKey: sig });
-	}
-	if (overflow) items.push({ id: "__more", role: 4, kind: "frame", label: `+${sigInfo.size - (cap - 1)}`, hueKey: "more" });
+	// ① N alone (NOT mixed with ② cards).
+	const band1: Item[] = [
+		{ id: focusNode.id, role: 1, kind: "card", label: focusNode.label, hueKey: focusNode.memberships[0] ?? focusId },
+	];
+	// ② T-exact notes (excluding N — N is shown in ①).
+	const band2: Item[] = exactOrdered.slice(1).slice(0, cap).map((nd) => ({
+		id: nd.id, role: 2, kind: "card" as const, label: nd.label, hueKey: nd.memberships[0] ?? nd.id,
+	}));
+	// ③ the T-enclosure (the GROUP_BY intersection of T), alone.
+	const band3: Item[] = [
+		{ id: "__T", role: 3, kind: "frame", label: sigLabel(tKeys) || "(all)", hueKey: Tsig || "T" },
+	];
+	// ④ T's proper-subset enclosures (|sig| desc), then "+N" if capped.
+	const band4: Item[] = subsetSigs.map(([sig, info]) => ({
+		id: `__sub_${sig}`, role: 4 as const, kind: "frame" as const, label: sigLabel(info.keys), hueKey: sig,
+	}));
+	if (overflow) band4.push({ id: "__more", role: 4, kind: "frame", label: `+${sigInfo.size - (cap - 1)}`, hueKey: "more" });
 
-	// 2D uniform grid (spec §3): square S×S cells, R rows × C=2R columns so the
-	// bbox is exactly 2:1 = the red grid's 16:8 ⇒ a square mesh (uH=2π·H/W is
-	// isotropic). Fill column-major: item k → (col=⌊k/R⌋, row=k%R). N (k=0) lands
-	// at (0,0) ⇒ v=0. Trailing cells stay empty (Escher wallpaper margin).
-	const n = items.length;
-	const R = Math.max(2, Math.ceil(Math.sqrt(n / 2)));
-	const C = 2 * R;
-	const S = CARD_CELL_W; // square source cell (value is arbitrary; only ratios matter)
-	const shapes: DrosteShape[] = items.map((it, k) => {
-		const col = Math.floor(k / R);
-		const row = k % R;
-		return { ...it, x0: col * S, y0: row * S, x1: col * S + S, y1: row * S + S };
-	});
-	return { shapes, bbox: { minX: 0, minY: 0, maxX: C * S, maxY: R * S }, focusId };
+	// Place each band in its OWN X-quartile [b/4, (b+1)/4); stack items in Y within
+	// the band (full band height ÷ count). NO cross-band grid packing, so the X
+	// axis (=v after wrapping) cleanly reads ① → ② → ③ → ④ left to right and N
+	// sits alone at v=0.
+	const WB = 180; // band width
+	const HT = 600; // plane height
+	const shapes: DrosteShape[] = [];
+	const placeBand = (band: Item[], b: number): void => {
+		const nrow = Math.max(1, band.length);
+		const hc = HT / nrow;
+		band.forEach((it, row) => {
+			shapes.push({ ...it, x0: b * WB, y0: row * hc, x1: b * WB + WB, y1: row * hc + hc });
+		});
+	};
+	placeBand(band1, 0);
+	placeBand(band2, 1);
+	placeBand(band3, 2);
+	placeBand(band4, 3);
+
+	return { shapes, bbox: { minX: 0, minY: 0, maxX: 4 * WB, maxY: HT }, focusId };
 }
 
 // Test/inspection helper: the ①②③④ shapes grouped by role (data correctness).
