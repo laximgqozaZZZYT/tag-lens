@@ -35,13 +35,16 @@ each role's (capped) element count (§2.1, "compact contiguous bands"):
   — at the innermost radius `≈ R₀·e^{U_BASE}`, NOT the bottom-left (that was a leftover
   from the square-perimeter model; the conformal map `z=exp(γζ)` puts `v=0` on the +x
   ray). A focus marker (§5) is drawn there so the entry is findable in the core.
-- **① sibling notes** → **② N's cluster(s)** → **③ sibling clusters** (co-occurring
-  first, else other clusters) → **④ `↻` bridge** to the next turn's focus. The angular
-  order encodes the abstraction climb; because `ln|z| = u + (ln k/2π)·v`, this angular
-  order also maps to an inner→outer **radial** climb over the turn.
-- The recursion is in the TURNS (§4): turn `s+1` re-roots on an unvisited sibling
-  cluster of turn `s`; the chain is finite and the last turn's ④ wraps back to `N`
-  (self-referential Droste loop). One full turn scales the picture by `k`.
+- **① sibling notes** → **② N's cluster(s)** → **③ the other clusters** (capped) →
+  **④ `↻ N` bridge** (self-reference — the nested copy is `N` again). The angular order
+  encodes the abstraction climb; because `ln|z| = u + (ln k/2π)·v`, this angular order
+  also maps to an inner→outer **radial** climb over the turn.
+- **Recursion = ×k self-similar nesting of ONE slice (revision 2026-05-31).** There is
+  a single slice; the renderer draws it at `m = 0, 1, 2, …` (`v += 2π·m`), each copy a
+  ×k reduction of the SAME picture nested inside the last — the Escher "image contains
+  itself". ④ is a self-reference (`↻ N`): the nested copy is `N` again. (The round-6
+  design — turn `s+1` re-roots on a *different* cluster — was WRONG: that nests a
+  different picture, i.e. drill-down, not self-similarity. See §4.)
 
 ### Architecture decisions (confirmed, not revisited)
 
@@ -150,11 +153,11 @@ not the square tiles of Escher's *Print Gallery*.
 2. For each bubble contour, card frame, and edge: subdivide into `drosteSubdiv`
    segments, map every vertex through `project`, stroke/fill the resulting polyline.
    Fill hues reuse the existing `clusterHue(groupKey)`.
-3. **Recursion tiling**: the layout emits one element array per turn (`slices[]`, §4).
-   Draw `drosteCopies` turns **back-to-front (outer/large/coarse first, inner/small/fine
-   last on top)**; turn `m` draws `slices[m mod L]` mapped at `v += 2π·m` (scale `k^m`).
-   `m mod L` wraps when the focus chain is shorter than the copy count, closing the
-   Droste loop self-referentially. This draw order is also the hit-test priority (§5).
+3. **Self-similar nesting**: the layout emits ONE slice (`slices` has length 1, §4).
+   Draw `drosteCopies` copies **back-to-front (outer/large/coarse first, inner/small/fine
+   last on top)**; copy `m` draws `slices[m mod 1]` (= the same slice) mapped at
+   `v += 2π·m` (scale `k^m`) — each a ×k reduction nested inside the last (the image
+   contains itself). This draw order is also the hit-test priority (§5).
    **Seam continuity**: because every turn uses the same `[0, 2π)` parametrisation and
    `z(ζ+2πi) = k·z(ζ)`, turn `m`'s `v=2π⁻` boundary and turn `m+1`'s `v=0⁺` boundary land
    on the same screen point — the tile boundaries are continuous even though the cell
@@ -173,25 +176,31 @@ not the square tiles of Escher's *Print Gallery*.
 Use the post-`rebuild` graph directly — no new query logic. Focus node `N`
 (`drosteFocus`, else first node with a real non-NONE membership, else first node).
 
-**The recursion lives in the turns (revision 2026-05-30d).** The layout builds a finite
-focus chain and emits one hierarchy slice per turn (`slices[]`):
+**ONE slice, ×k self-similar nesting (revision 2026-05-31 — supersedes round-6).**
+The layout emits a SINGLE hierarchy slice from `N`:
 
-- **Turn 0** — focus = node `N`. ① `N` + its sibling notes, ② `N`'s cluster(s),
-  ③ `N`'s sibling clusters, ④ a `↻` bridge to the next turn's focus.
-- **Turn s+1** — re-roots on a cluster taken from turn `s`'s ③: ① that cluster's member
-  notes, ② the cluster, ③ its sibling clusters, ④ bridge.
-- **③ ordering (A):** sibling clusters = those **co-occurring** with the focus cluster
-  (sharing ≥1 note) are shown **first**; only when that set is empty does it **fall back**
-  to other (unvisited) clusters. The next turn's focus is the first *unvisited* entry of
-  this same ordered list — so "③ → next N" climbs through genuinely related clusters and
-  only degrades gracefully on a disconnected focus.
-- The chain is finite (clusters run out — depth is ~2 real tiers, notes + clusters);
-  the renderer cycles `slices[m mod L]` and the last turn's ④ bridge points back to `N`
-  (`chain[(i+1) mod L]`) — a **self-referential Droste loop** (termination option (b)).
-  Empty vault ⇒ `slices = []` (renderer draws nothing; no divide-by-`L`).
+- **① `N` + its sibling notes** (notes sharing any of `N`'s clusters; `N` is the first
+  cell ⇒ `v = 0`).
+- **② `N`'s cluster(s).**
+- **③ the other clusters** (every cluster not in `N`'s set), capped to `cols` with a
+  final "+N" overflow cell — so ③ ≈ ① in width, not dominant (verified: ① 40–57%, ②
+  6–15%, ③ 29–44%, ④ 5–7%).
+- **④ a single `↻ N` bridge** — a *self-reference*, because the nested copy IS `N`.
+
+The renderer (§3) draws this one slice at `m = 0, 1, 2, …`, each a ×k reduction nested
+inside the last (`slices[m mod 1]`); `z(ζ+2πi)=k·z(ζ)` makes them continuous. This is
+the genuine Print Gallery "the image contains itself".
+
+> **Round-6 was wrong (corrected here).** Round 6 made turn `s+1` re-root on a
+> *different* cluster from turn `s`'s ③ (a finite focus chain, `visited` tracking,
+> co-occurring-sibling priority + fallback, a self-referential loop closing the chain).
+> That nests a *different* picture per level = drill-down, NOT self-similarity. All of
+> that machinery (chain / re-rooting / `visited` / fallback / per-turn slices) is
+> **removed**; the "sparse turns / chain-length-1 / empty-sibling" struggles it caused
+> were artefacts of nesting a different picture and do not arise for a single slice.
 
 Each slice is laid out as contiguous compact square bands per §2.1 (role order ①②③④
-preserved; widths ∝ capped counts; `N` at `v = 0`).
+preserved; widths ∝ capped counts; `N` at `v = 0`). Empty vault ⇒ `slices = []`.
 
 ## 5. Hit-testing & interaction
 
@@ -201,9 +210,14 @@ preserved; widths ∝ capped counts; `N` at `v = 0`).
   neighbours). Among candidates whose `(u, v)` falls inside a drawn element footprint,
   pick the **front-most** (last drawn = innermost/finest), matching the §3 draw order.
 - Click on a node → open the file. Click on empty area → no hit.
-- Click to **re-root focus N** to the front-most node (self-similar dive). This is a
-  headline interaction, so it relies on the precise resolution rule above. Synthetic
-  cells (`__loop_*` bridge, `__more_*` overflow) are ignored on click.
+- **Click to re-root** (self-similar context): every copy is the SAME slice, so a
+  screen point maps to one element id across all ×k copies; hit-test returns the
+  front-most (innermost) copy's id — the same id regardless of copy. Clicking a NOTE
+  sets `drosteFocus = id` and rebuilds, producing a NEW single slice rooted at that
+  node — i.e. **re-centres the whole self-similar spiral on the clicked node** (not a
+  "dive into a different nested picture"; all copies always share one `N`). Cluster
+  cells (②③) and synthetic cells (`__loop`, `__more_*`) do not re-root (focus must be a
+  node) and are ignored on click.
 - **Focus N marker**: the renderer draws a bright dot+ring on N's innermost (`m=0`)
   cell so the spiral's root/entry is findable in the central core (N is at angle ≈ 0,
   innermost — §1).
