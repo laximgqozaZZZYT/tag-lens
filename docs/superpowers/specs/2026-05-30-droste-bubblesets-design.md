@@ -95,6 +95,42 @@ exp(γ · 2πi) = exp(2πi · 1) · exp(ln k) = 1 · k = k
 
 `drosteTwistDir` flips the sign of `Im(γ)` (cw vs ccw spiral).
 
+### 2.1 Tile shape in ζ-space — what is "square" (revision 2026-05-30c)
+
+**Bug found in the first build:** unifying everything onto `z = R₀·exp(γζ)` (§2)
+defined the *map* correctly but left the *shape of the tile boundaries placed in
+ζ-space* undefined. The layout gave every element the full radial band
+(`Δu ≈ 0.8`, i.e. a `e^0.8 ≈ 2.2×` radius span) and only a thin angular slice
+(`Δv ≪ Δu`). Those extreme radial slivers make the constant-`u` (≈ constant-radius)
+boundaries dominate the eye, so the spiral renders as **circular arcs / sectors**,
+not the square tiles of Escher's *Print Gallery*.
+
+**Resolution — Approach B (conformal square grid in ζ).** Tile ζ-space with a
+**uniform grid whose cells are squares in the (u, v) plane: `Δu = Δv = Δ`.**
+
+- **What is square:** the *grid cells in ζ-space* (log-polar space). A cell is an
+  axis-aligned `Δ × Δ` square in `(u, v)`.
+- **Why it reads as square on screen:** `z = R₀·exp(γζ)` is holomorphic ⇒ conformal,
+  so it maps each tiny ζ-square to a screen tile that is *locally a square* — scaled by
+  `|dz/dζ| = |γ·z|` and rotated by `arg(γ·z)`. The four straight ζ-edges bend into
+  logarithmic-spiral arcs; the tile is a "quasi-square with spiral edges" — exactly the
+  Print Gallery look. **The square lives in ζ (log-polar) space; on screen it is warped
+  into the Droste spiral.**
+- **Why `Δu = Δv` specifically:** a ζ-cell's on-screen size is `≈ |γz|·Δu` along the
+  u-edge and `≈ |γz|·Δv` along the v-edge (conformal scale is isotropic). Equal steps
+  ⇒ equal on-screen edges ⇒ square. Unequal steps ⇒ slivers (the bug).
+- **Grid construction:** `v ∈ [0, 2π)` is split into the 4 hierarchy quadrants (§1);
+  each quadrant is filled with a `cols × rows` block of `Δ × Δ` cells. `Δ = (π/2)/cols`
+  (so a quadrant holds exactly `cols` columns), and `rows` cells stack along `u` with
+  the **same** `Δ`. One element per cell, in reading order. A level showing more
+  elements than `cols × rows` is capped (overflow folded into a final "+N" cell), which
+  also bounds render cost. One full turn (`v: 0→2π`) is still one Droste period (×k);
+  `drosteCopies` repeats it at successive scales via the renderer's `v += 2π·m`.
+- Rejected **Approach A** (warp `v→θ` so the *outline* is a polar square
+  `r(θ)=R/max(|cosθ|,|sinθ|)`): lighter and keeps straight outer edges, but fights the
+  conformal map — interior cells distort and angle-preservation is lost, so it is not a
+  faithful Print Gallery. Escher fidelity was the stated priority, so B wins.
+
 ## 3. Rendering pipeline (`draw-droste.ts`)
 
 1. Reset canvas transform; use a manual `project(u, v) → screen` built from §2.

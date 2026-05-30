@@ -1,67 +1,59 @@
 import type { GraphData } from "./types";
 
+// Approach B (spec §2.1): tile ζ-space with a UNIFORM SQUARE grid — every cell is
+// a Δ × Δ square in the (u, v) plane (Δu = Δv). Because z = R₀·exp(γζ) is
+// conformal, each ζ-square maps to a locally-square screen tile with logarithmic-
+// spiral edges (the Print Gallery look). Equal Δu/Δv is what stops cells reading
+// as radial slivers / circular sectors. The "square" lives in ζ (log-polar) space.
 export interface DrosteBandElement {
 	id: string;
 	kind: "node" | "cluster";
 	label: string;
 	hueKey: string; // key for clusterHue()
 	level: 1 | 2 | 3 | 4;
+	// Square cell in ζ-space: u1 - u0 === v1 - v0 === cell (radial × angular).
 	u0: number;
-	u1: number; // radial band extent (depth)
+	u1: number;
 	v0: number;
-	v1: number; // angular extent within [0, 2π)
+	v1: number;
 }
 
 export interface DrosteMeta {
 	elements: DrosteBandElement[];
 	focusId: string;
-	uPeriod: number; // radial thickness of one frame band
+	// Δ — the uniform square-cell size in ζ-space (Δu = Δv).
+	cell: number;
 }
 
 export interface DrosteLayoutOpts {
 	focusId?: string;
+	// Columns per hierarchy quadrant and radial rows per level. Δ = (π/2)/cols,
+	// and the same Δ is used for the u step so cells are square.
+	cols?: number;
+	rows?: number;
 }
 
 const TWO_PI = 2 * Math.PI;
-const QUAD = TWO_PI / 4; // one hierarchy level per quadrant
+const QUAD = TWO_PI / 4; // one hierarchy level per quadrant of the turn
 
-// Centreline (mid-u) of the band as a function of v, evaluated on the
-// canonical period. Exposed for the seam assert. Linear within each quadrant;
-// the level-4 quadrant interpolates level-3's trailing state back to level-1's
-// leading state so the cylinder closes smoothly.
-export function bandCentre(meta: DrosteMeta, v: number): number {
-	const vv = ((v % TWO_PI) + TWO_PI) % TWO_PI;
-	// Aggregate centre = mean of (u0+u1)/2 over elements whose [v0,v1] covers vv,
-	// falling back to uPeriod/2 in the transition gap.
-	let sum = 0, count = 0;
-	for (const e of meta.elements) {
-		if (vv >= e.v0 && vv < e.v1) {
-			sum += (e.u0 + e.u1) / 2;
-			count++;
-		}
-	}
-	return count > 0 ? sum / count : meta.uPeriod / 2;
-}
-
-export function bandWidth(meta: DrosteMeta, v: number): number {
-	const vv = ((v % TWO_PI) + TWO_PI) % TWO_PI;
-	let maxW = 0;
-	for (const e of meta.elements) {
-		if (vv >= e.v0 && vv < e.v1) maxW = Math.max(maxW, e.u1 - e.u0);
-	}
-	if (maxW > 0) return maxW;
-	// Fallback: derive the canonical band width from the first level-1 element
-	// so the transition quadrant (no elements) matches level-1's leading width,
-	// ensuring C0 seam closure.
-	const lvl1 = meta.elements.find((e) => e.level === 1);
-	return lvl1 ? lvl1.u1 - lvl1.u0 : meta.uPeriod;
+interface Item {
+	id: string;
+	label: string;
+	hueKey: string;
+	kind: "node" | "cluster";
 }
 
 export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): DrosteMeta {
+	const cols = Math.max(1, Math.floor(opts.cols ?? 6));
+	const rows = Math.max(1, Math.floor(opts.rows ?? 5));
+	const cell = QUAD / cols; // Δ — angular cell width; reused as the u step (square)
+	const uBase = cell; // one cell of inner margin before the first row
+
 	const nodes = data.nodes;
-	const focusId = opts.focusId && nodes.some((n) => n.id === opts.focusId)
-		? opts.focusId
-		: nodes[0]?.id ?? "";
+	const focusId =
+		opts.focusId && nodes.some((n) => n.id === opts.focusId)
+			? opts.focusId
+			: nodes[0]?.id ?? "";
 	const focus = nodes.find((n) => n.id === focusId);
 	const focusClusters = new Set(focus?.memberships ?? []);
 
@@ -75,67 +67,73 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 	const lvl2 = [...focusClusters];
 	const lvl3 = [...allClusters].filter((c) => !focusClusters.has(c));
 
-	const uPeriod = 1; // one frame band spans u ∈ [0, 1)
-	const u0 = 0.1 * uPeriod;
-	const u1 = 0.9 * uPeriod; // 10% margin top/bottom of the band
-
 	const elements: DrosteBandElement[] = [];
-	const spread = (
-		ids: { id: string; label: string; hueKey: string; kind: "node" | "cluster" }[],
-		level: 1 | 2 | 3,
-		qStart: number,
-	) => {
-		const n = Math.max(1, ids.length);
-		const slice = QUAD / n;
-		ids.forEach((it, i) => {
+	const capacity = cols * rows;
+
+	// Fill one quadrant with up to `capacity` Δ×Δ square cells (cols × rows) in
+	// reading order. Overflow folds into a final "+N" cell so render cost (and
+	// element count) stays bounded regardless of vault size.
+	const fill = (items: Item[], level: 1 | 2 | 3, qStart: number): void => {
+		let shown = items;
+		if (items.length > capacity) {
+			const overflow = items.length - (capacity - 1);
+			shown = [
+				...items.slice(0, capacity - 1),
+				{ id: `__more_l${level}`, label: `+${overflow}`, hueKey: "more", kind: "cluster" },
+			];
+		}
+		shown.forEach((it, i) => {
+			const col = i % cols;
+			const row = Math.floor(i / cols);
+			const v0 = qStart + col * cell;
+			const u0 = uBase + row * cell;
 			elements.push({
-				...it,
+				id: it.id,
+				label: it.label,
+				hueKey: it.hueKey,
+				kind: it.kind,
 				level,
 				u0,
-				u1,
-				v0: qStart + i * slice,
-				v1: qStart + (i + 1) * slice,
+				u1: u0 + cell,
+				v0,
+				v1: v0 + cell,
 			});
 		});
 	};
 
-	// Ensure the focus is the FIRST element of quadrant 1 (so it sits at v=0).
-	const lvl1Ordered = [
-		focus ? { id: focus.id, label: focus.label, hueKey: focus.memberships[0] ?? focus.id, kind: "node" as const } : null,
-		...peers.filter((n) => n.id !== focusId).map((n) => ({
-			id: n.id, label: n.label, hueKey: n.memberships[0] ?? n.id, kind: "node" as const,
-		})),
-	].filter(Boolean) as { id: string; label: string; hueKey: string; kind: "node" }[];
+	// Focus is cell 0 of quadrant 1 → bottom-left corner (v = 0).
+	const lvl1: Item[] = [
+		...(focus
+			? [{ id: focus.id, label: focus.label, hueKey: focus.memberships[0] ?? focus.id, kind: "node" as const }]
+			: []),
+		...peers
+			.filter((n) => n.id !== focusId)
+			.map((n) => ({ id: n.id, label: n.label, hueKey: n.memberships[0] ?? n.id, kind: "node" as const })),
+	];
 
-	spread(lvl1Ordered, 1, 0 * QUAD);
-	spread(lvl2.map((c) => ({ id: c, label: c, hueKey: c, kind: "cluster" as const })), 2, 1 * QUAD);
-	spread(lvl3.map((c) => ({ id: c, label: c, hueKey: c, kind: "cluster" as const })), 3, 2 * QUAD);
-	// Level 4 (transition quadrant) is intentionally left without its own
-	// elements: bandCentre/bandWidth fall back to the period midpoint there,
-	// which equals the periodic continuation of level 1's leading state, so the
-	// seam closes. (A future revision may render an explicit morph band.)
+	fill(lvl1, 1, 0 * QUAD);
+	fill(lvl2.map((c) => ({ id: c, label: c, hueKey: c, kind: "cluster" as const })), 2, 1 * QUAD);
+	fill(lvl3.map((c) => ({ id: c, label: c, hueKey: c, kind: "cluster" as const })), 3, 2 * QUAD);
+	// Quadrant 4 (v ∈ [3π/2, 2π)) is the transition band — left empty; the spiral
+	// continues into the next scale copy (v += 2π) there, closing the loop.
 
-	return { elements, focusId, uPeriod };
+	return { elements, focusId, cell };
 }
 
-// Seam continuity check (spec §8 #3): the layout is 2π-periodic in v, so the
-// band centreline + width must match at v=0 ≡ 2π to C0 (value) and C1 (slope).
-export function assertLayoutSeam(meta: DrosteMeta): {
-	c0CentreGap: number;
-	c0WidthGap: number;
-	c1CentreGap: number;
+// Approach B invariant (replaces the old band-seam check): every tile must be a
+// SQUARE in ζ-space (Δu = Δv) and lie within one period [0, 2π). maxAspectGap = 0
+// means perfectly square cells. The conformal seam continuity (the spiral closing
+// across v = 0 ≡ 2π) is guaranteed by the map itself — see conformal.test.ts's
+// scale-periodicity / angle-closure assertions — so it is not re-checked here.
+export function assertCellsSquare(meta: DrosteMeta): {
+	maxAspectGap: number;
+	allWithinPeriod: boolean;
 } {
-	const h = 1e-4;
-	const cLeft = bandCentre(meta, TWO_PI - h);
-	const cRight = bandCentre(meta, 0 + h);
-	const wLeft = bandWidth(meta, TWO_PI - h);
-	const wRight = bandWidth(meta, 0 + h);
-	// One-sided derivatives across the seam.
-	const dLeft = (bandCentre(meta, TWO_PI - h) - bandCentre(meta, TWO_PI - 2 * h)) / h;
-	const dRight = (bandCentre(meta, 0 + 2 * h) - bandCentre(meta, 0 + h)) / h;
-	return {
-		c0CentreGap: Math.abs(cLeft - cRight),
-		c0WidthGap: Math.abs(wLeft - wRight),
-		c1CentreGap: Math.abs(dLeft - dRight),
-	};
+	let maxAspectGap = 0;
+	let allWithinPeriod = true;
+	for (const e of meta.elements) {
+		maxAspectGap = Math.max(maxAspectGap, Math.abs((e.u1 - e.u0) - (e.v1 - e.v0)));
+		if (e.v0 < 0 || e.v1 > TWO_PI + 1e-9) allWithinPeriod = false;
+	}
+	return { maxAspectGap, allWithinPeriod };
 }
