@@ -1,5 +1,5 @@
 import type { GraphData, GraphNode } from "./types";
-import { NONE_BUCKET, CARD_CELL_W, CARD_CELL_H } from "./types";
+import { NONE_BUCKET, CARD_CELL_W } from "./types";
 
 // Print Gallery source plane (spec §2/§3, FINAL). We do NOT hand-build tiles. We
 // reorder the BubbleSets-style geometry into the ①②③④ containment-zoom order from
@@ -109,31 +109,37 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 	const overflow = subsetSigs.length > cap;
 	if (overflow) subsetSigs = subsetSigs.slice(0, cap - 1);
 
-	// Lay shapes left→right in ①②③④ order, one cell (W×H) per item, single row.
-	const W = CARD_CELL_W;
-	const H = CARD_CELL_H;
-	const shapes: DrosteShape[] = [];
-	let col = 0;
-	const put = (id: string, role: 1 | 2 | 3 | 4, kind: "card" | "frame", label: string, hueKey: string): void => {
-		shapes.push({ id, role, kind, label, hueKey, x0: col * W, y0: 0, x1: col * W + W, y1: H });
-		col++;
-	};
-
-	// ① N (also the first ② card) at v=0.
-	put(focusNode.id, 1, "card", focusNode.label, focusNode.memberships[0] ?? focusId);
+	// Collect items in ①②③④ order (no positions yet).
+	type Item = { id: string; role: 1 | 2 | 3 | 4; kind: "card" | "frame"; label: string; hueKey: string };
+	const items: Item[] = [];
+	// ① N at v=0 (the first item).
+	items.push({ id: focusNode.id, role: 1, kind: "card", label: focusNode.label, hueKey: focusNode.memberships[0] ?? focusId });
 	// ② the remaining exact-T cards.
 	for (const n of exactOrdered.slice(1).slice(0, cap)) {
-		put(n.id, 2, "card", n.label, n.memberships[0] ?? n.id);
+		items.push({ id: n.id, role: 2, kind: "card", label: n.label, hueKey: n.memberships[0] ?? n.id });
 	}
 	// ③ the T-enclosure frame.
-	put("__T", 3, "frame", sigLabel(tKeys) || "(all)", Tsig || "T");
+	items.push({ id: "__T", role: 3, kind: "frame", label: sigLabel(tKeys) || "(all)", hueKey: Tsig || "T" });
 	// ④ subset enclosure frames (broader), then "+N" if capped.
 	for (const [sig, info] of subsetSigs) {
-		put(`__sub_${sig}`, 4, "frame", sigLabel(info.keys), sig);
+		items.push({ id: `__sub_${sig}`, role: 4, kind: "frame", label: sigLabel(info.keys), hueKey: sig });
 	}
-	if (overflow) put("__more", 4, "frame", `+${sigInfo.size - (cap - 1)}`, "more");
+	if (overflow) items.push({ id: "__more", role: 4, kind: "frame", label: `+${sigInfo.size - (cap - 1)}`, hueKey: "more" });
 
-	return { shapes, bbox: { minX: 0, minY: 0, maxX: Math.max(W, col * W), maxY: H }, focusId };
+	// 2D uniform grid (spec §3): square S×S cells, R rows × C=2R columns so the
+	// bbox is exactly 2:1 = the red grid's 16:8 ⇒ a square mesh (uH=2π·H/W is
+	// isotropic). Fill column-major: item k → (col=⌊k/R⌋, row=k%R). N (k=0) lands
+	// at (0,0) ⇒ v=0. Trailing cells stay empty (Escher wallpaper margin).
+	const n = items.length;
+	const R = Math.max(2, Math.ceil(Math.sqrt(n / 2)));
+	const C = 2 * R;
+	const S = CARD_CELL_W; // square source cell (value is arbitrary; only ratios matter)
+	const shapes: DrosteShape[] = items.map((it, k) => {
+		const col = Math.floor(k / R);
+		const row = k % R;
+		return { ...it, x0: col * S, y0: row * S, x1: col * S + S, y1: row * S + S };
+	});
+	return { shapes, bbox: { minX: 0, minY: 0, maxX: C * S, maxY: R * S }, focusId };
 }
 
 // Test/inspection helper: the ①②③④ shapes grouped by role (data correctness).
