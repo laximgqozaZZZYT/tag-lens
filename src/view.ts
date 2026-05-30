@@ -1954,6 +1954,17 @@ export class MiniGraphView extends ItemView {
 			this.requestDraw();
 			return;
 		}
+		if (this.laid.droste) {
+			// Droste leaves nodes/clusters empty; the renderer centres the
+			// spiral at the canvas middle (R0 = min(w,h)/(4·dpr)), so a reset
+			// camera (zoom 1, no pan) frames the whole spiral. Without this,
+			// switching INTO droste from a zoomed-out mode leaves stale
+			// zoom/pan and the spiral renders microscopically.
+			this.zoom = 1;
+			this.panX = 0;
+			this.panY = 0;
+			return;
+		}
 		const hasContent =
 			this.laid.clusters.length > 0 || this.laid.nodes.length > 0;
 		if (!hasContent) return;

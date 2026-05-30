@@ -237,7 +237,7 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		if (merged.drosteTwistDir !== "ccw" && merged.drosteTwistDir !== "cw") {
 			merged.drosteTwistDir = "ccw";
 		}
-		merged.drosteCopies = intPositive(merged.drosteCopies, 4, 1);
+		merged.drosteCopies = Math.min(8, intPositive(merged.drosteCopies, 4, 1));
 		merged.drosteSubdiv = intPositive(merged.drosteSubdiv, 24, 1);
 		if (typeof merged.drosteFocus !== "string") merged.drosteFocus = "";
 		this.settings = merged as unknown as MiniSettings;
