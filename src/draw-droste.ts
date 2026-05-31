@@ -4,6 +4,7 @@ import { truncateToWidth } from "./canvas-utils";
 export interface DrawDrosteOpts {
 	canvas: HTMLCanvasElement;
 	dpr: number;
+	minFontPx: number; // units smaller than this (device px) are not recursed into
 	hoverId: string | null;
 	focusId: string;
 	// Optional collector: drawOrtho pushes each clickable card's SCREEN rect (device
@@ -31,24 +32,15 @@ function roleColor(role: 1 | 2 | 3 | 4 | 5): { h: number; s: number; l: number }
 //   ② T-exact notes — small squares arranged AROUND ① on a SQUARE ring (surrounding
 //      it, themselves forming a square).
 //   ③ T-enclosure, ④ subset enclosures — square frames nested outside.
-function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
-	const cx = o.canvas.width / 2, cy = o.canvas.height / 2;
-	// When ⑤ (unrelated notes) are present, shrink the ①②③④ core so they fit in an
-	// outer ring around it.
-	const hasFive = meta.shapes.some((e) => e.role === 5);
-	const maxR = Math.min(cx, cy) * (hasFive ? 0.72 : 0.94);
-	// Cartesian coordinate grid (background) — straight x/y lines centred on (cx,cy).
-	// (Under the warp this is what becomes the red Print-Gallery spiral mesh.)
-	const gstep = maxR / 16; // finer grid
-	ctx.strokeStyle = "rgba(210, 80, 80, 0.26)";
-	ctx.lineWidth = 1 * o.dpr;
-	for (let x = cx % gstep; x <= o.canvas.width; x += gstep) {
-		ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, o.canvas.height); ctx.stroke();
-	}
-	for (let y = cy % gstep; y <= o.canvas.height; y += gstep) {
-		ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(o.canvas.width, y); ctx.stroke();
-	}
-	// Snap an edge coord to the nearest grid line so ①②③④ borders align to the grid.
+// Draw ONE Droste unit (① N ∈ ② siblings ∈ ③ T-enclosure ∈ ④ subset enclosures,
+// plus ⑤ unrelated notes when drawFive) into the square centred on (ux,uy) with
+// half-size uR. Geometry is parametrised by the unit rect so the renderer can nest
+// ×1/2 copies toward the centre (drawNest). ⑤ is drawn only on the outermost unit.
+function drawUnit(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts, ux: number, uy: number, uR: number, drawFive: boolean): void {
+	const cx = ux, cy = uy;
+	const maxR = uR;
+	const gstep = maxR / 16; // this unit's grid pitch
+	// Snap an edge coord to THIS unit's grid (centred on its centre).
 	const snapX = (v: number): number => cx + Math.round((v - cx) / gstep) * gstep;
 	const snapY = (v: number): number => cy + Math.round((v - cy) / gstep) * gstep;
 	const r1half = 2 * gstep; // ① N = 4×4 grid cells
@@ -164,11 +156,10 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 			ctx.lineWidth = 1.5 * o.dpr; ctx.strokeStyle = "#1a1c22"; ctx.stroke();
 		}
 	}
-	// ⑤ unrelated notes (signature not ⊆ T): placed OUTSIDE the ①②③④ core. We tile
-	// the whole canvas on the grid and keep only cells that fall in the OUTER region
-	// (outside the core's bounding square), so ⑤ never overlaps ①②③④. ALL unrelated
-	// notes are shown; if more than the outer region holds, the last slot is a "+N".
-	const r5 = role(5);
+	// ⑤ unrelated notes (signature not ⊆ T): drawn ONLY on the outermost unit
+	// (drawFive), tiled in the OUTER region (outside the core square) so they never
+	// overlap ①②③④. ALL unrelated notes are shown; overflow becomes a "+N".
+	const r5 = drawFive ? role(5) : [];
 	if (r5.length) {
 		const step5 = gstep * 0.8; // ⑤ cell pitch (denser so more unrelated notes fit)
 		const m5 = gstep * 0.34;
@@ -201,8 +192,36 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 			}
 		}
 	}
-	// Hover tooltip: the grid cells are tiny (⑤ especially), so show the hovered
-	// note's full title in a small box near it.
+}
+
+// Orthogonal Droste recursion: draw the SAME unit (same focus) at the centre,
+// scaled ×1/2 each step, depth levels deep, outermost first so inner copies sit on
+// top. ⑤ is drawn once on the outermost unit; inner units are ①②③④ only. Units
+// smaller than minFontPx are skipped. No conformal warp, no red grid, no seg/copies.
+const DROSTE_K = 0.5; // shrink factor per nested level
+const DROSTE_DEPTH = 5; // number of nested copies
+
+function drawNest(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
+	const cx = o.canvas.width / 2, cy = o.canvas.height / 2;
+	const hasFive = meta.shapes.some((e) => e.role === 5);
+	// Outermost unit half-size: shrink when ⑤ exist so they fit in an outer ring.
+	const outerR = Math.min(cx, cy) * (hasFive ? 0.72 : 0.94);
+	const minSide = Math.max(8, o.minFontPx) * o.dpr; // skip units below the font floor
+	// Faint cartesian grid once (outermost unit's pitch), for the orthogonal look.
+	const gstep = outerR / 16;
+	ctx.strokeStyle = "rgba(210, 80, 80, 0.22)";
+	ctx.lineWidth = 1 * o.dpr;
+	for (let x = cx % gstep; x <= o.canvas.width; x += gstep) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, o.canvas.height); ctx.stroke(); }
+	for (let y = cy % gstep; y <= o.canvas.height; y += gstep) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(o.canvas.width, y); ctx.stroke(); }
+	// Outer → inner: draw the largest unit first, each ×DROSTE_K, up to DROSTE_DEPTH.
+	let uR = outerR;
+	for (let d = 0; d < DROSTE_DEPTH; d++) {
+		if (2 * uR < minSide) break; // too small to read → stop recursing
+		drawUnit(ctx, meta, o, cx, cy, uR, d === 0); // ⑤ only on the outermost (d===0)
+		uR *= DROSTE_K;
+	}
+	// Hover tooltip (drawn last, on top): the cells are tiny, so show the hovered
+	// note's full title near it. hitRegions accumulated across all units.
 	if (o.hoverId && o.hitRegions) {
 		const hr = o.hitRegions.find((r) => r.id === o.hoverId);
 		let label = "";
@@ -218,7 +237,7 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 			let bx = (hr.x0 + hr.x1) / 2 - bw / 2;
 			let by = hr.y0 - bh - 4 * o.dpr;
 			bx = Math.max(2 * o.dpr, Math.min(bx, o.canvas.width - bw - 2 * o.dpr));
-			if (by < 2 * o.dpr) by = hr.y1 + 4 * o.dpr; // flip below if no room above
+			if (by < 2 * o.dpr) by = hr.y1 + 4 * o.dpr;
 			ctx.fillStyle = "rgba(18,20,26,0.94)";
 			ctx.strokeStyle = "rgba(230,236,245,0.45)";
 			ctx.lineWidth = 1 * o.dpr;
@@ -235,6 +254,6 @@ export function drawDroste(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: D
 	ctx.fillStyle = "#0f1116";
 	ctx.fillRect(0, 0, o.canvas.width, o.canvas.height);
 	if (meta.shapes.length === 0) return;
-	// Droste-effect containment view: the ①②③④ nesting on a cartesian grid.
-	drawOrtho(ctx, meta, o);
+	// Orthogonal Droste recursion of the ①②③④(⑤) unit.
+	drawNest(ctx, meta, o);
 }

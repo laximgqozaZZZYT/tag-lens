@@ -2100,6 +2100,7 @@ export class MiniGraphView extends ItemView {
 			drawDroste(ctx, this.laid.droste, {
 				canvas: this.canvas,
 				dpr,
+				minFontPx: this.settings.minFontPx,
 				hoverId: this.hoveredNodeId,
 				focusId: this.laid.droste.focusId,
 				hitRegions: (this.drosteHit = []),
