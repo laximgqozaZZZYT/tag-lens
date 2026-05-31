@@ -38,35 +38,64 @@ function roleColor(role: 1 | 2 | 3 | 4): { h: number; s: number; l: number } {
 	}
 }
 
-// Orthogonal render = everything as centred, axis-aligned SQUARES, nested by ①②③④
-// order (① smallest at centre → ④ largest), overlapping allowed. No polar, no warp.
+// Orthogonal render (all squares, axis-aligned, no polar/warp):
+//   ① N — a square at the centre.
+//   ② T-exact notes — small squares arranged AROUND ① on a SQUARE ring (surrounding
+//      it, themselves forming a square).
+//   ③ T-enclosure, ④ subset enclosures — square frames nested outside.
 function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
 	const cx = o.canvas.width / 2, cy = o.canvas.height / 2;
-	const maxR = Math.min(cx, cy) * 0.92;
-	const minR = maxR * 0.1;
-	// Shapes are emitted in ①②③④ order; rank → square half-size (ascending).
-	const n = meta.shapes.length;
-	const half = (i: number) => minR + (n > 1 ? i / (n - 1) : 0) * (maxR - minR);
-	// Back-to-front: largest (④) first so smaller squares (① …) sit on top.
-	for (let i = n - 1; i >= 0; i--) {
-		const e = meta.shapes[i];
-		const rc = roleColor(e.role);
-		const r = half(i);
-		const x = cx - r, y = cy - r, sz = 2 * r;
-		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.28)`;
-		ctx.fillRect(x, y, sz, sz);
-		ctx.lineWidth = (e.id === o.hoverId ? 3.5 : 2) * o.dpr;
+	const maxR = Math.min(cx, cy) * 0.94;
+	const R1 = maxR * 0.13; // ① centre square half-size
+	const RR = maxR * 0.42; // ② ring radius (square the ② notes sit on)
+	const R3 = maxR * 0.66; // ③ frame
+	const R4 = maxR * 0.9; // ④ frame(s)
+	const cardH = maxR * 0.11; // ② note square half-size
+
+	// Point on a square (half-size R, centred) at perimeter fraction t ∈ [0,1).
+	const squarePt = (t: number, R: number): Pt => {
+		const p = ((t % 1) + 1) % 1 * 4, side = Math.floor(p) % 4, f = p - Math.floor(p);
+		if (side === 0) return { x: cx - R + 2 * R * f, y: cy - R };
+		if (side === 1) return { x: cx + R, y: cy - R + 2 * R * f };
+		if (side === 2) return { x: cx + R - 2 * R * f, y: cy + R };
+		return { x: cx - R, y: cy + R - 2 * R * f };
+	};
+	const frame = (R: number, rc: { h: number; s: number; l: number }, hover: boolean, label: string): void => {
+		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.10)`;
+		ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+		ctx.lineWidth = (hover ? 4 : 3) * o.dpr;
 		ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 12, 82)}%)`;
-		ctx.strokeRect(x, y, sz, sz);
-		// Label on the square's top edge so nested labels stack readably.
+		ctx.strokeRect(cx - R, cy - R, 2 * R, 2 * R);
 		ctx.fillStyle = "#e6ecf5";
 		ctx.font = `${12 * o.dpr}px sans-serif`;
-		ctx.textAlign = "center";
-		ctx.textBaseline = "bottom";
-		ctx.fillText(truncateToWidth(ctx, e.label, sz * 0.95), cx, y - 2 * o.dpr);
+		ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+		ctx.fillText(truncateToWidth(ctx, label, 2 * R * 0.95), cx, cy - R - 2 * o.dpr);
+	};
+	const square = (px: number, py: number, h: number, rc: { h: number; s: number; l: number }, hover: boolean, label: string): void => {
+		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.4)`;
+		ctx.fillRect(px - h, py - h, 2 * h, 2 * h);
+		ctx.lineWidth = (hover ? 3.5 : 1.8) * o.dpr;
+		ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 14, 85)}%)`;
+		ctx.strokeRect(px - h, py - h, 2 * h, 2 * h);
+		ctx.fillStyle = "#e6ecf5";
+		ctx.font = `${Math.min(h * 0.34, 12 * o.dpr)}px sans-serif`;
+		ctx.textAlign = "center"; ctx.textBaseline = "middle";
+		ctx.fillText(truncateToWidth(ctx, label, 2 * h * 0.92), px, py);
+	};
+
+	const role = (n: number) => meta.shapes.filter((e) => e.role === n);
+	// ④ frames (back), nested concentric if several; then ③.
+	const r4 = role(4);
+	r4.forEach((e, i) => frame(R4 - (i * (R4 - R3) * 0.5) / Math.max(1, r4.length), roleColor(4), e.id === o.hoverId, e.label));
+	for (const e of role(3)) frame(R3, roleColor(3), e.id === o.hoverId, e.label);
+	// ② T-exact notes around ① on the square ring at RR.
+	const r2 = role(2);
+	r2.forEach((e, j) => { const p = squarePt(j / Math.max(1, r2.length), RR); square(p.x, p.y, cardH, roleColor(2), e.id === o.hoverId, e.label); });
+	// ① N at the centre (on top).
+	for (const e of role(1)) {
+		square(cx, cy, R1, roleColor(1), e.id === o.hoverId, e.label);
 		if (e.id === o.focusId) {
-			ctx.beginPath();
-			ctx.arc(cx, cy, Math.max(3 * o.dpr, minR * 0.5), 0, 2 * Math.PI);
+			ctx.beginPath(); ctx.arc(cx, cy, Math.max(3 * o.dpr, R1 * 0.4), 0, 2 * Math.PI);
 			ctx.fillStyle = "#ffd35c"; ctx.fill();
 			ctx.lineWidth = 1.5 * o.dpr; ctx.strokeStyle = "#1a1c22"; ctx.stroke();
 		}
