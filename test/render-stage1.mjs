@@ -1,7 +1,10 @@
-// Stage 1 offline verification: warp a uniform 12×12 grid over a SQUARE source
-// bbox through the REAL conformal map (drosteUV + drosteForward from src/), and
-// emit an SVG. Goal: confirm the grid becomes a NET (crossing distorted quads),
-// not just radial spokes. k=2.5, ccw, copies=1, every line subdivided per-vertex.
+// Stage 1 offline verification (v2 — mathvisuals method): INVERSE per-pixel.
+// mathvisuals/PrintGallery samples a REPEATING grid texture at w = (re+im·i)·
+// log(z)/2π for every OUTPUT pixel z (CindyGL `colorplot` + imagergb repeat->true).
+// We replicate that: for each pixel, invert z → ζ via the real conformal.ts
+// (drosteInverseBranch), then shade red near integer grid lines of (u,v) tiled by
+// du=dv=2π/N. The twist (Im γ ≠ 0) couples ln|z| into the angular coord, so a
+// single principal strip tiles the whole plane → dense Droste mesh (not 1 turn).
 import { build } from "esbuild";
 import { pathToFileURL } from "node:url";
 import { writeFileSync, mkdtempSync } from "node:fs";
@@ -9,62 +12,63 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const entry = `
-import { drosteUV } from "../src/droste-layout";
-import { drosteForward } from "../src/conformal";
+import { drosteInverseBranch } from "../src/conformal";
 import { writeFileSync } from "node:fs";
+import { deflateSync } from "node:zlib";
 
-// SQUARE source bbox ⇒ uH = 2π·(H/W) = 2π (isotropic). This is the crux: a wide
-// bbox shrinks uH, collapses the u(ring) family, and leaves only radial spokes.
-const b = { minX: 0, minY: 0, maxX: 1, maxY: 1 };
-const p = { k: 2.5, twistDir: 1, R0: 1 }; // ccw; R0 arbitrary, we auto-fit below
-const N = 12;     // 12×12 grid
-const SUB = 24;   // drosteSubdiv: per-vertex subdivision of each grid line
-const m = 0;      // copies=1 ⇒ only m=0
+const W = 800, H = 800;
+const p = { k: 2.5, twistDir: 1, R0: 1 }; // ccw
+const N = 12;                 // grid divisions per 2π
+const du = 2 * Math.PI / N, dv = 2 * Math.PI / N;
+const VIEW = 4.0;             // world half-extent mapped to the canvas
+const LW = 0.05;              // half line width in cell units
 
-// Map a source point through the exact same pipeline project() uses.
-function map(x, y) {
-  const { u, v } = drosteUV(b, x, y);
-  return drosteForward(u, v + 2 * Math.PI * m, p); // {re, im}
+const buf = Buffer.alloc(W * H * 4);
+const near = (val, step) => { const f = val / step - Math.round(val / step); return Math.abs(f); };
+for (let py = 0; py < H; py++) {
+  for (let px = 0; px < W; px++) {
+    const zx = (px / W * 2 - 1) * VIEW;
+    const zy = (py / H * 2 - 1) * VIEW;
+    let r = 15, g = 17, b = 22; // bg #0f1116
+    const mag = Math.hypot(zx, zy);
+    if (mag > 1e-4) {
+      const { u, vRaw } = drosteInverseBranch({ re: zx, im: zy }, p, 0);
+      const d = Math.min(near(u, du), near(vRaw, dv)); // distance to nearest line (cell units)
+      if (d < LW) {
+        const a = 1 - d / LW;           // soft edge
+        r = Math.round(15 + (220 - 15) * a);
+        g = Math.round(17 + (60 - 17) * a);
+        b = Math.round(22 + (60 - 22) * a);
+      }
+    }
+    const o = (py * W + px) * 4;
+    buf[o] = r; buf[o + 1] = g; buf[o + 2] = b; buf[o + 3] = 255;
+  }
 }
 
-const lines = [];
-// vertical lines: const X (= const v), Y varies → the radial-ish family
-for (let i = 0; i <= N; i++) {
-  const x = i / N;
-  const pts = [];
-  for (let s = 0; s <= SUB; s++) pts.push(map(x, s / SUB));
-  lines.push(pts);
+// minimal PNG encoder (RGBA, no filter) via zlib
+function png(width, height, rgba) {
+  const raw = Buffer.alloc((width * 4 + 1) * height);
+  for (let y = 0; y < height; y++) {
+    raw[y * (width * 4 + 1)] = 0; // filter: none
+    rgba.copy(raw, y * (width * 4 + 1) + 1, y * width * 4, (y + 1) * width * 4);
+  }
+  const idat = deflateSync(raw);
+  const crcTable = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  const crc = (b) => { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = crcTable[(c ^ b[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length, 0);
+    const td = Buffer.concat([Buffer.from(type, "ascii"), data]);
+    const c = Buffer.alloc(4); c.writeUInt32BE(crc(td), 0);
+    return Buffer.concat([len, td, c]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", idat), chunk("IEND", Buffer.alloc(0))]);
 }
-// horizontal lines: const Y (= const u), X varies → the ring family
-for (let j = 0; j <= N; j++) {
-  const y = j / N;
-  const pts = [];
-  for (let s = 0; s <= SUB; s++) pts.push(map(s / SUB, y));
-  lines.push(pts);
-}
-
-// auto-fit z-bbox into a square canvas
-let minRe = Infinity, maxRe = -Infinity, minIm = Infinity, maxIm = -Infinity;
-for (const ln of lines) for (const z of ln) {
-  if (z.re < minRe) minRe = z.re; if (z.re > maxRe) maxRe = z.re;
-  if (z.im < minIm) minIm = z.im; if (z.im > maxIm) maxIm = z.im;
-}
-const W = 1000, H = 1000, pad = 40;
-const spanRe = maxRe - minRe || 1, spanIm = maxIm - minIm || 1;
-const sc = Math.min((W - 2 * pad) / spanRe, (H - 2 * pad) / spanIm);
-const ox = (W - sc * spanRe) / 2, oy = (H - sc * spanIm) / 2;
-const sx = (re) => ox + (re - minRe) * sc;
-const sy = (im) => oy + (im - minIm) * sc;
-
-let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" style="background:#0f1116">';
-for (const ln of lines) {
-  const d = ln.map((z, k) => (k ? "L" : "M") + sx(z.re).toFixed(2) + " " + sy(z.im).toFixed(2)).join(" ");
-  svg += '<path d="' + d + '" fill="none" stroke="rgba(220,60,60,0.7)" stroke-width="1.3"/>';
-}
-svg += "</svg>";
-writeFileSync("/home/ubuntu/obsidian-plugins/tag-lens/stage1-mesh.svg", svg);
-console.log("wrote stage1-mesh.svg :", lines.length, "lines,", (N+1)*2, "grid lines, each", SUB, "segments");
-console.log("z-bbox re[", minRe.toFixed(3), maxRe.toFixed(3), "] im[", minIm.toFixed(3), maxIm.toFixed(3), "]");
+writeFileSync("/home/ubuntu/obsidian-plugins/tag-lens/stage1-mesh.png", png(W, H, buf));
+console.log("wrote stage1-mesh.png (inverse per-pixel, N=" + N + ", k=2.5 ccw, view±" + VIEW + ")");
 `;
 
 const result = await build({
