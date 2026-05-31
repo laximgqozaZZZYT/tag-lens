@@ -38,9 +38,10 @@ function roleColor(role: 1 | 2 | 3 | 4): { h: number; s: number; l: number } {
 	}
 }
 
-// Orthogonal render = plain POLAR (NO exp(γζ) twist): radius = u (depth), angle = v.
-// Shows ① ∈ ② ∈ ③ ∈ ④ as concentric ring-sectors (containment visible) without the
-// conformal spiral. Each shape's source rect → (u,v) via drosteUV → ring sector.
+// Orthogonal render = CARTESIAN concentric nested RECTANGLES (NO exp(γζ) twist):
+// "radius" = u (depth) as a square half-size, position = v (angle) on the square's
+// perimeter (Chebyshev map: divide the circle direction by max(|cos|,|sin|)). Shows
+// ① ∈ ② ∈ ③ ∈ ④ as nested boxes (containment visible) in plain x/y, no spiral.
 function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
 	const b = meta.bbox;
 	const cx = o.canvas.width / 2, cy = o.canvas.height / 2;
@@ -53,7 +54,8 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	const pt = (x: number, y: number): Pt => {
 		const { u, v } = drosteUV(b, x, y);
 		const r = radOf(u);
-		return { x: cx + r * Math.cos(v), y: cy + r * Math.sin(v) };
+		const c = Math.cos(v), s = Math.sin(v), m = Math.max(Math.abs(c), Math.abs(s)) || 1;
+		return { x: cx + (r * c) / m, y: cy + (r * s) / m }; // square (concentric rect) perimeter
 	};
 	// Ring-sector path: outer arc (subdivided in v) + inner arc back.
 	const ringPath = (e: DrosteShape): void => {
