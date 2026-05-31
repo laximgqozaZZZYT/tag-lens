@@ -160,10 +160,11 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	// ② T-exact notes fill the cells SURROUNDING ① (ring by ring) → enclose it.
 	r2.forEach((e, j) => { const p = cellCenter(around[j].col, around[j].row); square(p.x, p.y, cardH, roleColor(2), e.id === o.hoverId, e.label); });
 	// ① N at the centre cell (on top).
+	const r1half = 2 * gstep; // ① N = 4×4 grid cells
 	for (const e of role(1)) {
-		square(cx, cy, cardH, roleColor(1), e.id === o.hoverId, e.label);
+		square(cx, cy, r1half, roleColor(1), e.id === o.hoverId, e.label);
 		if (e.id === o.focusId) {
-			ctx.beginPath(); ctx.arc(cx, cy, Math.max(3 * o.dpr, cardH * 0.4), 0, 2 * Math.PI);
+			ctx.beginPath(); ctx.arc(cx, cy, Math.max(3 * o.dpr, r1half * 0.35), 0, 2 * Math.PI);
 			ctx.fillStyle = "#ffd35c"; ctx.fill();
 			ctx.lineWidth = 1.5 * o.dpr; ctx.strokeStyle = "#1a1c22"; ctx.stroke();
 		}
