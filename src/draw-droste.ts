@@ -170,8 +170,8 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	// notes are shown; if more than the outer region holds, the last slot is a "+N".
 	const r5 = role(5);
 	if (r5.length) {
-		const step5 = gstep; // one grid cell per ⑤ note
-		const m5 = gstep * 0.42;
+		const step5 = gstep * 0.8; // ⑤ cell pitch (denser so more unrelated notes fit)
+		const m5 = gstep * 0.34;
 		const exHalf = D + H4 + gstep; // core exclusion half-extent (covers the ④ union)
 		const edge = gstep * 0.7; // keep cards off the very edge
 		// Candidate cell centres on the grid, outside the core square and inside canvas,
@@ -199,6 +199,33 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 				const e = r5[i];
 				square(s.x, s.y, m5, rc5, e.id === o.hoverId, e.label, e.id);
 			}
+		}
+	}
+	// Hover tooltip: the grid cells are tiny (⑤ especially), so show the hovered
+	// note's full title in a small box near it.
+	if (o.hoverId && o.hitRegions) {
+		const hr = o.hitRegions.find((r) => r.id === o.hoverId);
+		let label = "";
+		for (const s of meta.shapes) {
+			if (s.id === o.hoverId) { label = s.label; break; }
+			const m = s.members?.find((mm) => mm.id === o.hoverId);
+			if (m) { label = m.label; break; }
+		}
+		if (hr && label) {
+			ctx.font = `${12 * o.dpr}px sans-serif`;
+			const pad = 6 * o.dpr, bh = 20 * o.dpr;
+			const bw = ctx.measureText(label).width + 2 * pad;
+			let bx = (hr.x0 + hr.x1) / 2 - bw / 2;
+			let by = hr.y0 - bh - 4 * o.dpr;
+			bx = Math.max(2 * o.dpr, Math.min(bx, o.canvas.width - bw - 2 * o.dpr));
+			if (by < 2 * o.dpr) by = hr.y1 + 4 * o.dpr; // flip below if no room above
+			ctx.fillStyle = "rgba(18,20,26,0.94)";
+			ctx.strokeStyle = "rgba(230,236,245,0.45)";
+			ctx.lineWidth = 1 * o.dpr;
+			ctx.fillRect(bx, by, bw, bh); ctx.strokeRect(bx, by, bw, bh);
+			ctx.fillStyle = "#e6ecf5";
+			ctx.textAlign = "left"; ctx.textBaseline = "middle";
+			ctx.fillText(label, bx + pad, by + bh / 2);
 		}
 	}
 }

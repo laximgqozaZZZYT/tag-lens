@@ -1403,6 +1403,14 @@ export class MiniGraphView extends ItemView {
 		}
 		this.clusterLabels = clusterLabels;
 
+		// Droste-effect view operates vault-wide: snapshot the post-HAVING graph
+		// BEFORE the LIMIT stage trims it, so the containment map (and especially
+		// ⑤ unrelated notes) covers all notes, not just the limited subset.
+		const drosteFullData =
+			this.settings.viewMode === "droste"
+				? { nodes: data.nodes.slice(), edges: data.edges.slice() }
+				: undefined;
+
 		// Stage 2: degree maps (total / in / out). Used by ORDER_BY + size-
 		// mode resolvers. Cleared in place so view-state references stay
 		// valid for callers holding the same Map instance.
@@ -1487,6 +1495,7 @@ export class MiniGraphView extends ItemView {
 			latticeShowSubsetLinks: this.settings.latticeShowSubsetLinks,
 			latticeSpecificTop: this.settings.latticeSpecificTop,
 			drosteFocus: this.settings.drosteFocus,
+			drosteAllData: drosteFullData,
 			// Per-node "show names" checkbox state — layout uses it to expand
 			// each checked node so its name rows fit. Spread to a plain array
 			// so the LayoutOptions payload stays JSON-safe. The labels map
