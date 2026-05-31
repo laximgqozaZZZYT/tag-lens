@@ -1121,8 +1121,26 @@ export class MiniGraphView extends ItemView {
 		section.createEl("h4", { text: "Droste Effect" });
 		section.createEl("div", {
 			cls: "gim-row",
-			text: "Containment view from the focus note (①∈②∈③∈④). Click a note to re-centre.",
+			text: "Zoom (wheel on the canvas, or the buttons) drills through related notes; each ×2 promotes the focus. Click a note to re-centre.",
 		});
+		const row = section.createDiv({ cls: "gim-row" });
+		const zin = row.createEl("button", { text: "Zoom in ⊕" });
+		zin.addEventListener("click", () => this.drosteZoomBy(0.5));
+		const zout = row.createEl("button", { text: "Zoom out ⊖" });
+		zout.addEventListener("click", () => this.drosteZoomBy(-0.5));
+	}
+
+	// Step the Droste zoom (one unit = ×2 = one focus promotion). Re-lays the focus
+	// window when the integer index changes, then repaints. Shared by the wheel and
+	// the panel buttons so zoom works even where wheel events are intercepted.
+	private drosteZoomBy(delta: number): void {
+		const seq = this.laid.drosteSeq;
+		if (!seq || seq.length === 0) return;
+		const prevI = Math.floor(this.drosteZoom);
+		this.drosteZoom = Math.max(0, Math.min(seq.length - 1, this.drosteZoom + delta));
+		const i = Math.floor(this.drosteZoom);
+		if (i !== prevI) this.relayoutDrosteWindow(i);
+		this.requestDraw();
 	}
 
 	// One radio row for a view mode. Shared by the stable list and the
@@ -3313,15 +3331,8 @@ export class MiniGraphView extends ItemView {
 			// the focus window by one, so zooming alone walks the whole seq. Each unit
 			// step re-lays the visible focus window from the full graph.
 			if (this.laid.droste && this.laid.drosteSeq && this.laid.drosteSeq.length > 0) {
-				const seq = this.laid.drosteSeq;
-				const prevI = Math.floor(this.drosteZoom);
-				// Responsive step: one mouse notch ≈ 0.35 of a unit (so a few scrolls
-				// promote the focus); clamp per-event so a big delta doesn't leap.
-				const step = Math.max(-0.5, Math.min(0.5, e.deltaY * 0.0035));
-				this.drosteZoom = Math.max(0, Math.min(seq.length - 1, this.drosteZoom - step));
-				const i = Math.floor(this.drosteZoom);
-				if (i !== prevI) this.relayoutDrosteWindow(i);
-				this.requestDraw();
+				// One mouse notch ≈ 0.35 unit (clamped) so a few scrolls promote focus.
+				this.drosteZoomBy(-Math.max(-0.5, Math.min(0.5, e.deltaY * 0.0035)));
 				return;
 			}
 			const rect = c.getBoundingClientRect();
