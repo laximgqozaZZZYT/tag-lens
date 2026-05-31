@@ -46,6 +46,17 @@ function roleColor(role: 1 | 2 | 3 | 4): { h: number; s: number; l: number } {
 function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
 	const cx = o.canvas.width / 2, cy = o.canvas.height / 2;
 	const maxR = Math.min(cx, cy) * 0.94;
+	// Cartesian coordinate grid (background) — straight x/y lines centred on (cx,cy).
+	// (Under the warp this is what becomes the red Print-Gallery spiral mesh.)
+	const gstep = (o.gridV && o.gridV > 1 ? Math.min(cx, cy) * 2 / o.gridV : maxR / 6);
+	ctx.strokeStyle = "rgba(210, 80, 80, 0.28)";
+	ctx.lineWidth = 1 * o.dpr;
+	for (let x = cx % gstep; x <= o.canvas.width; x += gstep) {
+		ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, o.canvas.height); ctx.stroke();
+	}
+	for (let y = cy % gstep; y <= o.canvas.height; y += gstep) {
+		ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(o.canvas.width, y); ctx.stroke();
+	}
 	const role = (n: number) => meta.shapes.filter((e) => e.role === n);
 	const r2 = role(2);
 	// ①②: a centred square GRID — ① is the centre cell, ② fill the surrounding
