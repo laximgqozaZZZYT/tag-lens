@@ -1121,13 +1121,8 @@ export class MiniGraphView extends ItemView {
 		section.createEl("h4", { text: "Droste Effect" });
 		section.createEl("div", {
 			cls: "gim-row",
-			text: "Zoom (wheel on the canvas, or the buttons) drills through related notes; each ×2 promotes the focus. Click a note to re-centre.",
+			text: "Use the toolbar 🔍 zoom in/out (or the wheel) to drill through related notes — each ×2 promotes the focus. Click a note to re-centre.",
 		});
-		const row = section.createDiv({ cls: "gim-row" });
-		const zin = row.createEl("button", { text: "Zoom in ⊕" });
-		zin.addEventListener("click", () => this.drosteZoomBy(0.5));
-		const zout = row.createEl("button", { text: "Zoom out ⊖" });
-		zout.addEventListener("click", () => this.drosteZoomBy(-0.5));
 	}
 
 	// Step the Droste zoom (one unit = ×2 = one focus promotion). Re-lays the focus
@@ -1766,6 +1761,12 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private zoomBy(factor: number): void {
+		// Droste-effect view: the toolbar magnifiers drive the zoom-tunnel (one press
+		// ≈ half a focus step) instead of the world zoom.
+		if (this.laid.droste) {
+			this.drosteZoomBy(factor >= 1 ? 0.5 : -0.5);
+			return;
+		}
 		const rect = this.canvas.getBoundingClientRect();
 		const sx = rect.width / 2;
 		const sy = rect.height / 2;
