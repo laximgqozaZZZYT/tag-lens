@@ -52,7 +52,7 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	// cells (ring by ring) so they enclose ① on all sides and the block is a square.
 	let g = 1; // odd grid size with g² ≥ 1 + |②|
 	while (g * g < 1 + r2.length) g += 2;
-	const B = maxR * 0.25; // ①② block half-size (small, so ④ siblings have room)
+	const B = maxR * 0.2; // ①② block half-size (small, so ④ siblings + members have room)
 	const cell = (2 * B) / g; // grid cell size
 	const cardH = cell * 0.42; // square half-size inside a cell
 	const ctr = (g - 1) / 2;
@@ -95,9 +95,12 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	const r4 = role(4);
 	const rc4 = roleColor(4);
 	// Large offset so independent ④ siblings clearly diverge (Venn overlap sharing
-	// the central ③), not near-concentric (which read as nested).
-	const D = r4.length <= 1 ? 0 : maxR * 0.26; // stagger offset
-	const H4 = Math.min(R3 + D + maxR * 0.04, Math.min(cx, cy) - 2 * o.dpr - D); // each still contains ③
+	// the central ③), not near-concentric (which read as nested). The frame is sized
+	// R3 + offset + a member band so the group's own notes fit between ③ and the edge.
+	const D = r4.length <= 1 ? 0 : maxR * 0.22; // stagger offset
+	const memberBand = maxR * 0.16;
+	const H4 = Math.min(R3 + D + memberBand, Math.min(cx, cy) - 2 * o.dpr - D); // each still contains ③
+	const mh = maxR * 0.042; // member square half-size
 	r4.forEach((e, i) => {
 		const th = (2 * Math.PI * i) / Math.max(1, r4.length); // k=2 → right & left
 		const ox = D * Math.cos(th), oy = D * Math.sin(th);
@@ -111,6 +114,21 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 		ctx.font = `${12 * o.dpr}px sans-serif`;
 		ctx.textAlign = "center"; ctx.textBaseline = "bottom";
 		ctx.fillText(truncateToWidth(ctx, e.label, sz * 0.9), cx + ox, y - 2 * o.dpr);
+		// This group's own notes as small squares, in the outer gap (offset
+		// direction, away from the central ③ they all share).
+		const mem = e.members ?? [];
+		if (mem.length) {
+			const dx = D > 0 ? ox / D : 0, dy = D > 0 ? oy / D : 1; // unit dir (down if no offset)
+			const ccx = cx + dx * (H4 * 0.66), ccy = cy + dy * (H4 * 0.66);
+			const gm = Math.ceil(Math.sqrt(mem.length));
+			const step = mh * 2.2;
+			mem.forEach((mn, k) => {
+				const col = k % gm, row = Math.floor(k / gm);
+				const px = ccx + (col - (gm - 1) / 2) * step;
+				const py = ccy + (row - (gm - 1) / 2) * step;
+				square(px, py, mh, rc4, mn.id === o.hoverId, mn.label);
+			});
+		}
 	});
 	// ③ the single T-enclosure frame around the ①② block (inside every ④).
 	for (const e of role(3)) frame(R3, roleColor(3), e.id === o.hoverId, e.label);

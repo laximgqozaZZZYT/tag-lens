@@ -23,6 +23,10 @@ export interface DrosteShape {
 	y0: number;
 	x1: number;
 	y1: number;
+	// For ④ frames: the nodes belonging to this subset group (its exact-signature
+	// notes) — EXCLUDING ① N / ② T-exact (those have signature T, not a subset).
+	// Drawn as small squares inside the ④ enclosure.
+	members?: { id: string; label: string; hueKey: string }[];
 }
 
 export interface DrosteBBox {
@@ -93,24 +97,24 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 	const exactOrdered = [focusNode, ...exact.filter((n) => n.id !== focusId)];
 
 	// ④ proper-subset signatures present in the data, ordered |sig| desc then count desc.
-	const sigInfo = new Map<string, { keys: string[]; count: number }>();
+	const sigInfo = new Map<string, { keys: string[]; members: GraphNode[] }>();
 	for (const n of nodes) {
 		const keys = [...n.memberships].sort();
 		const subset = keys.length < T.size && keys.every((k) => T.has(k)); // proper ⊊ T
 		if (!subset) continue;
 		const sig = keys.join("");
 		const e = sigInfo.get(sig);
-		if (e) e.count++;
-		else sigInfo.set(sig, { keys, count: 1 });
+		if (e) e.members.push(n);
+		else sigInfo.set(sig, { keys, members: [n] });
 	}
 	let subsetSigs = [...sigInfo.entries()].sort((a, b) =>
-		b[1].keys.length - a[1].keys.length || b[1].count - a[1].count,
+		b[1].keys.length - a[1].keys.length || b[1].members.length - a[1].members.length,
 	);
 	const overflow = subsetSigs.length > cap;
 	if (overflow) subsetSigs = subsetSigs.slice(0, cap - 1);
 
 	// Build the FOUR bands (spec §2) as separate item lists.
-	type Item = { id: string; role: 1 | 2 | 3 | 4; kind: "card" | "frame"; label: string; hueKey: string };
+	type Item = { id: string; role: 1 | 2 | 3 | 4; kind: "card" | "frame"; label: string; hueKey: string; members?: { id: string; label: string; hueKey: string }[] };
 	// ① N alone (NOT mixed with ② cards).
 	const band1: Item[] = [
 		{ id: focusNode.id, role: 1, kind: "card", label: focusNode.label, hueKey: focusNode.memberships[0] ?? focusId },
@@ -126,6 +130,8 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 	// ④ T's proper-subset enclosures (|sig| desc), then "+N" if capped.
 	const band4: Item[] = subsetSigs.map(([sig, info]) => ({
 		id: `__sub_${sig}`, role: 4 as const, kind: "frame" as const, label: sigLabel(info.keys), hueKey: sig,
+		// This subset group's OWN notes (excludes ① N / ② T-exact: different signature).
+		members: info.members.slice(0, cap).map((nd) => ({ id: nd.id, label: nd.label, hueKey: nd.memberships[0] ?? nd.id })),
 	}));
 	if (overflow) band4.push({ id: "__more", role: 4, kind: "frame", label: `+${sigInfo.size - (cap - 1)}`, hueKey: "more" });
 
