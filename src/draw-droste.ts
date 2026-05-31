@@ -7,6 +7,9 @@ export interface DrawDrosteOpts {
 	minFontPx: number; // units smaller than this (device px) are not recursed into
 	hoverId: string | null;
 	focusId: string;
+	// Per-level focus chain: chain[0] = outermost (focus N), deeper entries are the
+	// re-rooted "next" foci so each ×½ centre copy shows a different context.
+	chain?: DrosteMeta[];
 	// Optional collector: drawOrtho pushes each clickable card's SCREEN rect (device
 	// px) here so the view can hit-test without re-deriving the geometry.
 	hitRegions?: { id: string; x0: number; y0: number; x1: number; y1: number }[];
@@ -36,7 +39,7 @@ function roleColor(role: 1 | 2 | 3 | 4 | 5): { h: number; s: number; l: number }
 // plus ⑤ unrelated notes when drawFive) into the square centred on (ux,uy) with
 // half-size uR. Geometry is parametrised by the unit rect so the renderer can nest
 // ×1/2 copies toward the centre (drawNest). ⑤ is drawn only on the outermost unit.
-function drawUnit(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts, ux: number, uy: number, uR: number, drawFive: boolean): void {
+function drawUnit(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts, ux: number, uy: number, uR: number, drawFive: boolean, unitFocus: string): void {
 	const cx = ux, cy = uy;
 	const maxR = uR;
 	const gstep = maxR / 16; // this unit's grid pitch
@@ -150,7 +153,7 @@ function drawUnit(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDroste
 	// ① N at the centre cell (on top).
 	for (const e of role(1)) {
 		square(cx, cy, r1half, roleColor(1), e.id === o.hoverId, e.label, e.id);
-		if (e.id === o.focusId) {
+		if (e.id === unitFocus) {
 			ctx.beginPath(); ctx.arc(cx, cy, Math.max(3 * o.dpr, r1half * 0.35), 0, 2 * Math.PI);
 			ctx.fillStyle = "#ffd35c"; ctx.fill();
 			ctx.lineWidth = 1.5 * o.dpr; ctx.strokeStyle = "#1a1c22"; ctx.stroke();
@@ -213,11 +216,15 @@ function drawNest(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDroste
 	ctx.lineWidth = 1 * o.dpr;
 	for (let x = cx % gstep; x <= o.canvas.width; x += gstep) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, o.canvas.height); ctx.stroke(); }
 	for (let y = cy % gstep; y <= o.canvas.height; y += gstep) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(o.canvas.width, y); ctx.stroke(); }
-	// Outer → inner: draw the largest unit first, each ×DROSTE_K, up to DROSTE_DEPTH.
+	// Per-level metas: chain[d] is re-rooted on the "next" focus so each ×½ copy shows
+	// a DIFFERENT context. Fall back to the single meta if no chain was supplied.
+	const chain = o.chain && o.chain.length ? o.chain : [meta];
+	// Outer → inner: draw the largest unit first, each ×DROSTE_K. ⑤ only on outermost.
 	let uR = outerR;
-	for (let d = 0; d < DROSTE_DEPTH; d++) {
+	for (let d = 0; d < Math.min(chain.length, DROSTE_DEPTH); d++) {
 		if (2 * uR < minSide) break; // too small to read → stop recursing
-		drawUnit(ctx, meta, o, cx, cy, uR, d === 0); // ⑤ only on the outermost (d===0)
+		const md = chain[d];
+		drawUnit(ctx, md, o, cx, cy, uR, d === 0, md.focusId);
 		uR *= DROSTE_K;
 	}
 	// Hover tooltip (drawn last, on top): the cells are tiny, so show the hovered
@@ -225,10 +232,12 @@ function drawNest(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDroste
 	if (o.hoverId && o.hitRegions) {
 		const hr = o.hitRegions.find((r) => r.id === o.hoverId);
 		let label = "";
-		for (const s of meta.shapes) {
-			if (s.id === o.hoverId) { label = s.label; break; }
-			const m = s.members?.find((mm) => mm.id === o.hoverId);
-			if (m) { label = m.label; break; }
+		outer: for (const md of chain) {
+			for (const s of md.shapes) {
+				if (s.id === o.hoverId) { label = s.label; break outer; }
+				const m = s.members?.find((mm) => mm.id === o.hoverId);
+				if (m) { label = m.label; break outer; }
+			}
 		}
 		if (hr && label) {
 			ctx.font = `${12 * o.dpr}px sans-serif`;

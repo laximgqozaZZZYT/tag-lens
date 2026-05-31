@@ -2103,6 +2103,7 @@ export class MiniGraphView extends ItemView {
 				minFontPx: this.settings.minFontPx,
 				hoverId: this.hoveredNodeId,
 				focusId: this.laid.droste.focusId,
+				chain: this.laid.drosteChain,
 				hitRegions: (this.drosteHit = []),
 			});
 			return;
@@ -3219,21 +3220,16 @@ export class MiniGraphView extends ItemView {
 				return;
 			}
 			if (this.laid.droste) {
-				// Conformal inverse-map click. A NODE band → open the file AND
-				// re-root the spiral on it (drosteFocus drives layoutDroste, so
-				// this is a relayout). Cluster bands have no file to open and
-				// re-rooting is node-only, so they're ignored.
+				// Click a note (any level of the recursion — the hit-test records
+				// every drawn card across all nested units) → open it AND re-root the
+				// whole view on it: it becomes the new focus N, T is recomputed and the
+				// focus chain rebuilt. Synthetic cells ("+N", frames) record no id.
 				const id = this.drosteHitTest(sx, sy);
-				// Synthetic cells (↻ bridge "__loop_*", "+N" overflow "__more_*")
-				// have no backing file — ignore them for open / re-root.
 				if (id && !id.startsWith("__")) {
-					const el = this.laid.droste.shapes.find((e) => e.id === id);
-					if (el && el.kind === "card") {
-						this.openFile(id);
-						this.settings.drosteFocus = id;
-						void this.save();
-						void this.rebuild();
-					}
+					this.openFile(id);
+					this.settings.drosteFocus = id;
+					void this.save();
+					void this.rebuild();
 				}
 				return;
 			}

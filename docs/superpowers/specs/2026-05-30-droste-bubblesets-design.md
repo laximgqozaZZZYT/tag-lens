@@ -49,25 +49,38 @@ the query's visible subset.
 ## 3. Render: orthogonal ½-recursion (`draw-droste.ts`)
 
 ```
-drawNest(canvas, focus):
+# layout builds a FOCUS CHAIN so each ×½ centre copy shows a DIFFERENT context:
+chain[0] = layout(N)
+for d in 1 .. DEPTH-1:
+    chain[d] = layout( nextFocus(chain[d-1], used) )   # re-root each level
+# render
+drawNest(canvas):
     grid()                                  # one faint cartesian grid (background)
-    drawFive once around the outermost unit # ⑤ tiled in the outer region
     uR = outerR                             # outermost unit half-size
-    for d in 0 .. DEPTH-1:                  # outer → inner (inner drawn on top)
+    for d in 0 .. len(chain)-1:             # outer → inner (inner drawn on top)
         if 2·uR < minFontPx: break          # too small to read ⇒ stop
-        drawUnit(centre, uR, drawFive = (d == 0))   # ①②③④ ; ⑤ only when d == 0
+        drawUnit(chain[d], centre, uR, drawFive = (d == 0))  # ①②③④ ; ⑤ only d==0
         uR *= k                             # ½ each step
 
 k = 0.5, DEPTH = 5.
 ```
 
+**`nextFocus(meta, used)` — the focus of the next inner level.** Drilling inward must
+reveal a DIFFERENT context, not the same figure shrinking, so we do NOT reuse N or its
+② peers (same `T` ⇒ identical layout). Pick, in order: (1) the first **④ proper-subset
+group's first member** — a representative of a BROADER enclosure N sits in; (2) failing
+that, the first **⑤ unrelated note** — a different region of the vault. Skip ids already
+on the chain (`used`); return nothing ⇒ recursion stops. So the chain walks N → broader
+context → … → an unrelated context, each level a distinct figure.
+
 - **`drawUnit(cx, cy, uR, drawFive)`** draws one ①②③④ (and ⑤ iff `drawFive`) sized to
   the square centred on `(cx,cy)` with half-size `uR`, snapping edges to that unit's own
   grid (`gstep = uR/16`).
-- **⑤ handling (decided):** drawn **only on the outermost unit** (`d == 0`). The
-  recursion uses the SAME focus at every level, so ⑤ is the same unrelated set each
-  time — redundant to repeat, and ×½⁵ shrinkage would crush it into an unreadable blob.
-  Inner units are ①②③④ only; ⑤ is the single outer backdrop.
+- **⑤ handling (decided):** drawn **only on the outermost unit** (`d == 0`). ⑤ is the
+  large surrounding context; ×½⁵ shrinkage would crush it into an unreadable blob, and
+  it is best read as a single outer backdrop. Inner units draw ①②③④ only — but each
+  with its OWN re-rooted focus (the chain above), so the centre is genuinely a different
+  figure, not the same one shrunk.
 - Outermost unit shrinks to `0.72·min(cx,cy)` when ⑤ exist (to leave the outer ring),
   else `0.94`.
 - Draw order outer→inner means each smaller copy sits on top, converging to the centre.

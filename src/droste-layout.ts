@@ -173,6 +173,24 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 }
 
 // Test/inspection helper: the ①②③④ shapes grouped by role (data correctness).
+// Focus for the NEXT (inner, ×½) recursion level. Drilling inward should reveal a
+// DIFFERENT context, not the same figure, so we do NOT reuse N or its ② peers (same
+// T ⇒ identical layout). Instead pick a representative of a BROADER enclosure N sits
+// in — the first ④ proper-subset group's first member — and fall back to an UNRELATED
+// ⑤ note (a different region of the vault) when no broader group is available. `used`
+// holds the focus ids already on the chain so we never loop. undefined ⇒ stop.
+export function nextDrosteFocus(meta: DrosteMeta, used: Set<string>): string | undefined {
+	for (const s of meta.shapes) {
+		if (s.role === 4 && s.members) {
+			for (const m of s.members) if (!used.has(m.id)) return m.id;
+		}
+	}
+	for (const s of meta.shapes) {
+		if (s.role === 5 && s.kind === "card" && !used.has(s.id)) return s.id;
+	}
+	return undefined;
+}
+
 export function drosteRoles(meta: DrosteMeta): { role: number; ids: string[]; labels: string[] }[] {
 	return [1, 2, 3, 4, 5].map((role) => {
 		const s = meta.shapes.filter((e) => e.role === role);
