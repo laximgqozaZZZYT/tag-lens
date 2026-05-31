@@ -15,3 +15,13 @@ docs/*
 # Droste stage verification artifacts
 stage1-mesh.svg
 stage1-mesh.png
+mvexact.png
+mvplain.png
+mvfine.png
+mvobl.png
+tex-verify.png
+logGrid-full.png
+stage1-plugin.png
+test/render-mv*.mjs
+test/verifytex.mjs
+test/verify-plugin.mjs

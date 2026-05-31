@@ -1,4 +1,5 @@
-import { drosteForward, drosteInverseBranch, type DrosteParams } from "./conformal";
+import { drosteForward, type DrosteParams } from "./conformal";
+import { GRID_TEX, decodeGridTex } from "./droste-grid-texture";
 import { drosteUV, type DrosteMeta, type DrosteShape, type DrosteBBox } from "./droste-layout";
 import { truncateToWidth } from "./canvas-utils";
 
@@ -277,51 +278,59 @@ function drawRedGrid(ctx: CanvasRenderingContext2D, b: DrosteBBox, m: number, p:
 //   3 = self-similar nesting (copies>1).
 const DROSTE_STAGE: 1 | 2 | 3 = 1;
 
-// STAGE 1: the Print Gallery red mesh by the mathvisuals method — INVERSE,
-// per-pixel, with TILING. mathvisuals samples a REPEATING grid texture at
-// w = (re+im·i)·log(z)/2π for every OUTPUT pixel z (CindyGL colorplot +
-// imagergb repeat->true). We do the same: for each pixel invert z → ζ=(u,vRaw)
-// via the real conformal.ts (drosteInverseBranch, principal branch n=0), then
-// shade red near the integer grid lines of (u,v) tiled by du=dv=2π/N. The twist
-// (Im γ ≠ 0) couples ln|z| into the angular coord, so a single principal strip
-// TILES the whole plane → a dense, self-similar Droste net filling the screen
-// (NOT one forward-mapped turn). Self-fit view (ignores zoom/pan for now).
+// STAGE 1: the Print Gallery red mesh, reproduced the way mathvisuals.org does it.
+// For every OUTPUT pixel z it samples a REPEATING "log grid" texture at
+//   w = (re + im·i·aspgr)·log(z) / (2π·aspgr) − offset      (geometry 1,-1)
+// (CindyGL colorplot + imagergb repeat->true). We do the same: invert each pixel
+// to w, wrap into the tiled scalloped-grid texture (src/droste-grid-texture.ts),
+// and paint red by its line luminance. The texture's pre-curved content is what
+// makes the result a coherent sheared spiral grid (pure level-sets only give
+// rotationally-symmetric webs). conformal.ts is untouched (this path is the
+// inverse map, not drosteForward). Rendered at reduced res then scaled for speed.
 function drawStage1Grid(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): void {
 	const W = o.canvas.width, H = o.canvas.height;
-	const cx = W / 2, cy = H / 2;
-	// geometry (1,-1) — the mathvisuals/PrintGallery default. Coefficient
-	// (1-i)·log(z)/2π ⇔ γ = 1+i ⇔ k=e^{2π}, twistDir=-1 in conformal.ts (UNCHANGED).
-	// Two orthogonal opposite log-spiral families (±45°) → a dense sheared square net.
-	const p: DrosteParams = { k: Math.exp(2 * Math.PI), twistDir: -1, R0: 1 };
-	const CELL = 0.16; // ζ grid spacing (cell density)
-	const LW = 0.09; // half line width in cell units (thick red lines)
-	const VIEW = 3.0; // world half-extent mapped to the shorter canvas half
-	const sc = Math.min(cx, cy) / VIEW; // world → device px
-	// place the spiral singularity off the centre (like mathvisuals SpiralCenter),
-	// so the visible bulk reads as a tilted lattice and the nest sits to one side.
-	const OFFX = VIEW * 0.42, OFFY = VIEW * 0.06;
-	const img = ctx.createImageData(W, H);
+	const tex = decodeGridTex();
+	const TW = GRID_TEX.width, TH = GRID_TEX.height, yP = GRID_TEX.yPeriod;
+	const aspgr = TW / TH;
+	const re = 1, imA = -aspgr; // geometry (1,-1): coefficient (re + im·i·aspgr), im=-1
+	const k = 1 / (2 * Math.PI * aspgr);
+	const offX = 0.9279, offY = 0.6047; // static texture pan (mathvisuals aa + .3·log(goff))
+	// reduced-resolution offscreen buffer (per-pixel complex log is costly)
+	const scaleDown = Math.min(1, 720 / Math.max(W, H));
+	const ow = Math.max(1, Math.round(W * scaleDown)), oh = Math.max(1, Math.round(H * scaleDown));
+	const oc = document.createElement("canvas"); oc.width = ow; oc.height = oh;
+	const octx = oc.getContext("2d");
+	if (!octx) return;
+	const img = octx.createImageData(ow, oh);
 	const data = img.data;
-	const near = (val: number, step: number): number => { const f = val / step - Math.round(val / step); return Math.abs(f); };
-	for (let py = 0; py < H; py++) {
-		for (let px = 0; px < W; px++) {
-			const zx = (px - cx) / sc + OFFX, zy = (py - cy) / sc + OFFY;
+	const cx = ow / 2, cy = oh / 2;
+	const sc = Math.min(ow, oh) / 12; // singularity centred; view half-span ≈ 6
+	for (let py = 0; py < oh; py++) {
+		for (let px = 0; px < ow; px++) {
+			const zx = (px - cx) / sc, zy = (py - cy) / sc;
 			let r = 15, g = 17, b = 22; // bg #0f1116
-			if (zx * zx + zy * zy > 1e-8) {
-				const { u, vRaw } = drosteInverseBranch({ re: zx, im: zy }, p, 0);
-				const d = Math.min(near(u, CELL), near(vRaw, CELL));
-				if (d < LW) {
-					const a = 1 - d / LW;
-					r = Math.round(15 + (220 - 15) * a);
-					g = Math.round(17 + (60 - 17) * a);
-					b = Math.round(22 + (60 - 22) * a);
-				}
+			const m2 = zx * zx + zy * zy;
+			if (m2 > 1e-10) {
+				const Lr = 0.5 * Math.log(m2), Li = Math.atan2(zy, zx);
+				// w = (re + imA·i)·(Lr + Li·i)·k − off
+				const wRe = (re * Lr - imA * Li) * k - offX;
+				const wIm = (re * Li + imA * Lr) * k - offY;
+				let fx = wRe - Math.floor(wRe);
+				const ty = wIm / yP; let fy = ty - Math.floor(ty);
+				const tx = Math.min(TW - 1, (fx * TW) | 0);
+				const tyy = Math.min(TH - 1, ((1 - fy) * TH) | 0);
+				const line = 1 - tex[tyy * TW + tx] / 255; // ~1 on a grid line
+				r = (15 + (225 - 15) * line) | 0;
+				g = (17 + (40 - 17) * line) | 0;
+				b = (22 + (40 - 22) * line) | 0;
 			}
-			const off = (py * W + px) * 4;
+			const off = (py * ow + px) * 4;
 			data[off] = r; data[off + 1] = g; data[off + 2] = b; data[off + 3] = 255;
 		}
 	}
-	ctx.putImageData(img, 0, 0);
+	octx.putImageData(img, 0, 0);
+	ctx.imageSmoothingEnabled = true;
+	ctx.drawImage(oc, 0, 0, W, H);
 }
 
 export function drawDroste(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
