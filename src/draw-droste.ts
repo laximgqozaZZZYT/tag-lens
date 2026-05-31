@@ -232,6 +232,20 @@ function drawNest(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDroste
 		if (2 * uR > 4 * outerR) continue; // far larger than the canvas → skip (off-screen)
 		drawUnit(ctx, chain[d], o, cx, cy, uR, d === backdropD, chain[d].focusId);
 	}
+	// Zoom HUD (top-left): current focus + zoom fraction, so the wheel response is
+	// visible and the focus promotion as you zoom through the tunnel is legible.
+	{
+		const f0 = chain[0].shapes.find((s) => s.role === 1);
+		const txt = `🔍 ${(o.zoomFrac ?? 0).toFixed(2)}  focus: ${f0 ? f0.label : ""}`;
+		ctx.font = `${12 * o.dpr}px sans-serif`;
+		ctx.textAlign = "left"; ctx.textBaseline = "top";
+		const pad = 5 * o.dpr;
+		const w = ctx.measureText(txt).width + 2 * pad;
+		ctx.fillStyle = "rgba(18,20,26,0.85)";
+		ctx.fillRect(pad, pad, w, 18 * o.dpr);
+		ctx.fillStyle = "#e6ecf5";
+		ctx.fillText(txt, 2 * pad, pad + 4 * o.dpr);
+	}
 	// Hover tooltip (drawn last, on top): the cells are tiny, so show the hovered
 	// note's full title near it. hitRegions accumulated across all units.
 	if (o.hoverId && o.hitRegions) {

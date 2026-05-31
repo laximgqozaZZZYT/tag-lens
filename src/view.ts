@@ -3315,7 +3315,10 @@ export class MiniGraphView extends ItemView {
 			if (this.laid.droste && this.laid.drosteSeq && this.laid.drosteSeq.length > 0) {
 				const seq = this.laid.drosteSeq;
 				const prevI = Math.floor(this.drosteZoom);
-				this.drosteZoom = Math.max(0, Math.min(seq.length - 1, this.drosteZoom - (e.deltaY * 0.0015) / Math.LN2));
+				// Responsive step: one mouse notch ≈ 0.35 of a unit (so a few scrolls
+				// promote the focus); clamp per-event so a big delta doesn't leap.
+				const step = Math.max(-0.5, Math.min(0.5, e.deltaY * 0.0035));
+				this.drosteZoom = Math.max(0, Math.min(seq.length - 1, this.drosteZoom - step));
 				const i = Math.floor(this.drosteZoom);
 				if (i !== prevI) this.relayoutDrosteWindow(i);
 				this.requestDraw();
