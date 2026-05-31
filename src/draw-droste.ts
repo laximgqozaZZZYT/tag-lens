@@ -123,7 +123,7 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	const D = r4.length <= 1 ? 0 : maxR * 0.22; // stagger offset
 	const memberBand = maxR * 0.16;
 	const H4 = Math.min(R3 + D + memberBand, Math.min(cx, cy) - 2 * o.dpr - D); // each still contains ③
-	const mh = maxR * 0.042; // member square half-size
+	const mh = gstep / 2; // member square = 1×1 grid cell
 	r4.forEach((e, i) => {
 		const th = (2 * Math.PI * i) / Math.max(1, r4.length); // k=2 → right & left
 		const ox = D * Math.cos(th), oy = D * Math.sin(th);
@@ -145,7 +145,7 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 			const dx = D > 0 ? ox / D : 0, dy = D > 0 ? oy / D : 1; // unit dir (down if no offset)
 			const ccx = cx + dx * (H4 * 0.88), ccy = cy + dy * (H4 * 0.88);
 			const gm = Math.ceil(Math.sqrt(mem.length));
-			const step = mh * 2.2;
+			const step = gstep; // 1 cell per member, adjacent
 			const grey = { h: 0, s: 0, l: 62 };
 			mem.forEach((mn, k) => {
 				const col = k % gm, row = Math.floor(k / gm);
