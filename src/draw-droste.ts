@@ -164,20 +164,42 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 			ctx.lineWidth = 1.5 * o.dpr; ctx.strokeStyle = "#1a1c22"; ctx.stroke();
 		}
 	}
-	// ⑤ unrelated notes (signature not ⊆ T): placed OUTSIDE the ①②③④ core, on a
-	// ring near the canvas edge, distributed by angle. No containment, so no frame.
+	// ⑤ unrelated notes (signature not ⊆ T): placed OUTSIDE the ①②③④ core. We tile
+	// the whole canvas on the grid and keep only cells that fall in the OUTER region
+	// (outside the core's bounding square), so ⑤ never overlaps ①②③④. ALL unrelated
+	// notes are shown; if more than the outer region holds, the last slot is a "+N".
 	const r5 = role(5);
 	if (r5.length) {
-		const ringR = Math.min(cx, cy) * 0.86; // between the shrunken core and the edge
-		const m5 = cardH * 0.8; // ⑤ card half-size (a touch smaller than ②)
+		const step5 = gstep; // one grid cell per ⑤ note
+		const m5 = gstep * 0.42;
+		const exHalf = D + H4 + gstep; // core exclusion half-extent (covers the ④ union)
+		const edge = gstep * 0.7; // keep cards off the very edge
+		// Candidate cell centres on the grid, outside the core square and inside canvas,
+		// ordered nearest-core-first so ⑤ forms a halo growing outward.
+		const slots: Pt[] = [];
+		const ni = Math.floor((cx - edge) / step5), nj = Math.floor((cy - edge) / step5);
+		for (let j = -nj; j <= nj; j++) {
+			for (let i = -ni; i <= ni; i++) {
+				const x = cx + i * step5, y = cy + j * step5;
+				if (Math.abs(x - cx) <= exHalf && Math.abs(y - cy) <= exHalf) continue; // inside core
+				if (x < edge || x > o.canvas.width - edge || y < edge || y > o.canvas.height - edge) continue;
+				slots.push({ x, y });
+			}
+		}
+		slots.sort((a, bb) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(bb.x - cx, bb.y - cy));
 		const rc5 = roleColor(5);
-		const grey = { h: 0, s: 0, l: 62 };
-		r5.forEach((e, i) => {
-			const th = -Math.PI / 2 + (2 * Math.PI * i) / r5.length; // start at top, clockwise
-			const px = cx + ringR * Math.cos(th), py = cy + ringR * Math.sin(th);
-			const clickable = e.kind === "card";
-			square(px, py, m5, clickable ? rc5 : grey, e.id === o.hoverId, e.label, clickable ? e.id : undefined);
-		});
+		const fit = Math.min(r5.length, slots.length);
+		const overflow = r5.length - slots.length; // >0 ⇒ last slot becomes a "+N"
+		for (let i = 0; i < fit; i++) {
+			const s = slots[i];
+			if (overflow > 0 && i === fit - 1) {
+				const grey = { h: 0, s: 0, l: 62 };
+				square(s.x, s.y, m5, grey, false, `+${overflow + 1}`);
+			} else {
+				const e = r5[i];
+				square(s.x, s.y, m5, rc5, e.id === o.hoverId, e.label, e.id);
+			}
+		}
 	}
 }
 

@@ -138,16 +138,15 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 
 	// ⑤ UNRELATED notes: signature is NOT a subset of T (at least one tag outside T),
 	// or untagged. These have no containment relation to N, so they sit outside ①②③④.
+	// NOT capped here — ALL of them are emitted; the renderer tiles as many as fit in
+	// the outer region and shows a "+N" marker for any remainder.
 	const unrelated = nodes.filter((n) => {
 		const keys = [...n.memberships];
 		return keys.length > 0 && !keys.every((k) => T.has(k));
 	});
-	const band5: Item[] = unrelated.slice(0, cap).map((nd) => ({
+	const band5: Item[] = unrelated.map((nd) => ({
 		id: nd.id, role: 5 as const, kind: "card" as const, label: nd.label, hueKey: nd.memberships[0] ?? nd.id,
 	}));
-	if (unrelated.length > cap) {
-		band5.push({ id: "__more5", role: 5, kind: "frame", label: `+${unrelated.length - cap}`, hueKey: "more" });
-	}
 
 	// CONCENTRIC nesting (spec 2026-05-31): ① ∈ ② ∈ ③ ∈ ④. The depth is u (radial,
 	// y here ⇒ drosteUV maps y→u): ① innermost band, ④ outermost. Each level's

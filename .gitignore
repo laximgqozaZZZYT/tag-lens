@@ -47,3 +47,6 @@ test/verify-stage1.mjs
 preview5.png
 preview5.svg
 test/preview5.mjs
+preview5b.png
+preview5b.svg
+test/preview5b.mjs
