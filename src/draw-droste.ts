@@ -65,14 +65,6 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 		Math.atan2(a.row - ctr, a.col - ctr) - Math.atan2(bb.row - ctr, bb.col - ctr),
 	);
 	const R3 = B + cell * 0.7; // ③ frame just outside the block
-	// Point on a square (half-size R, centred) at perimeter fraction t ∈ [0,1).
-	const squarePt = (t: number, R: number): Pt => {
-		const p = ((((t % 1) + 1) % 1)) * 4, side = Math.floor(p) % 4, f = p - Math.floor(p);
-		if (side === 0) return { x: cx - R + 2 * R * f, y: cy - R };
-		if (side === 1) return { x: cx + R, y: cy - R + 2 * R * f };
-		if (side === 2) return { x: cx + R - 2 * R * f, y: cy + R };
-		return { x: cx - R, y: cy + R - 2 * R * f };
-	};
 	const frame = (R: number, rc: { h: number; s: number; l: number }, hover: boolean, label: string): void => {
 		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.10)`;
 		ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
@@ -96,18 +88,30 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 		ctx.fillText(truncateToWidth(ctx, label, 2 * h * 0.92), px, py);
 	};
 
-	// ③ the single T-enclosure frame around the ①② block.
-	for (const e of role(3)) frame(R3, roleColor(3), e.id === o.hoverId, e.label);
-	// ④ subset enclosures: INDEPENDENT sibling tags → separate, non-overlapping
-	// squares spread around the ③ block (NOT nested — act does not contain drama).
+	// ④ subset enclosures (back): each CONTAINS ③ (act ⊇ act∩drama), drawn as a
+	// square frame larger than ③. Independent siblings (act, drama) are STAGGERED
+	// (centres offset in different directions) so each encloses ③ but neither is
+	// nested inside the other.
 	const r4 = role(4);
-	const h4 = maxR * 0.1;
-	const R4ring = Math.min(R3 + h4 * 1.3, maxR - h4);
+	const rc4 = roleColor(4);
+	const D = r4.length <= 1 ? 0 : maxR * 0.07; // stagger offset
+	const H4 = Math.min(R3 + D + maxR * 0.05, Math.min(cx, cy) - 2 * o.dpr - D); // contains ③
 	r4.forEach((e, i) => {
-		const t = r4.length <= 1 ? 0.125 : i / r4.length; // single → top-right; many → spread
-		const p = squarePt(t, R4ring);
-		square(p.x, p.y, h4, roleColor(4), e.id === o.hoverId, e.label);
+		const th = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(1, r4.length);
+		const ox = D * Math.cos(th), oy = D * Math.sin(th);
+		const x = cx + ox - H4, y = cy + oy - H4, sz = 2 * H4;
+		ctx.fillStyle = `hsla(${rc4.h}, ${rc4.s}%, ${rc4.l}%, 0.08)`;
+		ctx.fillRect(x, y, sz, sz);
+		ctx.lineWidth = (e.id === o.hoverId ? 4 : 3) * o.dpr;
+		ctx.strokeStyle = `hsl(${rc4.h}, ${rc4.s}%, ${Math.min(rc4.l + 12, 82)}%)`;
+		ctx.strokeRect(x, y, sz, sz);
+		ctx.fillStyle = "#e6ecf5";
+		ctx.font = `${12 * o.dpr}px sans-serif`;
+		ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+		ctx.fillText(truncateToWidth(ctx, e.label, sz * 0.9), cx + ox, y - 2 * o.dpr);
 	});
+	// ③ the single T-enclosure frame around the ①② block (inside every ④).
+	for (const e of role(3)) frame(R3, roleColor(3), e.id === o.hoverId, e.label);
 	// ② T-exact notes fill the cells SURROUNDING ① (ring by ring) → enclose it.
 	r2.forEach((e, j) => { const p = cellCenter(around[j].col, around[j].row); square(p.x, p.y, cardH, roleColor(2), e.id === o.hoverId, e.label); });
 	// ① N at the centre cell (on top).
