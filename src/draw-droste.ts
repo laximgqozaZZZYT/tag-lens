@@ -48,8 +48,8 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	const maxR = Math.min(cx, cy) * 0.94;
 	// Cartesian coordinate grid (background) — straight x/y lines centred on (cx,cy).
 	// (Under the warp this is what becomes the red Print-Gallery spiral mesh.)
-	const gstep = (o.gridV && o.gridV > 1 ? Math.min(cx, cy) * 2 / o.gridV : maxR / 6);
-	ctx.strokeStyle = "rgba(210, 80, 80, 0.28)";
+	const gstep = maxR / 16; // finer grid
+	ctx.strokeStyle = "rgba(210, 80, 80, 0.26)";
 	ctx.lineWidth = 1 * o.dpr;
 	for (let x = cx % gstep; x <= o.canvas.width; x += gstep) {
 		ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, o.canvas.height); ctx.stroke();
@@ -57,6 +57,9 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	for (let y = cy % gstep; y <= o.canvas.height; y += gstep) {
 		ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(o.canvas.width, y); ctx.stroke();
 	}
+	// Snap an edge coord to the nearest grid line so ①②③④ borders align to the grid.
+	const snapX = (v: number): number => cx + Math.round((v - cx) / gstep) * gstep;
+	const snapY = (v: number): number => cy + Math.round((v - cy) / gstep) * gstep;
 	const role = (n: number) => meta.shapes.filter((e) => e.role === n);
 	const r2 = role(2);
 	// ①②: a centred square GRID — ① is the centre cell, ② fill the surrounding
@@ -76,27 +79,36 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 		Math.atan2(a.row - ctr, a.col - ctr) - Math.atan2(bb.row - ctr, bb.col - ctr),
 	);
 	const R3 = B + cell * 0.45; // ③ frame just outside the block
+	// All boxes snap their edges to the grid (≥ 1 cell), so borders land on grid lines.
+	const snapBox = (x0: number, y0: number, x1: number, y1: number) => {
+		let sx0 = snapX(x0), sx1 = snapX(x1), sy0 = snapY(y0), sy1 = snapY(y1);
+		if (sx1 <= sx0) sx1 = sx0 + gstep;
+		if (sy1 <= sy0) sy1 = sy0 + gstep;
+		return { x: sx0, y: sy0, w: sx1 - sx0, h: sy1 - sy0 };
+	};
 	const frame = (R: number, rc: { h: number; s: number; l: number }, hover: boolean, label: string): void => {
+		const b2 = snapBox(cx - R, cy - R, cx + R, cy + R);
 		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.10)`;
-		ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+		ctx.fillRect(b2.x, b2.y, b2.w, b2.h);
 		ctx.lineWidth = (hover ? 4 : 3) * o.dpr;
 		ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 12, 82)}%)`;
-		ctx.strokeRect(cx - R, cy - R, 2 * R, 2 * R);
+		ctx.strokeRect(b2.x, b2.y, b2.w, b2.h);
 		ctx.fillStyle = "#e6ecf5";
 		ctx.font = `${12 * o.dpr}px sans-serif`;
 		ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-		ctx.fillText(truncateToWidth(ctx, label, 2 * R * 0.95), cx, cy - R - 2 * o.dpr);
+		ctx.fillText(truncateToWidth(ctx, label, b2.w * 0.95), b2.x + b2.w / 2, b2.y - 2 * o.dpr);
 	};
 	const square = (px: number, py: number, h: number, rc: { h: number; s: number; l: number }, hover: boolean, label: string): void => {
+		const b2 = snapBox(px - h, py - h, px + h, py + h);
 		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.4)`;
-		ctx.fillRect(px - h, py - h, 2 * h, 2 * h);
+		ctx.fillRect(b2.x, b2.y, b2.w, b2.h);
 		ctx.lineWidth = (hover ? 3.5 : 1.8) * o.dpr;
 		ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 14, 85)}%)`;
-		ctx.strokeRect(px - h, py - h, 2 * h, 2 * h);
+		ctx.strokeRect(b2.x, b2.y, b2.w, b2.h);
 		ctx.fillStyle = "#e6ecf5";
-		ctx.font = `${Math.min(h * 0.34, 12 * o.dpr)}px sans-serif`;
+		ctx.font = `${Math.min(b2.h * 0.34, 12 * o.dpr)}px sans-serif`;
 		ctx.textAlign = "center"; ctx.textBaseline = "middle";
-		ctx.fillText(truncateToWidth(ctx, label, 2 * h * 0.92), px, py);
+		ctx.fillText(truncateToWidth(ctx, label, b2.w * 0.92), b2.x + b2.w / 2, b2.y + b2.h / 2);
 	};
 
 	// ④ subset enclosures (back): each CONTAINS ③ (act ⊇ act∩drama), drawn as a
@@ -115,16 +127,16 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	r4.forEach((e, i) => {
 		const th = (2 * Math.PI * i) / Math.max(1, r4.length); // k=2 → right & left
 		const ox = D * Math.cos(th), oy = D * Math.sin(th);
-		const x = cx + ox - H4, y = cy + oy - H4, sz = 2 * H4;
+		const bf = snapBox(cx + ox - H4, cy + oy - H4, cx + ox + H4, cy + oy + H4);
 		ctx.fillStyle = `hsla(${rc4.h}, ${rc4.s}%, ${rc4.l}%, 0.08)`;
-		ctx.fillRect(x, y, sz, sz);
+		ctx.fillRect(bf.x, bf.y, bf.w, bf.h);
 		ctx.lineWidth = (e.id === o.hoverId ? 4 : 3) * o.dpr;
 		ctx.strokeStyle = `hsl(${rc4.h}, ${rc4.s}%, ${Math.min(rc4.l + 12, 82)}%)`;
-		ctx.strokeRect(x, y, sz, sz);
+		ctx.strokeRect(bf.x, bf.y, bf.w, bf.h);
 		ctx.fillStyle = "#e6ecf5";
 		ctx.font = `${12 * o.dpr}px sans-serif`;
 		ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-		ctx.fillText(truncateToWidth(ctx, e.label, sz * 0.9), cx + ox, y - 2 * o.dpr);
+		ctx.fillText(truncateToWidth(ctx, e.label, bf.w * 0.9), bf.x + bf.w / 2, bf.y - 2 * o.dpr);
 		// This group's own notes as small GREY squares, pushed into this ④'s
 		// EXCLUSIVE outer band (the offset direction) so they don't fall on top of
 		// the other ④ siblings' frames (which only share the central ③ region).
