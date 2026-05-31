@@ -25,3 +25,14 @@ stage1-plugin.png
 test/render-mv*.mjs
 test/verifytex.mjs
 test/verify-plugin.mjs
+soft-test.png
+soft-full.png
+fwd-grid.png
+fwd-grid.svg
+vec-test.png
+vec-tile.png
+power-test.png
+cheby-test.png
+mip-test.png
+scallop-test.png
+own-tile-test.png
