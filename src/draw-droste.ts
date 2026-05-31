@@ -271,6 +271,54 @@ function drawRedGrid(ctx: CanvasRenderingContext2D, b: DrosteBBox, m: number, p:
 	}
 }
 
+// Staged bring-up of the conformal warp (verify each stage before the next):
+//   1 = red grid MESH only (square bbox, copies=1) — the Print Gallery red net.
+//   2 = warped source content + grid overlay.
+//   3 = self-similar nesting (copies>1).
+const DROSTE_STAGE: 1 | 2 | 3 = 1;
+
+// STAGE 1: warp a uniform N×N grid over a SQUARE source bbox through the exact
+// same drosteUV→drosteForward pipeline, subdividing every line per-vertex, and
+// auto-fit the result to the canvas. A square bbox keeps uH = 2π·(H/W) = 2π so
+// the u(ring) family does NOT collapse — vertical+horizontal lines cross into a
+// net of distorted quadrilaterals (not just radial spokes). copies=1.
+function drawStage1Grid(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): void {
+	const b: DrosteBBox = { minX: 0, minY: 0, maxX: 1, maxY: 1 }; // SQUARE ⇒ uH = 2π
+	const p: DrosteParams = { k: o.k, twistDir: o.twistDir === "ccw" ? 1 : -1, R0: 1 };
+	const N = Math.max(2, o.gridV ?? 12);
+	const sub = Math.max(1, o.subdiv);
+	const map = (x: number, y: number): Pt => {
+		const { u, v } = drosteUV(b, x, y);
+		const z = drosteForward(u, v, p); // m=0 (copies=1)
+		return { x: z.re, y: z.im };
+	};
+	const lines: Pt[][] = [];
+	for (let i = 0; i <= N; i++) { // const-v (radial-ish) family
+		const x = i / N, pts: Pt[] = [];
+		for (let s = 0; s <= sub; s++) pts.push(map(x, s / sub));
+		lines.push(pts);
+	}
+	for (let j = 0; j <= N; j++) { // const-u (ring) family
+		const y = j / N, pts: Pt[] = [];
+		for (let s = 0; s <= sub; s++) pts.push(map(s / sub, y));
+		lines.push(pts);
+	}
+	// auto-fit z-bbox into the canvas (keeps the whole spiral on screen)
+	let mnX = Infinity, mxX = -Infinity, mnY = Infinity, mxY = -Infinity;
+	for (const ln of lines) for (const z of ln) { if (z.x < mnX) mnX = z.x; if (z.x > mxX) mxX = z.x; if (z.y < mnY) mnY = z.y; if (z.y > mxY) mxY = z.y; }
+	const W = o.canvas.width, H = o.canvas.height, pad = 30 * o.dpr;
+	const sc = Math.min((W - 2 * pad) / (mxX - mnX || 1), (H - 2 * pad) / (mxY - mnY || 1));
+	const ox = (W - sc * (mxX - mnX)) / 2, oy = (H - sc * (mxY - mnY)) / 2;
+	ctx.strokeStyle = "rgba(220, 60, 60, 0.7)";
+	ctx.lineWidth = 1.3 * o.dpr;
+	ctx.lineJoin = "round";
+	for (const ln of lines) {
+		ctx.beginPath();
+		ln.forEach((z, k) => { const X = ox + (z.x - mnX) * sc, Y = oy + (z.y - mnY) * sc; if (k) ctx.lineTo(X, Y); else ctx.moveTo(X, Y); });
+		ctx.stroke();
+	}
+}
+
 export function drawDroste(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
 	ctx.fillStyle = "#0f1116";
@@ -278,6 +326,11 @@ export function drawDroste(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: D
 	if (meta.shapes.length === 0) return;
 	if ((o.render ?? "grid") === "grid") {
 		drawOrtho(ctx, meta, o);
+		return;
+	}
+	// Spiral mode — staged bring-up.
+	if (DROSTE_STAGE === 1) {
+		drawStage1Grid(ctx, o);
 		return;
 	}
 	const p: DrosteParams = {

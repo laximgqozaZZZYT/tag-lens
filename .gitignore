@@ -11,3 +11,7 @@ scripts/
 # a path whose parent dir is excluded, so exclude docs/* (one level) not docs/.
 docs/*
 !docs/superpowers/
+
+# Droste stage verification artifacts
+stage1-mesh.svg
+stage1-mesh.png
