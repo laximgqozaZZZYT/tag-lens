@@ -226,23 +226,8 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		) {
 			merged.anchorPlacement = "concentric";
 		}
-		// --- droste (Print Gallery) validation ---
-		if (
-			typeof merged.drosteZoom !== "number" ||
-			!Number.isFinite(merged.drosteZoom) ||
-			(merged.drosteZoom as number) <= 1
-		) {
-			merged.drosteZoom = 2.5;
-		}
-		if (merged.drosteTwistDir !== "ccw" && merged.drosteTwistDir !== "cw") {
-			merged.drosteTwistDir = "ccw";
-		}
-		merged.drosteCopies = Math.min(8, intPositive(merged.drosteCopies, 4, 1));
-		merged.drosteSubdiv = Math.min(64, intPositive(merged.drosteSubdiv, 24, 1));
+		// --- Droste-effect view validation ---
 		if (typeof merged.drosteFocus !== "string") merged.drosteFocus = "";
-		if (merged.drosteRender !== "grid" && merged.drosteRender !== "spiral") {
-			merged.drosteRender = "grid";
-		}
 		this.settings = merged as unknown as MiniSettings;
 	}
 

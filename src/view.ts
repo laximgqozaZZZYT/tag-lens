@@ -55,8 +55,6 @@ import { drawMatrix, matrixGeom, MATRIX_BADGE_W } from "./draw-matrix";
 import type { MatrixLine } from "./draw-matrix";
 import { drawHeatmap, heatmapGeom } from "./draw-heatmap";
 import { drawDroste } from "./draw-droste";
-import { drosteInverseBranch } from "./conformal";
-import { drosteInvSource, DROSTE_UBASE } from "./droste-layout";
 import {
 	drawLattice,
 	latticeCellAt,
@@ -1110,83 +1108,16 @@ export class MiniGraphView extends ItemView {
 		topRow.createSpan({ text: "Most-specific tier on top" });
 	}
 
-	// Print Gallery (Escher) mode settings — the four conformal-warp draw
-	// parameters. All are pure repaint params (consumed directly by
-	// drawDroste), so each persists via save() and repaints via requestDraw()
-	// without a relayout. drosteFocus (the spiral root) is set by clicking a
-	// node in the view, not here.
+	// Droste-effect mode settings panel. The view has no draw parameters to
+	// tune — it self-fits and re-centres on the clicked note — so this is just
+	// a heading plus a one-line description of the containment view.
 	private renderDrosteSection(parent: HTMLElement): void {
 		const section = parent.createDiv({ cls: "gim-panel-section" });
-		section.createEl("h4", { text: "Print Gallery" });
-
-		// Render mode — "grid" (orthogonal ①②③④ source plane on a cartesian grid,
-		// pre-warp) vs "spiral" (conformal Droste warp). The spiral-only controls
-		// below (k / copies / subdivision / twist) have no effect in grid mode.
-		const modeRow = section.createDiv({ cls: "gim-row" });
-		modeRow.createSpan({ text: "Render mode" });
-		const modeSel = modeRow.createEl("select") as HTMLSelectElement;
-		modeSel.createEl("option", { text: "Grid (orthogonal)", value: "grid" });
-		modeSel.createEl("option", { text: "Spiral (conformal)", value: "spiral" });
-		modeSel.value = this.settings.drosteRender;
-		modeSel.addEventListener("change", () => {
-			this.settings.drosteRender = modeSel.value === "spiral" ? "spiral" : "grid";
-			void this.save();
-			this.requestDraw();
+		section.createEl("h4", { text: "Droste Effect" });
+		section.createEl("div", {
+			cls: "gim-row",
+			text: "Containment view from the focus note (①∈②∈③∈④). Click a note to re-centre.",
 		});
-
-		// Scale per loop (k) — how much |z| grows over one 2π turn.
-		const kRow = section.createDiv({ cls: "gim-row" });
-		kRow.createSpan({ text: "Scale per loop (k)" });
-		const kIn = kRow.createEl("input", {
-			type: "range",
-			attr: { min: "1.5", max: "16", step: "0.5" },
-		}) as HTMLInputElement;
-		kIn.value = String(this.settings.drosteZoom);
-		kIn.addEventListener("input", () => {
-			this.settings.drosteZoom = Number(kIn.value);
-			void this.save();
-			this.requestDraw();
-		});
-
-		// Recursion copies — how many back-to-front spiral repeats are drawn.
-		const copiesRow = section.createDiv({ cls: "gim-row" });
-		copiesRow.createSpan({ text: "Recursion copies" });
-		const copiesIn = copiesRow.createEl("input", {
-			type: "range",
-			attr: { min: "1", max: "8", step: "1" },
-		}) as HTMLInputElement;
-		copiesIn.value = String(this.settings.drosteCopies);
-		copiesIn.addEventListener("input", () => {
-			this.settings.drosteCopies = Math.round(Number(copiesIn.value));
-			void this.save();
-			this.requestDraw();
-		});
-
-		// Edge subdivision — straight strip edges become smooth spiral
-		// polylines; more segments = smoother curves (costlier draw).
-		const subdivRow = section.createDiv({ cls: "gim-row" });
-		subdivRow.createSpan({ text: "Edge subdivision" });
-		const subdivIn = subdivRow.createEl("input", {
-			type: "range",
-			attr: { min: "4", max: "64", step: "4" },
-		}) as HTMLInputElement;
-		subdivIn.value = String(this.settings.drosteSubdiv);
-		subdivIn.addEventListener("input", () => {
-			this.settings.drosteSubdiv = Math.round(Number(subdivIn.value));
-			void this.save();
-			this.requestDraw();
-		});
-
-		// Twist direction — clockwise vs counter-clockwise spiral.
-		const twistRow = section.createEl("label", { cls: "gim-toggle-row" });
-		const twistCb = twistRow.createEl("input", { type: "checkbox" });
-		twistCb.checked = this.settings.drosteTwistDir === "cw";
-		twistCb.addEventListener("change", () => {
-			this.settings.drosteTwistDir = twistCb.checked ? "cw" : "ccw";
-			void this.save();
-			this.requestDraw();
-		});
-		twistRow.createSpan({ text: "Clockwise twist" });
 	}
 
 	// One radio row for a view mode. Shared by the stable list and the
@@ -1400,15 +1331,6 @@ export class MiniGraphView extends ItemView {
 		// Lattice subset links only affect the back-layer of drawLattice —
 		// toggling repaints without re-bucketing intersections.
 		"latticeShowSubsetLinks",
-		// Droste warp params are consumed directly by drawDroste — changing
-		// them repaints the spiral without re-running layoutDroste. (drosteFocus
-		// is intentionally NOT here: re-rooting the spiral IS a relayout.)
-		"drosteZoom",
-		"drosteTwistDir",
-		"drosteCopies",
-		"drosteSubdiv",
-		// Grid ↔ spiral is a pure render switch over the same source plane.
-		"drosteRender",
 	]);
 
 	private layoutSignature(s: MiniSettings): string {
@@ -1986,20 +1908,8 @@ export class MiniGraphView extends ItemView {
 			return;
 		}
 		if (this.laid.droste) {
-			// Frame ~N turns of the spiral. The renderer centres z at the canvas
-			// middle with R0 = min(w,h)/(4·dpr); turn m's outer radius ≈
-			// R0·exp(uBase)·k^m. Solving |z|_outer·zoom ≤ 0.45·min(w,h) (device px)
-			// gives zoom = 1.8 / (exp(uBase)·k^N). N = min(copies, 3) keeps the
-			// inner turns legible while letting outer turns spill (Droste is
-			// infinite anyway). pan = 0 (z already centred).
-			const dd = this.laid.droste;
-			if (dd.shapes.length === 0) {
-				this.zoom = 1;
-			} else {
-				const N = Math.min(this.settings.drosteCopies, 3);
-				const k = this.settings.drosteZoom;
-				this.zoom = 1.8 / (Math.exp(DROSTE_UBASE) * Math.pow(k, N));
-			}
+			// The Droste-effect grid renderer self-fits to the canvas; reset transform.
+			this.zoom = 1;
 			this.panX = 0;
 			this.panY = 0;
 			this.requestDraw();
@@ -2176,22 +2086,13 @@ export class MiniGraphView extends ItemView {
 			});
 			return;
 		}
-		// Print Gallery (Escher): conformal Droste warp of the strip layout.
+		// Droste-effect containment view (nested ①②③④ squares).
 		if (this.laid.droste && this.laid.droste.shapes.length > 0) {
 			drawDroste(ctx, this.laid.droste, {
-				zoom: this.zoom,
-				panX: this.panX,
-				panY: this.panY,
 				canvas: this.canvas,
 				dpr,
-				k: this.settings.drosteZoom,
-				twistDir: this.settings.drosteTwistDir,
-				copies: this.settings.drosteCopies,
-				subdiv: this.settings.drosteSubdiv,
-				minFontPx: this.settings.minFontPx,
 				hoverId: this.hoveredNodeId,
 				focusId: this.laid.droste.focusId,
-				render: this.settings.drosteRender,
 				hitRegions: (this.drosteHit = []),
 			});
 			return;
@@ -2571,52 +2472,16 @@ export class MiniGraphView extends ItemView {
 		this.app.workspace.openLinkText(path, "", false);
 	}
 
-	// Inverse-map a pointer position (CSS px, as every other hit path here
-	// receives — see screenToWorld / onPointerMove which pass e.clientX-rect.left)
-	// back to a strip-space (u, v) and resolve the band element under it. This
-	// inverts draw-droste's project(): forward does
-	//   x_dev = cx + (z.re·zoom + panX)·dpr,   cx = canvas.width/2 (device px)
-	// so for a CSS-pixel sx the device X is sx·dpr and
-	//   z.re = ((sx·dpr − cx)/dpr − panX)/zoom.
-	// Keeping sx in CSS px makes panX/zoom match the same units screenToWorld
-	// uses (it does NOT multiply by dpr), so hover/click land correctly.
+	// Resolve the note under a pointer (CSS px) by scanning the clickable card
+	// rects the renderer recorded while drawing (device px). Last-drawn wins
+	// (front-most: ① over ② over members), so iterate in reverse.
 	private drosteHitTest(sx: number, sy: number): string | null {
-		const d = this.laid.droste;
-		if (!d) return null;
+		if (!this.laid.droste) return null;
 		const dpr = window.devicePixelRatio || 1;
-		// Grid mode: scan the rects the renderer recorded (device px). Last-drawn
-		// (front-most: ① over ② over members) wins, so iterate in reverse.
-		if ((this.settings.drosteRender ?? "grid") === "grid") {
-			const dx = sx * dpr, dy = sy * dpr;
-			for (let i = this.drosteHit.length - 1; i >= 0; i--) {
-				const r = this.drosteHit[i];
-				if (dx >= r.x0 && dx <= r.x1 && dy >= r.y0 && dy <= r.y1) return r.id;
-			}
-			return null;
-		}
-		const R0 = Math.min(this.canvas.width, this.canvas.height) / (4 * dpr);
-		const p = {
-			k: this.settings.drosteZoom,
-			twistDir: (this.settings.drosteTwistDir === "ccw" ? 1 : -1) as 1 | -1,
-			R0,
-		};
-		// device pixel → world complex z (inverse of draw-droste project()).
-		const cx = this.canvas.width / 2, cy = this.canvas.height / 2;
-		const z = {
-			re: ((sx * dpr - cx) / dpr - this.panX) / this.zoom,
-			im: ((sy * dpr - cy) / dpr - this.panY) / this.zoom,
-		};
-		// Front-most first (largest m = innermost/finest). Invert ζ → source(x,y)
-		// and return the CARD shape (node) containing it; every copy is the same
-		// source plane, so the id is identical across m.
-		if (d.shapes.length === 0) return null;
-		for (let m = this.settings.drosteCopies - 1; m >= 0; m--) {
-			const { u, vRaw } = drosteInverseBranch(z, p, m);
-			const v = ((vRaw % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-			const src = drosteInvSource(d.bbox, u, v);
-			for (const e of d.shapes) {
-				if (e.kind === "card" && src.x >= e.x0 && src.x <= e.x1 && src.y >= e.y0 && src.y <= e.y1) return e.id;
-			}
+		const dx = sx * dpr, dy = sy * dpr;
+		for (let i = this.drosteHit.length - 1; i >= 0; i--) {
+			const r = this.drosteHit[i];
+			if (dx >= r.x0 && dx <= r.x1 && dy >= r.y0 && dy <= r.y1) return r.id;
 		}
 		return null;
 	}

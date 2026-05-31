@@ -1,27 +1,13 @@
-import { drosteForward, type DrosteParams } from "./conformal";
-import { drosteUV, type DrosteMeta, type DrosteShape, type DrosteBBox } from "./droste-layout";
+import { type DrosteMeta } from "./droste-layout";
 import { truncateToWidth } from "./canvas-utils";
 
 export interface DrawDrosteOpts {
-	zoom: number;
-	panX: number;
-	panY: number;
 	canvas: HTMLCanvasElement;
 	dpr: number;
-	k: number;
-	twistDir: "ccw" | "cw";
-	copies: number;
-	subdiv: number;
-	minFontPx: number;
 	hoverId: string | null;
 	focusId: string;
-	gridV?: number; // red-grid vertical line count (default 16)
-	gridH?: number; // red-grid horizontal line count (default 8)
-	// Print Gallery render mode (default "grid"). "grid" = orthogonal cartesian
-	// source plane; "spiral" = conformal Droste warp.
-	render?: "grid" | "spiral";
 	// Optional collector: drawOrtho pushes each clickable card's SCREEN rect (device
-	// px) here so the view can hit-test grid mode without re-deriving the geometry.
+	// px) here so the view can hit-test without re-deriving the geometry.
 	hitRegions?: { id: string; x0: number; y0: number; x1: number; y1: number }[];
 }
 
@@ -176,172 +162,11 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	}
 }
 
-// source(x,y) → strip ζ (drosteUV) → plane z=R₀·exp(γ(ζ + i·2π·m)) → device px.
-function project(b: DrosteBBox, x: number, y: number, m: number, p: DrosteParams, o: DrawDrosteOpts): Pt {
-	const { u, v } = drosteUV(b, x, y);
-	const z = drosteForward(u, v + 2 * Math.PI * m, p);
-	const cx = o.canvas.width / 2;
-	const cy = o.canvas.height / 2;
-	return { x: cx + (z.re * o.zoom + o.panX) * o.dpr, y: cy + (z.im * o.zoom + o.panY) * o.dpr };
-}
-
-// Map a straight source segment to a subdivided warped polyline (append to path).
-function seg(ctx: CanvasRenderingContext2D, b: DrosteBBox, a: Pt, c: Pt, m: number, p: DrosteParams, o: DrawDrosteOpts, first: boolean): void {
-	const n = Math.max(1, o.subdiv);
-	for (let i = first ? 0 : 1; i <= n; i++) {
-		const t = i / n;
-		const d = project(b, a.x + (c.x - a.x) * t, a.y + (c.y - a.y) * t, m, p, o);
-		if (i === 0) ctx.moveTo(d.x, d.y);
-		else ctx.lineTo(d.x, d.y);
-	}
-}
-
-function shapePath(ctx: CanvasRenderingContext2D, b: DrosteBBox, e: DrosteShape, m: number, p: DrosteParams, o: DrawDrosteOpts): void {
-	const tl = { x: e.x0, y: e.y0 }, tr = { x: e.x1, y: e.y0 }, br = { x: e.x1, y: e.y1 }, bl = { x: e.x0, y: e.y1 };
-	ctx.beginPath();
-	seg(ctx, b, tl, tr, m, p, o, true);
-	seg(ctx, b, tr, br, m, p, o, false);
-	seg(ctx, b, br, bl, m, p, o, false);
-	seg(ctx, b, bl, tl, m, p, o, false);
-	ctx.closePath();
-}
-
-function drawShape(ctx: CanvasRenderingContext2D, b: DrosteBBox, e: DrosteShape, m: number, p: DrosteParams, o: DrawDrosteOpts): void {
-	const rc = roleColor(e.role);
-	shapePath(ctx, b, e, m, p, o);
-	if (e.kind === "card") {
-		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.42)`;
-		ctx.fill();
-		ctx.lineWidth = (e.id === o.hoverId ? 3 : 1.6) * o.dpr;
-		ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 15, 85)}%)`;
-		ctx.stroke();
-	} else {
-		// Group enclosure frame (BubbleSets style): faint fill + bold contour.
-		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.22)`;
-		ctx.fill();
-		ctx.lineWidth = (e.id === o.hoverId ? 4 : 3) * o.dpr;
-		ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 12, 82)}%)`;
-		ctx.stroke();
-	}
-	// Upright label at the warped centroid, clamped to the cell's angular width.
-	const c = project(b, (e.x0 + e.x1) / 2, (e.y0 + e.y1) / 2, m, p, o);
-	const a0 = project(b, (e.x0 + e.x1) / 2, e.y0, m, p, o);
-	const a1 = project(b, (e.x0 + e.x1) / 2, e.y1, m, p, o);
-	const w0 = project(b, e.x0, (e.y0 + e.y1) / 2, m, p, o);
-	const cellW = Math.hypot(a1.x - a0.x, a1.y - a0.y);
-	const localPx = Math.hypot(c.x - w0.x, c.y - w0.y);
-	if (localPx >= o.minFontPx * o.dpr && cellW >= o.minFontPx * o.dpr) {
-		ctx.fillStyle = "#e6ecf5";
-		ctx.font = `${Math.min(localPx * 0.5, 16 * o.dpr)}px sans-serif`;
-		ctx.textAlign = "center";
-		ctx.textBaseline = "middle";
-		ctx.fillText(truncateToWidth(ctx, e.label, cellW * 0.9), c.x, c.y);
-	}
-	// Focus N marker on its innermost (m=0) card.
-	if (e.id === o.focusId && m === 0) {
-		const r = Math.max(3 * o.dpr, Math.min(cellW, localPx) * 0.3);
-		ctx.beginPath();
-		ctx.arc(c.x, c.y, r, 0, 2 * Math.PI);
-		ctx.fillStyle = "#ffd35c";
-		ctx.fill();
-		ctx.lineWidth = 1.5 * o.dpr;
-		ctx.strokeStyle = "#1a1c22";
-		ctx.stroke();
-	}
-}
-
-// Red coordinate grid: the source orthogonal grid mapped through the same warp
-// (const-X → radial spiral, const-Y → ring) — the Print Gallery red grid.
-function drawRedGrid(ctx: CanvasRenderingContext2D, b: DrosteBBox, m: number, p: DrosteParams, o: DrawDrosteOpts): void {
-	const nv = Math.max(2, o.gridV ?? 16);
-	const nh = Math.max(2, o.gridH ?? 8);
-	ctx.strokeStyle = "rgba(220, 60, 60, 0.55)";
-	ctx.lineWidth = 1 * o.dpr;
-	for (let i = 0; i <= nv; i++) {
-		const x = b.minX + (i / nv) * (b.maxX - b.minX);
-		ctx.beginPath();
-		seg(ctx, b, { x, y: b.minY }, { x, y: b.maxY }, m, p, o, true);
-		ctx.stroke();
-	}
-	for (let j = 0; j <= nh; j++) {
-		const y = b.minY + (j / nh) * (b.maxY - b.minY);
-		ctx.beginPath();
-		seg(ctx, b, { x: b.minX, y }, { x: b.maxX, y }, m, p, o, true);
-		ctx.stroke();
-	}
-}
-
-// Staged bring-up of the conformal warp (verify each stage before the next):
-//   1 = red grid MESH only — the Print Gallery red net.
-//   2 = warped source content + grid overlay.
-//   3 = self-similar nesting.
-const DROSTE_STAGE: 1 | 2 | 3 = 1;
-
-// STAGE 1: the genuine conformal red mesh = the FORWARD image of an orthogonal
-// (u,v) strip grid under z = R₀·exp(γζ). We map EVERY subdivided vertex through
-// drosteForward (conformal.ts, unchanged), so straight strip lines become smooth
-// log-spiral curves. Because exp is analytic, ∂z/∂v = i·∂z/∂u, i.e. the two line
-// families cross at exactly 90° everywhere (verified numerically). geometry (1,-1):
-// γ = 1+i ⇔ k = e^{2π}, twistDir = -1. Drawing a dense grid over a wide (u,v) range
-// fills the plane and nests self-similarly into a central singularity; placing that
-// singularity off-centre makes the bulk read as a coherent sheared grid.
-function drawStage1Grid(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): void {
-	const W = o.canvas.width, H = o.canvas.height;
-	const p: DrosteParams = { k: Math.exp(2 * Math.PI), twistDir: -1, R0: 1 }; // γ = 1+i
-	const CELL = 0.19; // (u,v) grid spacing → cell density
-	const RANGE = 6.6; // half-extent of u and v drawn (covers screen + the nest)
-	const SCALE = Math.min(W, H) * 0.052; // world z → device px
-	const cx = W * 0.36, cy = H * 0.58; // singularity placed off-centre (like the target)
-	const S = Math.max(160, 6 * Math.round((2 * RANGE) / CELL)); // per-line subdivisions
-	const map = (u: number, v: number): Pt => {
-		const z = drosteForward(u, v, p);
-		return { x: cx + z.re * SCALE, y: cy + z.im * SCALE };
-	};
-	ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
-	ctx.strokeStyle = "#d62020";
-	ctx.lineWidth = 2.4 * o.dpr;
-	ctx.lineJoin = "round"; ctx.lineCap = "round";
-	const M = 120 * o.dpr; // off-canvas margin before breaking a polyline
-	const drawLine = (fn: (t: number) => Pt): void => {
-		ctx.beginPath();
-		let started = false;
-		for (let s = 0; s <= S; s++) {
-			const pt = fn(s / S);
-			if (pt.x < -M || pt.x > W + M || pt.y < -M || pt.y > H + M) { started = false; continue; }
-			if (started) ctx.lineTo(pt.x, pt.y); else { ctx.moveTo(pt.x, pt.y); started = true; }
-		}
-		ctx.stroke();
-	};
-	for (let u = -RANGE; u <= RANGE + 1e-9; u += CELL) drawLine((t) => map(u, -RANGE + 2 * RANGE * t)); // const-u (vary v)
-	for (let v = -RANGE; v <= RANGE + 1e-9; v += CELL) drawLine((t) => map(-RANGE + 2 * RANGE * t, v)); // const-v (vary u)
-}
-
 export function drawDroste(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
 	ctx.fillStyle = "#0f1116";
 	ctx.fillRect(0, 0, o.canvas.width, o.canvas.height);
 	if (meta.shapes.length === 0) return;
-	if ((o.render ?? "grid") === "grid") {
-		drawOrtho(ctx, meta, o);
-		return;
-	}
-	// Spiral mode — staged bring-up.
-	if (DROSTE_STAGE === 1) {
-		drawStage1Grid(ctx, o);
-		return;
-	}
-	const p: DrosteParams = {
-		k: o.k,
-		twistDir: o.twistDir === "ccw" ? 1 : -1,
-		R0: Math.min(o.canvas.width, o.canvas.height) / (4 * o.dpr),
-	};
-	ctx.lineJoin = "round";
-	ctx.lineCap = "round";
-	const b = meta.bbox;
-	// Back-to-front: outer (large) copy first, inner (small) last on top. Each copy
-	// is the SAME source plane reduced ×k and nested (self-similar Print Gallery).
-	for (let m = o.copies - 1; m >= 0; m--) {
-		for (const e of meta.shapes) drawShape(ctx, b, e, m, p, o);
-		drawRedGrid(ctx, b, m, p, o);
-	}
+	// Droste-effect containment view: the ①②③④ nesting on a cartesian grid.
+	drawOrtho(ctx, meta, o);
 }

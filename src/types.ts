@@ -180,21 +180,10 @@ export interface MiniSettings {
 	// shrink past this floor under heavy zoom-out get their world
 	// units bumped up so the rendered screen size stays ≥ minFontPx.
 	minFontPx: number;
-	// --- Print Gallery (Escher / Droste) view mode ---
-	// Scale factor per perimeter loop (k). Kept gentle by default so inner
-	// recursion copies survive the minFontPx floor (k=8×copies=4 ⇒ 512× span).
-	drosteZoom: number;
-	// Spiral chirality: "ccw" (|z| ×k as v increases) or "cw".
-	drosteTwistDir: "ccw" | "cw";
-	// Number of recursion copies drawn (back-to-front).
-	drosteCopies: number;
-	// Segments per edge when subdividing for the conformal warp.
-	drosteSubdiv: number;
-	// Focus node id placed at the bottom-left (v=0). "" ⇒ first node.
+	// --- Droste-effect view mode ---
+	// Focus note id the containment view is centred on. "" ⇒ first note.
+	// Clicking a note re-roots here.
 	drosteFocus: string;
-	// Print Gallery render mode: "grid" = orthogonal ①②③④ source plane on a
-	// cartesian grid (pre-warp); "spiral" = conformal Droste warp (exp(γζ)).
-	drosteRender: "grid" | "spiral";
 }
 
 export type ViewMode =
@@ -318,14 +307,13 @@ export const VIEW_MODES: ViewModeOption[] = [
 		description: "Stack of cards per intersection + dot matrix (handles ≥4-way intersections)",
 	},
 	{
-		// Escher "Print Gallery": the membership hierarchy laid around a square
-		// perimeter (focus node → node-peers → containing group → peer groups)
-		// and warped by the Droste conformal map so it spirals into itself.
-		// Beta: cards become quadrilaterals; text is drawn upright (a known
-		// readability compromise — see the spec §7).
+		// Droste-effect containment view: from the focus note outward —
+		// ① the note, ② its exact-tag peers, ③ their enclosing group, ④ the
+		// looser (subset-tag) groups that contain it — drawn as nested squares
+		// on a cartesian grid. Click a note to re-centre on it.
 		id: "droste",
-		label: "Print Gallery (Escher)",
-		description: "Droste conformal map (z = R₀·exp(γζ)); hierarchy spirals into itself",
+		label: "Droste Effect",
+		description: "Nested containment from the focus note (①∈②∈③∈④); click to re-centre",
 		experimental: true,
 	},
 ];
@@ -392,12 +380,7 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	latticeSpecificTop: true,
 	latticeNamedMax: 12,
 	minFontPx: 8,
-	drosteZoom: 2.5,
-	drosteTwistDir: "ccw",
-	drosteCopies: 4,
-	drosteSubdiv: 24,
 	drosteFocus: "",
-	drosteRender: "grid",
 };
 
 export const NONE_BUCKET = "(none)";
