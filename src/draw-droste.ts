@@ -21,16 +21,15 @@ export interface DrawDrosteOpts {
 
 type Pt = { x: number; y: number };
 
-// Clear per-ROLE palette so ①②③④⑤ are visually distinct at a glance
+// Clear per-ROLE palette so ①②③④ are visually distinct at a glance
 // (① focus = blue, ② exact-T notes = amber, ③ T-enclosure = purple,
-// ④ subset enclosures = green, ⑤ unrelated notes = muted slate).
-function roleColor(role: 1 | 2 | 3 | 4 | 5): { h: number; s: number; l: number } {
+// ④ subset enclosures = green).
+function roleColor(role: 1 | 2 | 3 | 4): { h: number; s: number; l: number } {
 	switch (role) {
 		case 1: return { h: 205, s: 90, l: 60 }; // ① blue
 		case 2: return { h: 45, s: 95, l: 60 }; // ② amber
 		case 3: return { h: 265, s: 80, l: 68 }; // ③ purple
-		case 4: return { h: 130, s: 65, l: 58 }; // ④ green
-		default: return { h: 200, s: 18, l: 52 }; // ⑤ muted slate (unrelated/outside)
+		default: return { h: 130, s: 65, l: 58 }; // ④ green
 	}
 }
 
@@ -39,11 +38,10 @@ function roleColor(role: 1 | 2 | 3 | 4 | 5): { h: number; s: number; l: number }
 //   ② T-exact notes — small squares arranged AROUND ① on a SQUARE ring (surrounding
 //      it, themselves forming a square).
 //   ③ T-enclosure, ④ subset enclosures — square frames nested outside.
-// Draw ONE Droste unit (① N ∈ ② siblings ∈ ③ T-enclosure ∈ ④ subset enclosures,
-// plus ⑤ unrelated notes when drawFive) into the square centred on (ux,uy) with
-// half-size uR. Geometry is parametrised by the unit rect so the renderer can nest
-// ×1/2 copies toward the centre (drawNest). ⑤ is drawn only on the outermost unit.
-function drawUnit(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts, ux: number, uy: number, uR: number, drawFive: boolean, unitFocus: string): void {
+// Draw ONE Droste unit (① N ∈ ② siblings ∈ ③ T-enclosure ∈ ④ subset enclosures) into
+// the square centred on (ux,uy) with half-size uR. Geometry is parametrised by the
+// unit rect so the renderer can nest ×1/2 copies toward the centre (drawNest).
+function drawUnit(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts, ux: number, uy: number, uR: number, unitFocus: string): void {
 	const cx = ux, cy = uy;
 	const maxR = uR;
 	const gstep = maxR / 16; // this unit's grid pitch
@@ -163,42 +161,6 @@ function drawUnit(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDroste
 			ctx.lineWidth = 1.5 * o.dpr; ctx.strokeStyle = "#1a1c22"; ctx.stroke();
 		}
 	}
-	// ⑤ unrelated notes (signature not ⊆ T): drawn ONLY on the outermost unit
-	// (drawFive), tiled in the OUTER region (outside the core square) so they never
-	// overlap ①②③④. ALL unrelated notes are shown; overflow becomes a "+N".
-	const r5 = drawFive ? role(5) : [];
-	if (r5.length) {
-		const step5 = gstep * 0.8; // ⑤ cell pitch (denser so more unrelated notes fit)
-		const m5 = gstep * 0.34;
-		const exHalf = D + H4 + gstep; // core exclusion half-extent (covers the ④ union)
-		const edge = gstep * 0.7; // keep cards off the very edge
-		// Candidate cell centres on the grid, outside the core square and inside canvas,
-		// ordered nearest-core-first so ⑤ forms a halo growing outward.
-		const slots: Pt[] = [];
-		const ni = Math.floor((cx - edge) / step5), nj = Math.floor((cy - edge) / step5);
-		for (let j = -nj; j <= nj; j++) {
-			for (let i = -ni; i <= ni; i++) {
-				const x = cx + i * step5, y = cy + j * step5;
-				if (Math.abs(x - cx) <= exHalf && Math.abs(y - cy) <= exHalf) continue; // inside core
-				if (x < edge || x > o.canvas.width - edge || y < edge || y > o.canvas.height - edge) continue;
-				slots.push({ x, y });
-			}
-		}
-		slots.sort((a, bb) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(bb.x - cx, bb.y - cy));
-		const rc5 = roleColor(5);
-		const fit = Math.min(r5.length, slots.length);
-		const overflow = r5.length - slots.length; // >0 ⇒ last slot becomes a "+N"
-		for (let i = 0; i < fit; i++) {
-			const s = slots[i];
-			if (overflow > 0 && i === fit - 1) {
-				const grey = { h: 0, s: 0, l: 62 };
-				square(s.x, s.y, m5, grey, false, `+${overflow + 1}`);
-			} else {
-				const e = r5[i];
-				square(s.x, s.y, m5, rc5, e.id === o.hoverId, e.label, e.id);
-			}
-		}
-	}
 }
 
 // Orthogonal Droste recursion: draw the focus window (seq order) at the centre, each
@@ -208,9 +170,7 @@ function drawUnit(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDroste
 // are skipped. No conformal warp, no red grid, no seg/copies.
 function drawNest(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
 	const cx = o.canvas.width / 2, cy = o.canvas.height / 2;
-	const hasFive = meta.shapes.some((e) => e.role === 5);
-	// Outermost unit half-size: shrink when ⑤ exist so they fit in an outer ring.
-	const outerR = Math.min(cx, cy) * (hasFive ? 0.72 : 0.94);
+	const outerR = Math.min(cx, cy) * 0.94; // outermost unit half-size
 	const minSide = Math.max(8, o.minFontPx) * o.dpr; // skip units below the font floor
 	// Faint cartesian grid once (outermost unit's pitch), for the orthogonal look.
 	const gstep = outerR / 16;
@@ -222,15 +182,12 @@ function drawNest(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDroste
 	// copy shows a DIFFERENT context. Fall back to the single meta if none supplied.
 	const chain = o.chain && o.chain.length ? o.chain : [meta];
 	const frac = Math.min(0.999, Math.max(0, o.zoomFrac ?? 0));
-	// Backdrop unit (the one drawn at ~full size): d such that uR ≤ outerR ⇒ d = 1 when
-	// zoomed in (frac>0), else the outermost d=0. ⑤ is drawn on it only.
-	const backdropD = frac > 1e-4 ? 1 : 0;
 	// Outer → inner: unit d at half-size outerR·2^(frac−d). Largest first ⇒ inner on top.
 	for (let d = 0; d < chain.length; d++) {
 		const uR = outerR * Math.pow(2, frac - d);
 		if (2 * uR < minSide) break; // too small to read → stop
 		if (2 * uR > 4 * outerR) continue; // far larger than the canvas → skip (off-screen)
-		drawUnit(ctx, chain[d], o, cx, cy, uR, d === backdropD, chain[d].focusId);
+		drawUnit(ctx, chain[d], o, cx, cy, uR, chain[d].focusId);
 	}
 	// Zoom HUD (top-left): current focus + zoom fraction, so the wheel response is
 	// visible and the focus promotion as you zoom through the tunnel is legible.

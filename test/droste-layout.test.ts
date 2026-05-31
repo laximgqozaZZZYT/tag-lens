@@ -40,10 +40,8 @@ ok(r(4).ids.includes("__sub_A") && r(4).ids.includes("__sub_B"), "④ = subset e
 ok(r(4).ids.indexOf("__sub_A") < r(4).ids.indexOf("__sub_B"), "④ {A}(count2) before {B}(count1)");
 ok(!r(4).ids.some((id) => id.includes("C")), "④ excludes superset {A,B,C}");
 
-// ⑤ unrelated notes: signature NOT a subset of T. z={A,B,C} ⊋ T={A,B} ⇒ ⑤.
-ok(r(5).ids.includes("z"), "⑤ includes unrelated (superset) z");
-ok(!r(5).ids.includes("n0") && !r(5).ids.includes("n1"), "⑤ excludes T-exact ①②");
-ok(!r(5).ids.includes("n2") && !r(5).ids.includes("n3"), "⑤ excludes subset-of-T ④ members");
+// Unrelated notes (z={A,B,C} ⊋ T={A,B}) are NOT drawn — only ①②③④ appear.
+ok(!roles.some((r2) => r2.ids.includes("z")), "unrelated superset z is not in any role");
 
 // Wrap round-trip: source(x,y) → (u,v) → source ≈ identity.
 {

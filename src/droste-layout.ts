@@ -11,11 +11,9 @@ import { NONE_BUCKET } from "./types";
 //   ② nodes whose membership set EXACTLY equals T (incl. N)
 //   ③ those nodes as ONE T-enclosure frame
 //   ④ groups whose signature is a PROPER SUBSET of T (zoom-out)
-//   ⑤ UNRELATED notes — signature NOT a subset of T (supersets, partial overlaps,
-//      disjoint tags, or untagged). Drawn OUTSIDE the ①②③④ core by the renderer.
 export interface DrosteShape {
 	id: string;
-	role: 1 | 2 | 3 | 4 | 5;
+	role: 1 | 2 | 3 | 4;
 	kind: "card" | "frame"; // card = node (filled); frame = group enclosure (stroked)
 	label: string;
 	hueKey: string;
@@ -115,7 +113,7 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 	if (overflow) subsetSigs = subsetSigs.slice(0, cap - 1);
 
 	// Build the bands as separate item lists.
-	type Item = { id: string; role: 1 | 2 | 3 | 4 | 5; kind: "card" | "frame"; label: string; hueKey: string; members?: { id: string; label: string; hueKey: string }[] };
+	type Item = { id: string; role: 1 | 2 | 3 | 4; kind: "card" | "frame"; label: string; hueKey: string; members?: { id: string; label: string; hueKey: string }[] };
 	// ① N alone (NOT mixed with ② cards).
 	const band1: Item[] = [
 		{ id: focusNode.id, role: 1, kind: "card", label: focusNode.label, hueKey: focusNode.memberships[0] ?? focusId },
@@ -136,18 +134,6 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 	}));
 	if (overflow) band4.push({ id: "__more", role: 4, kind: "frame", label: `+${sigInfo.size - (cap - 1)}`, hueKey: "more" });
 
-	// ⑤ UNRELATED notes: signature is NOT a subset of T (at least one tag outside T),
-	// or untagged. These have no containment relation to N, so they sit outside ①②③④.
-	// NOT capped here — ALL of them are emitted; the renderer tiles as many as fit in
-	// the outer region and shows a "+N" marker for any remainder.
-	const unrelated = nodes.filter((n) => {
-		const keys = [...n.memberships];
-		return keys.length > 0 && !keys.every((k) => T.has(k));
-	});
-	const band5: Item[] = unrelated.map((nd) => ({
-		id: nd.id, role: 5 as const, kind: "card" as const, label: nd.label, hueKey: nd.memberships[0] ?? nd.id,
-	}));
-
 	// CONCENTRIC nesting (spec 2026-05-31): ① ∈ ② ∈ ③ ∈ ④. The depth is u (radial,
 	// y here ⇒ drosteUV maps y→u): ① innermost band, ④ outermost. Each level's
 	// elements spread over v (angle, x here ⇒ x→v, full width). After the warp
@@ -166,10 +152,9 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 	placeRing(band1, 0); // ① innermost
 	placeRing(band2, 1); // ②
 	placeRing(band3, 2); // ③
-	placeRing(band4, 3); // ④
-	placeRing(band5, 4); // ⑤ unrelated (rendered outside the core)
+	placeRing(band4, 3); // ④ outermost
 
-	return { shapes, bbox: { minX: 0, minY: 0, maxX: WT, maxY: 5 * HB }, focusId };
+	return { shapes, bbox: { minX: 0, minY: 0, maxX: WT, maxY: 4 * HB }, focusId };
 }
 
 // Test/inspection helper: the ①②③④ shapes grouped by role (data correctness).
@@ -214,7 +199,7 @@ export function buildDrosteSeq(data: GraphData, focus0: string, cap: number): st
 }
 
 export function drosteRoles(meta: DrosteMeta): { role: number; ids: string[]; labels: string[] }[] {
-	return [1, 2, 3, 4, 5].map((role) => {
+	return [1, 2, 3, 4].map((role) => {
 		const s = meta.shapes.filter((e) => e.role === role);
 		return { role, ids: s.map((e) => e.id), labels: s.map((e) => e.label) };
 	});

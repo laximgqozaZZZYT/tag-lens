@@ -169,6 +169,7 @@ export class MiniGraphView extends ItemView {
 	// full pre-LIMIT graph the focus window is re-laid from as the index advances.
 	private drosteZoom = 0;
 	private drosteData: GraphData | null = null;
+	private drosteMenu: HTMLElement | null = null; // focus-picker mini-menu (tree + search)
 	private adjacency: Map<string, number[]> = new Map();
 	// Drag-to-move (nodes/clusters) was removed; pan/marquee/click-to-open
 	// are the only pointer interactions now.
@@ -327,6 +328,7 @@ export class MiniGraphView extends ItemView {
 			onActivate: () => this.cancelHover(),
 		});
 
+		this.addAction("list-tree", "Focus picker (Droste): search/tree of notes", () => this.toggleDrosteMenu());
 		this.addAction("square-dashed-mouse-pointer", "Marquee zoom (or Shift+drag)", () => this.marquee.arm());
 		this.addAction("zoom-in", "Zoom in", () => this.zoomBy(1.4));
 		this.addAction("zoom-out", "Zoom out", () => this.zoomBy(1 / 1.4));
@@ -2529,6 +2531,93 @@ export class MiniGraphView extends ItemView {
 		this.laid.droste = window[0];
 	}
 
+	// Make `id` the new Droste focus N: reset the zoom, recompute T + the focus
+	// chain, and rebuild. Used by both clicking a node and the focus-picker menu.
+	private setDrosteFocus(id: string): void {
+		this.settings.drosteFocus = id;
+		this.drosteZoom = 0;
+		void this.save();
+		void this.rebuild();
+	}
+
+	// Focus-picker mini-menu: a floating panel with a search box and a folder tree of
+	// every note (ids are paths). Selecting a note sets it as the new focus.
+	private toggleDrosteMenu(): void {
+		if (this.drosteMenu) { this.drosteMenu.remove(); this.drosteMenu = null; return; }
+		const nodes = (this.drosteData?.nodes ?? this.laid.nodes ?? []).slice();
+		const panel = this.root.createDiv();
+		this.drosteMenu = panel;
+		Object.assign(panel.style, {
+			position: "absolute", left: "8px", top: "34px", width: "270px",
+			maxHeight: "calc(100% - 48px)", display: "flex", flexDirection: "column",
+			background: "rgba(20,24,33,0.98)", border: "1px solid #3a4760", borderRadius: "6px",
+			boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "60", font: "12px sans-serif", color: "#e6edf3",
+		} as Partial<CSSStyleDeclaration>);
+		const head = panel.createDiv();
+		Object.assign(head.style, { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 8px", borderBottom: "1px solid #2a3447" });
+		head.createSpan({ text: `Focus picker (${nodes.length})` });
+		const close = head.createEl("button", { text: "×" });
+		close.style.cursor = "pointer";
+		close.addEventListener("click", () => this.toggleDrosteMenu());
+		const search = head.parentElement!.createEl("input", { attr: { type: "text", placeholder: "Search notes…" } });
+		Object.assign(search.style, { margin: "6px 8px", padding: "4px 6px", background: "#0f1116", border: "1px solid #2a3447", borderRadius: "4px", color: "#e6edf3" });
+		const body = panel.createDiv();
+		Object.assign(body.style, { overflow: "auto", padding: "4px 6px 8px" });
+		// folder tree from path-like ids
+		type TNode = { folders: Map<string, TNode>; leaves: { id: string; label: string }[] };
+		const mkT = (): TNode => ({ folders: new Map(), leaves: [] });
+		const tree = mkT();
+		for (const n of nodes) {
+			const parts = n.id.split("/");
+			let cur = tree;
+			for (let i = 0; i < parts.length - 1; i++) {
+				const p = parts[i];
+				let nx = cur.folders.get(p);
+				if (!nx) { nx = mkT(); cur.folders.set(p, nx); }
+				cur = nx;
+			}
+			cur.leaves.push({ id: n.id, label: parts[parts.length - 1] });
+		}
+		const leafRow = (id: string, label: string, depth: number): HTMLElement => {
+			const row = body.createDiv({ text: label });
+			Object.assign(row.style, { paddingLeft: `${6 + depth * 12}px`, padding: "2px 4px", cursor: "pointer", borderRadius: "3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" });
+			if (id === this.settings.drosteFocus) { row.style.background = "#2d6cdf55"; row.style.color = "#ffd35c"; }
+			row.addEventListener("mouseenter", () => (row.style.background = row.style.background || "#2a3447"));
+			row.addEventListener("click", () => { this.toggleDrosteMenu(); this.setDrosteFocus(id); });
+			return row;
+		};
+		const renderTree = (container: HTMLElement, t: TNode, depth: number): void => {
+			for (const [name, child] of [...t.folders.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+				const row = container.createDiv({ text: `▸ ${name}` });
+				Object.assign(row.style, { paddingLeft: `${6 + depth * 12}px`, padding: "2px 4px", cursor: "pointer", color: "#9db4d6", fontWeight: "600" });
+				const kids = container.createDiv();
+				kids.style.display = "none";
+				let built = false;
+				row.addEventListener("click", () => {
+					const open = kids.style.display !== "none";
+					kids.style.display = open ? "none" : "block";
+					row.textContent = `${open ? "▸" : "▾"} ${name}`;
+					if (!built) { renderTree(kids, child, depth + 1); built = true; }
+				});
+			}
+			for (const lf of t.leaves.sort((a, b) => (a.label < b.label ? -1 : 1))) leafRow(lf.id, lf.label, depth);
+		};
+		const draw = (): void => {
+			body.empty();
+			const q = search.value.trim().toLowerCase();
+			if (q) {
+				const hits = nodes.filter((n) => n.id.toLowerCase().includes(q) || n.label.toLowerCase().includes(q)).slice(0, 300);
+				if (!hits.length) { body.createDiv({ text: "(no matches)" }); return; }
+				for (const n of hits) leafRow(n.id, n.label, 0);
+			} else {
+				renderTree(body, tree, 0);
+			}
+		};
+		search.addEventListener("input", draw);
+		draw();
+		search.focus();
+	}
+
 	private drosteHitTest(sx: number, sy: number): string | null {
 		if (!this.laid.droste) return null;
 		const dpr = window.devicePixelRatio || 1;
@@ -3270,9 +3359,7 @@ export class MiniGraphView extends ItemView {
 				const id = this.drosteHitTest(sx, sy);
 				if (id && !id.startsWith("__")) {
 					this.openFile(id);
-					this.settings.drosteFocus = id;
-					void this.save();
-					void this.rebuild();
+					this.setDrosteFocus(id);
 				}
 				return;
 			}
