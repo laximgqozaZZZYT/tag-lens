@@ -13,15 +13,16 @@ export interface DrawDrosteOpts {
 
 type Pt = { x: number; y: number };
 
-// Clear per-ROLE palette so ①②③④ are visually distinct at a glance
+// Clear per-ROLE palette so ①②③④⑤ are visually distinct at a glance
 // (① focus = blue, ② exact-T notes = amber, ③ T-enclosure = purple,
-// ④ subset enclosures = green). fillA = stronger fill so roles read clearly.
-function roleColor(role: 1 | 2 | 3 | 4): { h: number; s: number; l: number } {
+// ④ subset enclosures = green, ⑤ unrelated notes = muted slate).
+function roleColor(role: 1 | 2 | 3 | 4 | 5): { h: number; s: number; l: number } {
 	switch (role) {
 		case 1: return { h: 205, s: 90, l: 60 }; // ① blue
 		case 2: return { h: 45, s: 95, l: 60 }; // ② amber
 		case 3: return { h: 265, s: 80, l: 68 }; // ③ purple
-		default: return { h: 130, s: 65, l: 58 }; // ④ green
+		case 4: return { h: 130, s: 65, l: 58 }; // ④ green
+		default: return { h: 200, s: 18, l: 52 }; // ⑤ muted slate (unrelated/outside)
 	}
 }
 
@@ -32,7 +33,10 @@ function roleColor(role: 1 | 2 | 3 | 4): { h: number; s: number; l: number } {
 //   ③ T-enclosure, ④ subset enclosures — square frames nested outside.
 function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
 	const cx = o.canvas.width / 2, cy = o.canvas.height / 2;
-	const maxR = Math.min(cx, cy) * 0.94;
+	// When ⑤ (unrelated notes) are present, shrink the ①②③④ core so they fit in an
+	// outer ring around it.
+	const hasFive = meta.shapes.some((e) => e.role === 5);
+	const maxR = Math.min(cx, cy) * (hasFive ? 0.72 : 0.94);
 	// Cartesian coordinate grid (background) — straight x/y lines centred on (cx,cy).
 	// (Under the warp this is what becomes the red Print-Gallery spiral mesh.)
 	const gstep = maxR / 16; // finer grid
@@ -159,6 +163,21 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 			ctx.fillStyle = "#ffd35c"; ctx.fill();
 			ctx.lineWidth = 1.5 * o.dpr; ctx.strokeStyle = "#1a1c22"; ctx.stroke();
 		}
+	}
+	// ⑤ unrelated notes (signature not ⊆ T): placed OUTSIDE the ①②③④ core, on a
+	// ring near the canvas edge, distributed by angle. No containment, so no frame.
+	const r5 = role(5);
+	if (r5.length) {
+		const ringR = Math.min(cx, cy) * 0.86; // between the shrunken core and the edge
+		const m5 = cardH * 0.8; // ⑤ card half-size (a touch smaller than ②)
+		const rc5 = roleColor(5);
+		const grey = { h: 0, s: 0, l: 62 };
+		r5.forEach((e, i) => {
+			const th = -Math.PI / 2 + (2 * Math.PI * i) / r5.length; // start at top, clockwise
+			const px = cx + ringR * Math.cos(th), py = cy + ringR * Math.sin(th);
+			const clickable = e.kind === "card";
+			square(px, py, m5, clickable ? rc5 : grey, e.id === o.hoverId, e.label, clickable ? e.id : undefined);
+		});
 	}
 }
 

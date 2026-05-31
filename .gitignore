@@ -44,3 +44,6 @@ stage1-plugin.svg
 test/fwd-conf*.mjs
 test/angle-check.mjs
 test/verify-stage1.mjs
+preview5.png
+preview5.svg
+test/preview5.mjs
