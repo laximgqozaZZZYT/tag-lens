@@ -38,56 +38,35 @@ function roleColor(role: 1 | 2 | 3 | 4): { h: number; s: number; l: number } {
 	}
 }
 
-// Orthogonal render = CARTESIAN concentric NESTED RECTANGLES (axis-aligned, NO polar,
-// NO exp twist). u (depth) → square half-size, v → position on the AXIS-ALIGNED square
-// perimeter (Chebyshev: /max(|cos|,|sin|)). innerR=0 so ① fills the centre (no hole):
-// ① ∈ ② ∈ ③ ∈ ④ as nested boxes in plain x/y.
+// Orthogonal render = everything as centred, axis-aligned SQUARES, nested by ①②③④
+// order (① smallest at centre → ④ largest), overlapping allowed. No polar, no warp.
 function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
-	const b = meta.bbox;
 	const cx = o.canvas.width / 2, cy = o.canvas.height / 2;
 	const maxR = Math.min(cx, cy) * 0.92;
-	const uLo = drosteUV(b, b.minX, b.minY).u;
-	const uHi = drosteUV(b, b.minX, b.maxY).u;
-	const radOf = (u: number) => ((u - uLo) / (uHi - uLo || 1)) * maxR; // innerR = 0 (no hole)
-	const pt = (x: number, y: number): Pt => {
-		const { u, v } = drosteUV(b, x, y);
-		const r = radOf(u);
-		const c = Math.cos(v), si = Math.sin(v), m = Math.max(Math.abs(c), Math.abs(si)) || 1;
-		return { x: cx + (r * c) / m, y: cy + (r * si) / m }; // axis-aligned square perimeter
-	};
-	const ringPath = (e: DrosteShape): void => {
-		const N = 28;
-		ctx.beginPath();
-		for (let i = 0; i <= N; i++) { const x = e.x0 + ((e.x1 - e.x0) * i) / N; const d = pt(x, e.y0); i ? ctx.lineTo(d.x, d.y) : ctx.moveTo(d.x, d.y); }
-		for (let i = N; i >= 0; i--) { const x = e.x0 + ((e.x1 - e.x0) * i) / N; const d = pt(x, e.y1); ctx.lineTo(d.x, d.y); }
-		ctx.closePath();
-	};
-	for (const e of meta.shapes) {
+	const minR = maxR * 0.1;
+	// Shapes are emitted in ①②③④ order; rank → square half-size (ascending).
+	const n = meta.shapes.length;
+	const half = (i: number) => minR + (n > 1 ? i / (n - 1) : 0) * (maxR - minR);
+	// Back-to-front: largest (④) first so smaller squares (① …) sit on top.
+	for (let i = n - 1; i >= 0; i--) {
+		const e = meta.shapes[i];
 		const rc = roleColor(e.role);
-		ringPath(e);
-		if (e.kind === "card") {
-			ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.42)`;
-			ctx.fill();
-			ctx.lineWidth = (e.id === o.hoverId ? 3 : 1.6) * o.dpr;
-			ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 15, 85)}%)`;
-			ctx.stroke();
-		} else {
-			ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.18)`;
-			ctx.fill();
-			ctx.lineWidth = (e.id === o.hoverId ? 4 : 3) * o.dpr;
-			ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 12, 82)}%)`;
-			ctx.stroke();
-		}
-		const c = pt((e.x0 + e.x1) / 2, (e.y0 + e.y1) / 2);
-		const band = radOf(drosteUV(b, b.minX, e.y1).u) - radOf(drosteUV(b, b.minX, e.y0).u);
+		const r = half(i);
+		const x = cx - r, y = cy - r, sz = 2 * r;
+		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.28)`;
+		ctx.fillRect(x, y, sz, sz);
+		ctx.lineWidth = (e.id === o.hoverId ? 3.5 : 2) * o.dpr;
+		ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 12, 82)}%)`;
+		ctx.strokeRect(x, y, sz, sz);
+		// Label on the square's top edge so nested labels stack readably.
 		ctx.fillStyle = "#e6ecf5";
-		ctx.font = `${Math.min(Math.abs(band) * 0.3, 13 * o.dpr)}px sans-serif`;
+		ctx.font = `${12 * o.dpr}px sans-serif`;
 		ctx.textAlign = "center";
-		ctx.textBaseline = "middle";
-		ctx.fillText(truncateToWidth(ctx, e.label, Math.abs(band) * 0.95 || 40), c.x, c.y);
+		ctx.textBaseline = "bottom";
+		ctx.fillText(truncateToWidth(ctx, e.label, sz * 0.95), cx, y - 2 * o.dpr);
 		if (e.id === o.focusId) {
 			ctx.beginPath();
-			ctx.arc(c.x, c.y, Math.max(3 * o.dpr, Math.abs(band) * 0.18), 0, 2 * Math.PI);
+			ctx.arc(cx, cy, Math.max(3 * o.dpr, minR * 0.5), 0, 2 * Math.PI);
 			ctx.fillStyle = "#ffd35c"; ctx.fill();
 			ctx.lineWidth = 1.5 * o.dpr; ctx.strokeStyle = "#1a1c22"; ctx.stroke();
 		}
