@@ -36,3 +36,11 @@ cheby-test.png
 mip-test.png
 scallop-test.png
 own-tile-test.png
+fwd-conformal.png
+fwd-conformal.svg
+fwd-conf2.png
+fwd-conf2.svg
+stage1-plugin.svg
+test/fwd-conf*.mjs
+test/angle-check.mjs
+test/verify-stage1.mjs

@@ -1,5 +1,4 @@
 import { drosteForward, type DrosteParams } from "./conformal";
-import { GRID_TEX, decodeGridTex } from "./droste-grid-texture";
 import { drosteUV, type DrosteMeta, type DrosteShape, type DrosteBBox } from "./droste-layout";
 import { truncateToWidth } from "./canvas-utils";
 
@@ -273,64 +272,48 @@ function drawRedGrid(ctx: CanvasRenderingContext2D, b: DrosteBBox, m: number, p:
 }
 
 // Staged bring-up of the conformal warp (verify each stage before the next):
-//   1 = red grid MESH only (square bbox, copies=1) — the Print Gallery red net.
+//   1 = red grid MESH only — the Print Gallery red net.
 //   2 = warped source content + grid overlay.
-//   3 = self-similar nesting (copies>1).
+//   3 = self-similar nesting.
 const DROSTE_STAGE: 1 | 2 | 3 = 1;
 
-// STAGE 1: the Print Gallery red mesh, reproduced the way mathvisuals.org does it.
-// For every OUTPUT pixel z it samples a REPEATING "log grid" texture at
-//   w = (re + im·i·aspgr)·log(z) / (2π·aspgr) − offset      (geometry 1,-1)
-// (CindyGL colorplot + imagergb repeat->true). We do the same: invert each pixel
-// to w, wrap into the tiled scalloped-grid texture (src/droste-grid-texture.ts),
-// and paint red by its line luminance. The texture's pre-curved content is what
-// makes the result a coherent sheared spiral grid (pure level-sets only give
-// rotationally-symmetric webs). conformal.ts is untouched (this path is the
-// inverse map, not drosteForward). Rendered at reduced res then scaled for speed.
+// STAGE 1: the genuine conformal red mesh = the FORWARD image of an orthogonal
+// (u,v) strip grid under z = R₀·exp(γζ). We map EVERY subdivided vertex through
+// drosteForward (conformal.ts, unchanged), so straight strip lines become smooth
+// log-spiral curves. Because exp is analytic, ∂z/∂v = i·∂z/∂u, i.e. the two line
+// families cross at exactly 90° everywhere (verified numerically). geometry (1,-1):
+// γ = 1+i ⇔ k = e^{2π}, twistDir = -1. Drawing a dense grid over a wide (u,v) range
+// fills the plane and nests self-similarly into a central singularity; placing that
+// singularity off-centre makes the bulk read as a coherent sheared grid.
 function drawStage1Grid(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): void {
 	const W = o.canvas.width, H = o.canvas.height;
-	const tex = decodeGridTex();
-	const TW = GRID_TEX.width, TH = GRID_TEX.height, yP = GRID_TEX.yPeriod;
-	const aspgr = TW / TH;
-	const re = 1, imA = -aspgr; // geometry (1,-1): coefficient (re + im·i·aspgr), im=-1
-	const k = 1 / (2 * Math.PI * aspgr);
-	const offX = 0.9279, offY = 0.6047; // static texture pan (mathvisuals aa + .3·log(goff))
-	// reduced-resolution offscreen buffer (per-pixel complex log is costly)
-	const scaleDown = Math.min(1, 720 / Math.max(W, H));
-	const ow = Math.max(1, Math.round(W * scaleDown)), oh = Math.max(1, Math.round(H * scaleDown));
-	const oc = document.createElement("canvas"); oc.width = ow; oc.height = oh;
-	const octx = oc.getContext("2d");
-	if (!octx) return;
-	const img = octx.createImageData(ow, oh);
-	const data = img.data;
-	const cx = ow / 2, cy = oh / 2;
-	const sc = Math.min(ow, oh) / 12; // singularity centred; view half-span ≈ 6
-	for (let py = 0; py < oh; py++) {
-		for (let px = 0; px < ow; px++) {
-			const zx = (px - cx) / sc, zy = (py - cy) / sc;
-			let r = 15, g = 17, b = 22; // bg #0f1116
-			const m2 = zx * zx + zy * zy;
-			if (m2 > 1e-10) {
-				const Lr = 0.5 * Math.log(m2), Li = Math.atan2(zy, zx);
-				// w = (re + imA·i)·(Lr + Li·i)·k − off
-				const wRe = (re * Lr - imA * Li) * k - offX;
-				const wIm = (re * Li + imA * Lr) * k - offY;
-				let fx = wRe - Math.floor(wRe);
-				const ty = wIm / yP; let fy = ty - Math.floor(ty);
-				const tx = Math.min(TW - 1, (fx * TW) | 0);
-				const tyy = Math.min(TH - 1, ((1 - fy) * TH) | 0);
-				const line = 1 - tex[tyy * TW + tx] / 255; // ~1 on a grid line
-				r = (15 + (225 - 15) * line) | 0;
-				g = (17 + (40 - 17) * line) | 0;
-				b = (22 + (40 - 22) * line) | 0;
-			}
-			const off = (py * ow + px) * 4;
-			data[off] = r; data[off + 1] = g; data[off + 2] = b; data[off + 3] = 255;
+	const p: DrosteParams = { k: Math.exp(2 * Math.PI), twistDir: -1, R0: 1 }; // γ = 1+i
+	const CELL = 0.19; // (u,v) grid spacing → cell density
+	const RANGE = 6.6; // half-extent of u and v drawn (covers screen + the nest)
+	const SCALE = Math.min(W, H) * 0.052; // world z → device px
+	const cx = W * 0.36, cy = H * 0.58; // singularity placed off-centre (like the target)
+	const S = Math.max(160, 6 * Math.round((2 * RANGE) / CELL)); // per-line subdivisions
+	const map = (u: number, v: number): Pt => {
+		const z = drosteForward(u, v, p);
+		return { x: cx + z.re * SCALE, y: cy + z.im * SCALE };
+	};
+	ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+	ctx.strokeStyle = "#d62020";
+	ctx.lineWidth = 2.4 * o.dpr;
+	ctx.lineJoin = "round"; ctx.lineCap = "round";
+	const M = 120 * o.dpr; // off-canvas margin before breaking a polyline
+	const drawLine = (fn: (t: number) => Pt): void => {
+		ctx.beginPath();
+		let started = false;
+		for (let s = 0; s <= S; s++) {
+			const pt = fn(s / S);
+			if (pt.x < -M || pt.x > W + M || pt.y < -M || pt.y > H + M) { started = false; continue; }
+			if (started) ctx.lineTo(pt.x, pt.y); else { ctx.moveTo(pt.x, pt.y); started = true; }
 		}
-	}
-	octx.putImageData(img, 0, 0);
-	ctx.imageSmoothingEnabled = true;
-	ctx.drawImage(oc, 0, 0, W, H);
+		ctx.stroke();
+	};
+	for (let u = -RANGE; u <= RANGE + 1e-9; u += CELL) drawLine((t) => map(u, -RANGE + 2 * RANGE * t)); // const-u (vary v)
+	for (let v = -RANGE; v <= RANGE + 1e-9; v += CELL) drawLine((t) => map(-RANGE + 2 * RANGE * t, v)); // const-v (vary u)
 }
 
 export function drawDroste(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
