@@ -46,20 +46,26 @@ function roleColor(role: 1 | 2 | 3 | 4): { h: number; s: number; l: number } {
 function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
 	const cx = o.canvas.width / 2, cy = o.canvas.height / 2;
 	const maxR = Math.min(cx, cy) * 0.94;
-	const R1 = maxR * 0.13; // ① centre square half-size
-	const RR = maxR * 0.42; // ② ring radius (square the ② notes sit on)
-	const R3 = maxR * 0.66; // ③ frame
-	const R4 = maxR * 0.9; // ④ frame(s)
-	const cardH = maxR * 0.11; // ② note square half-size
-
-	// Point on a square (half-size R, centred) at perimeter fraction t ∈ [0,1).
-	const squarePt = (t: number, R: number): Pt => {
-		const p = ((t % 1) + 1) % 1 * 4, side = Math.floor(p) % 4, f = p - Math.floor(p);
-		if (side === 0) return { x: cx - R + 2 * R * f, y: cy - R };
-		if (side === 1) return { x: cx + R, y: cy - R + 2 * R * f };
-		if (side === 2) return { x: cx + R - 2 * R * f, y: cy + R };
-		return { x: cx - R, y: cy + R - 2 * R * f };
-	};
+	const role = (n: number) => meta.shapes.filter((e) => e.role === n);
+	const r2 = role(2);
+	// ①②: a centred square GRID — ① is the centre cell, ② fill the surrounding
+	// cells (ring by ring) so they enclose ① on all sides and the block is a square.
+	let g = 1; // odd grid size with g² ≥ 1 + |②|
+	while (g * g < 1 + r2.length) g += 2;
+	const B = maxR * 0.5; // ①② block half-size
+	const cell = (2 * B) / g; // grid cell size
+	const cardH = cell * 0.42; // square half-size inside a cell
+	const ctr = (g - 1) / 2;
+	const cellCenter = (col: number, row: number): Pt => ({ x: cx + (col - ctr) * cell, y: cy + (row - ctr) * cell });
+	// surrounding cells ordered by ring distance (Chebyshev) then angle.
+	const around: { col: number; row: number }[] = [];
+	for (let row = 0; row < g; row++) for (let col = 0; col < g; col++) if (!(col === ctr && row === ctr)) around.push({ col, row });
+	around.sort((a, bb) =>
+		Math.max(Math.abs(a.col - ctr), Math.abs(a.row - ctr)) - Math.max(Math.abs(bb.col - ctr), Math.abs(bb.row - ctr)) ||
+		Math.atan2(a.row - ctr, a.col - ctr) - Math.atan2(bb.row - ctr, bb.col - ctr),
+	);
+	const R3 = B + cell * 0.7; // ③ frame just outside the block
+	const R4 = maxR * 0.94; // ④ frame(s)
 	const frame = (R: number, rc: { h: number; s: number; l: number }, hover: boolean, label: string): void => {
 		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.10)`;
 		ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
@@ -83,19 +89,17 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 		ctx.fillText(truncateToWidth(ctx, label, 2 * h * 0.92), px, py);
 	};
 
-	const role = (n: number) => meta.shapes.filter((e) => e.role === n);
 	// ④ frames (back), nested concentric if several; then ③.
 	const r4 = role(4);
 	r4.forEach((e, i) => frame(R4 - (i * (R4 - R3) * 0.5) / Math.max(1, r4.length), roleColor(4), e.id === o.hoverId, e.label));
 	for (const e of role(3)) frame(R3, roleColor(3), e.id === o.hoverId, e.label);
-	// ② T-exact notes around ① on the square ring at RR.
-	const r2 = role(2);
-	r2.forEach((e, j) => { const p = squarePt(j / Math.max(1, r2.length), RR); square(p.x, p.y, cardH, roleColor(2), e.id === o.hoverId, e.label); });
-	// ① N at the centre (on top).
+	// ② T-exact notes fill the cells SURROUNDING ① (ring by ring) → enclose it.
+	r2.forEach((e, j) => { const p = cellCenter(around[j].col, around[j].row); square(p.x, p.y, cardH, roleColor(2), e.id === o.hoverId, e.label); });
+	// ① N at the centre cell (on top).
 	for (const e of role(1)) {
-		square(cx, cy, R1, roleColor(1), e.id === o.hoverId, e.label);
+		square(cx, cy, cardH, roleColor(1), e.id === o.hoverId, e.label);
 		if (e.id === o.focusId) {
-			ctx.beginPath(); ctx.arc(cx, cy, Math.max(3 * o.dpr, R1 * 0.4), 0, 2 * Math.PI);
+			ctx.beginPath(); ctx.arc(cx, cy, Math.max(3 * o.dpr, cardH * 0.4), 0, 2 * Math.PI);
 			ctx.fillStyle = "#ffd35c"; ctx.fill();
 			ctx.lineWidth = 1.5 * o.dpr; ctx.strokeStyle = "#1a1c22"; ctx.stroke();
 		}
