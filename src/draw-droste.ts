@@ -52,7 +52,7 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	// cells (ring by ring) so they enclose ① on all sides and the block is a square.
 	let g = 1; // odd grid size with g² ≥ 1 + |②|
 	while (g * g < 1 + r2.length) g += 2;
-	const B = maxR * 0.5; // ①② block half-size
+	const B = maxR * 0.25; // ①② block half-size (small, so ④ siblings have room)
 	const cell = (2 * B) / g; // grid cell size
 	const cardH = cell * 0.42; // square half-size inside a cell
 	const ctr = (g - 1) / 2;
@@ -64,7 +64,7 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 		Math.max(Math.abs(a.col - ctr), Math.abs(a.row - ctr)) - Math.max(Math.abs(bb.col - ctr), Math.abs(bb.row - ctr)) ||
 		Math.atan2(a.row - ctr, a.col - ctr) - Math.atan2(bb.row - ctr, bb.col - ctr),
 	);
-	const R3 = B + cell * 0.7; // ③ frame just outside the block
+	const R3 = B + cell * 0.45; // ③ frame just outside the block
 	const frame = (R: number, rc: { h: number; s: number; l: number }, hover: boolean, label: string): void => {
 		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.10)`;
 		ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
@@ -94,10 +94,12 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	// nested inside the other.
 	const r4 = role(4);
 	const rc4 = roleColor(4);
-	const D = r4.length <= 1 ? 0 : maxR * 0.07; // stagger offset
-	const H4 = Math.min(R3 + D + maxR * 0.05, Math.min(cx, cy) - 2 * o.dpr - D); // contains ③
+	// Large offset so independent ④ siblings clearly diverge (Venn overlap sharing
+	// the central ③), not near-concentric (which read as nested).
+	const D = r4.length <= 1 ? 0 : maxR * 0.26; // stagger offset
+	const H4 = Math.min(R3 + D + maxR * 0.04, Math.min(cx, cy) - 2 * o.dpr - D); // each still contains ③
 	r4.forEach((e, i) => {
-		const th = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(1, r4.length);
+		const th = (2 * Math.PI * i) / Math.max(1, r4.length); // k=2 → right & left
 		const ox = D * Math.cos(th), oy = D * Math.sin(th);
 		const x = cx + ox - H4, y = cy + oy - H4, sz = 2 * H4;
 		ctx.fillStyle = `hsla(${rc4.h}, ${rc4.s}%, ${rc4.l}%, 0.08)`;
