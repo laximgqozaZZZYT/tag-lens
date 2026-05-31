@@ -60,15 +60,19 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	// Snap an edge coord to the nearest grid line so ①②③④ borders align to the grid.
 	const snapX = (v: number): number => cx + Math.round((v - cx) / gstep) * gstep;
 	const snapY = (v: number): number => cy + Math.round((v - cy) / gstep) * gstep;
+	const r1half = 2 * gstep; // ① N = 4×4 grid cells
 	const role = (n: number) => meta.shapes.filter((e) => e.role === n);
 	const r2 = role(2);
 	// ①②: a centred square GRID — ① is the centre cell, ② fill the surrounding
 	// cells (ring by ring) so they enclose ① on all sides and the block is a square.
 	let g = 1; // odd grid size with g² ≥ 1 + |②|
 	while (g * g < 1 + r2.length) g += 2;
-	const B = maxR * 0.2; // ①② block half-size (small, so ④ siblings + members have room)
-	const cell = (2 * B) / g; // grid cell size
-	const cardH = cell * 0.42; // square half-size inside a cell
+	const cardH = maxR * 0.055; // ② card half-size (kept ~ as-is, decoupled from spacing)
+	// Grid spacing must be large enough that the nearest ② cell clears the 4×4 ①:
+	// (cell − cardH) ≥ r1half + 1-cell gap. Floor at the old default so small graphs
+	// don't collapse.
+	const cell = Math.max((2 * (maxR * 0.2)) / g, r1half + cardH + gstep);
+	const B = (cell * g) / 2; // ①② block half-size derived from the spacing
 	const ctr = (g - 1) / 2;
 	const cellCenter = (col: number, row: number): Pt => ({ x: cx + (col - ctr) * cell, y: cy + (row - ctr) * cell });
 	// surrounding cells ordered by ring distance (Chebyshev) then angle.
@@ -160,7 +164,6 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 	// ② T-exact notes fill the cells SURROUNDING ① (ring by ring) → enclose it.
 	r2.forEach((e, j) => { const p = cellCenter(around[j].col, around[j].row); square(p.x, p.y, cardH, roleColor(2), e.id === o.hoverId, e.label); });
 	// ① N at the centre cell (on top).
-	const r1half = 2 * gstep; // ① N = 4×4 grid cells
 	for (const e of role(1)) {
 		square(cx, cy, r1half, roleColor(1), e.id === o.hoverId, e.label);
 		if (e.id === o.focusId) {
