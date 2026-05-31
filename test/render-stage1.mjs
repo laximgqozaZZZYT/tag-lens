@@ -17,18 +17,23 @@ import { writeFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 
 const W = 800, H = 800;
-const p = { k: 2.5, twistDir: 1, R0: 1 }; // ccw
-const N = 12;                 // grid divisions per 2π
-const du = 2 * Math.PI / N, dv = 2 * Math.PI / N;
-const VIEW = 4.0;             // world half-extent mapped to the canvas
-const LW = 0.05;              // half line width in cell units
+const argv = process.argv.slice(2);
+// geometry (1,-1): coefficient (1-i)·log(z)/2π ⇔ γ = 1+i ⇔ k=e^{2π}, twistDir=-1.
+const p = { k: Math.exp(2 * Math.PI), twistDir: -1, R0: 1 };
+const CELL = parseFloat(argv[0] ?? "0.18"); // grid spacing in ζ units
+const du = CELL, dv = CELL;
+const VIEW = parseFloat(argv[1] ?? "3.2");  // world half-extent mapped to the canvas
+const LW = parseFloat(argv[2] ?? "0.08");   // half line width in cell units
+const OFFX = parseFloat(argv[4] ?? "0");    // world offset of the singularity (left/right)
+const OFFY = parseFloat(argv[5] ?? "0");
+const OUT = argv[3] ?? "/home/ubuntu/obsidian-plugins/tag-lens/stage1-mesh.png";
 
 const buf = Buffer.alloc(W * H * 4);
 const near = (val, step) => { const f = val / step - Math.round(val / step); return Math.abs(f); };
 for (let py = 0; py < H; py++) {
   for (let px = 0; px < W; px++) {
-    const zx = (px / W * 2 - 1) * VIEW;
-    const zy = (py / H * 2 - 1) * VIEW;
+    const zx = (px / W * 2 - 1) * VIEW + OFFX;
+    const zy = (py / H * 2 - 1) * VIEW + OFFY;
     let r = 15, g = 17, b = 22; // bg #0f1116
     const mag = Math.hypot(zx, zy);
     if (mag > 1e-4) {
@@ -67,8 +72,8 @@ function png(width, height, rgba) {
   ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", idat), chunk("IEND", Buffer.alloc(0))]);
 }
-writeFileSync("/home/ubuntu/obsidian-plugins/tag-lens/stage1-mesh.png", png(W, H, buf));
-console.log("wrote stage1-mesh.png (inverse per-pixel, N=" + N + ", k=2.5 ccw, view±" + VIEW + ")");
+writeFileSync(OUT, png(W, H, buf));
+console.log("wrote stage1-mesh.png (inverse per-pixel, geometry 1,-1, cell=" + CELL + ", view±" + VIEW + ", LW=" + LW + ")");
 `;
 
 const result = await build({

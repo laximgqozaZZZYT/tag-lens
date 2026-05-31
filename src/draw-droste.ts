@@ -289,22 +289,27 @@ const DROSTE_STAGE: 1 | 2 | 3 = 1;
 function drawStage1Grid(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): void {
 	const W = o.canvas.width, H = o.canvas.height;
 	const cx = W / 2, cy = H / 2;
-	const p: DrosteParams = { k: o.k, twistDir: o.twistDir === "ccw" ? 1 : -1, R0: 1 };
-	const N = Math.max(2, o.gridV ?? 12);
-	const du = (2 * Math.PI) / N, dv = (2 * Math.PI) / N;
-	const LW = 0.05; // half line width in cell units
-	const VIEW = 4.0; // world half-extent mapped to the shorter canvas half
+	// geometry (1,-1) — the mathvisuals/PrintGallery default. Coefficient
+	// (1-i)·log(z)/2π ⇔ γ = 1+i ⇔ k=e^{2π}, twistDir=-1 in conformal.ts (UNCHANGED).
+	// Two orthogonal opposite log-spiral families (±45°) → a dense sheared square net.
+	const p: DrosteParams = { k: Math.exp(2 * Math.PI), twistDir: -1, R0: 1 };
+	const CELL = 0.16; // ζ grid spacing (cell density)
+	const LW = 0.09; // half line width in cell units (thick red lines)
+	const VIEW = 3.0; // world half-extent mapped to the shorter canvas half
 	const sc = Math.min(cx, cy) / VIEW; // world → device px
+	// place the spiral singularity off the centre (like mathvisuals SpiralCenter),
+	// so the visible bulk reads as a tilted lattice and the nest sits to one side.
+	const OFFX = VIEW * 0.42, OFFY = VIEW * 0.06;
 	const img = ctx.createImageData(W, H);
 	const data = img.data;
 	const near = (val: number, step: number): number => { const f = val / step - Math.round(val / step); return Math.abs(f); };
 	for (let py = 0; py < H; py++) {
 		for (let px = 0; px < W; px++) {
-			const zx = (px - cx) / sc, zy = (py - cy) / sc;
+			const zx = (px - cx) / sc + OFFX, zy = (py - cy) / sc + OFFY;
 			let r = 15, g = 17, b = 22; // bg #0f1116
 			if (zx * zx + zy * zy > 1e-8) {
 				const { u, vRaw } = drosteInverseBranch({ re: zx, im: zy }, p, 0);
-				const d = Math.min(near(u, du), near(vRaw, dv));
+				const d = Math.min(near(u, CELL), near(vRaw, CELL));
 				if (d < LW) {
 					const a = 1 - d / LW;
 					r = Math.round(15 + (220 - 15) * a);
