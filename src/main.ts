@@ -240,6 +240,9 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		merged.drosteCopies = Math.min(8, intPositive(merged.drosteCopies, 4, 1));
 		merged.drosteSubdiv = Math.min(64, intPositive(merged.drosteSubdiv, 24, 1));
 		if (typeof merged.drosteFocus !== "string") merged.drosteFocus = "";
+		if (merged.drosteRender !== "grid" && merged.drosteRender !== "spiral") {
+			merged.drosteRender = "grid";
+		}
 		this.settings = merged as unknown as MiniSettings;
 	}
 

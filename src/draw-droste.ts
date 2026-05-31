@@ -17,12 +17,13 @@ export interface DrawDrosteOpts {
 	focusId: string;
 	gridV?: number; // red-grid vertical line count (default 16)
 	gridH?: number; // red-grid horizontal line count (default 8)
+	// Print Gallery render mode (default "grid"). "grid" = orthogonal cartesian
+	// source plane; "spiral" = conformal Droste warp.
+	render?: "grid" | "spiral";
+	// Optional collector: drawOrtho pushes each clickable card's SCREEN rect (device
+	// px) here so the view can hit-test grid mode without re-deriving the geometry.
+	hitRegions?: { id: string; x0: number; y0: number; x1: number; y1: number }[];
 }
-
-// TEMPORARY: when true, skip the conformal warp / red grid / self-similar nesting
-// and draw the source plane (reordered BubbleSets shapes) in plain orthogonal
-// coordinates (linear x,y → screen). Flip back to false to re-enable exp(γζ).
-const DROSTE_ORTHO = true;
 
 type Pt = { x: number; y: number };
 
@@ -102,8 +103,9 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 		ctx.textAlign = "center"; ctx.textBaseline = "bottom";
 		ctx.fillText(truncateToWidth(ctx, label, b2.w * 0.95), b2.x + b2.w / 2, b2.y - 2 * o.dpr);
 	};
-	const square = (px: number, py: number, h: number, rc: { h: number; s: number; l: number }, hover: boolean, label: string): void => {
+	const square = (px: number, py: number, h: number, rc: { h: number; s: number; l: number }, hover: boolean, label: string, id?: string): void => {
 		const b2 = snapBox(px - h, py - h, px + h, py + h);
+		if (id && o.hitRegions) o.hitRegions.push({ id, x0: b2.x, y0: b2.y, x1: b2.x + b2.w, y1: b2.y + b2.h });
 		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.4)`;
 		ctx.fillRect(b2.x, b2.y, b2.w, b2.h);
 		ctx.lineWidth = (hover ? 3.5 : 1.8) * o.dpr;
@@ -155,17 +157,17 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 				const col = k % gm, row = Math.floor(k / gm);
 				const px = ccx + (col - (gm - 1) / 2) * step;
 				const py = ccy + (row - (gm - 1) / 2) * step;
-				square(px, py, mh, grey, mn.id === o.hoverId, mn.label);
+				square(px, py, mh, grey, mn.id === o.hoverId, mn.label, mn.id);
 			});
 		}
 	});
 	// ③ the single T-enclosure frame around the ①② block (inside every ④).
 	for (const e of role(3)) frame(R3, roleColor(3), e.id === o.hoverId, e.label);
 	// ② T-exact notes fill the cells SURROUNDING ① (ring by ring) → enclose it.
-	r2.forEach((e, j) => { const p = cellCenter(around[j].col, around[j].row); square(p.x, p.y, cardH, roleColor(2), e.id === o.hoverId, e.label); });
+	r2.forEach((e, j) => { const p = cellCenter(around[j].col, around[j].row); square(p.x, p.y, cardH, roleColor(2), e.id === o.hoverId, e.label, e.id); });
 	// ① N at the centre cell (on top).
 	for (const e of role(1)) {
-		square(cx, cy, r1half, roleColor(1), e.id === o.hoverId, e.label);
+		square(cx, cy, r1half, roleColor(1), e.id === o.hoverId, e.label, e.id);
 		if (e.id === o.focusId) {
 			ctx.beginPath(); ctx.arc(cx, cy, Math.max(3 * o.dpr, r1half * 0.35), 0, 2 * Math.PI);
 			ctx.fillStyle = "#ffd35c"; ctx.fill();
@@ -274,7 +276,7 @@ export function drawDroste(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: D
 	ctx.fillStyle = "#0f1116";
 	ctx.fillRect(0, 0, o.canvas.width, o.canvas.height);
 	if (meta.shapes.length === 0) return;
-	if (DROSTE_ORTHO) {
+	if ((o.render ?? "grid") === "grid") {
 		drawOrtho(ctx, meta, o);
 		return;
 	}

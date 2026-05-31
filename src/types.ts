@@ -192,6 +192,9 @@ export interface MiniSettings {
 	drosteSubdiv: number;
 	// Focus node id placed at the bottom-left (v=0). "" ⇒ first node.
 	drosteFocus: string;
+	// Print Gallery render mode: "grid" = orthogonal ①②③④ source plane on a
+	// cartesian grid (pre-warp); "spiral" = conformal Droste warp (exp(γζ)).
+	drosteRender: "grid" | "spiral";
 }
 
 export type ViewMode =
@@ -394,6 +397,7 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	drosteCopies: 4,
 	drosteSubdiv: 24,
 	drosteFocus: "",
+	drosteRender: "grid",
 };
 
 export const NONE_BUCKET = "(none)";

@@ -87,15 +87,35 @@ distortion). Thin red subdivided polylines, drawn over the warped content.
   below `minFontPx`, clamped to the cell's angular screen width with `…`
   (`truncateToWidth`). Text rotation to follow the warp is a v1.1 follow-up.
 
+## 5b. Render modes (grid ↔ spiral)
+
+The Print Gallery view has two render modes over the SAME ①②③④ source plane
+(`drosteRender`):
+
+- **`"grid"` (default)** — the orthogonal, pre-warp source plane drawn on a cartesian
+  grid: ① N as a **4×4-cell** central square; ② exact-`T` notes as a square ring of
+  cells surrounding ①; ③ the `T`-enclosure frame; ④ proper-subset frames offset around
+  ③ (siblings overlap only on the shared central ③, never nest into each other), each
+  holding its own member notes as **1×1-cell grey squares** in that frame's exclusive
+  outer band. All box edges snap to the grid. The block spacing is sized so ②'s nearest
+  cell always clears the 4×4 ①. This is the directly-readable containment view.
+- **`"spiral"`** — the same plane warped by `z = R₀·exp(γζ)` with the red coordinate
+  grid and ×k self-similar nesting (§3–§5): Escher's *Print Gallery*.
+
+Grid mode is self-fitting (ignores zoom/pan). Hit-testing in grid mode reuses the rects
+the renderer records while drawing (front-most wins); spiral mode inverts the conformal
+map. Both modes re-root on clicking a note.
+
 ## 6. Settings
 
 | field | default | meaning |
 |---|---|---|
-| `drosteZoom` (k) | 2.5 | scale per turn / twist; γ = 1 − i·ln k/2π. |
-| `drosteTwistDir` | `"ccw"` | spiral direction (sign of Im γ). |
-| `drosteCopies` | 4 | nested ×k copies drawn. |
-| `drosteSubdiv` | 24 | segments per source edge. |
-| `drosteFocus` | `""` | focus node id; empty ⇒ first node. Click re-roots. |
+| `drosteRender` | `"grid"` | render mode: `"grid"` (orthogonal cartesian plane) or `"spiral"` (conformal warp). |
+| `drosteZoom` (k) | 2.5 | scale per turn / twist; γ = 1 − i·ln k/2π. (spiral only) |
+| `drosteTwistDir` | `"ccw"` | spiral direction (sign of Im γ). (spiral only) |
+| `drosteCopies` | 4 | nested ×k copies drawn. (spiral only) |
+| `drosteSubdiv` | 24 | segments per source edge. (spiral only) |
+| `drosteFocus` | `""` | focus node id; empty ⇒ first node. Click re-roots (both modes). |
 
 ## 7. Verification
 

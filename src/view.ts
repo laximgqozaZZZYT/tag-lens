@@ -163,6 +163,9 @@ export class MiniGraphView extends ItemView {
 	// is an OUTGOING link (out from this node), edge.target === hoveredNodeId
 	// is an INCOMING backlink (into this node).
 	private hoveredNodeId: string | null = null;
+	// Clickable card rects (device px) recorded by the grid-mode Droste renderer,
+	// so grid-mode hit-testing reuses the drawn geometry instead of re-deriving it.
+	private drosteHit: { id: string; x0: number; y0: number; x1: number; y1: number }[] = [];
 	private adjacency: Map<string, number[]> = new Map();
 	// Drag-to-move (nodes/clusters) was removed; pan/marquee/click-to-open
 	// are the only pointer interactions now.
@@ -1116,6 +1119,21 @@ export class MiniGraphView extends ItemView {
 		const section = parent.createDiv({ cls: "gim-panel-section" });
 		section.createEl("h4", { text: "Print Gallery" });
 
+		// Render mode — "grid" (orthogonal ①②③④ source plane on a cartesian grid,
+		// pre-warp) vs "spiral" (conformal Droste warp). The spiral-only controls
+		// below (k / copies / subdivision / twist) have no effect in grid mode.
+		const modeRow = section.createDiv({ cls: "gim-row" });
+		modeRow.createSpan({ text: "Render mode" });
+		const modeSel = modeRow.createEl("select") as HTMLSelectElement;
+		modeSel.createEl("option", { text: "Grid (orthogonal)", value: "grid" });
+		modeSel.createEl("option", { text: "Spiral (conformal)", value: "spiral" });
+		modeSel.value = this.settings.drosteRender;
+		modeSel.addEventListener("change", () => {
+			this.settings.drosteRender = modeSel.value === "spiral" ? "spiral" : "grid";
+			void this.save();
+			this.requestDraw();
+		});
+
 		// Scale per loop (k) — how much |z| grows over one 2π turn.
 		const kRow = section.createDiv({ cls: "gim-row" });
 		kRow.createSpan({ text: "Scale per loop (k)" });
@@ -1389,6 +1407,8 @@ export class MiniGraphView extends ItemView {
 		"drosteTwistDir",
 		"drosteCopies",
 		"drosteSubdiv",
+		// Grid ↔ spiral is a pure render switch over the same source plane.
+		"drosteRender",
 	]);
 
 	private layoutSignature(s: MiniSettings): string {
@@ -2171,6 +2191,8 @@ export class MiniGraphView extends ItemView {
 				minFontPx: this.settings.minFontPx,
 				hoverId: this.hoveredNodeId,
 				focusId: this.laid.droste.focusId,
+				render: this.settings.drosteRender,
+				hitRegions: (this.drosteHit = []),
 			});
 			return;
 		}
@@ -2562,6 +2584,16 @@ export class MiniGraphView extends ItemView {
 		const d = this.laid.droste;
 		if (!d) return null;
 		const dpr = window.devicePixelRatio || 1;
+		// Grid mode: scan the rects the renderer recorded (device px). Last-drawn
+		// (front-most: ① over ② over members) wins, so iterate in reverse.
+		if ((this.settings.drosteRender ?? "grid") === "grid") {
+			const dx = sx * dpr, dy = sy * dpr;
+			for (let i = this.drosteHit.length - 1; i >= 0; i--) {
+				const r = this.drosteHit[i];
+				if (dx >= r.x0 && dx <= r.x1 && dy >= r.y0 && dy <= r.y1) return r.id;
+			}
+			return null;
+		}
 		const R0 = Math.min(this.canvas.width, this.canvas.height) / (4 * dpr);
 		const p = {
 			k: this.settings.drosteZoom,
