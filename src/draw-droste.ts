@@ -114,19 +114,21 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 		ctx.font = `${12 * o.dpr}px sans-serif`;
 		ctx.textAlign = "center"; ctx.textBaseline = "bottom";
 		ctx.fillText(truncateToWidth(ctx, e.label, sz * 0.9), cx + ox, y - 2 * o.dpr);
-		// This group's own notes as small squares, in the outer gap (offset
-		// direction, away from the central ③ they all share).
+		// This group's own notes as small GREY squares, pushed into this ④'s
+		// EXCLUSIVE outer band (the offset direction) so they don't fall on top of
+		// the other ④ siblings' frames (which only share the central ③ region).
 		const mem = e.members ?? [];
 		if (mem.length) {
 			const dx = D > 0 ? ox / D : 0, dy = D > 0 ? oy / D : 1; // unit dir (down if no offset)
-			const ccx = cx + dx * (H4 * 0.66), ccy = cy + dy * (H4 * 0.66);
+			const ccx = cx + dx * (H4 * 0.88), ccy = cy + dy * (H4 * 0.88);
 			const gm = Math.ceil(Math.sqrt(mem.length));
 			const step = mh * 2.2;
+			const grey = { h: 0, s: 0, l: 62 };
 			mem.forEach((mn, k) => {
 				const col = k % gm, row = Math.floor(k / gm);
 				const px = ccx + (col - (gm - 1) / 2) * step;
 				const py = ccy + (row - (gm - 1) / 2) * step;
-				square(px, py, mh, rc4, mn.id === o.hoverId, mn.label);
+				square(px, py, mh, grey, mn.id === o.hoverId, mn.label);
 			});
 		}
 	});
