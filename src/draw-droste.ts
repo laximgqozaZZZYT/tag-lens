@@ -65,7 +65,14 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 		Math.atan2(a.row - ctr, a.col - ctr) - Math.atan2(bb.row - ctr, bb.col - ctr),
 	);
 	const R3 = B + cell * 0.7; // ③ frame just outside the block
-	const R4 = maxR * 0.94; // ④ frame(s)
+	// Point on a square (half-size R, centred) at perimeter fraction t ∈ [0,1).
+	const squarePt = (t: number, R: number): Pt => {
+		const p = ((((t % 1) + 1) % 1)) * 4, side = Math.floor(p) % 4, f = p - Math.floor(p);
+		if (side === 0) return { x: cx - R + 2 * R * f, y: cy - R };
+		if (side === 1) return { x: cx + R, y: cy - R + 2 * R * f };
+		if (side === 2) return { x: cx + R - 2 * R * f, y: cy + R };
+		return { x: cx - R, y: cy + R - 2 * R * f };
+	};
 	const frame = (R: number, rc: { h: number; s: number; l: number }, hover: boolean, label: string): void => {
 		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.10)`;
 		ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
@@ -89,10 +96,18 @@ function drawOrtho(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrost
 		ctx.fillText(truncateToWidth(ctx, label, 2 * h * 0.92), px, py);
 	};
 
-	// ④ frames (back), nested concentric if several; then ③.
-	const r4 = role(4);
-	r4.forEach((e, i) => frame(R4 - (i * (R4 - R3) * 0.5) / Math.max(1, r4.length), roleColor(4), e.id === o.hoverId, e.label));
+	// ③ the single T-enclosure frame around the ①② block.
 	for (const e of role(3)) frame(R3, roleColor(3), e.id === o.hoverId, e.label);
+	// ④ subset enclosures: INDEPENDENT sibling tags → separate, non-overlapping
+	// squares spread around the ③ block (NOT nested — act does not contain drama).
+	const r4 = role(4);
+	const h4 = maxR * 0.1;
+	const R4ring = Math.min(R3 + h4 * 1.3, maxR - h4);
+	r4.forEach((e, i) => {
+		const t = r4.length <= 1 ? 0.125 : i / r4.length; // single → top-right; many → spread
+		const p = squarePt(t, R4ring);
+		square(p.x, p.y, h4, roleColor(4), e.id === o.hoverId, e.label);
+	});
 	// ② T-exact notes fill the cells SURROUNDING ① (ring by ring) → enclose it.
 	r2.forEach((e, j) => { const p = cellCenter(around[j].col, around[j].row); square(p.x, p.y, cardH, roleColor(2), e.id === o.hoverId, e.label); });
 	// ① N at the centre cell (on top).
