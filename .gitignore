@@ -58,3 +58,9 @@ test/preview-nest.mjs
 preview-chain.png
 preview-chain.svg
 test/preview-chain.mjs
+preview-zoom0.png
+preview-zoom0.svg
+preview-zoom05.png
+preview-zoom05.svg
+test/preview-zoom.mjs
+test/seq-report.mjs

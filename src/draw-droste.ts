@@ -7,9 +7,13 @@ export interface DrawDrosteOpts {
 	minFontPx: number; // units smaller than this (device px) are not recursed into
 	hoverId: string | null;
 	focusId: string;
-	// Per-level focus chain: chain[0] = outermost (focus N), deeper entries are the
-	// re-rooted "next" foci so each ×½ centre copy shows a different context.
+	// Per-level focus chain: chain[0] = window start (current focus), deeper entries
+	// are the next foci (seq order) so each ×½ centre copy shows a different context.
 	chain?: DrosteMeta[];
+	// Continuous zoom fraction in [0,1): unit d is drawn at half-size outerR·2^(frac−d),
+	// so as frac 0→1 the whole picture scales ×2 toward the centre; at 1 the window
+	// index advances by one (handled by the view) for a seamless infinite zoom.
+	zoomFrac?: number;
 	// Optional collector: drawOrtho pushes each clickable card's SCREEN rect (device
 	// px) here so the view can hit-test without re-deriving the geometry.
 	hitRegions?: { id: string; x0: number; y0: number; x1: number; y1: number }[];
@@ -197,13 +201,11 @@ function drawUnit(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDroste
 	}
 }
 
-// Orthogonal Droste recursion: draw the SAME unit (same focus) at the centre,
-// scaled ×1/2 each step, depth levels deep, outermost first so inner copies sit on
-// top. ⑤ is drawn once on the outermost unit; inner units are ①②③④ only. Units
-// smaller than minFontPx are skipped. No conformal warp, no red grid, no seg/copies.
-const DROSTE_K = 0.5; // shrink factor per nested level
-const DROSTE_DEPTH = 5; // number of nested copies
-
+// Orthogonal Droste recursion: draw the focus window (seq order) at the centre, each
+// level ×1/2 the last, outermost first so inner copies sit on top. The zoom fraction
+// scales all levels so the picture grows ×2 over one zoom unit (then the window index
+// advances). ⑤ is drawn on the ~full-size backdrop unit only. Units below minFontPx
+// are skipped. No conformal warp, no red grid, no seg/copies.
 function drawNest(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
 	const cx = o.canvas.width / 2, cy = o.canvas.height / 2;
 	const hasFive = meta.shapes.some((e) => e.role === 5);
@@ -216,16 +218,19 @@ function drawNest(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDroste
 	ctx.lineWidth = 1 * o.dpr;
 	for (let x = cx % gstep; x <= o.canvas.width; x += gstep) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, o.canvas.height); ctx.stroke(); }
 	for (let y = cy % gstep; y <= o.canvas.height; y += gstep) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(o.canvas.width, y); ctx.stroke(); }
-	// Per-level metas: chain[d] is re-rooted on the "next" focus so each ×½ copy shows
-	// a DIFFERENT context. Fall back to the single meta if no chain was supplied.
+	// Per-level metas: chain[d] is re-rooted on the next focus (seq order) so each ×½
+	// copy shows a DIFFERENT context. Fall back to the single meta if none supplied.
 	const chain = o.chain && o.chain.length ? o.chain : [meta];
-	// Outer → inner: draw the largest unit first, each ×DROSTE_K. ⑤ only on outermost.
-	let uR = outerR;
-	for (let d = 0; d < Math.min(chain.length, DROSTE_DEPTH); d++) {
-		if (2 * uR < minSide) break; // too small to read → stop recursing
-		const md = chain[d];
-		drawUnit(ctx, md, o, cx, cy, uR, d === 0, md.focusId);
-		uR *= DROSTE_K;
+	const frac = Math.min(0.999, Math.max(0, o.zoomFrac ?? 0));
+	// Backdrop unit (the one drawn at ~full size): d such that uR ≤ outerR ⇒ d = 1 when
+	// zoomed in (frac>0), else the outermost d=0. ⑤ is drawn on it only.
+	const backdropD = frac > 1e-4 ? 1 : 0;
+	// Outer → inner: unit d at half-size outerR·2^(frac−d). Largest first ⇒ inner on top.
+	for (let d = 0; d < chain.length; d++) {
+		const uR = outerR * Math.pow(2, frac - d);
+		if (2 * uR < minSide) break; // too small to read → stop
+		if (2 * uR > 4 * outerR) continue; // far larger than the canvas → skip (off-screen)
+		drawUnit(ctx, chain[d], o, cx, cy, uR, d === backdropD, chain[d].focusId);
 	}
 	// Hover tooltip (drawn last, on top): the cells are tiny, so show the hovered
 	// note's full title near it. hitRegions accumulated across all units.

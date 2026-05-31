@@ -173,22 +173,44 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 }
 
 // Test/inspection helper: the ①②③④ shapes grouped by role (data correctness).
-// Focus for the NEXT (inner, ×½) recursion level. Drilling inward should reveal a
-// DIFFERENT context, not the same figure, so we do NOT reuse N or its ② peers (same
-// T ⇒ identical layout). Instead pick a representative of a BROADER enclosure N sits
-// in — the first ④ proper-subset group's first member — and fall back to an UNRELATED
-// ⑤ note (a different region of the vault) when no broader group is available. `used`
-// holds the focus ids already on the chain so we never loop. undefined ⇒ stop.
-export function nextDrosteFocus(meta: DrosteMeta, used: Set<string>): string | undefined {
-	for (const s of meta.shapes) {
-		if (s.role === 4 && s.members) {
-			for (const m of s.members) if (!used.has(m.id)) return m.id;
+const tagsOf = (n: GraphNode): Set<string> => new Set(n.memberships.filter((m) => m !== NONE_BUCKET));
+
+function intersectionSize(a: Set<string>, b: Set<string>): number {
+	let c = 0;
+	for (const x of a) if (b.has(x)) c++;
+	return c;
+}
+
+// Focus VISITING ORDER for the Droste zoom-tunnel. From focus0, repeatedly pick the
+// unvisited note that shares the MOST tags with the current focus (ties → id asc);
+// when nothing unvisited shares a tag, take the next unvisited note in id order. This
+// is deterministic and reaches EVERY node, so zooming alone walks the whole vault.
+export function buildDrosteSeq(data: GraphData, focus0: string, cap: number): string[] {
+	const nodes = data.nodes;
+	if (nodes.length === 0) return [];
+	const order = nodes.map((n) => n.id).sort();
+	const tags = new Map<string, Set<string>>(nodes.map((n) => [n.id, tagsOf(n)]));
+	const visited = new Set<string>();
+	const seq: string[] = [];
+	let f = nodes.some((n) => n.id === focus0) ? focus0 : order[0];
+	const limit = Math.min(Math.max(1, cap), nodes.length);
+	while (f && seq.length < limit) {
+		seq.push(f);
+		visited.add(f);
+		const ft = tags.get(f) ?? new Set<string>();
+		let best: string | undefined;
+		let bestScore = 0;
+		for (const n of nodes) {
+			if (visited.has(n.id)) continue;
+			const s = intersectionSize(ft, tags.get(n.id) ?? new Set<string>());
+			if (s > 0 && (s > bestScore || (s === bestScore && (best === undefined || n.id < best)))) {
+				best = n.id;
+				bestScore = s;
+			}
 		}
+		f = best ?? order.find((id) => !visited.has(id)) ?? "";
 	}
-	for (const s of meta.shapes) {
-		if (s.role === 5 && s.kind === "card" && !used.has(s.id)) return s.id;
-	}
-	return undefined;
+	return seq;
 }
 
 export function drosteRoles(meta: DrosteMeta): { role: number; ids: string[]; labels: string[] }[] {

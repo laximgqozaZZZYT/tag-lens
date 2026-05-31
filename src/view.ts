@@ -7,7 +7,7 @@ import {
 	type SizedNode,
 	type ClusterRect,
 } from "./layout";
-import type { MiniSettings, GraphNode, ViewMode } from "./types";
+import type { MiniSettings, GraphNode, GraphData, ViewMode } from "./types";
 import {
 	NONE_BUCKET,
 	VIEW_MODES,
@@ -55,6 +55,7 @@ import { drawMatrix, matrixGeom, MATRIX_BADGE_W } from "./draw-matrix";
 import type { MatrixLine } from "./draw-matrix";
 import { drawHeatmap, heatmapGeom } from "./draw-heatmap";
 import { drawDroste } from "./draw-droste";
+import { layoutDroste } from "./droste-layout";
 import {
 	drawLattice,
 	latticeCellAt,
@@ -164,6 +165,10 @@ export class MiniGraphView extends ItemView {
 	// Clickable card rects (device px) recorded by the grid-mode Droste renderer,
 	// so grid-mode hit-testing reuses the drawn geometry instead of re-deriving it.
 	private drosteHit: { id: string; x0: number; y0: number; x1: number; y1: number }[] = [];
+	// Droste zoom-tunnel state: continuous zoom (×2 per unit ⇒ start index +1) and the
+	// full pre-LIMIT graph the focus window is re-laid from as the index advances.
+	private drosteZoom = 0;
+	private drosteData: GraphData | null = null;
 	private adjacency: Map<string, number[]> = new Map();
 	// Drag-to-move (nodes/clusters) was removed; pan/marquee/click-to-open
 	// are the only pointer interactions now.
@@ -1410,6 +1415,10 @@ export class MiniGraphView extends ItemView {
 			this.settings.viewMode === "droste"
 				? { nodes: data.nodes.slice(), edges: data.edges.slice() }
 				: undefined;
+		// Keep the full graph for the zoom-tunnel (re-laying the focus window as the
+		// zoom index advances) and start each (re)build at zoom 0.
+		this.drosteData = drosteFullData ?? null;
+		this.drosteZoom = 0;
 
 		// Stage 2: degree maps (total / in / out). Used by ORDER_BY + size-
 		// mode resolvers. Cleared in place so view-state references stay
@@ -2104,6 +2113,7 @@ export class MiniGraphView extends ItemView {
 				hoverId: this.hoveredNodeId,
 				focusId: this.laid.droste.focusId,
 				chain: this.laid.drosteChain,
+				zoomFrac: this.drosteZoom - Math.floor(this.drosteZoom),
 				hitRegions: (this.drosteHit = []),
 			});
 			return;
@@ -2486,6 +2496,20 @@ export class MiniGraphView extends ItemView {
 	// Resolve the note under a pointer (CSS px) by scanning the clickable card
 	// rects the renderer recorded while drawing (device px). Last-drawn wins
 	// (front-most: ① over ② over members), so iterate in reverse.
+	// Re-lay the visible focus window for zoom index `i`: lay out seq[i .. i+6] from the
+	// full graph and swap them into laid.droste(Chain) so the next focus is drawn at the
+	// centre. Cheap (≈6 layoutDroste calls) — runs only when the zoom index changes.
+	private relayoutDrosteWindow(i: number): void {
+		const seq = this.laid.drosteSeq;
+		if (!seq || !this.drosteData) return;
+		const window = seq.slice(i, i + 6).map((id) =>
+			layoutDroste(this.drosteData as GraphData, { focusId: id, labels: this.clusterLabels }),
+		);
+		if (window.length === 0) return;
+		this.laid.drosteChain = window;
+		this.laid.droste = window[0];
+	}
+
 	private drosteHitTest(sx: number, sy: number): string | null {
 		if (!this.laid.droste) return null;
 		const dpr = window.devicePixelRatio || 1;
@@ -3282,6 +3306,18 @@ export class MiniGraphView extends ItemView {
 			// height); the existing drag-pan also scrolls. No zoom here.
 			if (this.laid.matrix) {
 				this.panY -= e.deltaY;
+				this.requestDraw();
+				return;
+			}
+			// Droste zoom-tunnel: wheel zooms toward the centre. ×2 (one unit) advances
+			// the focus window by one, so zooming alone walks the whole seq. Each unit
+			// step re-lays the visible focus window from the full graph.
+			if (this.laid.droste && this.laid.drosteSeq && this.laid.drosteSeq.length > 0) {
+				const seq = this.laid.drosteSeq;
+				const prevI = Math.floor(this.drosteZoom);
+				this.drosteZoom = Math.max(0, Math.min(seq.length - 1, this.drosteZoom - (e.deltaY * 0.0015) / Math.LN2));
+				const i = Math.floor(this.drosteZoom);
+				if (i !== prevI) this.relayoutDrosteWindow(i);
 				this.requestDraw();
 				return;
 			}
