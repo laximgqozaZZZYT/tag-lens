@@ -210,6 +210,14 @@ export interface ViewModeOption {
 
 export const VIEW_MODES: ViewModeOption[] = [
 	{
+		// Icon Gallery (id stays "droste" for settings compatibility): one icon per
+		// note, tiled. Each icon nests the note's tag-intersection groups (②③) and
+		// its link/backlink relations (⑤). Pan/zoom to browse; mini-menu to jump.
+		id: "droste",
+		label: "Icon Gallery",
+		description: "Per-note icon: nested groups of notes sharing its tags, plus its links and backlinks",
+	},
+	{
 		// `id` stays "euler" for settings / preset compatibility; the label
 		// reflects the actual model — per-tag boxes with duplicated nodes and
 		// intersection sub-boxes, NOT true overlapping-region Euler curves.
@@ -305,16 +313,6 @@ export const VIEW_MODES: ViewModeOption[] = [
 		id: "upset",
 		label: "UpSet plot",
 		description: "Stack of cards per intersection + dot matrix (handles ≥4-way intersections)",
-	},
-	{
-		// Containment-lens view: from the focus note outward —
-		// ① the note, ② its exact-tag peers, ③ their enclosing group, ④ the
-		// looser (subset-tag) groups that contain it — drawn as nested squares
-		// on a cartesian grid. Click a note to re-centre on it.
-		id: "droste",
-		label: "Containment lens",
-		description: "Tag-membership containment around a focus note (①∈②∈③∈④); click to re-centre",
-		experimental: true,
 	},
 ];
 

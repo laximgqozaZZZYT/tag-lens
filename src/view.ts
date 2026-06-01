@@ -516,11 +516,9 @@ export class MiniGraphView extends ItemView {
 		const isMatrix = this.settings.viewMode === "matrix";
 		const isHeatmap = this.settings.viewMode === "heatmap";
 		const isLattice = this.settings.viewMode === "lattice";
-		const isDroste = this.settings.viewMode === "droste";
 		this.renderViewModeSection(el);
 		if (this.settings.viewMode === "bipartite") this.renderBipartiteSection(el);
 		if (isLattice) this.renderLatticeSection(el);
-		if (isDroste) this.renderDrosteSection(el);
 		this.renderExprSection(el, "WHERE", this.settings.where, this.whereError, {
 			autoKey: "whereAuto",
 		});
@@ -1114,18 +1112,6 @@ export class MiniGraphView extends ItemView {
 			void this.rebuild();
 		});
 		topRow.createSpan({ text: "Most-specific tier on top" });
-	}
-
-	// Droste-effect mode settings panel. The view has no draw parameters to
-	// tune — it self-fits and re-centres on the clicked note — so this is just
-	// a heading plus a one-line description of the containment view.
-	private renderDrosteSection(parent: HTMLElement): void {
-		const section = parent.createDiv({ cls: "gim-panel-section" });
-		section.createEl("h4", { text: "Containment lens" });
-		section.createEl("div", {
-			cls: "gim-row",
-			text: "Icon gallery: every note's containment icon, tiled. Scroll to zoom, drag to pan. Use the always-on search/tree panel (top-left) or click a note to centre its icon.",
-		});
 	}
 
 	// One radio row for a view mode. Shared by the stable list and the
