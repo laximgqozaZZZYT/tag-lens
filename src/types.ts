@@ -196,7 +196,8 @@ export type ViewMode =
 	| "heatmap"
 	| "lattice"
 	| "upset"
-	| "droste";
+	| "droste"
+	| "concentric-hive";
 
 export interface ViewModeOption {
 	id: ViewMode;
@@ -313,6 +314,16 @@ export const VIEW_MODES: ViewModeOption[] = [
 		id: "upset",
 		label: "UpSet plot",
 		description: "Stack of cards per intersection + dot matrix (handles ≥4-way intersections)",
+	},
+	{
+		// Concentric Hive (degree facet): shared spokes (one per group) × concentric
+		// degree rings. angle = member-axis centroid, radius = membership-degree bucket;
+		// node size = link count. Non-force, deterministic; reveals link structure + hubs
+		// + how deeply each note is multi-tagged without the graph-view hairball.
+		id: "concentric-hive",
+		label: "Concentric Hive（次数 facet）",
+		description: "Spokes = groups, rings = membership degree; deterministic link map (anti-hairball)",
+		experimental: true,
 	},
 ];
 

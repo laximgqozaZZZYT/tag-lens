@@ -55,6 +55,7 @@ import { drawMatrix, matrixGeom, MATRIX_BADGE_W } from "./draw-matrix";
 import type { MatrixLine } from "./draw-matrix";
 import { drawHeatmap, heatmapGeom } from "./draw-heatmap";
 import { drawDroste } from "./draw-droste";
+import { drawConcentricHive } from "./draw-concentric-hive";
 import {
 	drawLattice,
 	latticeCellAt,
@@ -167,6 +168,7 @@ export class MiniGraphView extends ItemView {
 	// Clickable card rects (device px) recorded by the grid-mode Droste renderer,
 	// so grid-mode hit-testing reuses the drawn geometry instead of re-deriving it.
 	private drosteHit: { id: string; x0: number; y0: number; x1: number; y1: number }[] = [];
+	private hiveHit: { id: string; x0: number; y0: number; x1: number; y1: number }[] = [];
 	// Containment lens: the full pre-LIMIT graph, so the lens + focus picker cover the
 	// whole vault (not just the LIMIT-trimmed subset).
 	private drosteData: GraphData | null = null;
@@ -1922,6 +1924,13 @@ export class MiniGraphView extends ItemView {
 			this.centerDrosteOn(this.settings.drosteFocus || this.laid.drosteGallery.cells[0]?.id || "");
 			return;
 		}
+		if (this.laid.hive && this.laid.hive.nodes.length > 0) {
+			// Concentric Hive: frame the whole world-space figure (spokes + outer labels).
+			const b = this.laid.hive.bounds;
+			const pad = 60;
+			this.fitToRect({ minX: b.minX - pad, minY: b.minY - pad, maxX: b.maxX + pad, maxY: b.maxY + pad });
+			return;
+		}
 		const hasContent =
 			this.laid.clusters.length > 0 || this.laid.nodes.length > 0;
 		if (!hasContent) return;
@@ -2090,6 +2099,20 @@ export class MiniGraphView extends ItemView {
 					const f = this.app.vault.getAbstractFileByPath(path);
 					return f instanceof TFile ? f.basename : path;
 				},
+			});
+			return;
+		}
+		// Concentric Hive: world-space spokes × degree rings. drawConcentricHive applies
+		// its own dpr/zoom/pan transform; we draw and return.
+		if (this.laid.hive && this.laid.hive.nodes.length > 0) {
+			drawConcentricHive(ctx, this.laid.hive, {
+				canvas: this.canvas,
+				dpr,
+				zoom: this.zoom,
+				panX: this.panX,
+				panY: this.panY,
+				hoverId: this.hoveredNodeId,
+				hitRegions: (this.hiveHit = []),
 			});
 			return;
 		}
@@ -2608,6 +2631,17 @@ export class MiniGraphView extends ItemView {
 		return null;
 	}
 
+	private hiveHitTest(sx: number, sy: number): string | null {
+		if (!this.laid.hive) return null;
+		const dpr = window.devicePixelRatio || 1;
+		const dx = sx * dpr, dy = sy * dpr;
+		for (let i = this.hiveHit.length - 1; i >= 0; i--) {
+			const r = this.hiveHit[i];
+			if (dx >= r.x0 && dx <= r.x1 && dy >= r.y0 && dy <= r.y1) return r.id;
+		}
+		return null;
+	}
+
 	// Heatmap cell click → a floating overlay listing the notes shared by the
 	// tag pair (or, on the diagonal, all notes of the tag). Each row opens the
 	// file. Reuses openFile; styled inline so it works without extra CSS.
@@ -2933,6 +2967,21 @@ export class MiniGraphView extends ItemView {
 				this.cancelHover();
 				this.hoverTarget = target;
 				if (target) this.scheduleHover(target, sx, sy);
+			} else if (this.tipEl) {
+				this.positionTip(sx, sy, this.tipEl);
+			}
+			return;
+		}
+		if (this.laid.hive) {
+			// Concentric Hive: highlight the hovered node + the shared file hover tip.
+			const id = this.hiveHitTest(sx, sy);
+			const target: HoverTarget = id ? { kind: "node", nodeId: id } : null;
+			if (!sameTarget(this.hoverTarget, target)) {
+				this.cancelHover();
+				this.hoverTarget = target;
+				this.hoveredNodeId = id;
+				if (target) this.scheduleHover(target, sx, sy);
+				this.requestDraw();
 			} else if (this.tipEl) {
 				this.positionTip(sx, sy, this.tipEl);
 			}
@@ -3334,6 +3383,12 @@ export class MiniGraphView extends ItemView {
 				this.openLatticeDetail(hitNode, sx, sy);
 				return;
 			}
+			if (this.laid.hive) {
+				// Concentric Hive: click a node → open the note (pan/zoom unchanged).
+				const id = this.hiveHitTest(sx, sy);
+				if (id) this.openFile(id);
+				return;
+			}
 			if (this.laid.drosteGallery) {
 				// Click a node cell (① or a member square) → open the note AND update
 				// the focus highlight. Pan/zoom is intentionally NOT changed here so
@@ -3369,7 +3424,7 @@ export class MiniGraphView extends ItemView {
 			this.cancelHover();
 			// Droste mode tracks hover via hoveredNodeId (no matrix/lattice
 			// crosshair state) — clear it so no band stays lit after exit.
-			const drosteHovered = this.laid.drosteGallery != null && this.hoveredNodeId !== null;
+			const drosteHovered = (this.laid.drosteGallery != null || this.laid.hive != null) && this.hoveredNodeId !== null;
 			if (drosteHovered) this.hoveredNodeId = null;
 			if (
 				drosteHovered ||

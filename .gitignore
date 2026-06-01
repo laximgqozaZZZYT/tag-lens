@@ -81,3 +81,5 @@ test/test-scallop.mjs
 test/test-soft-full.mjs
 test/test-soft.mjs
 test/test_overflow_detail.mjs
+test/preview-hive.mjs
+hive-*.png
