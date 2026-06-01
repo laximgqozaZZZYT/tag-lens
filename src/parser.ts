@@ -85,7 +85,7 @@ export function buildGraph(
 	for (const f of files) {
 		if (!idSet.has(f.path)) continue;
 		const cache = app.metadataCache.getFileCache(f);
-		const links = cache?.links ?? [];
+		const links = [...(cache?.links ?? []), ...(cache?.frontmatterLinks ?? [])];
 		for (const l of links) {
 			const dest = app.metadataCache.getFirstLinkpathDest(l.link, f.path);
 			if (!dest) continue;

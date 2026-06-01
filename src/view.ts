@@ -1576,7 +1576,8 @@ export class MiniGraphView extends ItemView {
 		this.lastLayoutSig = this.layoutSignature(this.settings);
 		const modeChanged = this.lastFramedMode !== this.settings.viewMode;
 		this.lastFramedMode = this.settings.viewMode;
-		if (wasEmpty || modeChanged) this.fitToView();
+		const isDroste = this.settings.viewMode === "droste";
+		if (modeChanged || (wasEmpty && !isDroste)) this.fitToView();
 		this.requestDraw();
 		if (this.settings.panelVisible) this.renderPanel();
 	}
@@ -2512,12 +2513,19 @@ export class MiniGraphView extends ItemView {
 		this.requestDraw();
 	}
 
-	// Focus node `id`: highlight it and centre its icon. The gallery already holds every
-	// node's icon, so no rebuild is needed. Shared by menu selection and canvas clicks.
-	private setDrosteFocus(id: string): void {
+	// Focus node `id`: highlight it and (optionally) centre its icon.
+	// center=true  → menu selection path: recalculate pan/zoom and move the
+	//                viewport to the selected cell (existing behaviour).
+	// center=false → canvas click path: keep current pan/zoom unchanged;
+	//                only update the focus highlight and repaint.
+	private setDrosteFocus(id: string, center = true): void {
 		this.settings.drosteFocus = id;
 		void this.save();
-		this.centerDrosteOn(id);
+		if (center) {
+			this.centerDrosteOn(id); // centerDrosteOn calls requestDraw internally
+		} else {
+			this.requestDraw();
+		}
 		this.drosteMenuRedraw?.();
 	}
 
@@ -3337,12 +3345,13 @@ export class MiniGraphView extends ItemView {
 				return;
 			}
 			if (this.laid.drosteGallery) {
-				// Click a node cell (① or a member square) → open the note AND focus its
-				// icon (centre it). Synthetic markers ("+N", frames) record no id.
+				// Click a node cell (① or a member square) → open the note AND update
+				// the focus highlight. Pan/zoom is intentionally NOT changed here so
+				// the user's current viewport is preserved; use the mini-menu to centre.
 				const id = this.drosteHitTest(sx, sy);
 				if (id && !id.startsWith("__")) {
 					this.openFile(id);
-					this.setDrosteFocus(id);
+					this.setDrosteFocus(id, false); // center=false: keep current pan/zoom
 				}
 				return;
 			}

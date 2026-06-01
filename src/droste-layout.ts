@@ -191,14 +191,16 @@ export interface DrosteGallery {
 	nodeKeys: Map<string, string[]>;            // id → sorted tag keys
 	nodeLabel: Map<string, string>;             // id → display label
 	labels: Map<string, string>;                // cluster-key → human label
+	links: Map<string, string[]>;               // id → ids it links TO (outgoing)
+	backlinks: Map<string, string[]>;           // id → ids that link to it (incoming)
 }
 
-export interface IconSet { keys: string[]; label: string; members: { id: string; label: string }[]; overflow: number; }
-export interface IconLevel { n: number; sets: IconSet[]; } // n: 2=②, 3=③₁, 4=③₂, …
+export interface IconSet { keys: string[]; label: string; members: { id: string; label: string }[]; overflow: number; hue?: number; }
+export interface IconLevel { n: number; sets: IconSet[]; kind?: "tag" | "link"; } // n: 2=②, 3=③₁, … ; ⑤ = kind "link"
 export interface IconDiagram { focusId: string; focusLabel: string; tKeys: string[]; levels: IconLevel[]; }
 
 // Build the gallery index over the FULL graph. Cheap: one pass to bucket nodes by
-// signature + a grid placement. Icon trees are built later, per visible cell.
+// signature + a grid placement, plus link/backlink adjacency. Icon trees built later.
 export function buildGallery(data: GraphData, labels?: Map<string, string>): DrosteGallery {
 	const nodeKeys = new Map<string, string[]>();
 	const nodeLabel = new Map<string, string>();
@@ -206,12 +208,20 @@ export function buildGallery(data: GraphData, labels?: Map<string, string>): Dro
 		nodeKeys.set(n.id, keysOf(n));
 		nodeLabel.set(n.id, n.label);
 	}
+	// link (source→target) / backlink (target→source) adjacency for ⑤.
+	const links = new Map<string, string[]>();
+	const backlinks = new Map<string, string[]>();
+	for (const e of data.edges) {
+		if (!nodeLabel.has(e.source) || !nodeLabel.has(e.target) || e.source === e.target) continue;
+		(links.get(e.source) ?? links.set(e.source, []).get(e.source)!).push(e.target);
+		(backlinks.get(e.target) ?? backlinks.set(e.target, []).get(e.target)!).push(e.source);
+	}
 	const cols = Math.max(1, Math.ceil(Math.sqrt(data.nodes.length)));
 	const rows = Math.max(1, Math.ceil(data.nodes.length / cols));
 	const cells: GalleryCell[] = data.nodes.map((n, i) => ({
 		id: n.id, label: n.label, col: i % cols, row: Math.floor(i / cols),
 	}));
-	return { cells, cols, rows, nodeKeys, nodeLabel, labels: labels ?? new Map() };
+	return { cells, cols, rows, nodeKeys, nodeLabel, labels: labels ?? new Map(), links, backlinks };
 }
 
 // Build one node's icon diagram (spec §1). Group every OTHER node M by the part of the
@@ -265,7 +275,7 @@ export function buildIcon(g: DrosteGallery, focusId: string): IconDiagram {
 		// region is non-empty.
 		if (d > 0 && !present(S)) continue;
 		const n = d + 2;
-		const cap = Math.pow(3, n) - 1; // per-set draw cap (spec 2026-06-01)
+		const cap = Math.pow(4, n) - 1; // per-set draw cap (spec 2026-06-01)
 		const mem = (excl.get(S.join(SEP)) ?? []).slice().sort((a, b) => (a.id < b.id ? -1 : 1));
 		const take = Math.min(mem.length, cap);
 		const set: IconSet = { keys: S, label: sigLabel(S), members: mem.slice(0, take), overflow: mem.length - take };
@@ -280,5 +290,29 @@ export function buildIcon(g: DrosteGallery, focusId: string): IconDiagram {
 		sets.sort((a, b) => b.keys.length - a.keys.length || b.members.length - a.members.length || (a.label < b.label ? -1 : 1));
 		levels.push({ n: d + 2, sets });
 	}
+
+	// ⑤ "link | backlink": the OUTERMOST ring. Links = notes N points to; backlinks =
+	// notes pointing to N (minus those already counted as links, so each node appears
+	// once). Coloured per relationship. Cap follows the same 4^n−1 rule.
+	const linkIds = g.links.get(focusId) ?? [];
+	const linkSet = new Set(linkIds);
+	const backIds = (g.backlinks.get(focusId) ?? []).filter((id) => !linkSet.has(id));
+	const toCell = (id: string) => ({ id, label: g.nodeLabel.get(id) ?? id });
+	if (linkIds.length || backIds.length) {
+		const n5 = (levels.length ? levels[levels.length - 1].n : 2) + 1;
+		const cap5 = Math.pow(4, n5) - 1;
+		const mk = (ids: string[], label: string, hue: number): IconSet => {
+			const m = [...new Set(ids)].sort().map(toCell);
+			return { keys: [label], label, members: m.slice(0, cap5), overflow: Math.max(0, m.length - cap5), hue };
+		};
+		const sets: IconSet[] = [];
+		if (linkIds.length) sets.push(mk(linkIds, "link", LINK_HUE));
+		if (backIds.length) sets.push(mk(backIds, "backlink", BACKLINK_HUE));
+		levels.push({ n: n5, sets, kind: "link" });
+	}
 	return { focusId, focusLabel, tKeys: T, levels };
 }
+
+// ⑤ link/backlink colours (distinct from the tag palette).
+export const LINK_HUE = 190; // link = cyan
+export const BACKLINK_HUE = 25; // backlink = orange
