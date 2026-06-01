@@ -272,20 +272,7 @@ export function drawDroste(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): vo
 			ctx.restore();
 		}
 	}
-	// hover tooltip (on top): show the hovered node's full label near its rect.
-	if (o.hoverId && o.hitRegions) {
-		const hr = o.hitRegions.find((r) => r.id === o.hoverId);
-		const label = gallery.nodeLabel.get(o.hoverId) ?? o.hoverId;
-		if (hr) {
-			ctx.font = `${12 * dpr}px sans-serif`;
-			const pad = 6 * dpr, bh = 20 * dpr, bw = ctx.measureText(label).width + 2 * pad;
-			let bx = (hr.x0 + hr.x1) / 2 - bw / 2, by = hr.y0 - bh - 4 * dpr;
-			bx = Math.max(2 * dpr, Math.min(bx, canvas.width - bw - 2 * dpr));
-			if (by < 2 * dpr) by = hr.y1 + 4 * dpr;
-			ctx.fillStyle = "rgba(18,20,26,0.94)"; ctx.strokeStyle = "rgba(230,236,245,0.45)"; ctx.lineWidth = 1 * dpr;
-			ctx.fillRect(bx, by, bw, bh); ctx.strokeRect(bx, by, bw, bh);
-			ctx.fillStyle = "#e6ecf5"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-			ctx.fillText(label, bx + pad, by + bh / 2);
-		}
-	}
+	// (Hover tip is the shared DOM tip — file name + folder — driven by the view's
+	// hoverTarget/showHover, matching every other view mode. The hovered cell itself is
+	// highlighted via o.hoverId in drawIcon.)
 }

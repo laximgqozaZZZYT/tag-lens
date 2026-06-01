@@ -2939,15 +2939,19 @@ export class MiniGraphView extends ItemView {
 			return;
 		}
 		if (this.laid.drosteGallery) {
-			// Icon Gallery: hover-highlight the node cell under the cursor.
+			// Icon Gallery: highlight the hovered cell AND show the same node hover tip
+			// (file name + folder) other view modes use. Synthetic markers ("__…") and
+			// empty space show no tip.
 			const id = this.drosteHitTest(sx, sy);
-			if (id !== this.hoveredNodeId) {
-				this.hoveredNodeId = id;
+			const target: HoverTarget = id && !id.startsWith("__") ? { kind: "node", nodeId: id } : null;
+			if (!sameTarget(this.hoverTarget, target)) {
+				this.cancelHover(); // also clears hoveredNodeId
+				this.hoverTarget = target;
+				this.hoveredNodeId = id; // set AFTER cancelHover for the cell highlight
+				if (target) this.scheduleHover(target, sx, sy);
 				this.requestDraw();
-			}
-			if (this.hoverTarget) {
-				this.cancelHover();
-				this.hoverTarget = null;
+			} else if (this.tipEl) {
+				this.positionTip(sx, sy, this.tipEl);
 			}
 			return;
 		}
