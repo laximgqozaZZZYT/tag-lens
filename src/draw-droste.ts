@@ -1,244 +1,240 @@
-import { type DrosteMeta } from "./droste-layout";
+import { buildIcon, type DrosteGallery, type IconDiagram } from "./droste-layout";
 import { truncateToWidth } from "./canvas-utils";
+
+// Containment lens = Icon Gallery (spec 2026-06-01). Every node gets an "icon diagram"
+// (① N ∈ ② sig(N) ∈ ③ direct-superset sets ∈ …), all tiled in a grid and navigated by
+// pan/zoom. Icons are built ON DEMAND for cells in the viewport (culling) and at a
+// level-of-detail floor (tiny cells draw a single marker). No recursion, no warp.
 
 export interface DrawDrosteOpts {
 	canvas: HTMLCanvasElement;
 	dpr: number;
-	minFontPx: number; // units smaller than this (device px) are not recursed into
+	gallery: DrosteGallery;
+	cellSize: number; // world px per gallery cell (square)
+	zoom: number; // world→screen scale (CSS px)
+	panX: number; // world→screen offset (CSS px)
+	panY: number;
 	hoverId: string | null;
-	focusId: string;
-	// Per-level focus chain: chain[0] = window start (current focus), deeper entries
-	// are the next foci (seq order) so each ×½ centre copy shows a different context.
-	chain?: DrosteMeta[];
-	// Continuous zoom fraction in [0,1): unit d is drawn at half-size outerR·2^(frac−d),
-	// so as frac 0→1 the whole picture scales ×2 toward the centre; at 1 the window
-	// index advances by one (handled by the view) for a seamless infinite zoom.
-	zoomFrac?: number;
-	// Optional collector: drawOrtho pushes each clickable card's SCREEN rect (device
-	// px) here so the view can hit-test without re-deriving the geometry.
+	focusId: string; // currently focused node (ring-highlighted)
+	// Collector: each clickable node's SCREEN rect (device px) for hit-testing.
 	hitRegions?: { id: string; x0: number; y0: number; x1: number; y1: number }[];
 }
 
 type Pt = { x: number; y: number };
 
-// Clear per-ROLE palette so ①②③④ are visually distinct at a glance
-// (① focus = blue, ② exact-T notes = amber, ③ T-enclosure = purple,
-// ④ subset enclosures = green).
-function roleColor(role: 1 | 2 | 3 | 4): { h: number; s: number; l: number } {
-	switch (role) {
-		case 1: return { h: 205, s: 90, l: 60 }; // ① blue
-		case 2: return { h: 45, s: 95, l: 60 }; // ② amber
-		case 3: return { h: 265, s: 80, l: 68 }; // ③ purple
-		default: return { h: 130, s: 65, l: 58 }; // ④ green
+// Even points clockwise around an axis-aligned square (centre c, half R), starting at
+// the top-left, so a level's member squares ring the inner figure.
+function squarePerimeter(cx: number, cy: number, R: number, k: number): Pt[] {
+	if (k <= 0) return [];
+	const side = 2 * R, per = 4 * side, out: Pt[] = [];
+	for (let i = 0; i < k; i++) {
+		let d = ((i + 0.5) / k) * per;
+		if (d < side) out.push({ x: cx - R + d, y: cy - R });
+		else if (d < 2 * side) { d -= side; out.push({ x: cx + R, y: cy - R + d }); }
+		else if (d < 3 * side) { d -= 2 * side; out.push({ x: cx + R - d, y: cy + R }); }
+		else { d -= 3 * side; out.push({ x: cx - R, y: cy + R - d }); }
 	}
+	return out;
 }
 
-// Orthogonal render (all squares, axis-aligned, no polar/warp):
-//   ① N — a square at the centre.
-//   ② T-exact notes — small squares arranged AROUND ① on a SQUARE ring (surrounding
-//      it, themselves forming a square).
-//   ③ T-enclosure, ④ subset enclosures — square frames nested outside.
-// Draw ONE Droste unit (① N ∈ ② siblings ∈ ③ T-enclosure ∈ ④ subset enclosures) into
-// the square centred on (ux,uy) with half-size uR. Geometry is parametrised by the
-// unit rect so the renderer can nest ×1/2 copies toward the centre (drawNest).
-function drawUnit(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts, ux: number, uy: number, uR: number, unitFocus: string): void {
-	const cx = ux, cy = uy;
-	const maxR = uR;
-	const gstep = maxR / 16; // this unit's grid pitch
-	// Snap an edge coord to THIS unit's grid (centred on its centre).
-	const snapX = (v: number): number => cx + Math.round((v - cx) / gstep) * gstep;
-	const snapY = (v: number): number => cy + Math.round((v - cy) / gstep) * gstep;
-	const r1half = 2 * gstep; // ① N = 4×4 grid cells
-	const role = (n: number) => meta.shapes.filter((e) => e.role === n);
-	const r2 = role(2);
-	// ①②: a centred square GRID — ① is the centre cell, ② fill the surrounding
-	// cells (ring by ring) so they enclose ① on all sides and the block is a square.
-	let g = 1; // odd grid size with g² ≥ 1 + |②|
-	while (g * g < 1 + r2.length) g += 2;
-	const cardH = maxR * 0.055; // ② card half-size (kept ~ as-is, decoupled from spacing)
-	// Grid spacing must be large enough that the nearest ② cell clears the 4×4 ①:
-	// (cell − cardH) ≥ r1half + 1-cell gap. Floor at the old default so small graphs
-	// don't collapse.
-	const cell = Math.max((2 * (maxR * 0.2)) / g, r1half + cardH + gstep);
-	const B = (cell * g) / 2; // ①② block half-size derived from the spacing
-	const ctr = (g - 1) / 2;
-	const cellCenter = (col: number, row: number): Pt => ({ x: cx + (col - ctr) * cell, y: cy + (row - ctr) * cell });
-	// surrounding cells ordered by ring distance (Chebyshev) then angle.
-	const around: { col: number; row: number }[] = [];
-	for (let row = 0; row < g; row++) for (let col = 0; col < g; col++) if (!(col === ctr && row === ctr)) around.push({ col, row });
-	around.sort((a, bb) =>
-		Math.max(Math.abs(a.col - ctr), Math.abs(a.row - ctr)) - Math.max(Math.abs(bb.col - ctr), Math.abs(bb.row - ctr)) ||
-		Math.atan2(a.row - ctr, a.col - ctr) - Math.atan2(bb.row - ctr, bb.col - ctr),
-	);
-	const R3 = B + cell * 0.45; // ③ frame just outside the block
-	// All boxes snap their edges to the grid (≥ 1 cell), so borders land on grid lines.
-	const snapBox = (x0: number, y0: number, x1: number, y1: number) => {
-		let sx0 = snapX(x0), sx1 = snapX(x1), sy0 = snapY(y0), sy1 = snapY(y1);
-		if (sx1 <= sx0) sx1 = sx0 + gstep;
-		if (sy1 <= sy0) sy1 = sy0 + gstep;
-		return { x: sx0, y: sy0, w: sx1 - sx0, h: sy1 - sy0 };
-	};
-	const frame = (R: number, rc: { h: number; s: number; l: number }, hover: boolean, label: string): void => {
-		const b2 = snapBox(cx - R, cy - R, cx + R, cy + R);
-		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.10)`;
-		ctx.fillRect(b2.x, b2.y, b2.w, b2.h);
-		ctx.lineWidth = (hover ? 4 : 3) * o.dpr;
-		ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 12, 82)}%)`;
-		ctx.strokeRect(b2.x, b2.y, b2.w, b2.h);
-		ctx.fillStyle = "#e6ecf5";
-		ctx.font = `${12 * o.dpr}px sans-serif`;
-		ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-		ctx.fillText(truncateToWidth(ctx, label, b2.w * 0.95), b2.x + b2.w / 2, b2.y - 2 * o.dpr);
-	};
-	const square = (px: number, py: number, h: number, rc: { h: number; s: number; l: number }, hover: boolean, label: string, id?: string): void => {
-		const b2 = snapBox(px - h, py - h, px + h, py + h);
-		if (id && o.hitRegions) o.hitRegions.push({ id, x0: b2.x, y0: b2.y, x1: b2.x + b2.w, y1: b2.y + b2.h });
-		ctx.fillStyle = `hsla(${rc.h}, ${rc.s}%, ${rc.l}%, 0.4)`;
-		ctx.fillRect(b2.x, b2.y, b2.w, b2.h);
-		ctx.lineWidth = (hover ? 3.5 : 1.8) * o.dpr;
-		ctx.strokeStyle = `hsl(${rc.h}, ${rc.s}%, ${Math.min(rc.l + 14, 85)}%)`;
-		ctx.strokeRect(b2.x, b2.y, b2.w, b2.h);
-		ctx.fillStyle = "#e6ecf5";
-		ctx.font = `${Math.min(b2.h * 0.34, 12 * o.dpr)}px sans-serif`;
-		ctx.textAlign = "center"; ctx.textBaseline = "middle";
-		ctx.fillText(truncateToWidth(ctx, label, b2.w * 0.92), b2.x + b2.w / 2, b2.y + b2.h / 2);
-	};
+const FOCUS_RING = "#ffd35c";
+const ICON_BG = "rgba(255,255,255,0.02)";
+const TWO_HUE = 45; // ② = amber
+// Distinct hue per single tag of T (for ③ node colour-coding + the ③ frame label).
+const TAG_HUES = [130, 265, 200, 25, 175, 310, 95, 330];
 
-	// ④ subset enclosures (back): each CONTAINS ③ (act ⊇ act∩drama), drawn as a
-	// square frame larger than ③. Independent siblings (act, drama) are STAGGERED
-	// (centres offset in different directions) so each encloses ③ but neither is
-	// nested inside the other.
-	const r4 = role(4);
-	const rc4 = roleColor(4);
-	// Large offset so independent ④ siblings clearly diverge (Venn overlap sharing
-	// the central ③), not near-concentric (which read as nested). The frame is sized
-	// R3 + offset + a member band so the group's own notes fit between ③ and the edge.
-	const D = r4.length <= 1 ? 0 : maxR * 0.22; // stagger offset
-	const memberBand = maxR * 0.16;
-	const H4 = Math.min(R3 + D + memberBand, Math.min(cx, cy) - 2 * o.dpr - D); // each still contains ③
-	const mh = gstep / 2; // member square = 1×1 grid cell
-	r4.forEach((e, i) => {
-		const th = (2 * Math.PI * i) / Math.max(1, r4.length); // k=2 → right & left
-		const ox = D * Math.cos(th), oy = D * Math.sin(th);
-		const bf = snapBox(cx + ox - H4, cy + oy - H4, cx + ox + H4, cy + oy + H4);
-		ctx.fillStyle = `hsla(${rc4.h}, ${rc4.s}%, ${rc4.l}%, 0.08)`;
-		ctx.fillRect(bf.x, bf.y, bf.w, bf.h);
-		ctx.lineWidth = (e.id === o.hoverId ? 4 : 3) * o.dpr;
-		ctx.strokeStyle = `hsl(${rc4.h}, ${rc4.s}%, ${Math.min(rc4.l + 12, 82)}%)`;
-		ctx.strokeRect(bf.x, bf.y, bf.w, bf.h);
-		ctx.fillStyle = "#e6ecf5";
-		ctx.font = `${12 * o.dpr}px sans-serif`;
-		ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-		ctx.fillText(truncateToWidth(ctx, e.label, bf.w * 0.9), bf.x + bf.w / 2, bf.y - 2 * o.dpr);
-		// This group's own notes as small GREY squares, pushed into this ④'s
-		// EXCLUSIVE outer band (the offset direction) so they don't fall on top of
-		// the other ④ siblings' frames (which only share the central ③ region).
-		const mem = e.members ?? [];
-		if (mem.length) {
-			const dx = D > 0 ? ox / D : 0, dy = D > 0 ? oy / D : 1; // unit dir (down if no offset)
-			const ccx = cx + dx * (H4 * 0.88), ccy = cy + dy * (H4 * 0.88);
-			const gm = Math.ceil(Math.sqrt(mem.length));
-			const step = gstep; // 1 cell per member, adjacent
-			const grey = { h: 0, s: 0, l: 62 };
-			mem.forEach((mn, k) => {
-				const col = k % gm, row = Math.floor(k / gm);
-				const px = ccx + (col - (gm - 1) / 2) * step;
-				const py = ccy + (row - (gm - 1) / 2) * step;
-				square(px, py, mh, grey, mn.id === o.hoverId, mn.label, mn.id);
-			});
-		}
+// Draw T's single tags as "a | b | c" centred at (cx,topY), each tag in its own colour
+// (the same colour used to fill that tag's ③ member cells). Separators are dim.
+function drawTagLabel(ctx: CanvasRenderingContext2D, labels: string[], hues: number[], cx: number, topY: number, dpr: number): void {
+	ctx.font = `${10 * dpr}px sans-serif`;
+	ctx.textBaseline = "top";
+	const segs: { t: string; h: number | null }[] = [];
+	labels.forEach((l, i) => { if (i > 0) segs.push({ t: " | ", h: null }); segs.push({ t: l, h: hues[i] }); });
+	const w = segs.map((s) => ctx.measureText(s.t).width);
+	const total = w.reduce((a, b) => a + b, 0);
+	let x = cx - total / 2;
+	ctx.textAlign = "left";
+	segs.forEach((s, i) => {
+		ctx.fillStyle = s.h == null ? "rgba(200,210,225,0.65)" : `hsl(${s.h}, 70%, 74%)`;
+		ctx.fillText(s.t, x, topY);
+		x += w[i];
 	});
-	// ③ the single T-enclosure frame around the ①② block (inside every ④).
-	for (const e of role(3)) frame(R3, roleColor(3), e.id === o.hoverId, e.label);
-	// ② T-exact notes fill the cells SURROUNDING ① (ring by ring) → enclose it.
-	r2.forEach((e, j) => { const p = cellCenter(around[j].col, around[j].row); square(p.x, p.y, cardH, roleColor(2), e.id === o.hoverId, e.label, e.id); });
-	// ① N at the centre cell (on top).
-	for (const e of role(1)) {
-		square(cx, cy, r1half, roleColor(1), e.id === o.hoverId, e.label, e.id);
-		if (e.id === unitFocus) {
-			ctx.beginPath(); ctx.arc(cx, cy, Math.max(3 * o.dpr, r1half * 0.35), 0, 2 * Math.PI);
-			ctx.fillStyle = "#ffd35c"; ctx.fill();
-			ctx.lineWidth = 1.5 * o.dpr; ctx.strokeStyle = "#1a1c22"; ctx.stroke();
-		}
-	}
 }
 
-// Orthogonal Droste recursion: draw the focus window (seq order) at the centre, each
-// level ×1/2 the last, outermost first so inner copies sit on top. The zoom fraction
-// scales all levels so the picture grows ×2 over one zoom unit (then the window index
-// advances). ⑤ is drawn on the ~full-size backdrop unit only. Units below minFontPx
-// are skipped. No conformal warp, no red grid, no seg/copies.
-function drawNest(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
-	const cx = o.canvas.width / 2, cy = o.canvas.height / 2;
-	const outerR = Math.min(cx, cy) * 0.94; // outermost unit half-size
-	const minSide = Math.max(8, o.minFontPx) * o.dpr; // skip units below the font floor
-	// Faint cartesian grid once (outermost unit's pitch), for the orthogonal look.
-	const gstep = outerR / 16;
-	ctx.strokeStyle = "rgba(210, 80, 80, 0.22)";
-	ctx.lineWidth = 1 * o.dpr;
-	for (let x = cx % gstep; x <= o.canvas.width; x += gstep) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, o.canvas.height); ctx.stroke(); }
-	for (let y = cy % gstep; y <= o.canvas.height; y += gstep) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(o.canvas.width, y); ctx.stroke(); }
-	// Per-level metas: chain[d] is re-rooted on the next focus (seq order) so each ×½
-	// copy shows a DIFFERENT context. Fall back to the single meta if none supplied.
-	const chain = o.chain && o.chain.length ? o.chain : [meta];
-	const frac = Math.min(0.999, Math.max(0, o.zoomFrac ?? 0));
-	// Outer → inner: unit d at half-size outerR·2^(frac−d). Largest first ⇒ inner on top.
-	for (let d = 0; d < chain.length; d++) {
-		const uR = outerR * Math.pow(2, frac - d);
-		if (2 * uR < minSide) break; // too small to read → stop
-		if (2 * uR > 4 * outerR) continue; // far larger than the canvas → skip (off-screen)
-		drawUnit(ctx, chain[d], o, cx, cy, uR, chain[d].focusId);
+// Draw one icon diagram centred at (scx,scy) with available half-size `half` (device px).
+// Grid-based: ① is 4×4 grid cells, ② members 2×2, ③ members 1×1; concentric square
+// enclosures are sized to CONTAIN their members, and nothing overlaps. A faint grid is
+// drawn so the cell sizes are legible.
+function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number, scy: number, half: number, o: DrawDrosteOpts): void {
+	const dpr = o.dpr;
+	const tags = icon.tKeys;
+	const tIdx = new Map(tags.map((t, i) => [t, i]));
+	const tagHue = (t: string): number => TAG_HUES[(tIdx.get(t) ?? 0) % TAG_HUES.length];
+	const tagLabel = (t: string): string => o.gallery.labels.get(t) ?? t;
+
+	type Item = { id?: string; label: string; hue: number; agg?: boolean; placeholder?: boolean; spacer?: boolean };
+	const buildItems = (lvl: IconDiagram["levels"][number]): Item[] => {
+		const out: Item[] = [];
+		lvl.sets.forEach((set, si) => {
+			// colour: ② amber; ③ by the single tag the set shares (its first key).
+			const hue = lvl.n === 2 ? TWO_HUE : tagHue(set.keys[0] ?? tags[0] ?? "");
+			if (si > 0) out.push({ label: "", hue, spacer: true }); // gap between incomparable sets
+			for (const m of set.members) out.push({ id: m.id, label: m.label, hue });
+			if (set.overflow > 0) out.push({ label: `+${set.overflow}`, hue, agg: true });
+			if (set.members.length === 0 && set.overflow === 0) out.push({ label: set.label, hue, placeholder: true });
+		});
+		return out;
+	};
+
+	// Radius layout in grid-unit (u) space: accumulate outward so rings never overlap and
+	// each frame contains its members; the per-ring radius also grows to give every member
+	// a non-overlapping slot on the perimeter.
+	const gapU = 0.55;
+	let rU = 2; // ① half = 2u (⇒ 4×4 cells)
+	const rings: { items: Item[]; isTwo: boolean; memHalfU: number; RcU: number; frameU: number }[] = [];
+	for (let f = 0; f < icon.levels.length; f++) {
+		const lvl = icon.levels[f];
+		const items = buildItems(lvl);
+		const isTwo = lvl.n === 2;
+		const memHalfU = isTwo ? 1 : 0.5; // ② 2×2 ⇒ half 1u, ③ 1×1 ⇒ half 0.5u
+		const count = Math.max(1, items.length);
+		const pitchU = 2 * memHalfU + 0.4; // member size + gap ⇒ no overlap on the ring
+		let RcU = rU + gapU + memHalfU; // clear the previous frame
+		RcU = Math.max(RcU, (count * pitchU) / 8); // enough perimeter for `count` members
+		const frameU = RcU + memHalfU + gapU; // frame contains the ring
+		rings.push({ items, isTwo, memHalfU, RcU, frameU });
+		rU = frameU;
 	}
-	// Zoom HUD (top-left): current focus + zoom fraction, so the wheel response is
-	// visible and the focus promotion as you zoom through the tunnel is legible.
-	{
-		const f0 = chain[0].shapes.find((s) => s.role === 1);
-		const txt = `🔍 ${(o.zoomFrac ?? 0).toFixed(2)}  focus: ${f0 ? f0.label : ""}`;
-		ctx.font = `${12 * o.dpr}px sans-serif`;
-		ctx.textAlign = "left"; ctx.textBaseline = "top";
-		const pad = 5 * o.dpr;
-		const w = ctx.measureText(txt).width + 2 * pad;
-		ctx.fillStyle = "rgba(18,20,26,0.85)";
-		ctx.fillRect(pad, pad, w, 18 * o.dpr);
-		ctx.fillStyle = "#e6ecf5";
-		ctx.fillText(txt, 2 * pad, pad + 4 * o.dpr);
-	}
-	// Hover tooltip (drawn last, on top): the cells are tiny, so show the hovered
-	// note's full title near it. hitRegions accumulated across all units.
-	if (o.hoverId && o.hitRegions) {
-		const hr = o.hitRegions.find((r) => r.id === o.hoverId);
-		let label = "";
-		outer: for (const md of chain) {
-			for (const s of md.shapes) {
-				if (s.id === o.hoverId) { label = s.label; break outer; }
-				const m = s.members?.find((mm) => mm.id === o.hoverId);
-				if (m) { label = m.label; break outer; }
+	const totalU = Math.max(2.0001, rU);
+	const u = half / totalU; // grid pitch in device px
+	const s1 = 2 * u; // ① half-size
+	const labelOK = u > 4.5 * dpr;
+	const push = (id: string, x: number, y: number, h: number): void => {
+		if (o.hitRegions) o.hitRegions.push({ id, x0: x - h, y0: y - h, x1: x + h, y1: y + h });
+	};
+
+	// faint background grid at pitch u (clipped to the icon box).
+	ctx.save();
+	ctx.beginPath(); ctx.rect(scx - half, scy - half, 2 * half, 2 * half); ctx.clip();
+	ctx.strokeStyle = "rgba(150,165,190,0.10)"; ctx.lineWidth = 1;
+	for (let gx = scx - Math.ceil(half / u) * u; gx <= scx + half; gx += u) { ctx.beginPath(); ctx.moveTo(gx, scy - half); ctx.lineTo(gx, scy + half); ctx.stroke(); }
+	for (let gy = scy - Math.ceil(half / u) * u; gy <= scy + half; gy += u) { ctx.beginPath(); ctx.moveTo(scx - half, gy); ctx.lineTo(scx + half, gy); ctx.stroke(); }
+	ctx.restore();
+
+	// frames + members, outer → inner (inner on top).
+	for (let f = rings.length - 1; f >= 0; f--) {
+		const R = rings[f];
+		const Ro = R.frameU * u, Rc = R.RcU * u, mh = R.memHalfU * u;
+		ctx.fillStyle = ICON_BG; ctx.fillRect(scx - Ro, scy - Ro, 2 * Ro, 2 * Ro);
+		ctx.lineWidth = 1.4 * dpr;
+		ctx.strokeStyle = R.isTwo ? "hsl(45,70%,62%)" : "hsl(150,28%,55%)";
+		ctx.strokeRect(scx - Ro, scy - Ro, 2 * Ro, 2 * Ro);
+		const pts = squarePerimeter(scx, scy, Rc, R.items.length);
+		R.items.forEach((it, i) => {
+			if (it.spacer) return;
+			const p = pts[i];
+			if (it.agg) {
+				ctx.fillStyle = "rgba(120,140,165,0.5)"; ctx.fillRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
+				ctx.strokeStyle = "rgba(190,205,225,0.7)"; ctx.lineWidth = 1 * dpr; ctx.strokeRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
+				if (labelOK) { ctx.fillStyle = "#cfe"; ctx.font = `${Math.min(mh * 0.9, 10 * dpr)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(it.label, p.x, p.y); }
+			} else if (it.placeholder) {
+				ctx.setLineDash([3 * dpr, 2 * dpr]); ctx.strokeStyle = `hsl(${it.hue}, 60%, 70%)`; ctx.lineWidth = 1.2 * dpr;
+				ctx.strokeRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh); ctx.setLineDash([]);
+				if (labelOK) { ctx.fillStyle = `hsl(${it.hue}, 60%, 82%)`; ctx.font = `${Math.min(mh * 0.8, 10 * dpr)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(truncateToWidth(ctx, it.label, 1.8 * mh), p.x, p.y); }
+			} else {
+				const hover = it.id != null && it.id === o.hoverId;
+				ctx.fillStyle = `hsla(${it.hue}, 75%, 55%, 0.45)`; ctx.fillRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
+				ctx.lineWidth = (hover ? 2.5 : 1.2) * dpr; ctx.strokeStyle = `hsl(${it.hue}, 85%, ${hover ? 80 : 70}%)`; ctx.strokeRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
+				if (it.id) push(it.id, p.x, p.y, mh);
+				if (labelOK && mh > 6 * dpr) { ctx.fillStyle = "#eef"; ctx.font = `${Math.min(mh * 0.7, 11 * dpr)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(truncateToWidth(ctx, it.label, 1.8 * mh), p.x, p.y); }
+			}
+		});
+		// frame label inside the top edge.
+		if (labelOK) {
+			if (R.isTwo) {
+				ctx.fillStyle = "hsl(45,60%,80%)"; ctx.font = `${10 * dpr}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "top";
+				ctx.fillText(truncateToWidth(ctx, icon.levels[f].sets.map((s) => s.label).join(" ∩ "), 1.9 * Ro), scx, scy - Ro + 2 * dpr);
+			} else {
+				// ③: T's single tags as "a | b | c", each in its tag colour (matches members).
+				drawTagLabel(ctx, tags.map(tagLabel), tags.map(tagHue), scx, scy - Ro + 2 * dpr, dpr);
 			}
 		}
-		if (hr && label) {
-			ctx.font = `${12 * o.dpr}px sans-serif`;
-			const pad = 6 * o.dpr, bh = 20 * o.dpr;
-			const bw = ctx.measureText(label).width + 2 * pad;
-			let bx = (hr.x0 + hr.x1) / 2 - bw / 2;
-			let by = hr.y0 - bh - 4 * o.dpr;
-			bx = Math.max(2 * o.dpr, Math.min(bx, o.canvas.width - bw - 2 * o.dpr));
-			if (by < 2 * o.dpr) by = hr.y1 + 4 * o.dpr;
-			ctx.fillStyle = "rgba(18,20,26,0.94)";
-			ctx.strokeStyle = "rgba(230,236,245,0.45)";
-			ctx.lineWidth = 1 * o.dpr;
+	}
+	// ① focus node at the centre (on top), 4×4 — note title drawn LARGE inside it.
+	ctx.fillStyle = "hsla(205, 90%, 60%, 0.5)";
+	ctx.fillRect(scx - s1, scy - s1, 2 * s1, 2 * s1);
+	ctx.lineWidth = (icon.focusId === o.focusId ? 3 : 1.6) * dpr;
+	ctx.strokeStyle = icon.focusId === o.focusId ? FOCUS_RING : "hsl(205, 90%, 72%)";
+	ctx.strokeRect(scx - s1, scy - s1, 2 * s1, 2 * s1);
+	push(icon.focusId, scx, scy, s1);
+	if (labelOK) {
+		ctx.fillStyle = icon.focusId === o.focusId ? FOCUS_RING : "#ffffff";
+		ctx.font = `bold ${Math.min(s1 * 0.5, 24 * dpr)}px sans-serif`;
+		ctx.textAlign = "center"; ctx.textBaseline = "middle";
+		ctx.fillText(truncateToWidth(ctx, icon.focusLabel, 1.85 * s1), scx, scy);
+	}
+}
+
+export function drawDroste(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): void {
+	const { canvas, dpr, gallery, cellSize, zoom, panX, panY } = o;
+	ctx.setTransform(1, 0, 0, 1, 0, 0);
+	ctx.fillStyle = "#0f1116";
+	ctx.fillRect(0, 0, canvas.width, canvas.height);
+	if (!gallery || gallery.cells.length === 0) return;
+	// world→device-screen
+	const sx = (wx: number): number => (wx * zoom + panX) * dpr;
+	const sy = (wy: number): number => (wy * zoom + panY) * dpr;
+	const cs = cellSize * zoom * dpr; // cell size on screen (device px)
+	const gap = cs * 0.09; // clear gap between icons so they never touch/overlap
+	const half = cs / 2 - gap;
+	// visible cell range (cull)
+	const wx0 = (-panX) / zoom, wy0 = (-panY) / zoom;
+	const wx1 = (canvas.width / dpr - panX) / zoom, wy1 = (canvas.height / dpr - panY) / zoom;
+	const c0 = Math.max(0, Math.floor(wx0 / cellSize) - 1);
+	const c1 = Math.min(gallery.cols - 1, Math.ceil(wx1 / cellSize) + 1);
+	const r0 = Math.max(0, Math.floor(wy0 / cellSize) - 1);
+	const r1 = Math.min(gallery.rows - 1, Math.ceil(wy1 / cellSize) + 1);
+	const byPos = (col: number, row: number): string | null => {
+		const i = row * gallery.cols + col;
+		return i >= 0 && i < gallery.cells.length ? gallery.cells[i].id : null;
+	};
+	for (let row = r0; row <= r1; row++) {
+		for (let col = c0; col <= c1; col++) {
+			const id = byPos(col, row);
+			if (!id) continue;
+			const scx = sx((col + 0.5) * cellSize), scy = sy((row + 0.5) * cellSize);
+			if (half < 3 * dpr) {
+				// LOD floor: a single marker for the node.
+				ctx.fillStyle = id === o.focusId ? FOCUS_RING : "hsl(205, 80%, 62%)";
+				const m = Math.max(1 * dpr, half);
+				ctx.fillRect(scx - m, scy - m, 2 * m, 2 * m);
+				if (o.hitRegions) o.hitRegions.push({ id, x0: scx - m, y0: scy - m, x1: scx + m, y1: scy + m });
+				continue;
+			}
+			// Clip to this cell so an icon can NEVER draw into a neighbour's cell
+			// (spec §0/§2: icon diagrams must not overlap each other).
+			ctx.save();
+			ctx.beginPath();
+			ctx.rect(scx - cs / 2, scy - cs / 2, cs, cs);
+			ctx.clip();
+			drawIcon(ctx, buildIcon(gallery, id), scx, scy, half, o);
+			ctx.restore();
+		}
+	}
+	// hover tooltip (on top): show the hovered node's full label near its rect.
+	if (o.hoverId && o.hitRegions) {
+		const hr = o.hitRegions.find((r) => r.id === o.hoverId);
+		const label = gallery.nodeLabel.get(o.hoverId) ?? o.hoverId;
+		if (hr) {
+			ctx.font = `${12 * dpr}px sans-serif`;
+			const pad = 6 * dpr, bh = 20 * dpr, bw = ctx.measureText(label).width + 2 * pad;
+			let bx = (hr.x0 + hr.x1) / 2 - bw / 2, by = hr.y0 - bh - 4 * dpr;
+			bx = Math.max(2 * dpr, Math.min(bx, canvas.width - bw - 2 * dpr));
+			if (by < 2 * dpr) by = hr.y1 + 4 * dpr;
+			ctx.fillStyle = "rgba(18,20,26,0.94)"; ctx.strokeStyle = "rgba(230,236,245,0.45)"; ctx.lineWidth = 1 * dpr;
 			ctx.fillRect(bx, by, bw, bh); ctx.strokeRect(bx, by, bw, bh);
-			ctx.fillStyle = "#e6ecf5";
-			ctx.textAlign = "left"; ctx.textBaseline = "middle";
+			ctx.fillStyle = "#e6ecf5"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
 			ctx.fillText(label, bx + pad, by + bh / 2);
 		}
 	}
-}
-
-export function drawDroste(ctx: CanvasRenderingContext2D, meta: DrosteMeta, o: DrawDrosteOpts): void {
-	ctx.setTransform(1, 0, 0, 1, 0, 0);
-	ctx.fillStyle = "#0f1116";
-	ctx.fillRect(0, 0, o.canvas.width, o.canvas.height);
-	if (meta.shapes.length === 0) return;
-	// Orthogonal Droste recursion of the ①②③④(⑤) unit.
-	drawNest(ctx, meta, o);
 }

@@ -26,6 +26,9 @@ export interface DrosteShape {
 	// notes) — EXCLUDING ① N / ② T-exact (those have signature T, not a subset).
 	// Drawn as small squares inside the ④ enclosure.
 	members?: { id: string; label: string; hueKey: string }[];
+	// For ④ frames: the group's sorted tag keys, so the renderer can build the
+	// subset containment order (S ⊊ S′ ⇒ nest; incomparable ⇒ never overlap).
+	keys?: string[];
 }
 
 export interface DrosteBBox {
@@ -113,7 +116,7 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 	if (overflow) subsetSigs = subsetSigs.slice(0, cap - 1);
 
 	// Build the bands as separate item lists.
-	type Item = { id: string; role: 1 | 2 | 3 | 4; kind: "card" | "frame"; label: string; hueKey: string; members?: { id: string; label: string; hueKey: string }[] };
+	type Item = { id: string; role: 1 | 2 | 3 | 4; kind: "card" | "frame"; label: string; hueKey: string; members?: { id: string; label: string; hueKey: string }[]; keys?: string[] };
 	// ① N alone (NOT mixed with ② cards).
 	const band1: Item[] = [
 		{ id: focusNode.id, role: 1, kind: "card", label: focusNode.label, hueKey: focusNode.memberships[0] ?? focusId },
@@ -129,6 +132,7 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 	// ④ T's proper-subset enclosures (|sig| desc), then "+N" if capped.
 	const band4: Item[] = subsetSigs.map(([sig, info]) => ({
 		id: `__sub_${sig}`, role: 4 as const, kind: "frame" as const, label: sigLabel(info.keys), hueKey: sig,
+		keys: info.keys,
 		// This subset group's OWN notes (excludes ① N / ② T-exact: different signature).
 		members: info.members.slice(0, cap).map((nd) => ({ id: nd.id, label: nd.label, hueKey: nd.memberships[0] ?? nd.id })),
 	}));
@@ -158,49 +162,123 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 }
 
 // Test/inspection helper: the ①②③④ shapes grouped by role (data correctness).
-const tagsOf = (n: GraphNode): Set<string> => new Set(n.memberships.filter((m) => m !== NONE_BUCKET));
-
-function intersectionSize(a: Set<string>, b: Set<string>): number {
-	let c = 0;
-	for (const x of a) if (b.has(x)) c++;
-	return c;
-}
-
-// Focus VISITING ORDER for the Droste zoom-tunnel. From focus0, repeatedly pick the
-// unvisited note that shares the MOST tags with the current focus (ties → id asc);
-// when nothing unvisited shares a tag, take the next unvisited note in id order. This
-// is deterministic and reaches EVERY node, so zooming alone walks the whole vault.
-export function buildDrosteSeq(data: GraphData, focus0: string, cap: number): string[] {
-	const nodes = data.nodes;
-	if (nodes.length === 0) return [];
-	const order = nodes.map((n) => n.id).sort();
-	const tags = new Map<string, Set<string>>(nodes.map((n) => [n.id, tagsOf(n)]));
-	const visited = new Set<string>();
-	const seq: string[] = [];
-	let f = nodes.some((n) => n.id === focus0) ? focus0 : order[0];
-	const limit = Math.min(Math.max(1, cap), nodes.length);
-	while (f && seq.length < limit) {
-		seq.push(f);
-		visited.add(f);
-		const ft = tags.get(f) ?? new Set<string>();
-		let best: string | undefined;
-		let bestScore = 0;
-		for (const n of nodes) {
-			if (visited.has(n.id)) continue;
-			const s = intersectionSize(ft, tags.get(n.id) ?? new Set<string>());
-			if (s > 0 && (s > bestScore || (s === bestScore && (best === undefined || n.id < best)))) {
-				best = n.id;
-				bestScore = s;
-			}
-		}
-		f = best ?? order.find((id) => !visited.has(id)) ?? "";
-	}
-	return seq;
-}
-
 export function drosteRoles(meta: DrosteMeta): { role: number; ids: string[]; labels: string[] }[] {
 	return [1, 2, 3, 4].map((role) => {
 		const s = meta.shapes.filter((e) => e.role === role);
 		return { role, ids: s.map((e) => e.id), labels: s.map((e) => e.label) };
 	});
+}
+
+// ============================================================================
+// Icon Gallery (spec 2026-06-01). Per node N, an "icon diagram":
+//   ① N (centre) ∈ ② sig(N) set + members ∈ ③ direct-superset sets + members ∈ …
+// generalising one tag outward per level until single-tag sets. All nodes' icons
+// are tiled in a grid. Icons are built ON DEMAND (per visible cell) from the index.
+// ============================================================================
+
+const SEP = "\u0001"; // signature key joiner (control char — cannot appear in tag keys)
+const keysOf = (n: GraphNode): string[] => {
+	const k = n.memberships.filter((m) => m !== NONE_BUCKET).sort();
+	return k.length ? k : [...n.memberships].sort();
+};
+
+export interface GalleryCell { id: string; label: string; col: number; row: number; }
+export interface DrosteGallery {
+	cells: GalleryCell[];
+	cols: number;
+	rows: number;
+	// On-demand index for buildIcon():
+	nodeKeys: Map<string, string[]>;            // id → sorted tag keys
+	nodeLabel: Map<string, string>;             // id → display label
+	labels: Map<string, string>;                // cluster-key → human label
+}
+
+export interface IconSet { keys: string[]; label: string; members: { id: string; label: string }[]; overflow: number; }
+export interface IconLevel { n: number; sets: IconSet[]; } // n: 2=②, 3=③₁, 4=③₂, …
+export interface IconDiagram { focusId: string; focusLabel: string; tKeys: string[]; levels: IconLevel[]; }
+
+// Build the gallery index over the FULL graph. Cheap: one pass to bucket nodes by
+// signature + a grid placement. Icon trees are built later, per visible cell.
+export function buildGallery(data: GraphData, labels?: Map<string, string>): DrosteGallery {
+	const nodeKeys = new Map<string, string[]>();
+	const nodeLabel = new Map<string, string>();
+	for (const n of data.nodes) {
+		nodeKeys.set(n.id, keysOf(n));
+		nodeLabel.set(n.id, n.label);
+	}
+	const cols = Math.max(1, Math.ceil(Math.sqrt(data.nodes.length)));
+	const rows = Math.max(1, Math.ceil(data.nodes.length / cols));
+	const cells: GalleryCell[] = data.nodes.map((n, i) => ({
+		id: n.id, label: n.label, col: i % cols, row: Math.floor(i / cols),
+	}));
+	return { cells, cols, rows, nodeKeys, nodeLabel, labels: labels ?? new Map() };
+}
+
+// Build one node's icon diagram (spec §1). Group every OTHER node M by the part of the
+// focus tags it shares, O(M) = T ∩ sig(M); place it at level d = |T| − |O| (d=0 ⇒ ②,
+// d=1 ⇒ ③₁, …). So ② = nodes sharing ALL of T, ③₁ = nodes sharing all-but-one tag of T
+// grouped by which subset, etc. Nodes sharing nothing (O=∅) are excluded. Per-set draw
+// cap = 2^(n-1); the remainder folds into `overflow`. No exact-signature requirement, so
+// "share a subset of T" groups (e.g. {character} when T={character,hero}) are populated.
+export function buildIcon(g: DrosteGallery, focusId: string): IconDiagram {
+	const clusterLabel = (k: string): string => g.labels.get(k) ?? k;
+	const sigLabel = (keys: string[]): string => (keys.length ? keys.map(clusterLabel).join(" ∩ ") : "(none)");
+	const T = g.nodeKeys.get(focusId) ?? [];
+	const focusLabel = g.nodeLabel.get(focusId) ?? focusId;
+	const k = T.length;
+	const Tset = new Set(T);
+	// EXCLUSIVE members keyed by O(M) = T ∩ sig(M); plus the set of distinct observed O's
+	// (for the "region non-empty" test: region(S) ≠ ∅ ⟺ some observed O ⊇ S).
+	const excl = new Map<string, { id: string; label: string }[]>();
+	const observed: Set<string>[] = [];
+	const seenO = new Set<string>();
+	for (const [id, keys] of g.nodeKeys) {
+		if (id === focusId) continue;
+		const O = keys.filter((kk) => Tset.has(kk));
+		if (O.length === 0) continue;
+		const sig = O.join(SEP);
+		const arr = excl.get(sig);
+		if (arr) arr.push({ id, label: g.nodeLabel.get(id) ?? id });
+		else { excl.set(sig, [{ id, label: g.nodeLabel.get(id) ?? id }]); }
+		if (!seenO.has(sig)) { seenO.add(sig); observed.push(new Set(O)); }
+	}
+	// Enumerate the subsets of T to draw. |T|≤3 ⇒ ALL non-empty subsets (incl T itself for
+	// ②). |T|≥4 ⇒ best-effort: T plus subsets of size |T|−1 and |T|−2 only.
+	const subsets: string[][] = [];
+	const all: string[][] = [];
+	const recur = (start: number, cur: string[]): void => {
+		all.push([...cur]);
+		for (let i = start; i < T.length; i++) { cur.push(T[i]); recur(i + 1, cur); cur.pop(); }
+	};
+	recur(0, []);
+	for (const S of all) {
+		if (S.length === 0) continue;
+		if (k > 3 && S.length < k && S.length < k - 2) continue; // 4+ tags: only sizes k, k−1, k−2
+		subsets.push(S);
+	}
+	const present = (S: string[]): boolean => observed.some((O) => S.every((x) => O.has(x)));
+	const byLevel = new Map<number, IconSet[]>();
+	for (const S of subsets) {
+		const d = k - S.length;
+		// ② (d=0, S=T) is N's OWN enclosure — always drawn (empty if no T-exact peers,
+		// spec §5「該当なしなら②は空」). Proper subsets (③, d≥1) are drawn only if their
+		// region is non-empty.
+		if (d > 0 && !present(S)) continue;
+		const n = d + 2;
+		const cap = Math.pow(3, n) - 1; // per-set draw cap (spec 2026-06-01)
+		const mem = (excl.get(S.join(SEP)) ?? []).slice().sort((a, b) => (a.id < b.id ? -1 : 1));
+		const take = Math.min(mem.length, cap);
+		const set: IconSet = { keys: S, label: sigLabel(S), members: mem.slice(0, take), overflow: mem.length - take };
+		const arr = byLevel.get(d);
+		if (arr) arr.push(set); else byLevel.set(d, [set]);
+	}
+	const levels: IconLevel[] = [];
+	const maxD = byLevel.size ? Math.max(...byLevel.keys()) : -1;
+	for (let d = 0; d <= maxD; d++) {
+		const sets = byLevel.get(d);
+		if (!sets) continue;
+		sets.sort((a, b) => b.keys.length - a.keys.length || b.members.length - a.members.length || (a.label < b.label ? -1 : 1));
+		levels.push({ n: d + 2, sets });
+	}
+	return { focusId, focusLabel, tKeys: T, levels };
 }

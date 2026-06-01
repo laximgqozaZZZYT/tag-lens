@@ -55,7 +55,6 @@ import { drawMatrix, matrixGeom, MATRIX_BADGE_W } from "./draw-matrix";
 import type { MatrixLine } from "./draw-matrix";
 import { drawHeatmap, heatmapGeom } from "./draw-heatmap";
 import { drawDroste } from "./draw-droste";
-import { layoutDroste } from "./droste-layout";
 import {
 	drawLattice,
 	latticeCellAt,
@@ -106,6 +105,9 @@ export const VIEW_TYPE_MINI = "tag-lens-view";
 // Internal cache: maps file path → pre-processed body preview (post-frontmatter,
 // trimmed). Persists across rebuilds so we don't re-read 2k+ files every time
 // metadataCache fires "resolved".
+
+// Containment-lens gallery: world px per icon cell (square). Pan/zoom navigates.
+const DROSTE_CELL = 240;
 
 export class MiniGraphView extends ItemView {
 	private canvas!: HTMLCanvasElement;
@@ -165,11 +167,11 @@ export class MiniGraphView extends ItemView {
 	// Clickable card rects (device px) recorded by the grid-mode Droste renderer,
 	// so grid-mode hit-testing reuses the drawn geometry instead of re-deriving it.
 	private drosteHit: { id: string; x0: number; y0: number; x1: number; y1: number }[] = [];
-	// Droste zoom-tunnel state: continuous zoom (×2 per unit ⇒ start index +1) and the
-	// full pre-LIMIT graph the focus window is re-laid from as the index advances.
-	private drosteZoom = 0;
+	// Containment lens: the full pre-LIMIT graph, so the lens + focus picker cover the
+	// whole vault (not just the LIMIT-trimmed subset).
 	private drosteData: GraphData | null = null;
-	private drosteMenu: HTMLElement | null = null; // focus-picker mini-menu (tree + search)
+	private drosteMenu: HTMLElement | null = null; // always-on mini-menu (tree + search)
+	private drosteMenuRedraw: (() => void) | null = null; // re-renders menu rows (highlight)
 	private adjacency: Map<string, number[]> = new Map();
 	// Drag-to-move (nodes/clusters) was removed; pan/marquee/click-to-open
 	// are the only pointer interactions now.
@@ -328,7 +330,6 @@ export class MiniGraphView extends ItemView {
 			onActivate: () => this.cancelHover(),
 		});
 
-		this.addAction("list-tree", "Focus picker (Droste): search/tree of notes", () => this.toggleDrosteMenu());
 		this.addAction("square-dashed-mouse-pointer", "Marquee zoom (or Shift+drag)", () => this.marquee.arm());
 		this.addAction("zoom-in", "Zoom in", () => this.zoomBy(1.4));
 		this.addAction("zoom-out", "Zoom out", () => this.zoomBy(1 / 1.4));
@@ -1120,24 +1121,11 @@ export class MiniGraphView extends ItemView {
 	// a heading plus a one-line description of the containment view.
 	private renderDrosteSection(parent: HTMLElement): void {
 		const section = parent.createDiv({ cls: "gim-panel-section" });
-		section.createEl("h4", { text: "Droste Effect" });
+		section.createEl("h4", { text: "Containment lens" });
 		section.createEl("div", {
 			cls: "gim-row",
-			text: "Use the toolbar 🔍 zoom in/out (or the wheel) to drill through related notes — each ×2 promotes the focus. Click a note to re-centre.",
+			text: "Icon gallery: every note's containment icon, tiled. Scroll to zoom, drag to pan. Use the always-on search/tree panel (top-left) or click a note to centre its icon.",
 		});
-	}
-
-	// Step the Droste zoom (one unit = ×2 = one focus promotion). Re-lays the focus
-	// window when the integer index changes, then repaints. Shared by the wheel and
-	// the panel buttons so zoom works even where wheel events are intercepted.
-	private drosteZoomBy(delta: number): void {
-		const seq = this.laid.drosteSeq;
-		if (!seq || seq.length === 0) return;
-		const prevI = Math.floor(this.drosteZoom);
-		this.drosteZoom = Math.max(0, Math.min(seq.length - 1, this.drosteZoom + delta));
-		const i = Math.floor(this.drosteZoom);
-		if (i !== prevI) this.relayoutDrosteWindow(i);
-		this.requestDraw();
 	}
 
 	// One radio row for a view mode. Shared by the stable list and the
@@ -1397,16 +1385,19 @@ export class MiniGraphView extends ItemView {
 		// Stage 1b: HAVING runs AFTER buildGraph so auto thresholds can scale
 		// with the produced node count, then drops the resulting clusters
 		// from each node's memberships + the cluster-label map.
-		// Lattice mode is the ONE view whose value comes from DEEP intersections
-		// (3-way, 4-way, …). Auto-HAVING's TOP_K=20 long-tail drop strips
-		// rare tags from every note's memberships, so any 3rd+ tag on a note
-		// vanishes upstream of layoutLattice and the lattice can only ever
-		// show degree ≤ 2. Skip AUTO entirely for lattice — manual HAVING
-		// expressions still run, and the lattice's own `Min intersection
-		// size` / `Max nodes per tier` controls handle clutter. Other modes
+		// Lattice AND Containment-lens (droste) both derive their value from each
+		// note's FULL multi-tag membership: the lattice from DEEP intersections
+		// (3-way, 4-way, …), and the lens from T (= N's tag intersection), its
+		// exact-T peers (②) and its proper-subset groups (④). Auto-HAVING's
+		// TOP_K=20 long-tail drop strips rare tags from every note's memberships,
+		// collapsing a {act,drama,character} note to its dominant {character} —
+		// which flattens both views (T becomes a single tag, ④ subsets vanish).
+		// Skip AUTO for both; manual HAVING expressions still run. Other modes
 		// keep AUTO unchanged.
 		const effHavingAuto =
-			this.settings.viewMode === "lattice" ? false : this.settings.havingAuto;
+			this.settings.viewMode === "lattice" || this.settings.viewMode === "droste"
+				? false
+				: this.settings.havingAuto;
 		const effHaving = resolveEffectiveHaving(
 			this.settings.having,
 			effHavingAuto,
@@ -1423,17 +1414,16 @@ export class MiniGraphView extends ItemView {
 		}
 		this.clusterLabels = clusterLabels;
 
-		// Droste-effect view operates vault-wide: snapshot the post-HAVING graph
-		// BEFORE the LIMIT stage trims it, so the containment map (and especially
-		// ⑤ unrelated notes) covers all notes, not just the limited subset.
+		// Containment lens operates vault-wide: snapshot the post-HAVING graph BEFORE the
+		// LIMIT stage trims it, so the icon gallery covers all notes, not the limited set.
 		const drosteFullData =
 			this.settings.viewMode === "droste"
 				? { nodes: data.nodes.slice(), edges: data.edges.slice() }
 				: undefined;
-		// Keep the full graph for the zoom-tunnel (re-laying the focus window as the
-		// zoom index advances) and start each (re)build at zoom 0.
 		this.drosteData = drosteFullData ?? null;
-		this.drosteZoom = 0;
+		// Rebuild the always-on mini-menu fresh (node set may have changed); ensureDrosteMenu
+		// re-creates it on the next draw when in lens mode.
+		this.removeDrosteMenu();
 
 		// Stage 2: degree maps (total / in / out). Used by ORDER_BY + size-
 		// mode resolvers. Cleared in place so view-state references stay
@@ -1763,12 +1753,6 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private zoomBy(factor: number): void {
-		// Droste-effect view: the toolbar magnifiers drive the zoom-tunnel (one press
-		// ≈ half a focus step) instead of the world zoom.
-		if (this.laid.droste) {
-			this.drosteZoomBy(factor >= 1 ? 0.5 : -0.5);
-			return;
-		}
 		const rect = this.canvas.getBoundingClientRect();
 		const sx = rect.width / 2;
 		const sy = rect.height / 2;
@@ -1946,12 +1930,9 @@ export class MiniGraphView extends ItemView {
 			this.requestDraw();
 			return;
 		}
-		if (this.laid.droste) {
-			// The Droste-effect grid renderer self-fits to the canvas; reset transform.
-			this.zoom = 1;
-			this.panX = 0;
-			this.panY = 0;
-			this.requestDraw();
+		if (this.laid.drosteGallery) {
+			// Icon Gallery: centre on the focus node's cell at a readable zoom.
+			this.centerDrosteOn(this.settings.drosteFocus || this.laid.drosteGallery.cells[0]?.id || "");
 			return;
 		}
 		const hasContent =
@@ -2125,16 +2106,19 @@ export class MiniGraphView extends ItemView {
 			});
 			return;
 		}
-		// Droste-effect containment view (nested ①②③④ squares).
-		if (this.laid.droste && this.laid.droste.shapes.length > 0) {
-			drawDroste(ctx, this.laid.droste, {
+		// Containment lens = Icon Gallery: every node's icon diagram, tiled, pan/zoomed.
+		if (this.laid.drosteGallery && this.laid.drosteGallery.cells.length > 0) {
+			this.ensureDrosteMenu();
+			drawDroste(ctx, {
 				canvas: this.canvas,
 				dpr,
-				minFontPx: this.settings.minFontPx,
+				gallery: this.laid.drosteGallery,
+				cellSize: DROSTE_CELL,
+				zoom: this.zoom,
+				panX: this.panX,
+				panY: this.panY,
 				hoverId: this.hoveredNodeId,
-				focusId: this.laid.droste.focusId,
-				chain: this.laid.drosteChain,
-				zoomFrac: this.drosteZoom - Math.floor(this.drosteZoom),
+				focusId: this.settings.drosteFocus,
 				hitRegions: (this.drosteHit = []),
 			});
 			return;
@@ -2514,56 +2498,55 @@ export class MiniGraphView extends ItemView {
 		this.app.workspace.openLinkText(path, "", false);
 	}
 
-	// Resolve the note under a pointer (CSS px) by scanning the clickable card
-	// rects the renderer recorded while drawing (device px). Last-drawn wins
-	// (front-most: ① over ② over members), so iterate in reverse.
-	// Re-lay the visible focus window for zoom index `i`: lay out seq[i .. i+6] from the
-	// full graph and swap them into laid.droste(Chain) so the next focus is drawn at the
-	// centre. Cheap (≈6 layoutDroste calls) — runs only when the zoom index changes.
-	private relayoutDrosteWindow(i: number): void {
-		const seq = this.laid.drosteSeq;
-		if (!seq || !this.drosteData) return;
-		const window = seq.slice(i, i + 6).map((id) =>
-			layoutDroste(this.drosteData as GraphData, { focusId: id, labels: this.clusterLabels }),
-		);
-		if (window.length === 0) return;
-		this.laid.drosteChain = window;
-		this.laid.droste = window[0];
+	// Centre the gallery viewport on node `id`'s cell at a readable zoom.
+	private centerDrosteOn(id: string): void {
+		const g = this.laid.drosteGallery;
+		if (!g) return;
+		const cell = g.cells.find((c) => c.id === id) ?? g.cells[0];
+		if (!cell) return;
+		const cw = this.canvas.clientWidth || 1, ch = this.canvas.clientHeight || 1;
+		this.zoom = Math.max(0.05, Math.min(3, (Math.min(cw, ch) * 0.55) / DROSTE_CELL));
+		const wx = (cell.col + 0.5) * DROSTE_CELL, wy = (cell.row + 0.5) * DROSTE_CELL;
+		this.panX = cw / 2 - wx * this.zoom;
+		this.panY = ch / 2 - wy * this.zoom;
+		this.requestDraw();
 	}
 
-	// Make `id` the new Droste focus N: reset the zoom, recompute T + the focus
-	// chain, and rebuild. Used by both clicking a node and the focus-picker menu.
+	// Focus node `id`: highlight it and centre its icon. The gallery already holds every
+	// node's icon, so no rebuild is needed. Shared by menu selection and canvas clicks.
 	private setDrosteFocus(id: string): void {
 		this.settings.drosteFocus = id;
-		this.drosteZoom = 0;
 		void this.save();
-		void this.rebuild();
+		this.centerDrosteOn(id);
+		this.drosteMenuRedraw?.();
 	}
 
-	// Focus-picker mini-menu: a floating panel with a search box and a folder tree of
-	// every note (ids are paths). Selecting a note sets it as the new focus.
-	private toggleDrosteMenu(): void {
-		if (this.drosteMenu) { this.drosteMenu.remove(); this.drosteMenu = null; return; }
-		const nodes = (this.drosteData?.nodes ?? this.laid.nodes ?? []).slice();
+	private removeDrosteMenu(): void {
+		this.drosteMenu?.remove();
+		this.drosteMenu = null;
+		this.drosteMenuRedraw = null;
+	}
+
+	// Always-on mini-menu (tree + search) for the Icon Gallery. Selecting a note centres
+	// its icon. Built once and kept visible while the lens is active.
+	private ensureDrosteMenu(): void {
+		if (this.drosteMenu || !this.laid.drosteGallery) return;
+		const nodes = this.laid.drosteGallery.cells.map((c) => ({ id: c.id, label: c.label }));
 		const panel = this.root.createDiv();
 		this.drosteMenu = panel;
 		Object.assign(panel.style, {
-			position: "absolute", left: "8px", top: "34px", width: "270px",
-			maxHeight: "calc(100% - 48px)", display: "flex", flexDirection: "column",
-			background: "rgba(20,24,33,0.98)", border: "1px solid #3a4760", borderRadius: "6px",
+			position: "absolute", left: "8px", top: "8px", width: "270px",
+			maxHeight: "calc(100% - 16px)", display: "flex", flexDirection: "column",
+			background: "rgba(20,24,33,0.96)", border: "1px solid #3a4760", borderRadius: "6px",
 			boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "60", font: "12px sans-serif", color: "#e6edf3",
 		} as Partial<CSSStyleDeclaration>);
 		const head = panel.createDiv();
-		Object.assign(head.style, { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 8px", borderBottom: "1px solid #2a3447" });
-		head.createSpan({ text: `Focus picker (${nodes.length})` });
-		const close = head.createEl("button", { text: "×" });
-		close.style.cursor = "pointer";
-		close.addEventListener("click", () => this.toggleDrosteMenu());
-		const search = head.parentElement!.createEl("input", { attr: { type: "text", placeholder: "Search notes…" } });
+		Object.assign(head.style, { padding: "6px 8px", borderBottom: "1px solid #2a3447", fontWeight: "600" });
+		head.createSpan({ text: `Notes (${nodes.length}) — click to focus` });
+		const search = panel.createEl("input", { attr: { type: "text", placeholder: "Search notes…" } });
 		Object.assign(search.style, { margin: "6px 8px", padding: "4px 6px", background: "#0f1116", border: "1px solid #2a3447", borderRadius: "4px", color: "#e6edf3" });
 		const body = panel.createDiv();
 		Object.assign(body.style, { overflow: "auto", padding: "4px 6px 8px" });
-		// folder tree from path-like ids
 		type TNode = { folders: Map<string, TNode>; leaves: { id: string; label: string }[] };
 		const mkT = (): TNode => ({ folders: new Map(), leaves: [] });
 		const tree = mkT();
@@ -2578,12 +2561,14 @@ export class MiniGraphView extends ItemView {
 			}
 			cur.leaves.push({ id: n.id, label: parts[parts.length - 1] });
 		}
-		const leafRow = (id: string, label: string, depth: number): HTMLElement => {
-			const row = body.createDiv({ text: label });
-			Object.assign(row.style, { paddingLeft: `${6 + depth * 12}px`, padding: "2px 4px", cursor: "pointer", borderRadius: "3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" });
-			if (id === this.settings.drosteFocus) { row.style.background = "#2d6cdf55"; row.style.color = "#ffd35c"; }
-			row.addEventListener("mouseenter", () => (row.style.background = row.style.background || "#2a3447"));
-			row.addEventListener("click", () => { this.toggleDrosteMenu(); this.setDrosteFocus(id); });
+		const leafRow = (container: HTMLElement, id: string, label: string, depth: number): HTMLElement => {
+			const row = container.createDiv({ text: label });
+			const baseBg = id === this.settings.drosteFocus ? "#2d6cdf55" : "";
+			Object.assign(row.style, { paddingLeft: `${6 + depth * 12}px`, padding: "2px 4px", cursor: "pointer", borderRadius: "3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", background: baseBg });
+			if (id === this.settings.drosteFocus) row.style.color = "#ffd35c";
+			row.addEventListener("mouseenter", () => (row.style.background = "#2a3447"));
+			row.addEventListener("mouseleave", () => (row.style.background = baseBg));
+			row.addEventListener("click", () => this.setDrosteFocus(id));
 			return row;
 		};
 		const renderTree = (container: HTMLElement, t: TNode, depth: number): void => {
@@ -2600,7 +2585,7 @@ export class MiniGraphView extends ItemView {
 					if (!built) { renderTree(kids, child, depth + 1); built = true; }
 				});
 			}
-			for (const lf of t.leaves.sort((a, b) => (a.label < b.label ? -1 : 1))) leafRow(lf.id, lf.label, depth);
+			for (const lf of t.leaves.sort((a, b) => (a.label < b.label ? -1 : 1))) leafRow(container, lf.id, lf.label, depth);
 		};
 		const draw = (): void => {
 			body.empty();
@@ -2608,18 +2593,18 @@ export class MiniGraphView extends ItemView {
 			if (q) {
 				const hits = nodes.filter((n) => n.id.toLowerCase().includes(q) || n.label.toLowerCase().includes(q)).slice(0, 300);
 				if (!hits.length) { body.createDiv({ text: "(no matches)" }); return; }
-				for (const n of hits) leafRow(n.id, n.label, 0);
+				for (const n of hits) leafRow(body, n.id, n.label, 0);
 			} else {
 				renderTree(body, tree, 0);
 			}
 		};
+		this.drosteMenuRedraw = draw;
 		search.addEventListener("input", draw);
 		draw();
-		search.focus();
 	}
 
 	private drosteHitTest(sx: number, sy: number): string | null {
-		if (!this.laid.droste) return null;
+		if (!this.laid.drosteGallery) return null;
 		const dpr = window.devicePixelRatio || 1;
 		const dx = sx * dpr, dy = sy * dpr;
 		for (let i = this.drosteHit.length - 1; i >= 0; i--) {
@@ -2959,8 +2944,8 @@ export class MiniGraphView extends ItemView {
 			}
 			return;
 		}
-		if (this.laid.droste) {
-			// Conformal inverse-map: hover-highlight the band under the cursor.
+		if (this.laid.drosteGallery) {
+			// Icon Gallery: hover-highlight the node cell under the cursor.
 			const id = this.drosteHitTest(sx, sy);
 			if (id !== this.hoveredNodeId) {
 				this.hoveredNodeId = id;
@@ -3351,11 +3336,9 @@ export class MiniGraphView extends ItemView {
 				this.openLatticeDetail(hitNode, sx, sy);
 				return;
 			}
-			if (this.laid.droste) {
-				// Click a note (any level of the recursion — the hit-test records
-				// every drawn card across all nested units) → open it AND re-root the
-				// whole view on it: it becomes the new focus N, T is recomputed and the
-				// focus chain rebuilt. Synthetic cells ("+N", frames) record no id.
+			if (this.laid.drosteGallery) {
+				// Click a node cell (① or a member square) → open the note AND focus its
+				// icon (centre it). Synthetic markers ("+N", frames) record no id.
 				const id = this.drosteHitTest(sx, sy);
 				if (id && !id.startsWith("__")) {
 					this.openFile(id);
@@ -3387,7 +3370,7 @@ export class MiniGraphView extends ItemView {
 			this.cancelHover();
 			// Droste mode tracks hover via hoveredNodeId (no matrix/lattice
 			// crosshair state) — clear it so no band stays lit after exit.
-			const drosteHovered = this.laid.droste != null && this.hoveredNodeId !== null;
+			const drosteHovered = this.laid.drosteGallery != null && this.hoveredNodeId !== null;
 			if (drosteHovered) this.hoveredNodeId = null;
 			if (
 				drosteHovered ||
@@ -3413,14 +3396,6 @@ export class MiniGraphView extends ItemView {
 			if (this.laid.matrix) {
 				this.panY -= e.deltaY;
 				this.requestDraw();
-				return;
-			}
-			// Droste zoom-tunnel: wheel zooms toward the centre. ×2 (one unit) advances
-			// the focus window by one, so zooming alone walks the whole seq. Each unit
-			// step re-lays the visible focus window from the full graph.
-			if (this.laid.droste && this.laid.drosteSeq && this.laid.drosteSeq.length > 0) {
-				// One mouse notch ≈ 0.35 unit (clamped) so a few scrolls promote focus.
-				this.drosteZoomBy(-Math.max(-0.5, Math.min(0.5, e.deltaY * 0.0035)));
 				return;
 			}
 			const rect = c.getBoundingClientRect();

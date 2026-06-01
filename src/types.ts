@@ -307,13 +307,13 @@ export const VIEW_MODES: ViewModeOption[] = [
 		description: "Stack of cards per intersection + dot matrix (handles ≥4-way intersections)",
 	},
 	{
-		// Droste-effect containment view: from the focus note outward —
+		// Containment-lens view: from the focus note outward —
 		// ① the note, ② its exact-tag peers, ③ their enclosing group, ④ the
 		// looser (subset-tag) groups that contain it — drawn as nested squares
 		// on a cartesian grid. Click a note to re-centre on it.
 		id: "droste",
-		label: "Droste Effect",
-		description: "Nested containment from the focus note (①∈②∈③∈④); click to re-centre",
+		label: "Containment lens",
+		description: "Tag-membership containment around a focus note (①∈②∈③∈④); click to re-centre",
 		experimental: true,
 	},
 ];
