@@ -1,7 +1,8 @@
 # Tag Lens
 
-Lightweight tag-membership visualisations for an Obsidian vault: a connection
-matrix, a tag co-occurrence heatmap, an UpSet plot, and a bipartite tag graph.
+Lightweight tag-membership visualisations for an Obsidian vault: a per-note
+**Icon Gallery**, an intersection lattice, a tag co-occurrence heatmap, an
+UpSet plot, and BubbleSets — plus several experimental region / graph views.
 
 Designed for vaults where notes are tagged in deeply overlapping ways and a
 single force-directed graph would just hairball. Each view answers a different
@@ -11,12 +12,12 @@ question.
 
 | Mode | What it shows |
 |---|---|
-| **Connection matrix** | Rows = notes, columns = tags, a dot marks membership. Rows and columns are seriated (Jaccard barycenter) so co-occurring tags / similar notes sit together. Same-signature rows can be bundled into ×N blocks and collapsed to a summary. |
+| **Icon Gallery** | One compact icon per note, tiled in a grid. From the note outward, each icon nests: the note itself, notes that share **all** its tags, groups of notes that share **some** of its tags (colour-coded per tag), and the note's **links / backlinks**. Pan/zoom to browse; an always-on search + folder-tree panel jumps to any note; hover for the file tip, click to open. |
+| **Intersection lattice** | Degree-tiered Hasse-style layout of exact tag intersections with subset links; each node auto-switches between overview / density / individual rendering by count and zoom. |
 | **Tag co-occurrence heatmap** | Symmetric tag × tag grid; cell shade = how many notes share two tags (Jaccard by default; raw count on a log/p95 scale). Diagonal = tag size. Click a cell to list the notes shared by that tag pair. |
 | **UpSet plot** | Stack of cards per intersection signature + dot matrix at the bottom — handles ≥ 4-way intersections that diagrams can't draw. |
-| **Bipartite tag graph** | Notes and tags are both nodes; an edge marks membership. Three placements: `Force` (spring embedder, default), `Concentric` (tags on an inner ring, notes on outer ring(s) with arc edges), `Clustered` (one main tag per note; notes packed in concentric rings around their main tag's "island"). |
 | **BubbleSets** | Containment layout drawn as rectangular iso-contour bubbles. |
-| Experimental (beta) | Nested set diagram / Containment map / Euler diagram — region/containment views that break on giant-tag, hierarchy-less vaults but are kept selectable; **Print Gallery (Escher)** — the membership hierarchy laid around a square perimeter and warped by the Droste conformal map so it spirals into itself (each loop zooms by a factor k). |
+| Experimental (beta) | **Connection matrix** (notes × tags dot grid, seriated), **Tag graph** (bipartite notes + tag nodes), and the region/containment family — **Nested set diagram / Containment map / Euler diagram** — kept selectable but with known scaling caveats on giant-tag, hierarchy-less vaults. |
 
 The settings panel (the sliders icon in the view's toolbar) is shared by every
 mode: WHERE / GROUP_BY / HAVING / ORDER_BY / LIMIT expressions filter the data;
@@ -77,12 +78,13 @@ npm run build
 
 ## Privacy & data access
 
-Tag Lens reads the **tags** (frontmatter `tags` and inline `#tag` markers) and
-basic metadata (path, basename, frontmatter fields used by WHERE / GROUP_BY /
-ORDER_BY) of **every Markdown note in the current vault** so it can build the
-matrix / heatmap / UpSet / tag-graph visualisations. This is required for the
-plugin's core purpose. The reads happen entirely **locally** — the plugin makes
-**no network requests** and sends nothing to any server.
+Tag Lens reads the **tags** (frontmatter `tags` and inline `#tag` markers),
+**note links** (inline `[[…]]` and frontmatter links — used for the Icon
+Gallery's link / backlink ring), and basic metadata (path, basename,
+frontmatter fields used by WHERE / GROUP_BY / ORDER_BY) of **every Markdown
+note in the current vault** so it can build the visualisations. This is
+required for the plugin's core purpose. The reads happen entirely **locally** —
+the plugin makes **no network requests** and sends nothing to any server.
 
 ## Compatibility
 
