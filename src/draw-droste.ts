@@ -132,8 +132,10 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 		const lvl = icon.levels[f];
 		const items = buildItems(lvl);
 		const isTwo = lvl.n === 2;
-		const memHalfC = isTwo ? 1.5 : 0.5; // ② 3×3 ⇒ half 1.5, ③/⑤ 1×1 ⇒ half 0.5
-		const stepC = (isTwo ? 3 : 1) + 1; // coarse cell = member footprint + 1-cell gap
+		const isLink = lvl.kind === "link";
+		const big = isTwo || isLink; // ② and ⑤ are 3×3; ③ stays 1×1
+		const memHalfC = big ? 1.5 : 0.5; // ②⑤ 3×3 ⇒ half 1.5, ③ 1×1 ⇒ half 0.5
+		const stepC = (big ? 3 : 1) + 1; // coarse cell = member footprint + 1-cell gap (②⑤=4, ③=2)
 		const count = Math.max(1, items.length);
 		// nSteps: coarse-ring radius (in coarse cells) — clears the inner frame AND has
 		// ≥count border slots (border of a (2n+1)² coarse grid = 8n slots).
@@ -187,8 +189,8 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 				ctx.lineWidth = (hover ? 2.5 : 1.2) * dpr; ctx.strokeStyle = `hsl(${it.hue}, 85%, ${hover ? 80 : 70}%)`; ctx.strokeRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
 				if (it.id) push(it.id, p.x, p.y, mh);
 				if (labelOK && mh > 6 * dpr) {
-					// ② (3×3) wraps long labels to multiple lines; ③ (1×1) is too small → truncate.
-					if (R.isTwo) drawWrapped(ctx, it.label, p.x, p.y, mh, Math.min(mh * 0.42, 11 * dpr), "#eef");
+					// ②⑤ (3×3) wrap long labels to multiple lines; ③ (1×1) is too small → truncate.
+					if (R.isTwo || R.isLink) drawWrapped(ctx, it.label, p.x, p.y, mh, Math.min(mh * 0.42, 11 * dpr), "#eef");
 					else { ctx.fillStyle = "#eef"; ctx.font = `${Math.min(mh * 0.7, 10 * dpr)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(truncateToWidth(ctx, it.label, 1.8 * mh), p.x, p.y); }
 				}
 			}
