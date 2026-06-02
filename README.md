@@ -24,6 +24,25 @@ mode: WHERE / GROUP_BY / HAVING / ORDER_BY / LIMIT expressions filter the data;
 NODE DISPLAY controls card sizing; GRAPH DISPLAY toggles per-mode display
 options (e.g. matrix `Group identical rows` / `Collapse groups`).
 
+## Note navigator
+
+A floating panel — available in **every** view mode — lists all notes (after
+WHERE / GROUP_BY / HAVING / LIMIT), with the same content regardless of the mode:
+
+- **Folder** and **Tag** trees. The tag tree groups notes by `#tag` and adds
+  multi-tag **combination sub-groups** (e.g. `#a · #b`) so notes that belong to
+  several tags are easy to find.
+- **Search** by plain text, `#tag` (hierarchical) or frontmatter `key:value`,
+  with live suggestions.
+- **Show / hide** notes on the graph via a checkbox on each row; folder
+  checkboxes cascade to their notes (tri-state), and **Select all / Deselect all**
+  toggle everything at once.
+- Click a note to focus / locate / open it.
+
+The panel is **movable, resizable and minimisable** (drag the header to move, the
+bottom-right corner to resize, double-click the header to minimise); show or hide
+it from the settings panel.
+
 ## Install
 
 ### Manual
