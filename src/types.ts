@@ -184,6 +184,29 @@ export interface MiniSettings {
 	// Focus note id the containment view is centred on. "" ⇒ first note.
 	// Clicking a note re-roots here.
 	drosteFocus: string;
+	// --- Note-navigator panel geometry (mouse move + resize) ---
+	// Last {left, top, width, height} (px, relative to the view container) the
+	// user dragged/resized the floating note navigator to. Optional so existing
+	// vaults (data.json without this key) still load; absent ⇒ default top-left
+	// 270px panel. Persisted on drag/resize end.
+	noteMenuRect?: { left: number; top: number; width: number; height: number };
+	// Whether the floating note navigator is shown at all. Controlled by a
+	// checkbox in the graph-settings panel. In DEFAULT_SETTINGS (default true)
+	// so the menu shows by default and existing vaults without the key get
+	// `true` via the `{...DEFAULT_SETTINGS, ...raw}` merge. When false,
+	// ensureNoteMenu() early-returns (and removes the menu) in every mode.
+	noteMenuVisible: boolean;
+	// Whether the navigator is minimized (header double-click toggles it). When
+	// minimized only the header bar is shown; the search box + tree body are
+	// hidden and the panel collapses to the header height. Optional and NOT in
+	// DEFAULT_SETTINGS, so existing vaults load unchanged (absent ⇒ restored).
+	noteMenuMinimized?: boolean;
+	// Navigator tree grouping: "folder" (group by note path, default) or "tag"
+	// (group by the note's GROUP_BY membership keys; a note appears under each of
+	// its groups). Switched by a Folder/Tag radio group in the navigator header.
+	// Optional and NOT in DEFAULT_SETTINGS, so existing vaults load unchanged
+	// (absent ⇒ "folder").
+	noteMenuGroupBy?: "folder" | "tag";
 }
 
 export type ViewMode =
@@ -196,8 +219,7 @@ export type ViewMode =
 	| "heatmap"
 	| "lattice"
 	| "upset"
-	| "droste"
-	| "concentric-hive";
+	| "droste";
 
 export interface ViewModeOption {
 	id: ViewMode;
@@ -315,16 +337,6 @@ export const VIEW_MODES: ViewModeOption[] = [
 		label: "UpSet plot",
 		description: "Stack of cards per intersection + dot matrix (handles ≥4-way intersections)",
 	},
-	{
-		// Concentric Hive (degree facet): shared spokes (one per group) × concentric
-		// degree rings. angle = member-axis centroid, radius = membership-degree bucket;
-		// node size = link count. Non-force, deterministic; reveals link structure + hubs
-		// + how deeply each note is multi-tagged without the graph-view hairball.
-		id: "concentric-hive",
-		label: "Concentric Hive（次数 facet）",
-		description: "Spokes = groups, rings = membership degree; deterministic link map (anti-hairball)",
-		experimental: true,
-	},
 ];
 
 export const DEFAULT_SETTINGS: MiniSettings = {
@@ -390,6 +402,10 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	latticeNamedMax: 12,
 	minFontPx: 8,
 	drosteFocus: "",
+	// Show the floating note navigator by default. Existing vaults missing this
+	// key inherit `true` via the settings merge. (noteMenuMinimized is
+	// intentionally absent here — it's optional so old vaults load unchanged.)
+	noteMenuVisible: true,
 };
 
 export const NONE_BUCKET = "(none)";

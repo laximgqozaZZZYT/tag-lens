@@ -1,5 +1,6 @@
 import type { GraphData, GraphEdge, GraphNode, MiniSettings } from "./types";
 import { computeParentOf, computeTrulyAgg } from "./aggregate-util";
+import { nodeIsHidden } from "./note-menu";
 
 // rebuild()'s data flow happens in 5 named stages. Each stage is a pure
 // function with explicit inputs / outputs so the path from raw vault →
@@ -129,9 +130,12 @@ export function filterLayoutData(
 		settings.inheritFrom ?? {},
 	);
 	const preTrulyAgg = computeTrulyAgg(data.nodes, preAggSet, preParentOf);
+	// Match hiddenNodes entries as PATH-OR-ID (nodeIsHidden): a single path entry
+	// (the navigator checkboxes) hides every `${tag}\t${path}` Euler/bubbles copy;
+	// a raw-id entry (legacy per-card panel) still hides exactly that card.
 	const hiddenSet = new Set(settings.hiddenNodes);
 	const layoutNodes = data.nodes.filter(
-		(n) => !preTrulyAgg.has(n.id) && !hiddenSet.has(n.id),
+		(n) => !preTrulyAgg.has(n.id) && !nodeIsHidden(n.id, hiddenSet),
 	);
 	const layoutAlive = new Set(layoutNodes.map((n) => n.id));
 	const layoutEdges = filterEdgesByAlive(data.edges, (id) =>

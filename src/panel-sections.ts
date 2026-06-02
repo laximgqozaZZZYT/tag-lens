@@ -95,6 +95,10 @@ export interface ExprSectionDeps {
 	settings: MiniSettings;
 	save: () => void;
 	rerender: () => void;
+	// Called after the expression value changes so the graph + menu rebuild.
+	// WHERE / GROUP_BY / HAVING / LIMIT are query-pipeline settings — editing
+	// them must produce a full rebuild, not just a repaint.
+	rebuild?: () => void;
 }
 
 // Expression-row section (WHERE / GROUP_BY / HAVING / LIMIT). Each row
@@ -119,6 +123,7 @@ export function renderExprSection(
 		cb.addEventListener("change", () => {
 			deps.settings[key] = cb.checked;
 			void deps.save();
+			deps.rebuild?.();
 		});
 		autoLabel.createSpan({ text: "auto" });
 	}
@@ -139,6 +144,7 @@ export function renderExprSection(
 		input.addEventListener("change", () => {
 			updateRow(rows, idx, input.value.trim());
 			void deps.save();
+			deps.rebuild?.();
 		});
 		const del = row.createEl("button", { cls: "gim-expr-del", text: "×" });
 		del.setAttr("aria-label", "Remove row");

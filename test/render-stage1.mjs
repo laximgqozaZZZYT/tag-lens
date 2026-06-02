@@ -26,6 +26,8 @@ const VIEW = parseFloat(argv[1] ?? "3.2");  // world half-extent mapped to the c
 const LW = parseFloat(argv[2] ?? "0.08");   // half line width in cell units
 const OFFX = parseFloat(argv[4] ?? "0");    // world offset of the singularity (left/right)
 const OFFY = parseFloat(argv[5] ?? "0");
+const PU = parseFloat(argv[6] ?? "0");      // phase offset in u (pan the grid)
+const PV = parseFloat(argv[7] ?? "0");      // phase offset in v
 const OUT = argv[3] ?? "/home/ubuntu/obsidian-plugins/tag-lens/stage1-mesh.png";
 
 const buf = Buffer.alloc(W * H * 4);
@@ -37,7 +39,8 @@ for (let py = 0; py < H; py++) {
     let r = 15, g = 17, b = 22; // bg #0f1116
     const mag = Math.hypot(zx, zy);
     if (mag > 1e-4) {
-      const { u, vRaw } = drosteInverseBranch({ re: zx, im: zy }, p, 0);
+      const inv = drosteInverseBranch({ re: zx, im: zy }, p, 0);
+      const u = inv.u + PU, vRaw = inv.vRaw + PV;
       const d = Math.min(near(u, du), near(vRaw, dv)); // distance to nearest line (cell units)
       if (d < LW) {
         const a = 1 - d / LW;           // soft edge

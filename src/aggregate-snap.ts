@@ -7,6 +7,7 @@ import {
 	findFreeCell,
 } from "./aggregate-util";
 import { simpleChannelRoute } from "./edge-routing";
+import { nodeIsHidden } from "./note-menu";
 
 export interface AggregateSnapResult {
 	trulyAgg: Set<string>;
@@ -64,7 +65,7 @@ export function runAggregateSnap(
 	const occupied = new Set<string>();
 	for (const n of laid.nodes) {
 		if (trulyAgg.has(n.id)) continue;
-		if (hiddenSet.has(n.id)) continue;
+		if (nodeIsHidden(n.id, hiddenSet)) continue;
 		const fp = nodeFootprint(n, slotW, slotH);
 		for (let c = fp.startCol; c <= fp.endCol; c++) {
 			for (let r = fp.startRow; r <= fp.endRow; r++) {
@@ -76,7 +77,7 @@ export function runAggregateSnap(
 	// verification after the cell-snap spiral.
 	const cardAABBs = buildCardAABBs(
 		laid.nodes,
-		(id) => trulyAgg.has(id) || hiddenSet.has(id),
+		(id) => trulyAgg.has(id) || nodeIsHidden(id, hiddenSet),
 	);
 	const cellHitsCard = (col: number, row: number): boolean =>
 		cellHitsAnyCard(col, row, cardAABBs, slotW, slotH);

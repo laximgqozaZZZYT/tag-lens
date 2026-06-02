@@ -18,6 +18,12 @@ export interface DrawDrosteOpts {
 	focusId: string; // currently focused node (ring-highlighted)
 	// Collector: each clickable node's SCREEN rect (device px) for hit-testing.
 	hitRegions?: { id: string; x0: number; y0: number; x1: number; y1: number }[];
+	// Set of hidden node ids/paths. When provided, cells whose id (or its
+	// tab-stripped path) is in this set are skipped every paint without a
+	// rebuild — so requestDraw() from a checkbox toggle or Deselect-all
+	// immediately removes the cell from the screen. Matches the same
+	// nodeIsHidden(id, hiddenSet) semantics used by the other draw paths.
+	hiddenSet?: Set<string>;
 }
 
 type Pt = { x: number; y: number };
@@ -253,6 +259,15 @@ export function drawDroste(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): vo
 		for (let col = c0; col <= c1; col++) {
 			const id = byPos(col, row);
 			if (!id) continue;
+			// Skip cells hidden by the navigator checkboxes / Deselect-all.
+			// Re-read hiddenSet fresh every paint so a requestDraw() from a
+			// toggle immediately removes the cell — matching the skipNode path
+			// used by all other view modes.
+			if (o.hiddenSet) {
+				const tab = id.indexOf("\t");
+				const path = tab >= 0 ? id.slice(tab + 1) : id;
+				if (o.hiddenSet.has(id) || o.hiddenSet.has(path)) continue;
+			}
 			const scx = sx((col + 0.5) * cellSize), scy = sy((row + 0.5) * cellSize);
 			if (half < 3 * dpr) {
 				// LOD floor: a single marker for the node.

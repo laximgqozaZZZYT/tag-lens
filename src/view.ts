@@ -55,7 +55,6 @@ import { drawMatrix, matrixGeom, MATRIX_BADGE_W } from "./draw-matrix";
 import type { MatrixLine } from "./draw-matrix";
 import { drawHeatmap, heatmapGeom } from "./draw-heatmap";
 import { drawDroste } from "./draw-droste";
-import { drawConcentricHive } from "./draw-concentric-hive";
 import {
 	drawLattice,
 	latticeCellAt,
@@ -99,6 +98,7 @@ import {
 	positionTip as positionTipFn,
 } from "./highlight";
 import { MarqueeController } from "./marquee-controller";
+import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, folderCheckState, buildFolderPathKey, type MenuRect, type NoteRef, type TreeNode, type Suggestion } from "./note-menu";
 
 export const VIEW_TYPE_MINI = "tag-lens-view";
 
@@ -168,12 +168,67 @@ export class MiniGraphView extends ItemView {
 	// Clickable card rects (device px) recorded by the grid-mode Droste renderer,
 	// so grid-mode hit-testing reuses the drawn geometry instead of re-deriving it.
 	private drosteHit: { id: string; x0: number; y0: number; x1: number; y1: number }[] = [];
-	private hiveHit: { id: string; x0: number; y0: number; x1: number; y1: number }[] = [];
 	// Containment lens: the full pre-LIMIT graph, so the lens + focus picker cover the
 	// whole vault (not just the LIMIT-trimmed subset).
 	private drosteData: GraphData | null = null;
-	private drosteMenu: HTMLElement | null = null; // always-on mini-menu (tree + search)
-	private drosteMenuRedraw: (() => void) | null = null; // re-renders menu rows (highlight)
+	// Always-on mode-agnostic note navigator (folder tree + search). Built once
+	// per rebuild and shown in EVERY view mode. `noteMenu` is the DOM panel,
+	// `noteMenuRedraw` re-renders its rows (to refresh the highlighted row).
+	private noteMenu: HTMLElement | null = null;
+	private noteMenuRedraw: (() => void) | null = null;
+	// Mouse-dragged position + size of the note navigator. The menu is recreated
+	// fresh on every rebuild (removeNoteMenu → ensureNoteMenu), so the current
+	// rect is stashed here and REAPPLIED in ensureNoteMenu() to survive rebuilds.
+	// null ⇒ not yet placed → use the default geometry (and seed from settings).
+	private noteMenuRect: MenuRect | null = null;
+	// Minimized state of the note navigator (header double-click toggles it).
+	// Survives REBUILDS via this field and RELOADS via the optional
+	// settings.noteMenuMinimized. Seeded from settings on first construction so
+	// a reloaded vault re-applies the persisted minimized state. When minimized
+	// the search box + tree body are hidden and the panel collapses to header
+	// height; `noteMenuRestoreHeight` remembers the body height to restore to.
+	private noteMenuMinimized = false;
+	// The panel height (px) to restore to when un-minimizing. Captured at the
+	// moment of minimizing so a double-click round-trips back to the prior size.
+	private noteMenuRestoreHeight: number | null = null;
+	// Universal note list for the navigator, captured during rebuild() right
+	// after the post-LIMIT `data` is computed. Used as the fallback note source
+	// for aggregate modes (heatmap/matrix/lattice/upset) where `laid.nodes` is
+	// empty. {id (file path), label (basename)}.
+	private menuNotes: {
+		id: string;
+		label: string;
+		memberships: string[];
+		path: string;
+		tags: string[];
+		frontmatter: Record<string, string[]>;
+	}[] = [];
+	// Navigator tree grouping: "folder" (by note path, default) or "tag" (by the
+	// note's GROUP_BY membership keys). Survives REBUILDS via this field and
+	// RELOADS via the optional settings.noteMenuGroupBy. A small radio group in
+	// the menu header switches it; changing it re-renders the tree.
+	private noteMenuGroupBy: "folder" | "tag" = "folder";
+	// The last search query the user typed in the note navigator's search box.
+	// Saved in removeNoteMenu() and restored in ensureNoteMenu() so a rebuild
+	// triggered mid-typing (e.g. by a vault file change) doesn't blank the box.
+	private noteMenuSearchQuery = "";
+	// Set of folder/group path keys that the user has EXPANDED in the tree.
+	// Captured in removeNoteMenu() (by reading live DOM data-path attributes)
+	// and reapplied in ensureNoteMenu() after the tree is built, so expanded
+	// folders survive every menu rebuild (including the one triggered by a
+	// checkbox toggle). Keys are the stable path strings used as Map keys in
+	// the tree (folder names joined by "/", e.g. "Area", "Area/Sub").
+	// NOTE: each folder's children are built LAZILY on first expand. The
+	// restore pass calls the same synthetic open/close logic that a real
+	// click would to ensure lazy children are built before marking open.
+	private noteMenuExpandedPaths: Set<string> = new Set();
+	// The scroll offset of the tree body element at the time of the last
+	// removeNoteMenu() call. Restored after rebuilding the tree in
+	// ensureNoteMenu() so the viewport stays put after a checkbox toggle.
+	private noteMenuScrollTop = 0;
+	// The last note "located" on canvas via the navigator (non-droste modes),
+	// used to highlight its row in the menu.
+	private locatedNoteId: string | null = null;
 	private adjacency: Map<string, number[]> = new Map();
 	// Drag-to-move (nodes/clusters) was removed; pan/marquee/click-to-open
 	// are the only pointer interactions now.
@@ -294,6 +349,12 @@ export class MiniGraphView extends ItemView {
 		private save: () => Promise<void>,
 	) {
 		super(leaf);
+		// Seed the minimized state from the persisted (optional) setting so a
+		// reloaded vault re-applies it. Absent ⇒ restored (false).
+		this.noteMenuMinimized = settings.noteMenuMinimized === true;
+		// Seed the tree grouping from the persisted (optional) setting. Absent or
+		// any non-"tag" value ⇒ default "folder".
+		this.noteMenuGroupBy = settings.noteMenuGroupBy === "tag" ? "tag" : "folder";
 	}
 
 	getViewType(): string {
@@ -1151,6 +1212,40 @@ export class MiniGraphView extends ItemView {
 		const section = parent.createDiv({ cls: "gim-panel-section" });
 		section.createEl("h4", { text: "View mode" });
 
+		// Note-navigator show/hide control (mode-agnostic — the navigator is shown
+		// in every view mode). Two radios bound to the boolean `noteMenuVisible`:
+		// Show → true, Hide → false. Flips the setting, persists, and shows/hides
+		// the floating menu immediately. Matches the other toggle-row styling.
+		const navRow = section.createDiv({ cls: "gim-toggle-row" });
+		navRow.createSpan({ text: "Note navigator:" });
+		const applyNoteMenu = (visible: boolean): void => {
+			this.settings.noteMenuVisible = visible;
+			void this.save();
+			if (visible) {
+				// Turn on → the next draw pass (re)creates the menu via ensureNoteMenu().
+				this.requestDraw();
+			} else {
+				// Turn off → tear the menu down immediately.
+				this.removeNoteMenu();
+			}
+		};
+		for (const [label, visible] of [
+			["Show", true],
+			["Hide", false],
+		] as const) {
+			const optLabel = navRow.createEl("label", { cls: "gim-toggle-row" });
+			const radio = optLabel.createEl("input", {
+				type: "radio",
+				attr: { name: "gim-notemenu-vis" },
+			}) as HTMLInputElement;
+			radio.checked = this.settings.noteMenuVisible === visible;
+			radio.addEventListener("change", () => {
+				if (!radio.checked) return;
+				applyNoteMenu(visible);
+			});
+			optLabel.createSpan({ text: label });
+		}
+
 		// Stable modes first.
 		const stableGroup = section.createDiv({ cls: "gim-viewmode-options" });
 		for (const opt of VIEW_MODES.filter((o) => !o.experimental)) {
@@ -1303,6 +1398,10 @@ export class MiniGraphView extends ItemView {
 				settings: this.settings,
 				save: () => void this.save(),
 				rerender: () => this.renderPanel(),
+				// WHERE / GROUP_BY / HAVING / LIMIT are pipeline settings — any
+				// expression change must trigger a full rebuild so the graph,
+				// note menu, and mode-specific layout all reflect the new query.
+				rebuild: () => void this.rebuild(),
 			},
 			opts,
 		);
@@ -1369,6 +1468,12 @@ export class MiniGraphView extends ItemView {
 		this.whereError = errors.where ?? "";
 		this.groupByError = errors.groupBy ?? "";
 		let { data, clusterLabels } = result;
+		// Pristine post-buildGraph graph (post WHERE/GROUP_BY, pre any HAVING/LIMIT
+		// mutation). The note navigator derives its MODE-INDEPENDENT note set from
+		// THIS so switching only the view mode never changes the menu — see
+		// buildMenuNotes() below. `data` itself is mutated by the mode-specific
+		// HAVING/LIMIT stages, so we snapshot before that happens.
+		const menuSourceData = result.data;
 
 		// Stage 1b: HAVING runs AFTER buildGraph so auto thresholds can scale
 		// with the produced node count, then drops the resulting clusters
@@ -1383,7 +1488,8 @@ export class MiniGraphView extends ItemView {
 		// Skip AUTO for both; manual HAVING expressions still run. Other modes
 		// keep AUTO unchanged.
 		const effHavingAuto =
-			this.settings.viewMode === "lattice" || this.settings.viewMode === "droste"
+			this.settings.viewMode === "lattice" ||
+			this.settings.viewMode === "droste"
 				? false
 				: this.settings.havingAuto;
 		const effHaving = resolveEffectiveHaving(
@@ -1404,14 +1510,20 @@ export class MiniGraphView extends ItemView {
 
 		// Containment lens operates vault-wide: snapshot the post-HAVING graph BEFORE the
 		// LIMIT stage trims it, so the icon gallery covers all notes, not the limited set.
+		// Hiding is NOT applied here: the gallery always bakes the full pre-LIMIT note set
+		// and drawDroste skips hidden cells at draw time (its hiddenSet is the single source
+		// of truth for hiding). This lets Select all / Deselect all and per-note toggles
+		// show/hide tiles instantly via requestDraw, with no rebuild required.
 		const drosteFullData =
 			this.settings.viewMode === "droste"
 				? { nodes: data.nodes.slice(), edges: data.edges.slice() }
 				: undefined;
 		this.drosteData = drosteFullData ?? null;
-		// Rebuild the always-on mini-menu fresh (node set may have changed); ensureDrosteMenu
-		// re-creates it on the next draw when in lens mode.
-		this.removeDrosteMenu();
+		// Rebuild the always-on note navigator fresh (node set may have changed);
+		// ensureNoteMenu re-creates it on the next draw in EVERY mode. The located-
+		// note highlight is per-graph, so clear it on every rebuild.
+		this.removeNoteMenu();
+		this.locatedNoteId = null;
 
 		// Stage 2: degree maps (total / in / out). Used by ORDER_BY + size-
 		// mode resolvers. Cleared in place so view-state references stay
@@ -1436,6 +1548,15 @@ export class MiniGraphView extends ItemView {
 			nodes: visibleNodes,
 			edges: filterEdgesByAlive(data.edges, (id) => modes.has(id)),
 		};
+
+		// Universal note list for the note navigator. Built MODE-INDEPENDENTLY
+		// from the pristine post-buildGraph graph (see buildMenuNotes): the same
+		// vault + same WHERE/GROUP_BY/HAVING/LIMIT settings yield an IDENTICAL menu
+		// (note list, Folder tree, Tag tree, search) in EVERY view mode. This does
+		// NOT use the mode-specific `data` (which lattice/droste exempt from
+		// auto-HAVING, changing their node set + memberships); the menu pipeline
+		// always uses the user's real `havingAuto` so no mode is special-cased.
+		this.menuNotes = this.buildMenuNotes(menuSourceData);
 
 		await this.ensureBodies(data.nodes);
 		if (gen !== this.rebuildGen) return;
@@ -1626,6 +1747,7 @@ export class MiniGraphView extends ItemView {
 			nodeSizeMode: this.settings.nodeSizeMode,
 		});
 	}
+
 
 	private cardFor(n: GraphNode): SizedNode {
 		const display = this.getNodeDisplay(n.id);
@@ -1924,13 +2046,6 @@ export class MiniGraphView extends ItemView {
 			this.centerDrosteOn(this.settings.drosteFocus || this.laid.drosteGallery.cells[0]?.id || "");
 			return;
 		}
-		if (this.laid.hive && this.laid.hive.nodes.length > 0) {
-			// Concentric Hive: frame the whole world-space figure (spokes + outer labels).
-			const b = this.laid.hive.bounds;
-			const pad = 60;
-			this.fitToRect({ minX: b.minX - pad, minY: b.minY - pad, maxX: b.maxX + pad, maxY: b.maxY + pad });
-			return;
-		}
 		const hasContent =
 			this.laid.clusters.length > 0 || this.laid.nodes.length > 0;
 		if (!hasContent) return;
@@ -2046,6 +2161,10 @@ export class MiniGraphView extends ItemView {
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
 		ctx.fillStyle = "#0f1116";
 		ctx.fillRect(0, 0, cw, ch);
+		// Mode-agnostic note navigator (folder tree + search). Built once per
+		// rebuild; shown in EVERY view mode. It self-suppresses when there are
+		// zero notes. Sits top-left, the same slot as the old Icon Gallery menu.
+		this.ensureNoteMenu();
 		// If the filter pipeline (WHERE / HAVING / LIMIT) eliminated every
 		// node, draw a hint instead of an empty canvas. This makes the cause
 		// of the blank view discoverable instead of mysterious.
@@ -2102,23 +2221,8 @@ export class MiniGraphView extends ItemView {
 			});
 			return;
 		}
-		// Concentric Hive: world-space spokes × degree rings. drawConcentricHive applies
-		// its own dpr/zoom/pan transform; we draw and return.
-		if (this.laid.hive && this.laid.hive.nodes.length > 0) {
-			drawConcentricHive(ctx, this.laid.hive, {
-				canvas: this.canvas,
-				dpr,
-				zoom: this.zoom,
-				panX: this.panX,
-				panY: this.panY,
-				hoverId: this.hoveredNodeId,
-				hitRegions: (this.hiveHit = []),
-			});
-			return;
-		}
 		// Containment lens = Icon Gallery: every node's icon diagram, tiled, pan/zoomed.
 		if (this.laid.drosteGallery && this.laid.drosteGallery.cells.length > 0) {
-			this.ensureDrosteMenu();
 			drawDroste(ctx, {
 				canvas: this.canvas,
 				dpr,
@@ -2130,6 +2234,10 @@ export class MiniGraphView extends ItemView {
 				hoverId: this.hoveredNodeId,
 				focusId: this.settings.drosteFocus,
 				hitRegions: (this.drosteHit = []),
+				// Pass the live hidden set so the draw path skips unchecked cells
+				// immediately on requestDraw() — no rebuild required (matches
+				// the skipNode path used by all other view modes).
+				hiddenSet: new Set(this.settings.hiddenNodes),
 			});
 			return;
 		}
@@ -2245,7 +2353,7 @@ export class MiniGraphView extends ItemView {
 		const hasHighlight = this.highlightedEdgeIdx.size > 0;
 		const hiddenSet = new Set(this.settings.hiddenNodes);
 		const skipNode = (id: string): boolean =>
-			hiddenSet.has(id) || this.trulyAggSet.has(id);
+			nodeIsHidden(id, hiddenSet) || this.trulyAggSet.has(id);
 
 		for (let ti = iLo; ti <= iHi; ti++) {
 			for (let tj = jLo; tj <= jHi; tj++) {
@@ -2535,89 +2643,744 @@ export class MiniGraphView extends ItemView {
 		} else {
 			this.requestDraw();
 		}
-		this.drosteMenuRedraw?.();
+		this.noteMenuRedraw?.();
 	}
 
-	private removeDrosteMenu(): void {
-		this.drosteMenu?.remove();
-		this.drosteMenu = null;
-		this.drosteMenuRedraw = null;
+	private removeNoteMenu(): void {
+		// Snapshot the current search query, expanded folder paths, and scroll
+		// position before tearing down the DOM so ensureNoteMenu() can restore
+		// them — a rebuild mid-typing or mid-browsing must not reset the menu UI.
+		if (this.noteMenu) {
+			const searchEl = this.noteMenu.querySelector<HTMLInputElement>("input[type=text]");
+			if (searchEl) this.noteMenuSearchQuery = searchEl.value;
+			// Collect all folder rows whose children are currently OPEN. Each
+			// folder row has a data-menupath attribute set at build time (see
+			// ensureNoteMenu) and is open when its sibling kids-div is visible.
+			const newExpanded = new Set<string>();
+			const folderRows = this.noteMenu.querySelectorAll<HTMLElement>("[data-menupath]");
+			folderRows.forEach((row) => {
+				// The kids div is the next sibling of the folder row.
+				const kids = row.nextElementSibling as HTMLElement | null;
+				if (kids && kids.style.display !== "none") {
+					const path = row.dataset.menupath;
+					if (path !== undefined) newExpanded.add(path);
+				}
+			});
+			this.noteMenuExpandedPaths = newExpanded;
+			// Capture the scroll position of the body (overflow:auto div).
+			const bodyEl = this.noteMenu.querySelector<HTMLElement>(".gim-notemenu-body");
+			if (bodyEl) this.noteMenuScrollTop = bodyEl.scrollTop;
+		}
+		this.noteMenu?.remove();
+		this.noteMenu = null;
+		this.noteMenuRedraw = null;
 	}
 
-	// Always-on mini-menu (tree + search) for the Icon Gallery. Selecting a note centres
-	// its icon. Built once and kept visible while the lens is active.
-	private ensureDrosteMenu(): void {
-		if (this.drosteMenu || !this.laid.drosteGallery) return;
-		const nodes = this.laid.drosteGallery.cells.map((c) => ({ id: c.id, label: c.label }));
+	// The note list the navigator should show. MODE-INVARIANT: `menuNoteList`
+	// ignores `this.laid` for the displayed set and always returns the universal
+	// `this.menuNotes` (built mode-independently by buildMenuNotes). `this.laid`
+	// is passed only for signature stability with `menuClickAction` (click
+	// ROUTING stays mode-appropriate).
+	private currentMenuNotes(): NoteRef[] {
+		return menuNoteList(this.laid, this.menuNotes);
+	}
+
+	// Build the navigator's universal note set MODE-INDEPENDENTLY.
+	//
+	// Source = the pristine post-buildGraph graph (post WHERE/GROUP_BY, pre any
+	// HAVING/LIMIT). We then re-run the HAVING and LIMIT stages here using the
+	// user's REAL `havingAuto` (never the lattice/droste auto-HAVING exemption
+	// applied to the on-canvas `data`). Because no view mode is special-cased,
+	// the resulting note SET, order, and memberships depend ONLY on the vault +
+	// the WHERE/GROUP_BY/HAVING/LIMIT settings — so the menu's note list, Folder
+	// tree, Tag tree, and search are IDENTICAL across every view mode.
+	//
+	// (Manual/explicit HAVING and WHERE/LIMIT still apply — those are intended
+	// filters shared by all modes; only the mode-dependent auto-HAVING exemption
+	// is removed from the menu.)
+	private buildMenuNotes(source: GraphData): {
+		id: string;
+		label: string;
+		memberships: string[];
+		path: string;
+		tags: string[];
+		frontmatter: Record<string, string[]>;
+	}[] {
+		// 1. HAVING — using the user's real havingAuto (mode-independent).
+		let graph: GraphData = { nodes: source.nodes.slice(), edges: source.edges.slice() };
+		const eff = resolveEffectiveHaving(
+			this.settings.having,
+			this.settings.havingAuto,
+			graph.nodes.length,
+		);
+		const { dropped } = computeDroppedClustersFn(
+			graph.nodes,
+			eff,
+			this.settings.havingAuto,
+		);
+		if (dropped.size > 0) graph = filterMemberships(graph, dropped);
+
+		// 2. LIMIT — same rules as the canvas, ranked by a SELF-CONTAINED degree
+		//    map (from this graph's own edges) + this graph's memberships, so the
+		//    selection never depends on the mode-specific on-canvas state.
+		const degreeMap = computeDegreeMaps(graph.edges).degreeMap;
+		const membById = new Map(graph.nodes.map((n) => [n.id, n.memberships]));
+		const tiers = this.parseLimitRules();
+		const { visibleNodes } = applyLimitRules(
+			graph.nodes,
+			tiers,
+			this.settings.orderField,
+			this.settings.orderDir,
+			(id, field) =>
+				getSortKeyFn(id, field, {
+					app: this.app,
+					degreeMap,
+					membershipsOf: (nid) => membById.get(nid),
+				}),
+		);
+
+		// 3. Project to NoteRefs, backfilling search metadata from metadataCache.
+		return visibleNodes.map((n) => {
+			const memberships = n.memberships ?? [];
+			const path = stripTabPrefix(n.id);
+			const { tags, frontmatter } = this.noteSearchMeta(path, memberships);
+			return { id: n.id, label: n.label, memberships, path, tags, frontmatter };
+		});
+	}
+
+	// Collect a note's searchable tags + frontmatter from Obsidian's
+	// metadataCache for the advanced navigator search. Robust to a missing
+	// file/cache (returns empty tags + frontmatter). The ONLY place Obsidian
+	// metadata is read for the navigator — note-menu.ts stays pure/DOM-less.
+	//   • tags        — combined from (a) the note's GROUP_BY `memberships`
+	//                   (decoded; only the tag-derived ones), (b) frontmatter
+	//                   `tags`, and (c) inline cache.tags. Leading '#' stripped,
+	//                   hierarchy ("a/b") kept, deduped.
+	//   • frontmatter — every frontmatter key (except the internal `position`)
+	//                   flattened to an array of string values: scalars →
+	//                   [String(v)], arrays → mapped to String.
+	private noteSearchMeta(
+		path: string,
+		memberships: string[],
+	): { tags: string[]; frontmatter: Record<string, string[]> } {
+		const tagSet = new Set<string>();
+		const stripHash = (t: string): string => (t.startsWith("#") ? t.slice(1) : t);
+		// (a) memberships → decode "key=value" group keys; keep the value as a tag.
+		for (const m of memberships) {
+			if (m.length === 0) continue;
+			// Group keys look like "tag=value" / "key=value" (value URI-encoded) or a
+			// bare bucket name ("all", "(none)"). Take the value half if a '=' is present.
+			const eq = m.indexOf("=");
+			let raw = eq >= 0 ? m.slice(eq + 1) : m;
+			try { raw = decodeURIComponent(raw); } catch { /* keep raw */ }
+			raw = stripHash(raw);
+			if (raw.length > 0) tagSet.add(raw);
+		}
+		const frontmatter: Record<string, string[]> = {};
+		const file = this.app.vault.getAbstractFileByPath(path);
+		if (file instanceof TFile) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			// (b) frontmatter `tags` + (c) inline cache.tags.
+			if (cache?.tags) for (const t of cache.tags) tagSet.add(stripHash(t.tag));
+			const fm = cache?.frontmatter as Record<string, unknown> | undefined;
+			const fmTags = fm?.tags;
+			if (Array.isArray(fmTags)) for (const t of fmTags) tagSet.add(stripHash(String(t)));
+			else if (typeof fmTags === "string") tagSet.add(stripHash(fmTags));
+			// Flatten every frontmatter key (skip the internal `position` key).
+			if (fm) {
+				for (const key of Object.keys(fm)) {
+					if (key === "position") continue;
+					const v = fm[key];
+					if (v === null || v === undefined) { frontmatter[key] = []; continue; }
+					frontmatter[key] = Array.isArray(v) ? v.map((x) => String(x)) : [String(v)];
+				}
+			}
+		}
+		return { tags: [...tagSet], frontmatter };
+	}
+
+	// Which row to highlight as "current": the droste focus in droste mode,
+	// otherwise the last note located on canvas (if any).
+	private currentMenuHighlightId(): string | null {
+		if (this.laid.drosteGallery) return this.settings.drosteFocus || null;
+		return this.locatedNoteId;
+	}
+
+	// Single dispatcher for a navigator-row click. Routes per mode:
+	//   • droste mode               → setDrosteFocus(id) (re-centre the gallery)
+	//   • node positioned on canvas  → centre the viewport on it + highlight
+	//   • else (aggregate / no pos)  → openFile(id)
+	private focusNoteFromMenu(id: string): void {
+		switch (menuClickAction(this.laid, id)) {
+			case "drosteFocus":
+				this.setDrosteFocus(id);
+				return;
+			case "locate":
+				this.locateNodeOnCanvas(id);
+				return;
+			default:
+				this.openFile(id);
+		}
+	}
+
+	// Centre the viewport on a positioned node and select/highlight it so the
+	// user can spot it. Reuses the existing pan/zoom + highlight machinery.
+	private locateNodeOnCanvas(id: string): void {
+		const node = this.laid.nodes.find((n) => n.id === id);
+		if (!node) return;
+		const cw = this.canvas.clientWidth || 1, ch = this.canvas.clientHeight || 1;
+		// Zoom in enough to read the card, but never zoom out from the current
+		// view if it's already closer.
+		this.zoom = Math.max(this.zoom, 0.6);
+		this.panX = cw / 2 - node.x * this.zoom;
+		this.panY = ch / 2 - node.y * this.zoom;
+		this.locatedNoteId = id;
+		// Drive the shared highlight machinery exactly like a hover would, so the
+		// node + its incident edges/clusters light up.
+		this.applyHighlight({ kind: "node", nodeId: id });
+		this.noteMenuRedraw?.();
+	}
+
+	// Always-on, mode-agnostic note navigator (folder tree + search). Built once
+	// per rebuild and shown in EVERY view mode. Selecting a note routes through
+	// `focusNoteFromMenu` (droste focus / canvas locate / openFile). Self-
+	// suppresses when there are zero notes.
+	private ensureNoteMenu(): void {
+		// Respect the graph-settings show/hide toggle: when off, the menu must
+		// never appear in ANY mode — tear down any existing panel and bail.
+		if (!this.settings.noteMenuVisible) {
+			this.removeNoteMenu();
+			return;
+		}
+		if (this.noteMenu) return;
+		const nodes = this.currentMenuNotes();
+		if (nodes.length === 0) return;
+		const isDroste = !!this.laid.drosteGallery;
 		const panel = this.root.createDiv();
-		this.drosteMenu = panel;
+		this.noteMenu = panel;
+		// Resolve the panel rect (px, relative to this.root). Priority:
+		//   1. this.noteMenuRect — survives REBUILDS (set on every drag/resize).
+		//   2. this.settings.noteMenuRect — survives RELOADS (persisted to data.json).
+		//   3. the built-in default (top-left, 270px wide, container-tall).
+		// On every (re)build we clamp the rect to the current container size so a
+		// shrunken view can never strand the panel off-screen.
+		const NOTE_MENU_MIN = { width: 180, height: 120 };
+		const container = { width: this.root.clientWidth || 0, height: this.root.clientHeight || 0 };
+		const defaultRect: MenuRect = {
+			left: 8,
+			top: 8,
+			width: 270,
+			// Default height ≈ "calc(100% - 16px)" of the old maxHeight, but as an
+			// explicit number so the resize handle has something to grow/shrink.
+			height: Math.max(NOTE_MENU_MIN.height, (container.height || 600) - 16),
+		};
+		const seed: MenuRect = this.noteMenuRect
+			?? (this.settings.noteMenuRect ? { ...this.settings.noteMenuRect } : defaultRect);
+		// Only clamp when we know the container size (clientHeight can be 0 before
+		// the first paint); otherwise keep the seed verbatim.
+		const rect: MenuRect = container.width > 0 && container.height > 0
+			? clampRect(seed, container, NOTE_MENU_MIN)
+			: seed;
+		this.noteMenuRect = rect;
 		Object.assign(panel.style, {
-			position: "absolute", left: "8px", top: "8px", width: "270px",
-			maxHeight: "calc(100% - 16px)", display: "flex", flexDirection: "column",
+			position: "absolute",
+			left: `${rect.left}px`, top: `${rect.top}px`,
+			width: `${rect.width}px`, height: `${rect.height}px`,
+			display: "flex", flexDirection: "column", overflow: "hidden",
 			background: "rgba(20,24,33,0.96)", border: "1px solid #3a4760", borderRadius: "6px",
 			boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "60", font: "12px sans-serif", color: "#e6edf3",
 		} as Partial<CSSStyleDeclaration>);
 		const head = panel.createDiv();
-		Object.assign(head.style, { padding: "6px 8px", borderBottom: "1px solid #2a3447", fontWeight: "600" });
-		head.createSpan({ text: `Notes (${nodes.length}) — click to focus` });
-		const search = panel.createEl("input", { attr: { type: "text", placeholder: "Search notes…" } });
-		Object.assign(search.style, { margin: "6px 8px", padding: "4px 6px", background: "#0f1116", border: "1px solid #2a3447", borderRadius: "4px", color: "#e6edf3" });
-		const body = panel.createDiv();
-		Object.assign(body.style, { overflow: "auto", padding: "4px 6px 8px" });
-		type TNode = { folders: Map<string, TNode>; leaves: { id: string; label: string }[] };
-		const mkT = (): TNode => ({ folders: new Map(), leaves: [] });
-		const tree = mkT();
-		for (const n of nodes) {
-			const parts = n.id.split("/");
-			let cur = tree;
-			for (let i = 0; i < parts.length - 1; i++) {
-				const p = parts[i];
-				let nx = cur.folders.get(p);
-				if (!nx) { nx = mkT(); cur.folders.set(p, nx); }
-				cur = nx;
+		// The header IS the drag handle (no icon): cursor:move, text unselectable
+		// so a drag doesn't paint a selection. flex:0 0 auto keeps it fixed height.
+		Object.assign(head.style, {
+			padding: "6px 8px", borderBottom: "1px solid #2a3447", fontWeight: "600",
+			cursor: "move", userSelect: "none", flex: "0 0 auto",
+		} as Partial<CSSStyleDeclaration>);
+		// Header verb is mode-appropriate: droste focuses, other modes either
+		// locate the card on canvas or open the file.
+		const verb = isDroste ? "focus" : "locate/open";
+		const headText = head.createSpan({ text: `Notes (${nodes.length}) — click to ${verb}` });
+		// ── Grouping selector (Folder / Tag) ────────────────────────────────────
+		// A small radio group in the header switches the tree between the FOLDER
+		// tree (by note path, default) and the TAG tree (by GROUP_BY membership
+		// keys). The chosen grouping survives rebuilds (this.noteMenuGroupBy) and
+		// reloads (settings.noteMenuGroupBy). Changing it re-renders the tree.
+		const groupBar = head.createDiv();
+		Object.assign(groupBar.style, {
+			display: "flex", gap: "10px", marginTop: "4px", fontWeight: "400",
+			fontSize: "11px", color: "#9db4d6", cursor: "default",
+		} as Partial<CSSStyleDeclaration>);
+		const groupName = "gim-notemenu-group";
+		const mkGroupRadio = (value: "folder" | "tag", labelText: string): void => {
+			const lab = groupBar.createEl("label");
+			Object.assign(lab.style, { display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer", userSelect: "none" } as Partial<CSSStyleDeclaration>);
+			const radio = lab.createEl("input", { attr: { type: "radio", name: groupName, value } });
+			radio.checked = this.noteMenuGroupBy === value;
+			lab.createSpan({ text: labelText });
+			radio.addEventListener("change", () => {
+				if (!radio.checked) return;
+				this.noteMenuGroupBy = value;
+				this.settings.noteMenuGroupBy = value;
+				void this.save();
+				this.noteMenuRedraw?.();
+			});
+			// Don't let a click in the selector start a header MOVE drag.
+			lab.addEventListener("mousedown", (ev) => ev.stopPropagation());
+		};
+		mkGroupRadio("folder", "Folder");
+		mkGroupRadio("tag", "Tag");
+		// ── Select all / Deselect all ────────────────────────────────────────────
+		// Two small buttons that (un)check EVERY note in the current menu set
+		// at once. Operate on the full `nodes` list (currentMenuNotes, already
+		// captured above as `nodes`), keyed by hideKey = stripTabPrefix(id) — the
+		// same key the per-row checkboxes use. Does NOT call rebuild(); a plain
+		// requestDraw() is enough because the draw() skipNode filter re-reads
+		// hiddenNodes fresh every frame.
+		const bulkBar = head.createDiv();
+		Object.assign(bulkBar.style, {
+			display: "flex", gap: "6px", marginTop: "4px",
+		} as Partial<CSSStyleDeclaration>);
+		const mkBulkBtn = (label: string, handler: () => void): void => {
+			const btn = bulkBar.createEl("button");
+			btn.textContent = label;
+			Object.assign(btn.style, {
+				fontSize: "10px", padding: "2px 6px", cursor: "pointer",
+				background: "#1a2236", border: "1px solid #3a4760",
+				borderRadius: "3px", color: "#9db4d6", lineHeight: "1.4",
+			} as Partial<CSSStyleDeclaration>);
+			// Prevent the button click from starting a header move-drag.
+			btn.addEventListener("mousedown", (ev) => ev.stopPropagation());
+			btn.addEventListener("click", (ev) => {
+				ev.stopPropagation();
+				handler();
+			});
+		};
+		mkBulkBtn("Select all", () => {
+			// Show all: remove every listed note's hide-key from hiddenNodes.
+			for (const n of nodes) {
+				const k = hideKey(n);
+				const idx = this.settings.hiddenNodes.indexOf(k);
+				if (idx >= 0) this.settings.hiddenNodes.splice(idx, 1);
 			}
-			cur.leaves.push({ id: n.id, label: parts[parts.length - 1] });
-		}
+			void this.save();
+			this.requestDraw();
+			// Redraw the menu so checkboxes reflect the new state without rebuilding
+			// the panel (no scroll/expand collapse).
+			this.noteMenuRedraw?.();
+		});
+		mkBulkBtn("Deselect all", () => {
+			// Hide all: add every listed note's hide-key to hiddenNodes (dedup).
+			for (const n of nodes) {
+				const k = hideKey(n);
+				if (!this.settings.hiddenNodes.includes(k)) {
+					this.settings.hiddenNodes.push(k);
+				}
+			}
+			void this.save();
+			this.requestDraw();
+			this.noteMenuRedraw?.();
+		});
+		// Search input lives in a relatively-positioned wrapper so the suggestion
+		// dropdown can be absolutely positioned directly beneath it.
+		const searchWrap = panel.createDiv();
+		Object.assign(searchWrap.style, { position: "relative", margin: "6px 8px", flex: "0 0 auto" } as Partial<CSSStyleDeclaration>);
+		const search = searchWrap.createEl("input", { attr: { type: "text", placeholder: "Search: word, #tag, key:value" } });
+		Object.assign(search.style, { display: "block", width: "100%", boxSizing: "border-box", padding: "4px 6px", background: "#0f1116", border: "1px solid #2a3447", borderRadius: "4px", color: "#e6edf3" } as Partial<CSSStyleDeclaration>);
+		// Restore the search query that was active before this rebuild (if any).
+		// This preserves the user's typed text across vault-change-triggered rebuilds.
+		if (this.noteMenuSearchQuery) search.value = this.noteMenuSearchQuery;
+		// Suggestion (autocomplete) dropdown — absolutely positioned under the input,
+		// same panel styling, zIndex above the body. Hidden until there are matches.
+		const suggBox = searchWrap.createDiv();
+		Object.assign(suggBox.style, {
+			position: "absolute", left: "0", right: "0", top: "100%", marginTop: "2px",
+			background: "rgba(20,24,33,0.98)", border: "1px solid #3a4760", borderRadius: "4px",
+			boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "70", overflow: "auto", maxHeight: "240px",
+			display: "none",
+		} as Partial<CSSStyleDeclaration>);
+		const body = panel.createDiv({ cls: "gim-notemenu-body" });
+		// flex:1 1 auto + minHeight:0 → the tree scroll area grows/shrinks with the
+		// panel height (set above / on resize) instead of a fixed maxHeight.
+		Object.assign(body.style, { overflow: "auto", padding: "4px 6px 8px", flex: "1 1 auto", minHeight: "0" } as Partial<CSSStyleDeclaration>);
+		// Mouse-drag MOVE (header) + RESIZE (corner). No icons/buttons: the header
+		// itself is the move handle, an invisible corner zone is the resize handle.
+		const grip = this.wireNoteMenuDrag(panel, head, search, NOTE_MENU_MIN);
+
+		// ── MINIMIZE: header DOUBLE-CLICK toggles minimized ⇄ restored ───────────
+		// No icon/button — a clean double-click on the header is the only affordance.
+		// dblclick (not click) so it never conflicts with the single-click/drag MOVE.
+		// Minimized ⇒ hide the search + tree body and collapse the panel to the
+		// header bar height (width unchanged). The body height to restore to is
+		// remembered on minimize so a second double-click round-trips back.
+		const headerOnlyHeight = (): number => {
+			// Header bar + the panel's borders (= total height when body is hidden).
+			const h = head.offsetHeight || 0;
+			const border = panel.offsetHeight - panel.clientHeight; // top+bottom border
+			return Math.max(1, h + (border > 0 ? border : 2));
+		};
+		const applyMinimizedState = (): void => {
+			if (this.noteMenuMinimized) {
+				search.style.display = "none";
+				body.style.display = "none";
+				// Resize is meaningless while collapsed — hide the grip.
+				grip.style.display = "none";
+				const collapsed = noteMenuHeight(true, headerOnlyHeight(), rect.height, this.noteMenuRestoreHeight);
+				panel.style.height = `${collapsed}px`;
+				// Header-only hint: show the bare title (no count/verb, no icon).
+				headText.setText(`Notes (${nodes.length})`);
+			} else {
+				search.style.display = "";
+				body.style.display = "";
+				grip.style.display = "";
+				// Restore the remembered body height (fall back to the live rect).
+				const current = this.noteMenuRect?.height ?? rect.height;
+				const h = noteMenuHeight(false, headerOnlyHeight(), current, this.noteMenuRestoreHeight);
+				panel.style.height = `${h}px`;
+				if (this.noteMenuRect) this.noteMenuRect = { ...this.noteMenuRect, height: h };
+				headText.setText(`Notes (${nodes.length}) — click to ${verb}`);
+			}
+		};
+		head.addEventListener("dblclick", (ev: MouseEvent) => {
+			ev.preventDefault();
+			ev.stopPropagation();
+			if (!this.noteMenuMinimized) {
+				// Remember the current (expanded) height before collapsing.
+				this.noteMenuRestoreHeight = this.noteMenuRect?.height ?? panel.offsetHeight;
+			}
+			this.noteMenuMinimized = !this.noteMenuMinimized;
+			applyMinimizedState();
+			// Persist across reloads (NOT in DEFAULT_SETTINGS — stays optional).
+			this.settings.noteMenuMinimized = this.noteMenuMinimized;
+			void this.save();
+		});
+		// Reapply the persisted/in-memory minimized state on every (re)build so it
+		// survives rebuilds and reloads.
+		applyMinimizedState();
+		// A row checkbox that must NOT trigger the row's click (focus/locate/open)
+		// nor start a header MOVE drag. We stopPropagation on mousedown (so the
+		// header-drag listener and the row-click handler never see it) and on click
+		// (belt-and-braces). The visibility toggle is handled by the caller's
+		// `change` listener.
+		const mkRowCheckbox = (host: HTMLElement): HTMLInputElement => {
+			const cb = host.createEl("input", { attr: { type: "checkbox" } }) as HTMLInputElement;
+			Object.assign(cb.style, { margin: "0 4px 0 0", flex: "0 0 auto", cursor: "pointer" } as Partial<CSSStyleDeclaration>);
+			cb.addEventListener("mousedown", (ev) => ev.stopPropagation());
+			cb.addEventListener("click", (ev) => ev.stopPropagation());
+			return cb;
+		};
+		// Current global hidden-set (path-or-id keys). Rebuilt fresh on every draw()
+		// so checkbox states always reflect the persisted `hiddenNodes`.
+		const hiddenSetNow = (): Set<string> => new Set(this.settings.hiddenNodes);
+
 		const leafRow = (container: HTMLElement, id: string, label: string, depth: number): HTMLElement => {
-			const row = container.createDiv({ text: label });
-			const baseBg = id === this.settings.drosteFocus ? "#2d6cdf55" : "";
-			Object.assign(row.style, { paddingLeft: `${6 + depth * 12}px`, padding: "2px 4px", cursor: "pointer", borderRadius: "3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", background: baseBg });
-			if (id === this.settings.drosteFocus) row.style.color = "#ffd35c";
+			const row = container.createDiv();
+			const highlightId = this.currentMenuHighlightId();
+			const baseBg = id === highlightId ? "#2d6cdf55" : "";
+			// padding must come BEFORE paddingLeft — Object.assign applies properties
+			// left-to-right; putting padding last would overwrite the depth indent.
+			Object.assign(row.style, { display: "flex", alignItems: "center", padding: "2px 4px", paddingLeft: `${6 + depth * 12}px`, cursor: "pointer", borderRadius: "3px", whiteSpace: "nowrap", overflow: "hidden", background: baseBg } as Partial<CSSStyleDeclaration>);
+			// Per-note visibility checkbox. CHECKED ⇔ the note is NOT hidden. The
+			// state is GLOBAL per note (driven by hiddenNodes, keyed by PATH) so a
+			// note appearing in multiple tag groups shows the same state everywhere.
+			const noteKey = stripTabPrefix(id);
+			const cb = mkRowCheckbox(row);
+			cb.checked = !hiddenSetNow().has(noteKey);
+			cb.addEventListener("change", () => {
+				// Toggle this note's hide key (its PATH) so EVERY on-canvas copy of
+				// the note is hidden/shown at once in every mode.
+				// IMPORTANT: do NOT call rebuild() here — the graph draw() already
+				// reads hiddenNodes fresh on every paint (via nodeIsHidden / skipNode),
+				// so requestDraw() is enough to hide/show the node on canvas.
+				// Calling rebuild() would tear down and recreate the whole menu panel,
+				// collapsing all expanded folders and resetting the scroll position,
+				// which makes it impossible to uncheck several notes in a row inside
+				// an open folder.
+				this.toggleArrayMember("hiddenNodes", noteKey, !cb.checked);
+				void this.save();
+				this.requestDraw();
+			});
+			// The label carries the row-click behaviour (focus/locate/open) + ellipsis.
+			const lbl = row.createSpan({ text: label });
+			Object.assign(lbl.style, { flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as Partial<CSSStyleDeclaration>);
+			if (id === highlightId) lbl.style.color = "#ffd35c";
 			row.addEventListener("mouseenter", () => (row.style.background = "#2a3447"));
 			row.addEventListener("mouseleave", () => (row.style.background = baseBg));
-			row.addEventListener("click", () => this.setDrosteFocus(id));
+			lbl.addEventListener("click", () => this.focusNoteFromMenu(id));
 			return row;
 		};
-		const renderTree = (container: HTMLElement, t: TNode, depth: number): void => {
-			for (const [name, child] of [...t.folders.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
-				const row = container.createDiv({ text: `▸ ${name}` });
-				Object.assign(row.style, { paddingLeft: `${6 + depth * 12}px`, padding: "2px 4px", cursor: "pointer", color: "#9db4d6", fontWeight: "600" });
+		// The folders/leaves are already deterministically sorted by buildFolderTree
+		// / buildTagTree, so renderTree just walks them in insertion order.
+		// `parentPath` is the accumulated path prefix (folder keys joined by "/")
+		// used to stamp each folder row with a stable data-menupath attribute so
+		// removeNoteMenu() can snapshot which paths were open, and the restore
+		// pass after draw() can re-open them.
+		const renderTree = (container: HTMLElement, t: TreeNode, depth: number, parentPath = ""): void => {
+			for (const [name, child] of t.folders.entries()) {
+				// Tag-tree folders carry a display label ("#project", "#A · #B");
+				// folder-tree nodes have none, so fall back to the Map key.
+				const display = child.label ?? name;
+				const folderPath = buildFolderPathKey(parentPath, name);
+				const row = container.createDiv();
+				// Stamp the stable path key so removeNoteMenu() can record which
+				// folders were open and ensureNoteMenu() can re-open them.
+				row.dataset.menupath = folderPath;
+				// padding before paddingLeft — same order as leafRow (see comment there).
+				Object.assign(row.style, { display: "flex", alignItems: "center", padding: "2px 4px", paddingLeft: `${6 + depth * 12}px`, color: "#9db4d6", fontWeight: "600" } as Partial<CSSStyleDeclaration>);
+				// Folder/group/combo checkbox — TRI-STATE over its descendant notes:
+				// checked = all visible, unchecked = all hidden, indeterminate = mixed.
+				// Toggling cascades to EVERY descendant note (check-all / uncheck-all).
+				const descKeys = collectDescendantNoteKeys(child);
+				const fcb = mkRowCheckbox(row);
+				const applyFolderState = (): void => {
+					const st = folderCheckState(descKeys, hiddenSetNow());
+					fcb.indeterminate = st === "indeterminate";
+					fcb.checked = st === "checked";
+				};
+				applyFolderState();
+				fcb.addEventListener("change", () => {
+					// Standard cascade: currently fully checked → hide all; otherwise
+					// (unchecked OR indeterminate) → show all. Update every descendant
+					// note key at once, save once.
+					// IMPORTANT: same as the leaf checkbox — do NOT call rebuild() here.
+					// requestDraw() is enough; the draw() skipNode filter re-reads
+					// hiddenNodes fresh each frame.
+					const wasChecked = folderCheckState(descKeys, hiddenSetNow()) === "checked";
+					const hide = wasChecked;
+					for (const k of descKeys) this.toggleArrayMember("hiddenNodes", k, hide);
+					void this.save();
+					this.requestDraw();
+				});
+				const lbl = row.createSpan({ text: `▸ ${display}` });
+				Object.assign(lbl.style, { flex: "1 1 auto", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as Partial<CSSStyleDeclaration>);
 				const kids = container.createDiv();
 				kids.style.display = "none";
 				let built = false;
-				row.addEventListener("click", () => {
-					const open = kids.style.display !== "none";
-					kids.style.display = open ? "none" : "block";
-					row.textContent = `${open ? "▸" : "▾"} ${name}`;
-					if (!built) { renderTree(kids, child, depth + 1); built = true; }
+				// Open this folder (build children lazily if not yet built).
+				const openFolder = (): void => {
+					kids.style.display = "block";
+					lbl.textContent = `▾ ${display}`;
+					if (!built) { renderTree(kids, child, depth + 1, folderPath); built = true; }
+				};
+				// Close this folder.
+				const closeFolder = (): void => {
+					kids.style.display = "none";
+					lbl.textContent = `▸ ${display}`;
+				};
+				lbl.addEventListener("click", () => {
+					if (kids.style.display !== "none") closeFolder(); else openFolder();
 				});
+				// If this folder's path was open before the last rebuild, restore it.
+				if (this.noteMenuExpandedPaths.has(folderPath)) openFolder();
 			}
-			for (const lf of t.leaves.sort((a, b) => (a.label < b.label ? -1 : 1))) leafRow(container, lf.id, lf.label, depth);
+			for (const lf of t.leaves) leafRow(container, lf.id, lf.label, depth);
 		};
 		const draw = (): void => {
 			body.empty();
-			const q = search.value.trim().toLowerCase();
+			const q = search.value.trim();
 			if (q) {
-				const hits = nodes.filter((n) => n.id.toLowerCase().includes(q) || n.label.toLowerCase().includes(q)).slice(0, 300);
+				// Advanced search ALWAYS shows a flat, UNIQUE-by-path list — never
+				// duplicated by grouping. (Tag-tree duplication applies only to the
+				// non-search tree shown when the query is empty.)
+				const hits = advancedSearch(nodes, q).slice(0, 300);
 				if (!hits.length) { body.createDiv({ text: "(no matches)" }); return; }
 				for (const n of hits) leafRow(body, n.id, n.label, 0);
 			} else {
+				const tree = this.noteMenuGroupBy === "tag" ? buildTagTree(nodes, this.clusterLabels) : buildFolderTree(nodes);
 				renderTree(body, tree, 0);
 			}
 		};
-		this.drosteMenuRedraw = draw;
-		search.addEventListener("input", draw);
+
+		// ── Suggestion dropdown machinery ────────────────────────────────────────
+		// `suggestions` mirrors what's currently rendered in `suggBox`; `selIdx` is
+		// the keyboard-highlighted row (−1 = none). The dropdown completes the TOKEN
+		// currently being typed (substring after the last space).
+		let suggestions: Suggestion[] = [];
+		let selIdx = -1;
+		const kindGlyph: Record<Suggestion["kind"], string> = { tag: "#", field: "⊳", note: "·" };
+		const kindColor: Record<Suggestion["kind"], string> = { tag: "#7fc8ff", field: "#c8a6ff", note: "#9db4d6" };
+		// Replace the current token in the input with `text`. Tags/notes get a
+		// trailing space (term complete); "key:" stays open (no space) so the user
+		// can keep typing the value.
+		const acceptSuggestion = (text: string, kind: Suggestion["kind"]): void => {
+			const val = search.value;
+			const tok = currentToken(val);
+			const head = val.slice(0, val.length - tok.length);
+			const trailing = text.endsWith(":") ? "" : " ";
+			search.value = head + text + trailing;
+			closeSuggest();
+			search.focus();
+			draw();
+		};
+		const renderSelection = (): void => {
+			const rows = Array.from(suggBox.children) as HTMLElement[];
+			rows.forEach((r, i) => { r.style.background = i === selIdx ? "#2a3447" : ""; });
+		};
+		const closeSuggest = (): void => {
+			suggBox.style.display = "none";
+			suggBox.empty();
+			suggestions = [];
+			selIdx = -1;
+		};
+		const openSuggest = (): void => {
+			suggestions = suggestQuery(nodes, search.value);
+			suggBox.empty();
+			selIdx = -1;
+			if (suggestions.length === 0) { suggBox.style.display = "none"; return; }
+			suggestions.forEach((s, i) => {
+				const row = suggBox.createDiv();
+				Object.assign(row.style, { padding: "3px 8px", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", gap: "6px", alignItems: "center" } as Partial<CSSStyleDeclaration>);
+				const glyph = row.createSpan({ text: kindGlyph[s.kind] });
+				Object.assign(glyph.style, { color: kindColor[s.kind], width: "10px", flex: "0 0 auto", textAlign: "center" } as Partial<CSSStyleDeclaration>);
+				row.createSpan({ text: s.text });
+				row.addEventListener("mouseenter", () => { selIdx = i; renderSelection(); });
+				// mousedown (not click) so it fires before the input's blur closes the box.
+				row.addEventListener("mousedown", (ev) => {
+					ev.preventDefault();
+					acceptSuggestion(s.text, s.kind);
+				});
+			});
+			suggBox.style.display = "block";
+		};
+		// Re-suggest as the user types; close when the current token is empty.
+		const onInput = (): void => {
+			draw();
+			if (currentToken(search.value).length === 0) closeSuggest();
+			else openSuggest();
+		};
+		this.noteMenuRedraw = draw;
+		search.addEventListener("input", onInput);
+		search.addEventListener("keydown", (ev: KeyboardEvent) => {
+			const open = suggBox.style.display !== "none" && suggestions.length > 0;
+			if (ev.key === "ArrowDown") {
+				if (!open) { openSuggest(); return; }
+				ev.preventDefault();
+				selIdx = (selIdx + 1) % suggestions.length;
+				renderSelection();
+			} else if (ev.key === "ArrowUp") {
+				if (!open) return;
+				ev.preventDefault();
+				selIdx = (selIdx - 1 + suggestions.length) % suggestions.length;
+				renderSelection();
+			} else if (ev.key === "Enter") {
+				if (open && selIdx >= 0) {
+					ev.preventDefault();
+					const s = suggestions[selIdx];
+					acceptSuggestion(s.text, s.kind);
+				} else {
+					// No highlighted suggestion → just run the search (close any box).
+					closeSuggest();
+					draw();
+				}
+			} else if (ev.key === "Escape") {
+				if (open) { ev.preventDefault(); ev.stopPropagation(); closeSuggest(); }
+			}
+		});
+		// Close on blur — small delay so a suggestion mousedown/click lands first.
+		search.addEventListener("blur", () => { window.setTimeout(closeSuggest, 150); });
+		// Open the dropdown again when the field regains focus with a live token.
+		search.addEventListener("focus", () => { if (currentToken(search.value).length > 0) openSuggest(); });
 		draw();
+		// Restore the scroll position of the body after the tree is built. The
+		// expanded-folder restoring happens synchronously inside renderTree (via
+		// the openFolder() calls), so by the time draw() returns the DOM already
+		// reflects the correct expanded state. Restoring scrollTop after that
+		// keeps the viewport at the exact position it was before the rebuild.
+		if (this.noteMenuScrollTop > 0) {
+			body.scrollTop = this.noteMenuScrollTop;
+		}
+	}
+
+	// Wire the note navigator's two pure mouse-drag affordances — NO icons or
+	// buttons are added:
+	//   • MOVE   — mousedown on the HEADER bar starts a drag that updates the
+	//              panel left/top. Drags starting on the search input or a tree
+	//              row are ignored (those need their own clicks); only the bare
+	//              header surface initiates a move.
+	//   • RESIZE — an invisible bottom-right CORNER grab zone (cursor
+	//              nwse-resize) whose drag updates the panel width/height. The
+	//              flex column makes the body scroll-area grow/shrink with it.
+	// Both clamp through clampRect (min size + on-screen guarantee) and persist
+	// the final rect on mouseup: to this.noteMenuRect (survives rebuilds) and to
+	// this.settings.noteMenuRect via this.save() (survives reloads).
+	// Returns the invisible resize-grip element so the caller can hide it while
+	// the panel is minimized (resize is meaningless when collapsed).
+	private wireNoteMenuDrag(
+		panel: HTMLElement,
+		head: HTMLElement,
+		search: HTMLElement,
+		min: { width: number; height: number },
+	): HTMLElement {
+		const NOTE_MENU_MIN = min;
+		const containerSize = (): { width: number; height: number } => ({
+			width: this.root.clientWidth || 0,
+			height: this.root.clientHeight || 0,
+		});
+		// Apply a (clamped) rect to both the live DOM and the persisted fields.
+		const applyRect = (raw: MenuRect): void => {
+			const c = containerSize();
+			const r = c.width > 0 && c.height > 0 ? clampRect(raw, c, NOTE_MENU_MIN) : raw;
+			this.noteMenuRect = r;
+			panel.style.left = `${r.left}px`;
+			panel.style.top = `${r.top}px`;
+			panel.style.width = `${r.width}px`;
+			panel.style.height = `${r.height}px`;
+		};
+		const persist = (): void => {
+			if (this.noteMenuRect) this.settings.noteMenuRect = { ...this.noteMenuRect };
+			void this.save();
+		};
+
+		// ── MOVE: drag the header ───────────────────────────────────────────────
+		head.addEventListener("mousedown", (ev: MouseEvent) => {
+			if (ev.button !== 0) return;
+			// Don't hijack mousedowns meant for the search input (it lives in the
+			// header column in some layouts) — only the bare header surface drags.
+			if (ev.target !== head && !head.contains(ev.target as Node | null)) return;
+			if (search.contains(ev.target as Node | null)) return;
+			const start = this.noteMenuRect ?? { left: 0, top: 0, width: panel.offsetWidth, height: panel.offsetHeight };
+			const ox = ev.clientX, oy = ev.clientY;
+			const baseLeft = start.left, baseTop = start.top;
+			ev.preventDefault();
+			const onMove = (e: MouseEvent): void => {
+				applyRect({ left: baseLeft + (e.clientX - ox), top: baseTop + (e.clientY - oy), width: start.width, height: start.height });
+			};
+			const onUp = (): void => {
+				window.removeEventListener("mousemove", onMove, true);
+				window.removeEventListener("mouseup", onUp, true);
+				persist();
+			};
+			window.addEventListener("mousemove", onMove, true);
+			window.addEventListener("mouseup", onUp, true);
+		});
+
+		// ── RESIZE: drag the invisible bottom-right corner ──────────────────────
+		const grip = panel.createDiv();
+		Object.assign(grip.style, {
+			position: "absolute", right: "0", bottom: "0", width: "16px", height: "16px",
+			cursor: "nwse-resize", zIndex: "61",
+			// Invisible (no icon): just a transparent hit target in the corner.
+			background: "transparent",
+		} as Partial<CSSStyleDeclaration>);
+		grip.addEventListener("mousedown", (ev: MouseEvent) => {
+			if (ev.button !== 0) return;
+			const start = this.noteMenuRect ?? { left: 0, top: 0, width: panel.offsetWidth, height: panel.offsetHeight };
+			const ox = ev.clientX, oy = ev.clientY;
+			const baseW = start.width, baseH = start.height;
+			ev.preventDefault();
+			ev.stopPropagation();
+			const onMove = (e: MouseEvent): void => {
+				applyRect({ left: start.left, top: start.top, width: baseW + (e.clientX - ox), height: baseH + (e.clientY - oy) });
+			};
+			const onUp = (): void => {
+				window.removeEventListener("mousemove", onMove, true);
+				window.removeEventListener("mouseup", onUp, true);
+				persist();
+			};
+			window.addEventListener("mousemove", onMove, true);
+			window.addEventListener("mouseup", onUp, true);
+		});
+		return grip;
 	}
 
 	private drosteHitTest(sx: number, sy: number): string | null {
@@ -2631,16 +3394,6 @@ export class MiniGraphView extends ItemView {
 		return null;
 	}
 
-	private hiveHitTest(sx: number, sy: number): string | null {
-		if (!this.laid.hive) return null;
-		const dpr = window.devicePixelRatio || 1;
-		const dx = sx * dpr, dy = sy * dpr;
-		for (let i = this.hiveHit.length - 1; i >= 0; i--) {
-			const r = this.hiveHit[i];
-			if (dx >= r.x0 && dx <= r.x1 && dy >= r.y0 && dy <= r.y1) return r.id;
-		}
-		return null;
-	}
 
 	// Heatmap cell click → a floating overlay listing the notes shared by the
 	// tag pair (or, on the diagonal, all notes of the tag). Each row opens the
@@ -2967,21 +3720,6 @@ export class MiniGraphView extends ItemView {
 				this.cancelHover();
 				this.hoverTarget = target;
 				if (target) this.scheduleHover(target, sx, sy);
-			} else if (this.tipEl) {
-				this.positionTip(sx, sy, this.tipEl);
-			}
-			return;
-		}
-		if (this.laid.hive) {
-			// Concentric Hive: highlight the hovered node + the shared file hover tip.
-			const id = this.hiveHitTest(sx, sy);
-			const target: HoverTarget = id ? { kind: "node", nodeId: id } : null;
-			if (!sameTarget(this.hoverTarget, target)) {
-				this.cancelHover();
-				this.hoverTarget = target;
-				this.hoveredNodeId = id;
-				if (target) this.scheduleHover(target, sx, sy);
-				this.requestDraw();
 			} else if (this.tipEl) {
 				this.positionTip(sx, sy, this.tipEl);
 			}
@@ -3383,12 +4121,6 @@ export class MiniGraphView extends ItemView {
 				this.openLatticeDetail(hitNode, sx, sy);
 				return;
 			}
-			if (this.laid.hive) {
-				// Concentric Hive: click a node → open the note (pan/zoom unchanged).
-				const id = this.hiveHitTest(sx, sy);
-				if (id) this.openFile(id);
-				return;
-			}
 			if (this.laid.drosteGallery) {
 				// Click a node cell (① or a member square) → open the note AND update
 				// the focus highlight. Pan/zoom is intentionally NOT changed here so
@@ -3424,7 +4156,7 @@ export class MiniGraphView extends ItemView {
 			this.cancelHover();
 			// Droste mode tracks hover via hoveredNodeId (no matrix/lattice
 			// crosshair state) — clear it so no band stays lit after exit.
-			const drosteHovered = (this.laid.drosteGallery != null || this.laid.hive != null) && this.hoveredNodeId !== null;
+			const drosteHovered = this.laid.drosteGallery != null && this.hoveredNodeId !== null;
 			if (drosteHovered) this.hoveredNodeId = null;
 			if (
 				drosteHovered ||
