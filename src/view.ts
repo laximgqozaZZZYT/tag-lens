@@ -226,6 +226,11 @@ export class MiniGraphView extends ItemView {
 	// removeNoteMenu() call. Restored after rebuilding the tree in
 	// ensureNoteMenu() so the viewport stays put after a checkbox toggle.
 	private noteMenuScrollTop = 0;
+	// If the note navigator throws while building (e.g. a mobile-webview API
+	// quirk), we capture the error here so the FIGURE still renders (the menu is
+	// non-essential) and a small banner surfaces the cause on-canvas. Logged once.
+	private noteMenuError: string | null = null;
+	private noteMenuErrorLogged = false;
 	// The last note "located" on canvas via the navigator (non-droste modes),
 	// used to highlight its row in the menu.
 	private locatedNoteId: string | null = null;
@@ -2173,7 +2178,21 @@ export class MiniGraphView extends ItemView {
 		// Mode-agnostic note navigator (folder tree + search). Built once per
 		// rebuild; shown in EVERY view mode. It self-suppresses when there are
 		// zero notes. Sits top-left, the same slot as the old Icon Gallery menu.
-		this.ensureNoteMenu();
+		// ISOLATED: the navigator must NEVER prevent the figure from drawing — a
+		// throw here (seen on mobile) used to abort the whole draw, leaving the
+		// canvas blank. Catch it, keep drawing, and surface the cause in a banner.
+		this.noteMenuError = null;
+		try {
+			this.ensureNoteMenu();
+		} catch (e) {
+			this.noteMenuError = e instanceof Error ? `${e.message}` : String(e);
+			if (!this.noteMenuErrorLogged) {
+				console.error("[tag-lens] note navigator failed to render (figure still drawn):", e);
+				this.noteMenuErrorLogged = true;
+			}
+			// A half-built panel would overlay the canvas — remove it so the figure is clean.
+			try { this.removeNoteMenu(); } catch { /* ignore */ }
+		}
 		// If the filter pipeline (WHERE / HAVING / LIMIT) eliminated every
 		// node, draw a hint instead of an empty canvas. This makes the cause
 		// of the blank view discoverable instead of mysterious.
@@ -2415,6 +2434,24 @@ export class MiniGraphView extends ItemView {
 				this.upsetSelectedSignatureKey,
 				this.settings.minFontPx,
 			);
+		}
+
+		// Non-fatal navigator error → small screen-space banner so the cause is
+		// visible on mobile (where the console isn't reachable). The figure above
+		// is already drawn; this just annotates it.
+		if (this.noteMenuError) {
+			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+			const msg = `⚠ Note menu disabled: ${this.noteMenuError}`;
+			ctx.font = "12px sans-serif";
+			ctx.textBaseline = "top";
+			ctx.textAlign = "left";
+			const padX = 8, padY = 5, cw = this.canvas.clientWidth || 0;
+			const text = msg.length > 140 ? `${msg.slice(0, 139)}…` : msg;
+			const tw = Math.min(ctx.measureText(text).width, Math.max(0, cw - 16));
+			ctx.fillStyle = "rgba(120,30,30,0.92)";
+			ctx.fillRect(8, 8, tw + padX * 2, 22);
+			ctx.fillStyle = "#ffd7d7";
+			ctx.fillText(text, 8 + padX, 8 + padY, Math.max(0, cw - 24));
 		}
 	}
 
