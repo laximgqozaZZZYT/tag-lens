@@ -83,3 +83,6 @@ test/test-soft.mjs
 test/test_overflow_detail.mjs
 test/preview-hive.mjs
 hive-*.png
+
+# Playwright MCP browser snapshot artifacts
+.playwright-mcp/

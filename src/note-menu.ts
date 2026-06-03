@@ -42,12 +42,14 @@ export interface MenuLaidLike {
 	nodes: { id: string; label: string; memberships?: string[] }[];
 }
 
-// The note list to DISPLAY in the navigator. MODE-INVARIANT by construction:
-// it is ALWAYS the universal `menuNotes` set (the post-WHERE/HAVING/LIMIT
-// visible-note set, captured mode-independently in rebuild() — see view.ts
-// `buildMenuNotes`). It does NOT branch on `laid` (no droste-gallery / no
-// positioned-`laid.nodes` branch), so switching only the view mode never
-// changes the displayed list, the Folder tree, the Tag tree, or search.
+// The note list to DISPLAY in the navigator. It is ALWAYS the `menuNotes` set
+// captured in rebuild() and does NOT branch on `laid` here (no droste-gallery /
+// no positioned-`laid.nodes` branch). The set itself is chosen upstream by
+// `navigatorNodeSource` (see view.ts rebuild): the mode-invariant
+// post-WHERE/HAVING/LIMIT set for every mode EXCEPT droste, and the full
+// pre-LIMIT gallery snapshot in droste so every Icon Gallery tile is
+// controllable. So switching between NON-droste modes never changes the
+// displayed list, Folder tree, Tag tree, or search.
 //
 // `laid` is accepted only for signature stability with `menuClickAction`
 // (click ROUTING stays mode-appropriate); it is intentionally unused here.
@@ -60,6 +62,30 @@ export function menuNoteList(_laid: MenuLaidLike, menuNotes: NoteRef[]): NoteRef
 		tags: n.tags,
 		frontmatter: n.frontmatter,
 	}));
+}
+
+// Which note set should feed the navigator (and thus which notes get a
+// visibility checkbox), given the current mode's on-canvas node universe.
+//
+// INVARIANT: every node drawn on the canvas MUST have a navigator checkbox,
+// otherwise "Deselect all" / per-row unchecking can never hide it.
+//
+//   • Icon Gallery (droste): the canvas bakes the FULL pre-LIMIT snapshot
+//     (`buildGallery` emits one cell per input node), so the navigator must list
+//     that SAME full set — not the LIMIT-trimmed menu set. Listing only the
+//     trimmed set left LIMIT-dropped gallery tiles with no checkbox, so they
+//     could never be hidden (the "deselect-all leaves tiles visible" bug).
+//   • every other mode: the canvas draws the mode-invariant LIMIT-trimmed set,
+//     so the navigator lists that — keeping the list identical across modes.
+//
+// Generic over the node shape so callers can pass GraphNode[] or NoteRef[].
+// Pure: no DOM, no mutation; returns one of the input arrays as-is.
+export function navigatorNodeSource<T>(opts: {
+	isDroste: boolean;
+	galleryNodes: T[];
+	limitedNodes: T[];
+}): T[] {
+	return opts.isDroste ? opts.galleryNodes : opts.limitedNodes;
 }
 
 // What a row click should do for note `id`, in the current mode:

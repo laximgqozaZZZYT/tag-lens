@@ -98,7 +98,7 @@ import {
 	positionTip as positionTipFn,
 } from "./highlight";
 import { MarqueeController } from "./marquee-controller";
-import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, folderCheckState, buildFolderPathKey, type MenuRect, type NoteRef, type TreeNode, type Suggestion } from "./note-menu";
+import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type Suggestion } from "./note-menu";
 
 export const VIEW_TYPE_MINI = "tag-lens-view";
 
@@ -1469,9 +1469,9 @@ export class MiniGraphView extends ItemView {
 		this.groupByError = errors.groupBy ?? "";
 		let { data, clusterLabels } = result;
 		// Pristine post-buildGraph graph (post WHERE/GROUP_BY, pre any HAVING/LIMIT
-		// mutation). The note navigator derives its MODE-INDEPENDENT note set from
-		// THIS so switching only the view mode never changes the menu — see
-		// buildMenuNotes() below. `data` itself is mutated by the mode-specific
+		// mutation). The navigator's mode-invariant (non-droste) note set is derived
+		// from THIS via menuLimitedNodes() below, so switching between non-droste
+		// modes never changes the menu. `data` itself is mutated by the mode-specific
 		// HAVING/LIMIT stages, so we snapshot before that happens.
 		const menuSourceData = result.data;
 
@@ -1549,14 +1549,23 @@ export class MiniGraphView extends ItemView {
 			edges: filterEdgesByAlive(data.edges, (id) => modes.has(id)),
 		};
 
-		// Universal note list for the note navigator. Built MODE-INDEPENDENTLY
-		// from the pristine post-buildGraph graph (see buildMenuNotes): the same
-		// vault + same WHERE/GROUP_BY/HAVING/LIMIT settings yield an IDENTICAL menu
-		// (note list, Folder tree, Tag tree, search) in EVERY view mode. This does
-		// NOT use the mode-specific `data` (which lattice/droste exempt from
-		// auto-HAVING, changing their node set + memberships); the menu pipeline
-		// always uses the user's real `havingAuto` so no mode is special-cased.
-		this.menuNotes = this.buildMenuNotes(menuSourceData);
+		// Note list for the note navigator. Every on-canvas node MUST get a
+		// checkbox, else "Deselect all" can't hide it. `navigatorNodeSource` picks
+		// the right universe per mode:
+		//   • non-droste — the mode-invariant LIMIT-trimmed set (menuLimitedNodes),
+		//     built from the pristine post-buildGraph graph with the user's REAL
+		//     havingAuto, so the menu (note list, Folder/Tag tree, search) is
+		//     IDENTICAL across all those modes regardless of their on-canvas state.
+		//   • droste (Icon Gallery) — the FULL pre-LIMIT snapshot the gallery bakes
+		//     (`drosteFullData`); the gallery draws one tile PER NODE, so the
+		//     navigator must list that same full set or LIMIT-dropped tiles would
+		//     have no checkbox and could never be hidden.
+		const menuNodeSource = navigatorNodeSource({
+			isDroste: this.settings.viewMode === "droste",
+			galleryNodes: drosteFullData?.nodes ?? [],
+			limitedNodes: this.menuLimitedNodes(menuSourceData),
+		});
+		this.menuNotes = this.projectMenuNotes(menuNodeSource);
 
 		await this.ensureBodies(data.nodes);
 		if (gen !== this.rebuildGen) return;
@@ -2676,11 +2685,11 @@ export class MiniGraphView extends ItemView {
 		this.noteMenuRedraw = null;
 	}
 
-	// The note list the navigator should show. MODE-INVARIANT: `menuNoteList`
-	// ignores `this.laid` for the displayed set and always returns the universal
-	// `this.menuNotes` (built mode-independently by buildMenuNotes). `this.laid`
-	// is passed only for signature stability with `menuClickAction` (click
-	// ROUTING stays mode-appropriate).
+	// The note list the navigator should show. `menuNoteList` ignores `this.laid`
+	// for the displayed set and always returns `this.menuNotes` (chosen per mode
+	// by navigatorNodeSource in rebuild: the mode-invariant trimmed set, or the
+	// full gallery snapshot in droste). `this.laid` is passed only for signature
+	// stability with `menuClickAction` (click ROUTING stays mode-appropriate).
 	private currentMenuNotes(): NoteRef[] {
 		return menuNoteList(this.laid, this.menuNotes);
 	}
@@ -2698,14 +2707,12 @@ export class MiniGraphView extends ItemView {
 	// (Manual/explicit HAVING and WHERE/LIMIT still apply — those are intended
 	// filters shared by all modes; only the mode-dependent auto-HAVING exemption
 	// is removed from the menu.)
-	private buildMenuNotes(source: GraphData): {
-		id: string;
-		label: string;
-		memberships: string[];
-		path: string;
-		tags: string[];
-		frontmatter: Record<string, string[]>;
-	}[] {
+	// The mode-invariant LIMIT-trimmed node set for the navigator: applies the
+	// user's REAL HAVING + LIMIT (stages 1–2) so the same vault + settings yield
+	// an identical list in every NON-droste mode. Returns the surviving GraphNodes
+	// (un-projected) so the caller can pick this OR the full droste snapshot via
+	// `navigatorNodeSource` before the single projection pass.
+	private menuLimitedNodes(source: GraphData): GraphNode[] {
 		// 1. HAVING — using the user's real havingAuto (mode-independent).
 		let graph: GraphData = { nodes: source.nodes.slice(), edges: source.edges.slice() };
 		const eff = resolveEffectiveHaving(
@@ -2738,9 +2745,20 @@ export class MiniGraphView extends ItemView {
 					membershipsOf: (nid) => membById.get(nid),
 				}),
 		);
+		return visibleNodes;
+	}
 
-		// 3. Project to NoteRefs, backfilling search metadata from metadataCache.
-		return visibleNodes.map((n) => {
+	// Project navigator GraphNodes to NoteRefs, backfilling search metadata
+	// (tags/frontmatter) from Obsidian's metadataCache.
+	private projectMenuNotes(nodes: GraphNode[]): {
+		id: string;
+		label: string;
+		memberships: string[];
+		path: string;
+		tags: string[];
+		frontmatter: Record<string, string[]>;
+	}[] {
+		return nodes.map((n) => {
 			const memberships = n.memberships ?? [];
 			const path = stripTabPrefix(n.id);
 			const { tags, frontmatter } = this.noteSearchMeta(path, memberships);

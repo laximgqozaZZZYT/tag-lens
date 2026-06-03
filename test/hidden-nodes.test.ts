@@ -19,7 +19,7 @@
 import { ok } from "./assert";
 import { buildGallery } from "../src/droste-layout";
 import { filterLayoutData } from "../src/rebuild-pipeline";
-import { hideKey, nodeIsHidden } from "../src/note-menu";
+import { hideKey, nodeIsHidden, navigatorNodeSource } from "../src/note-menu";
 import type { GraphData, MiniSettings } from "../src/types";
 import type { NoteRef } from "../src/note-menu";
 import { updateRow, removeRow } from "../src/panel-sections";
@@ -240,4 +240,69 @@ const fullData: GraphData = { nodes: allNodes, edges: allEdges };
 	const mockAutoRebuild = (): void => { autoRebuildCalled = true; };
 	mockAutoRebuild?.();
 	ok(autoRebuildCalled, "(E) deps.rebuild is called when auto-checkbox changes");
+}
+
+// ─── (F) Navigator must cover EVERY on-canvas node (droste regression) ─────────
+// Regression for the "deselect-all leaves some gallery tiles visible" bug.
+//
+// In Icon Gallery (droste) mode the canvas bakes the FULL pre-LIMIT snapshot
+// (buildGallery emits one cell per input node — see block (A)), but the
+// navigator's checkbox list was derived from the LIMIT-trimmed menu set. Any
+// gallery cell dropped by LIMIT therefore had NO checkbox, so deselect-all could
+// never add it to hiddenNodes and the tile stayed on screen forever.
+//
+// `navigatorNodeSource` is the pure decision the rebuild wiring uses to pick the
+// note set that feeds the navigator: the FULL gallery snapshot in droste mode,
+// the mode-invariant LIMIT-trimmed set everywhere else. The invariant under test:
+// deselecting every navigator row must hide every on-canvas node.
+{
+	// Full vault snapshot the gallery bakes (pre-LIMIT): 4 notes.
+	const galleryNodes = allNodes;
+	const gallery = buildGallery({ nodes: galleryNodes, edges: allEdges });
+	// Simulate LIMIT keeping only the first 2 notes (a/b) — the OLD menu set.
+	const limitedNodes = galleryNodes.slice(0, 2);
+
+	// Same draw-time skip predicate drawDroste uses (mirrored from block (D)).
+	const skipCell = (id: string, hiddenSet: Set<string>): boolean => {
+		const tab = id.indexOf("\t");
+		const path = tab >= 0 ? id.slice(tab + 1) : id;
+		return hiddenSet.has(id) || hiddenSet.has(path);
+	};
+	// Deselect-all over a given navigator source → resulting hiddenNodes set.
+	const deselectAll = (source: { id: string }[]): Set<string> =>
+		new Set(source.map((n) => hideKey(n as NoteRef)));
+
+	// In droste mode the navigator source MUST be the full gallery snapshot.
+	const drosteSource = navigatorNodeSource({
+		isDroste: true,
+		galleryNodes,
+		limitedNodes,
+	});
+	ok(
+		drosteSource.length === galleryNodes.length,
+		"(F) droste navigator source covers the FULL pre-LIMIT gallery set",
+	);
+	const hiddenDroste = deselectAll(drosteSource);
+	ok(
+		gallery.cells.every((c) => skipCell(c.id, hiddenDroste)),
+		"(F) deselect-all hides EVERY gallery cell in droste mode (regression)",
+	);
+
+	// Documents the bug: deselecting the LIMIT-trimmed set leaves c/d visible.
+	const hiddenLimited = deselectAll(limitedNodes);
+	ok(
+		gallery.cells.some((c) => !skipCell(c.id, hiddenLimited)),
+		"(F) using the LIMIT-trimmed set would leave gallery cells visible (the bug)",
+	);
+
+	// Non-droste modes stay mode-invariant: navigator source is the trimmed set.
+	const otherSource = navigatorNodeSource({
+		isDroste: false,
+		galleryNodes,
+		limitedNodes,
+	});
+	ok(
+		otherSource.length === limitedNodes.length,
+		"(F) non-droste navigator source is the mode-invariant LIMIT-trimmed set",
+	);
 }
