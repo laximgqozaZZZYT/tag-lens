@@ -2947,7 +2947,10 @@ export class MiniGraphView extends ItemView {
 		closeBtn.addEventListener("click", (ev) => { ev.stopPropagation(); this.toggleNoteMenu(); });
 		// ── Top-level tabs: Notes | Settings ─────────────────────────────────────
 		const tabBar = head.createDiv();
-		Object.assign(tabBar.style, { display: "flex", gap: "4px", marginTop: "6px", fontWeight: "400", fontSize: "11px" } as Partial<CSSStyleDeclaration>);
+		// Underline-style tabs: the bar carries the divider line that the active
+		// tab's accent underline sits on (marginBottom:-1px lines them up), so the
+		// active tab reads as connected to the body below.
+		Object.assign(tabBar.style, { display: "flex", gap: "2px", marginTop: "8px", fontWeight: "400", fontSize: "11px", borderBottom: "1px solid #2a3447" } as Partial<CSSStyleDeclaration>);
 		tabBar.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		// Don't let a double-click on the tab bar toggle the header's minimize.
 		tabBar.addEventListener("dblclick", (ev) => ev.stopPropagation());
@@ -2965,8 +2968,11 @@ export class MiniGraphView extends ItemView {
 				if (!b) continue;
 				const on = this.activeMenuTab === key;
 				Object.assign(b.style, {
-					background: on ? "#2d6cdf" : "transparent", color: on ? "#fff" : "#9db4d6",
-					border: "1px solid #3a4760", borderRadius: "4px", padding: "3px 10px", cursor: "pointer",
+					background: "transparent", border: "none",
+					borderBottom: on ? "2px solid #2d6cdf" : "2px solid transparent",
+					borderRadius: "0", padding: "6px 14px", marginBottom: "-1px",
+					color: on ? "#e6edf3" : "#9db4d6", fontWeight: on ? "600" : "400",
+					cursor: "pointer", fontSize: "11px", lineHeight: "1.3",
 				} as Partial<CSSStyleDeclaration>);
 			}
 		};
@@ -2983,6 +2989,11 @@ export class MiniGraphView extends ItemView {
 			tabBtns[key] = b;
 			b.addEventListener("mousedown", (ev) => ev.stopPropagation());
 			b.addEventListener("click", (ev) => { ev.stopPropagation(); showTab(key); });
+			// Hover affordance for the inactive tab (active styling wins via styleTabs).
+			b.addEventListener("mouseenter", () => {
+				if (this.activeMenuTab !== key) { b.style.color = "#cdd9ec"; b.style.borderBottomColor = "#3a4760"; }
+			});
+			b.addEventListener("mouseleave", () => styleTabs());
 		};
 		mkTab("notes", "Notes");
 		mkTab("settings", "Settings");
