@@ -266,22 +266,32 @@ function comboKeysUnder(tree: TreeNode, tag: string): string[] {
 	ok(leavesAt(t, ["a", cid]).indexOf("n2.md") < 0, "tag tree: {a}-only n2 NOT in the combo subgroup");
 }
 
-// (c) Tag tree: a {A,B,C} note's combo "#a · #b · #c" appears under ALL three.
+// (c) Tag tree (SUBSET LATTICE): a {A,B,C} note nests under each 2-subset combo,
+//     which itself sits under its single tags. The 3-way node is SHARED across
+//     every parent chain and carries the note leaf.
 {
 	const notes: NoteRef[] = [
 		{ id: "m.md", label: "m", memberships: ["a", "b", "c"] },
 	];
 	const t = buildTagTree(notes);
-	const ca = comboKeysUnder(t, "a");
-	const cb = comboKeysUnder(t, "b");
-	const cc = comboKeysUnder(t, "c");
-	ok(ca.length === 1 && cb.length === 1 && cc.length === 1, "tag tree: 3-way combo present under a,b,c");
-	ok(ca[0] === cb[0] && cb[0] === cc[0], "tag tree: 3-way combo key identical under all three tags");
-	const cid = ca[0];
-	ok(labelAt(t, ["a", cid]) === "#a · #b · #c", "tag tree: 3-way combo label '#a · #b · #c'");
-	ok(leavesAt(t, ["a", cid]).join(",") === "m.md", "tag tree: combo under #a holds m");
-	ok(leavesAt(t, ["b", cid]).join(",") === "m.md", "tag tree: combo under #b holds m");
-	ok(leavesAt(t, ["c", cid]).join(",") === "m.md", "tag tree: combo under #c holds m");
+	// Top level: #a, #b, #c.
+	ok(["a", "b", "c"].every((k) => t.folders.has(k)), "tag tree: single tags #a #b #c at top level");
+	// Each single tag hosts the 2-combos that contain it.
+	ok(comboKeysUnder(t, "a").join("|") === "a b|a c", "tag tree: #a hosts 2-combos {a,b},{a,c}");
+	ok(comboKeysUnder(t, "b").join("|") === "a b|b c", "tag tree: #b hosts {a,b},{b,c}");
+	ok(comboKeysUnder(t, "c").join("|") === "a c|b c", "tag tree: #c hosts {a,c},{b,c}");
+	// The 2-combo carries the label and nests the 3-way combo as its child.
+	ok(labelAt(t, ["a", "a b"]) === "#a · #b", "tag tree: 2-combo labeled '#a · #b'");
+	ok([...t.folders.get("a")!.folders.get("a b")!.folders.keys()].join(",") === "a b c", "tag tree: {a,b} nests {a,b,c}");
+	ok(labelAt(t, ["a", "a b", "a b c"]) === "#a · #b · #c", "tag tree: 3-way labeled '#a · #b · #c'");
+	ok(leavesAt(t, ["a", "a b", "a b c"]).join(",") === "m.md", "tag tree: 3-way node holds m");
+	// The 3-way node is the SAME shared object reached via {a,b}, {a,c}, {b,c}.
+	const viaAB = t.folders.get("a")!.folders.get("a b")!.folders.get("a b c");
+	const viaAC = t.folders.get("a")!.folders.get("a c")!.folders.get("a b c");
+	const viaBC = t.folders.get("b")!.folders.get("b c")!.folders.get("a b c");
+	ok(viaAB === viaAC && viaAC === viaBC && !!viaAB, "tag tree: the 3-way node is SHARED across all parent chains");
+	// A folder cascade from #a sees the 3-way note m (descendants recurse the lattice).
+	ok(collectDescendantNoteKeys(t.folders.get("a")!).join(",") === "m.md", "tag tree: #a cascade reaches the lattice-nested m");
 }
 
 // (d) Untagged bucket: notes with no memberships go under "(untagged)" (unchanged).

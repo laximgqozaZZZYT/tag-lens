@@ -251,10 +251,17 @@ export function buildFolderPathKey(parentPath: string, name: string): string {
 // Leaf hide-keys are derived from the leaf id via stripTabPrefix so Euler copies
 // collapse to their shared path. Deterministic (folders/leaves are walked in the
 // tree's already-sorted insertion order); returned de-duplicated, order-stable.
+//
+// The tag tree is a SHARED DAG (a combo node is referenced under every parent it
+// belongs to — see buildTagTree's subset-lattice), so we memoise VISITED NODES
+// to avoid re-walking a shared subtree once per path (which would be factorial).
 export function collectDescendantNoteKeys(node: TreeNode): string[] {
 	const seen = new Set<string>();
 	const out: string[] = [];
+	const visited = new Set<TreeNode>();
 	const walk = (t: TreeNode): void => {
+		if (visited.has(t)) return;
+		visited.add(t);
 		for (const lf of t.leaves) {
 			const key = stripTabPrefix(lf.id);
 			if (!seen.has(key)) { seen.add(key); out.push(key); }
@@ -360,67 +367,126 @@ export function comboLabel(keys: string[], displays?: Map<string, string>): stri
 	return keys.map((k) => tagLabel(k, displays?.get(k))).join(" · ");
 }
 
-// Stable Map key for a multi-tag combination group. NUL-joined so two different
-// membership sets can never collide into one key (plain concatenation could:
-// {"a","bc"} and {"ab","c"} both → "abc"). Internal only; the display label
-// comes from comboLabel.
-function comboId(sortedKeys: string[]): string {
-	return `combo:${sortedKeys.join("\u0000")}`;
+// Stable Map key for a signature (sorted membership-key set). Space-joined; the
+// membership keys are URI-encoded ("tag=foo%20bar"), so they never contain a raw
+// space and two different sets cannot collide into one key. A single-tag node
+// uses the raw tag key; a combo node's key always contains a space separator.
+function sigKey(sortedKeys: string[]): string {
+	return sortedKeys.join(" ");
 }
 
-// Tag tree (multi-tag combination structure, NESTED). Deterministic.
-//   - Top level: one folder per DISTINCT membership key, label "#A" (tagLabel).
-//   - Under #A: notes with membership EXACTLY {A} -> leaves directly; notes with
-//     2+ memberships including A -> COMBINATION SUBGROUP folders keyed by the
-//     note's FULL sorted membership set (label "#A · #B …"), duplicated under
-//     EVERY constituent tag.
-//   - Notes with no memberships -> UNTAGGED_BUCKET top-level folder.
-// The NESTING is intentional: a tag folder whose combo subgroups are partially
-// hidden reads as INDETERMINATE (the tri-state checkbox shows a dash), so a
-// partial hide is visually distinct from a full uncheck. Hiding is GLOBAL per
-// note path, so the same combo placed under #A and #B stays in sync — that
-// shared state is surfaced honestly by the dash on every affected ancestor.
-// Sort: tag folders by Map key asc; within a tag renderTree shows folders
-// (combos, sorted by "combo:<keys>" asc) before leaves (label asc, id asc).
-// `displays` (optional clusterLabels-style key->name map) affects labels only;
-// grouping is always by the raw membership keys.
+// Beyond this signature degree we DON'T materialise the full subset lattice
+// (2^k intermediate nodes): such a note is linked straight under its single
+// tags instead. Keeps a pathological high-degree note from exploding the tree.
+const LATTICE_MAX_DEGREE = 8;
+
+// Sort a SHARED-DAG tree (folders by Map key asc, leaves by label/id asc),
+// MEMOISED by node identity so a node referenced under several parents stays a
+// single shared object in the output (preventing factorial blow-up).
+function sortedTreeShared(root: TreeNode): TreeNode {
+	const memo = new Map<TreeNode, TreeNode>();
+	const rec = (t: TreeNode): TreeNode => {
+		const hit = memo.get(t);
+		if (hit) return hit;
+		const out = emptyTree();
+		memo.set(t, out); // register before recursion so shared children dedupe
+		if (t.label !== undefined) out.label = t.label;
+		for (const name of [...t.folders.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) {
+			out.folders.set(name, rec(t.folders.get(name) as TreeNode));
+		}
+		out.leaves = [...t.leaves].sort((a, b) =>
+			a.label < b.label ? -1 : a.label > b.label ? 1 : (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+		);
+		return out;
+	};
+	return rec(root);
+}
+
+// Tag tree (SUBSET-LATTICE, NESTED). Deterministic.
+//   - A note tagged EXACTLY {A,B,C} lands in the node for signature {A,B,C}.
+//   - That node is nested under EVERY (k-1)-subset: {A,B,C} -> under {A,B}, {A,C},
+//     {B,C}; each {X,Y} -> under single tags {X} and {Y}; single tags are top
+//     level. So a combo is reachable along every constituent chain, and the SAME
+//     combo node is SHARED (one object) across all its parents -- toggling it in
+//     one place updates it everywhere (global per-note hiding + live refresh).
+//   - Intermediate subset nodes are created even with no exact-match notes (they
+//     host deeper combos); their checkbox reads from descendants (dash if mixed).
+//   - Notes with no memberships -> UNTAGGED_BUCKET top-level node.
+// Returned as a shared DAG (sortedTreeShared keeps the sharing); renderTree draws
+// each occurrence with its own DOM, and collectDescendantNoteKeys de-dupes by
+// visited node + note key. `displays` affects labels only.
 export function buildTagTree(notes: NoteRef[], displays?: Map<string, string>): TreeNode {
 	const root = emptyTree();
-	const tagFolder = (key: string): TreeNode => {
-		let f = root.folders.get(key);
-		if (!f) {
-			f = emptyTree();
-			f.label = key === UNTAGGED_BUCKET ? UNTAGGED_BUCKET : tagLabel(key, displays?.get(key));
-			root.folders.set(key, f);
-		}
-		return f;
-	};
 
+	// Exact signature key -> { sig, leaves } (notes tagged EXACTLY that set).
+	const exact = new Map<string, { sig: string[]; leaves: TreeLeaf[] }>();
+	const untagged: TreeLeaf[] = [];
 	for (const n of notes) {
 		const groups = (n.memberships ?? []).filter((g) => g.length > 0);
-		if (groups.length === 0) {
-			tagFolder(UNTAGGED_BUCKET).leaves.push({ id: n.id, label: leafLabel(n) });
-			continue;
-		}
-		const set = [...new Set(groups)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-		if (set.length === 1) {
-			tagFolder(set[0]).leaves.push({ id: n.id, label: leafLabel(n) });
-			continue;
-		}
-		const cid = comboId(set);
-		const clabel = comboLabel(set, displays);
-		for (const key of set) {
-			const parent = tagFolder(key);
-			let sub = parent.folders.get(cid);
-			if (!sub) {
-				sub = emptyTree();
-				sub.label = clabel;
-				parent.folders.set(cid, sub);
-			}
-			sub.leaves.push({ id: n.id, label: leafLabel(n) });
-		}
+		if (groups.length === 0) { untagged.push({ id: n.id, label: leafLabel(n) }); continue; }
+		const sig = [...new Set(groups)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+		const k = sigKey(sig);
+		let e = exact.get(k);
+		if (!e) { e = { sig, leaves: [] }; exact.set(k, e); }
+		e.leaves.push({ id: n.id, label: leafLabel(n) });
 	}
-	return sortedTree(root);
+
+	// One SHARED node per relevant signature (subsets of note signatures).
+	const nodes = new Map<string, { sig: string[]; node: TreeNode }>();
+	const ensureNode = (sig: string[]): TreeNode => {
+		const k = sigKey(sig);
+		let r = nodes.get(k);
+		if (!r) {
+			const node = emptyTree();
+			node.label = sig.length === 1 ? tagLabel(sig[0], displays?.get(sig[0])) : comboLabel(sig, displays);
+			r = { sig, node };
+			nodes.set(k, r);
+		}
+		return r.node;
+	};
+	// Every non-empty subset of a sorted signature (each subset stays sorted).
+	const subsetsOf = (sig: string[]): string[][] => {
+		const res: string[][] = [];
+		for (let mask = 1; mask < (1 << sig.length); mask++) {
+			const sub: string[] = [];
+			for (let i = 0; i < sig.length; i++) if (mask & (1 << i)) sub.push(sig[i]);
+			res.push(sub);
+		}
+		return res;
+	};
+
+	// Materialise nodes: always the single tags; the full lattice up to the cap;
+	// the exact signature node itself (carrying the leaves).
+	for (const { sig, leaves } of exact.values()) {
+		for (const t of sig) ensureNode([t]);
+		if (sig.length <= LATTICE_MAX_DEGREE) {
+			for (const sub of subsetsOf(sig)) ensureNode(sub);
+		}
+		ensureNode(sig).leaves.push(...leaves);
+	}
+
+	// Wire parent -> child by the Hasse (immediate-subset) relation. A size-1 node
+	// is top level. A size-k node nests under each existing (k-1)-subset; if none
+	// exist (a capped high-degree note), it falls back under its single tags.
+	for (const { sig, node } of nodes.values()) {
+		if (sig.length === 1) { root.folders.set(sigKey(sig), node); continue; }
+		const parents: string[][] = [];
+		for (let i = 0; i < sig.length; i++) {
+			const parentSig = sig.slice(0, i).concat(sig.slice(i + 1));
+			if (nodes.has(sigKey(parentSig))) parents.push(parentSig);
+		}
+		const targets = parents.length > 0 ? parents : sig.map((t) => [t]);
+		for (const p of targets) nodes.get(sigKey(p))!.node.folders.set(sigKey(sig), node);
+	}
+
+	if (untagged.length > 0) {
+		const u = emptyTree();
+		u.label = UNTAGGED_BUCKET;
+		u.leaves.push(...untagged);
+		root.folders.set(UNTAGGED_BUCKET, u);
+	}
+
+	return sortedTreeShared(root);
 }
 
 
