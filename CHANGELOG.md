@@ -10,7 +10,8 @@ A floating mini-menu, available in **every** view mode, that lists all notes
 (after WHERE / GROUP_BY / HAVING / LIMIT) and lets you:
 
 - Browse notes as a **Folder** tree or a **Tag** tree — the tag tree groups by
-  `#tag` and adds multi-tag **combination sub-groups** (e.g. `#a · #b`) so notes
+  `#tag` and adds multi-tag **combination sub-groups** (e.g. `#a * #b`, where `*`
+  means AND / `|` means OR) so notes
   belonging to several tags are easy to find.
 - **Search** by plain text, `#tag` (hierarchical) or frontmatter `key:value`,
   with live suggestions.

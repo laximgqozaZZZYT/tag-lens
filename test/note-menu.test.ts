@@ -228,8 +228,8 @@ function comboKeysUnder(tree: TreeNode, tag: string): string[] {
 	ok(tagLabel("tag:project") === "#project", "tagLabel: strips 'tag:' prefix");
 	ok(tagLabel("tag=status%2Factive") === "#status/active", "tagLabel: URI-decodes value");
 	ok(tagLabel("tag=x", "status/active") === "#status/active", "tagLabel: uses display name when given");
-	ok(comboLabel(["tag=a", "tag=b"]) === "#a · #b", "comboLabel: '#a · #b'");
-	ok(comboLabel(["a", "b", "c"]) === "#a · #b · #c", "comboLabel: 3-way joined by ' · '");
+	ok(comboLabel(["tag=a", "tag=b"]) === "#a * #b", "comboLabel: '#a * #b'");
+	ok(comboLabel(["a", "b", "c"]) === "#a * #b * #c", "comboLabel: 3-way joined by ' * '");
 }
 
 // (a) Tag tree: top-level tag folders are labeled "#A"; a single-tag note is a
@@ -244,7 +244,7 @@ function comboKeysUnder(tree: TreeNode, tag: string): string[] {
 	ok(comboKeysUnder(t, "a").length === 0, "tag tree: {a}-only note creates NO combo subgroup");
 }
 
-// (b) Tag tree: a {A,B} note's combo subgroup "#a · #b" appears under BOTH #a and
+// (b) Tag tree: a {A,B} note's combo subgroup "#a * #b" appears under BOTH #a and
 //     #b (intended duplication); a {A}-only note stays a direct leaf under #a.
 {
 	const notes: NoteRef[] = [
@@ -257,8 +257,8 @@ function comboKeysUnder(tree: TreeNode, tag: string): string[] {
 	const cb = comboKeysUnder(t, "b");
 	ok(ca.length === 1 && cb.length === 1 && ca[0] === cb[0], "tag tree: {a,b} combo key is the SAME under #a and #b");
 	const cid = ca[0];
-	ok(labelAt(t, ["a", cid]) === "#a · #b", "tag tree: combo subgroup labeled '#a · #b'");
-	ok(labelAt(t, ["b", cid]) === "#a · #b", "tag tree: same combo label under #b");
+	ok(labelAt(t, ["a", cid]) === "#a * #b", "tag tree: combo subgroup labeled '#a * #b'");
+	ok(labelAt(t, ["b", cid]) === "#a * #b", "tag tree: same combo label under #b");
 	ok(leavesAt(t, ["a", cid]).join(",") === "n1.md", "tag tree: combo under #a holds n1");
 	ok(leavesAt(t, ["b", cid]).join(",") === "n1.md", "tag tree: combo under #b holds n1 (duplicated)");
 	// n2 ({a}-only) is a DIRECT leaf under #a, not inside the combo subgroup.
@@ -281,9 +281,9 @@ function comboKeysUnder(tree: TreeNode, tag: string): string[] {
 	ok(comboKeysUnder(t, "b").join("|") === "a b|b c", "tag tree: #b hosts {a,b},{b,c}");
 	ok(comboKeysUnder(t, "c").join("|") === "a c|b c", "tag tree: #c hosts {a,c},{b,c}");
 	// The 2-combo carries the label and nests the 3-way combo as its child.
-	ok(labelAt(t, ["a", "a b"]) === "#a · #b", "tag tree: 2-combo labeled '#a · #b'");
+	ok(labelAt(t, ["a", "a b"]) === "#a * #b", "tag tree: 2-combo labeled '#a * #b'");
 	ok([...t.folders.get("a")!.folders.get("a b")!.folders.keys()].join(",") === "a b c", "tag tree: {a,b} nests {a,b,c}");
-	ok(labelAt(t, ["a", "a b", "a b c"]) === "#a · #b · #c", "tag tree: 3-way labeled '#a · #b · #c'");
+	ok(labelAt(t, ["a", "a b", "a b c"]) === "#a * #b * #c", "tag tree: 3-way labeled '#a * #b * #c'");
 	ok(leavesAt(t, ["a", "a b", "a b c"]).join(",") === "m.md", "tag tree: 3-way node holds m");
 	// The 3-way node is the SAME shared object reached via {a,b}, {a,c}, {b,c}.
 	const viaAB = t.folders.get("a")!.folders.get("a b")!.folders.get("a b c");
@@ -316,7 +316,7 @@ function comboKeysUnder(tree: TreeNode, tag: string): string[] {
 	const t = buildTagTree(notes, displays);
 	ok(labelAt(t, ["tag=proj"]) === "#project", "tag tree: display name → '#project'");
 	const cid = comboKeysUnder(t, "tag=proj")[0];
-	ok(labelAt(t, ["tag=proj", cid]) === "#project · #status/active", "tag tree: combo uses display names");
+	ok(labelAt(t, ["tag=proj", cid]) === "#project * #status/active", "tag tree: combo uses display names");
 }
 
 // (b) searchNotes dedupes a multi-group note to a single result.

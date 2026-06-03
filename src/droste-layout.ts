@@ -76,7 +76,7 @@ export function layoutDroste(data: GraphData, opts: DrosteLayoutOpts = {}): Dros
 	const cap = Math.max(1, Math.floor(opts.cols ?? 8));
 	const labels = opts.labels ?? new Map<string, string>();
 	const clusterLabel = (k: string): string => labels.get(k) ?? k;
-	const sigLabel = (keys: string[]): string => keys.map(clusterLabel).join(" ∩ ");
+	const sigLabel = (keys: string[]): string => keys.map(clusterLabel).join(" * ");
 	const nodes = data.nodes;
 
 	let focusId = opts.focusId && nodes.some((n) => n.id === opts.focusId) ? opts.focusId : "";
@@ -232,7 +232,7 @@ export function buildGallery(data: GraphData, labels?: Map<string, string>): Dro
 // "share a subset of T" groups (e.g. {character} when T={character,hero}) are populated.
 export function buildIcon(g: DrosteGallery, focusId: string): IconDiagram {
 	const clusterLabel = (k: string): string => g.labels.get(k) ?? k;
-	const sigLabel = (keys: string[]): string => (keys.length ? keys.map(clusterLabel).join(" ∩ ") : "(none)");
+	const sigLabel = (keys: string[]): string => (keys.length ? keys.map(clusterLabel).join(" * ") : "(none)");
 	const T = g.nodeKeys.get(focusId) ?? [];
 	const focusLabel = g.nodeLabel.get(focusId) ?? focusId;
 	const k = T.length;

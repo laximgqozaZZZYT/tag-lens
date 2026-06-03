@@ -32,7 +32,7 @@ ok(!r(2).ids.includes("z"), "② excludes superset z");
 
 // ③ the single T-enclosure frame, labelled with T's tags.
 ok(r(3).ids.length === 1 && r(3).ids[0] === "__T", "③ = one T-enclosure frame");
-ok(r(3).labels[0] === "Alpha ∩ Beta", "③ frame labelled with T's tags");
+ok(r(3).labels[0] === "Alpha * Beta", "③ frame labelled with T's tags");
 
 // ④ proper-subset signatures present in data: {A} and {B} (both size 1 here),
 // ordered |sig| desc then count desc → {A}(count 2) before {B}(count 1). z excluded.

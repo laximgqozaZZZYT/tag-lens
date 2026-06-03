@@ -206,12 +206,12 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 			const labelY = scy - Ro - 2 * dpr; // outside the frame (above top edge)
 			if (R.isTwo) {
 				ctx.fillStyle = "hsl(45,60%,82%)"; ctx.font = `${10 * dpr}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-				ctx.fillText(truncateToWidth(ctx, icon.levels[f].sets.map((s) => s.label).join(" ∩ "), 1.95 * Ro), scx, labelY);
+				ctx.fillText(truncateToWidth(ctx, icon.levels[f].sets.map((s) => s.label).join(" * "), 1.95 * Ro), scx, labelY);
 			} else if (R.isLink) {
 				// ⑤: "link | backlink" (only the categories present), each in its colour.
 				drawTagLabel(ctx, R.lvl.sets.map((s) => s.label), R.lvl.sets.map((s) => s.hue ?? 0), scx, labelY, dpr);
 			} else {
-				// ③: THIS ring's own sets (e.g. "beat∩drama | beat∩timeline | drama∩timeline"
+				// ③: THIS ring's own sets (e.g. "beat*drama | beat*timeline | drama*timeline"
 				// for the 2-tag-subset ring, "beat | drama | timeline" for the 1-tag ring),
 				// each in its set colour — NOT always T's single tags (that duplicated labels
 				// across the ③₁/③₂ rings).

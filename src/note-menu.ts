@@ -362,9 +362,10 @@ function stripTagPrefix(key: string): string {
 	}
 }
 
-// Combination label for a sorted set of membership keys -> "#A · #B · #C".
+// Combination label for a sorted set of membership keys -> "#A * #B * #C".
+// `*` is the unified AND (intersection) operator across the whole UI; `|` is OR.
 export function comboLabel(keys: string[], displays?: Map<string, string>): string {
-	return keys.map((k) => tagLabel(k, displays?.get(k))).join(" · ");
+	return keys.map((k) => tagLabel(k, displays?.get(k))).join(" * ");
 }
 
 // Stable Map key for a signature (sorted membership-key set). Space-joined; the

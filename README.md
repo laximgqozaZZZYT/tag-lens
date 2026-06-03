@@ -30,7 +30,7 @@ A floating panel — available in **every** view mode — lists all notes (after
 WHERE / GROUP_BY / HAVING / LIMIT), with the same content regardless of the mode:
 
 - **Folder** and **Tag** trees. The tag tree groups notes by `#tag` and adds
-  multi-tag **combination sub-groups** (e.g. `#a · #b`) so notes that belong to
+  multi-tag **combination sub-groups** (e.g. `#a * #b`, `*` = AND, `|` = OR) so notes that belong to
   several tags are easy to find.
 - **Search** by plain text, `#tag` (hierarchical) or frontmatter `key:value`,
   with live suggestions.

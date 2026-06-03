@@ -3151,7 +3151,7 @@ export class MiniGraphView extends ItemView {
 		// pass after draw() can re-open them.
 		const renderTree = (container: HTMLElement, t: TreeNode, depth: number, parentPath = ""): void => {
 			for (const [name, child] of t.folders.entries()) {
-				// Tag-tree folders carry a display label ("#project", "#A · #B");
+				// Tag-tree folders carry a display label ("#project", "#A * #B");
 				// folder-tree nodes have none, so fall back to the Map key.
 				const display = child.label ?? name;
 				const folderPath = buildFolderPathKey(parentPath, name);
@@ -3472,7 +3472,7 @@ export class MiniGraphView extends ItemView {
 		const sigTitle = node.isOther
 			? `Other (×${node.signature.length || node.count})`
 			: node.displayTags.length
-				? node.displayTags.map((s) => `#${s}`).join(" ∩ ")
+				? node.displayTags.map((s) => `#${s}`).join(" * ")
 				: "(no tags)";
 		const title = `${sigTitle} (${node.nodeIds.length})`;
 		this.showNodeListOverlay(title, node.nodeIds, sx, sy, () => {
@@ -3894,7 +3894,7 @@ export class MiniGraphView extends ItemView {
 				// cell's colour scale.
 				const uni = ti.size + tj.size - cnt;
 				const jac = uni > 0 ? (cnt / uni).toFixed(2) : "0.00";
-				tip.createSpan({ cls: "gim-tip-title", text: `${ti.label} ∩ ${tj.label}` });
+				tip.createSpan({ cls: "gim-tip-title", text: `${ti.label} * ${tj.label}` });
 				tip.createSpan({ cls: "gim-tip-sub", text: `${cnt} notes (Jaccard ${jac})` });
 			}
 			this.root.appendChild(tip);
@@ -4158,8 +4158,8 @@ export class MiniGraphView extends ItemView {
 				// "Other (×M)" bundle nodes have no concrete signature — the
 				// signature array is empty by construction in lattice-layout.
 				// Render their title as "その他 (×M)" with the count; concrete
-				// intersections show the DISPLAY tag list joined by " ∩ " (same
-				// resolution the header uses).
+				// intersections show the DISPLAY tag list joined by " * " (the unified
+				// AND operator; same resolution the header uses).
 				this.openLatticeDetail(hitNode, sx, sy);
 				return;
 			}
