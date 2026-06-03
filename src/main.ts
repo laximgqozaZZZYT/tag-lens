@@ -79,7 +79,11 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		if (merged.orderDir !== "asc" && merged.orderDir !== "desc") {
 			merged.orderDir = "asc";
 		}
-		if (typeof merged.panelVisible !== "boolean") merged.panelVisible = false;
+		// The unified menu (note navigator + graph-settings tabs) shows by default;
+		// the toolbar gear / the menu's × toggle it. `panelVisible` (the old docking
+		// settings panel) is retired.
+		if (typeof merged.noteMenuVisible !== "boolean") merged.noteMenuVisible = true;
+		delete merged.panelVisible;
 		if (typeof merged.showBody !== "boolean") merged.showBody = true;
 		// Retired pixel-sized fields (now superseded by nodeRows / nodeCols).
 		delete merged.nodeWidth;

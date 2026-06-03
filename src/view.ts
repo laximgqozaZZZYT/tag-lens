@@ -231,6 +231,13 @@ export class MiniGraphView extends ItemView {
 	// non-essential) and a small banner surfaces the cause on-canvas. Logged once.
 	private noteMenuError: string | null = null;
 	private noteMenuErrorLogged = false;
+	// Which top-level tab the unified menu shows: the note navigator ("notes") or
+	// the graph settings ("settings"). In-memory only — opening via the toolbar
+	// gear always resets to "notes"; a manual switch survives graph rebuilds.
+	private activeMenuTab: "notes" | "settings" = "notes";
+	// The live container the settings tab renders into (replaces the old docking
+	// panel's `panelEl` as the host that `applyTabFilter`/`renderTabButton` query).
+	private settingsHostEl: HTMLElement | null = null;
 	// The last note "located" on canvas via the navigator (non-droste modes),
 	// used to highlight its row in the menu.
 	private locatedNoteId: string | null = null;
@@ -301,7 +308,6 @@ export class MiniGraphView extends ItemView {
 	// Per-node resolved NODE_DISPLAY snapshot. Filled once per rebuild from
 	// the override chain so cardFor / drawCard don't re-walk it per call.
 	private nodeDisplayCache: Map<string, NodeDisplay> = new Map();
-	private panelEl: HTMLDivElement | null = null;
 	// Current tab in the settings panel. "__all__" = 全体. Otherwise = a
 	// cluster groupKey produced by WHERE → GROUP_BY → HAVING.
 	private activeTab: string = "__all__";
@@ -439,50 +445,43 @@ export class MiniGraphView extends ItemView {
 			}),
 		);
 
-		this.addAction("sliders-horizontal", "Toggle graph settings", () => this.togglePanel());
+		// The toolbar gear now opens/closes the UNIFIED menu (note navigator +
+		// graph settings as tabs). Graph settings is the "Settings" tab inside it.
+		this.addAction("sliders-horizontal", "Toggle Tag Lens menu", () => this.toggleNoteMenu());
 
 		void this.rebuild();
 		this.resize();
-		if (this.settings.panelVisible) this.renderPanel();
 	}
 
-	private togglePanel(): void {
-		this.settings.panelVisible = !this.settings.panelVisible;
+	// Open/close the unified menu. Opening always lands on the Notes tab; the
+	// menu itself is (re)built by ensureNoteMenu() on the next draw pass.
+	private toggleNoteMenu(): void {
+		this.settings.noteMenuVisible = !this.settings.noteMenuVisible;
 		void this.save();
-		if (this.settings.panelVisible) this.renderPanel();
-		else this.tearDownPanel();
+		if (this.settings.noteMenuVisible) {
+			this.activeMenuTab = "notes";
+			this.requestDraw();
+		} else {
+			this.removeNoteMenu();
+		}
 	}
 
 	async onClose(): Promise<void> {
 		this.resizeObs?.disconnect();
 		cancelAnimationFrame(this.rafId);
 		this.cancelHover();
-		this.tearDownPanel();
+		this.removeNoteMenu();
 	}
 
-	// ---- Settings panel (in-view, Obsidian-core-graph-style) ----
-
-	private tearDownPanel(): void {
-		this.panelEl?.remove();
-		this.panelEl = null;
-	}
-
-	private renderPanel(): void {
-		if (!this.settings.panelVisible) {
-			this.tearDownPanel();
-			return;
-		}
-		if (!this.panelEl) {
-			this.panelEl = this.root.createDiv({ cls: "gim-panel" });
-		}
-		const el = this.panelEl;
+	// Render the graph-settings UI (layer chips + the active layer/all content)
+	// into `host`. This is the body of the unified menu's "Settings" tab — it
+	// reuses every existing render*Section helper unchanged; only the host moved
+	// from the old right-docking `.gim-panel` to the menu. `host` is recorded so
+	// `applyTabFilter`/`renderTabButton` can query the live chips.
+	private renderSettingsBody(host: HTMLElement): void {
+		this.settingsHostEl = host;
+		const el = host;
 		el.empty();
-
-		const header = el.createDiv({ cls: "gim-panel-header" });
-		header.createEl("h3", { text: "Graph settings" });
-		const closeBtn = header.createEl("button", { cls: "gim-panel-close", text: "×" });
-		closeBtn.setAttr("aria-label", "Close settings");
-		closeBtn.addEventListener("click", () => this.togglePanel());
 
 		// Tab bar: 全体 + one tab per cluster produced by WHERE → GROUP_BY →
 		// HAVING. If the previously active tab has been filtered out (e.g.
@@ -535,6 +534,16 @@ export class MiniGraphView extends ItemView {
 		}
 	}
 
+	// Re-render the settings tab in place after a settings change. No-op unless
+	// the unified menu is open AND currently showing the Settings tab (so a
+	// change made elsewhere doesn't force a tab switch). Replaces the old
+	// `renderPanel()` self-refresh of the docking panel.
+	private refreshSettingsTab(): void {
+		if (this.noteMenu && this.activeMenuTab === "settings" && this.settingsHostEl) {
+			this.renderSettingsBody(this.settingsHostEl);
+		}
+	}
+
 	private renderTabButton(
 		bar: HTMLElement,
 		key: string,
@@ -557,7 +566,7 @@ export class MiniGraphView extends ItemView {
 		}
 		btn.addEventListener("click", () => {
 			this.activeTab = key;
-			this.renderPanel();
+			this.refreshSettingsTab();
 		});
 	}
 
@@ -567,9 +576,9 @@ export class MiniGraphView extends ItemView {
 	// Also reveals the currently-active tab even if it doesn't match the
 	// filter, so the user can always see "where they are".
 	private applyTabFilter(): void {
-		if (!this.panelEl) return;
+		if (!this.settingsHostEl) return;
 		const q = this.tabFilter.trim().toLowerCase();
-		const chips = this.panelEl.querySelectorAll<HTMLElement>(".gim-panel-tab");
+		const chips = this.settingsHostEl.querySelectorAll<HTMLElement>(".gim-panel-tab");
 		chips.forEach((btn) => {
 			if (btn.dataset.alwaysVisible === "1" || btn.classList.contains("active")) {
 				btn.style.display = "";
@@ -742,7 +751,7 @@ export class MiniGraphView extends ItemView {
 				if (i >= 0) this.settings.hiddenNodes.splice(i, 1);
 			}
 			void this.save();
-			this.renderPanel();
+			this.refreshSettingsTab();
 			this.requestDraw();
 		});
 		const hideAllBtn = controls.createEl("button", { text: "Hide all" });
@@ -753,7 +762,7 @@ export class MiniGraphView extends ItemView {
 				}
 			}
 			void this.save();
-			this.renderPanel();
+			this.refreshSettingsTab();
 			this.requestDraw();
 		});
 
@@ -1202,7 +1211,7 @@ export class MiniGraphView extends ItemView {
 			this.settings.viewMode = next;
 			void this.save();
 			void this.rebuild();
-			this.renderPanel();
+			this.refreshSettingsTab();
 		});
 		const text = item.createDiv({ cls: "gim-viewmode-text" });
 		text.createEl("strong", {
@@ -1217,39 +1226,8 @@ export class MiniGraphView extends ItemView {
 		const section = parent.createDiv({ cls: "gim-panel-section" });
 		section.createEl("h4", { text: "View mode" });
 
-		// Note-navigator show/hide control (mode-agnostic — the navigator is shown
-		// in every view mode). Two radios bound to the boolean `noteMenuVisible`:
-		// Show → true, Hide → false. Flips the setting, persists, and shows/hides
-		// the floating menu immediately. Matches the other toggle-row styling.
-		const navRow = section.createDiv({ cls: "gim-toggle-row" });
-		navRow.createSpan({ text: "Note navigator:" });
-		const applyNoteMenu = (visible: boolean): void => {
-			this.settings.noteMenuVisible = visible;
-			void this.save();
-			if (visible) {
-				// Turn on → the next draw pass (re)creates the menu via ensureNoteMenu().
-				this.requestDraw();
-			} else {
-				// Turn off → tear the menu down immediately.
-				this.removeNoteMenu();
-			}
-		};
-		for (const [label, visible] of [
-			["Show", true],
-			["Hide", false],
-		] as const) {
-			const optLabel = navRow.createEl("label", { cls: "gim-toggle-row" });
-			const radio = optLabel.createEl("input", {
-				type: "radio",
-				attr: { name: "gim-notemenu-vis" },
-			}) as HTMLInputElement;
-			radio.checked = this.settings.noteMenuVisible === visible;
-			radio.addEventListener("change", () => {
-				if (!radio.checked) return;
-				applyNoteMenu(visible);
-			});
-			optLabel.createSpan({ text: label });
-		}
+		// (The note-navigator show/hide control was removed: the toolbar gear and
+		// the menu's × button now open/close the unified menu directly.)
 
 		// Stable modes first.
 		const stableGroup = section.createDiv({ cls: "gim-viewmode-options" });
@@ -1366,7 +1344,7 @@ export class MiniGraphView extends ItemView {
 			cb.addEventListener("change", () => {
 				set(cb.checked);
 				void this.save();
-				this.renderPanel(); // refresh Collapse enabled state
+				this.refreshSettingsTab(); // refresh Collapse enabled state
 			});
 			row.createSpan({ text: label });
 		};
@@ -1402,7 +1380,7 @@ export class MiniGraphView extends ItemView {
 			{
 				settings: this.settings,
 				save: () => void this.save(),
-				rerender: () => this.renderPanel(),
+				rerender: () => this.refreshSettingsTab(),
 				// WHERE / GROUP_BY / HAVING / LIMIT are pipeline settings — any
 				// expression change must trigger a full rebuild so the graph,
 				// note menu, and mode-specific layout all reflect the new query.
@@ -1702,7 +1680,7 @@ export class MiniGraphView extends ItemView {
 		const isDroste = this.settings.viewMode === "droste";
 		if (modeChanged || (wasEmpty && !isDroste)) this.fitToView();
 		this.requestDraw();
-		if (this.settings.panelVisible) this.renderPanel();
+		this.refreshSettingsTab();
 	}
 
 	// Build the effective LIMIT rule list by parsing manual rows + filling in
@@ -1942,7 +1920,7 @@ export class MiniGraphView extends ItemView {
 		const h = maxY - minY;
 		if (!isFinite(w) || w <= 0 || h <= 0) return false;
 		const panelW =
-			this.settings.panelVisible && this.panelEl ? this.panelEl.offsetWidth : 0;
+			0;
 		const visW = Math.max(1, this.canvas.clientWidth - panelW);
 		const visH = Math.max(1, this.canvas.clientHeight);
 		const fitZoom = Math.min(visW / w, visH / h);
@@ -2016,7 +1994,7 @@ export class MiniGraphView extends ItemView {
 			// the gutter never overlaps any node at default zoom.
 			const L = this.laid.lattice;
 			const panelW =
-				this.settings.panelVisible && this.panelEl ? this.panelEl.offsetWidth : 0;
+				0;
 			const visW = Math.max(1, this.canvas.clientWidth - panelW);
 			const visH = Math.max(1, this.canvas.clientHeight);
 			const pad = 8;
@@ -2082,7 +2060,7 @@ export class MiniGraphView extends ItemView {
 		// The settings panel overlays the right side of the canvas without
 		// pushing it, so subtract its width from the effective fit area and
 		// centre against the visible half.
-		const panelW = this.settings.panelVisible && this.panelEl ? this.panelEl.offsetWidth : 0;
+		const panelW = 0;
 		const visW = Math.max(1, this.canvas.clientWidth - panelW);
 		const visH = this.canvas.clientHeight;
 		// Reserve canvas-pixel padding (zoom-independent). Top gets extra room
@@ -2924,7 +2902,9 @@ export class MiniGraphView extends ItemView {
 		const defaultRect: MenuRect = {
 			left: 8,
 			top: 8,
-			width: 270,
+			// Wider default than the old note-only menu so the Settings tab's form
+			// rows (expressions, selects) fit without horizontal scrolling.
+			width: 320,
 			// Default height ≈ "calc(100% - 16px)" of the old maxHeight, but as an
 			// explicit number so the resize handle has something to grow/shrink.
 			height: Math.max(NOTE_MENU_MIN.height, (container.height || 600) - 16),
@@ -2955,13 +2935,66 @@ export class MiniGraphView extends ItemView {
 		// Header verb is mode-appropriate: droste focuses, other modes either
 		// locate the card on canvas or open the file.
 		const verb = isDroste ? "focus" : "locate/open";
-		const headText = head.createSpan({ text: `Notes (${nodes.length}) — click to ${verb}` });
+		// Title row: name on the left, × close on the right.
+		const titleRow = head.createDiv();
+		Object.assign(titleRow.style, { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" } as Partial<CSSStyleDeclaration>);
+		titleRow.createSpan({ text: "Tag Lens" });
+		const closeBtn = titleRow.createSpan({ text: "×" });
+		Object.assign(closeBtn.style, { cursor: "pointer", fontWeight: "700", fontSize: "16px", lineHeight: "1", padding: "0 4px", color: "#9db4d6", flex: "0 0 auto" } as Partial<CSSStyleDeclaration>);
+		closeBtn.setAttr("aria-label", "Close menu");
+		closeBtn.addEventListener("mousedown", (ev) => ev.stopPropagation());
+		closeBtn.addEventListener("dblclick", (ev) => ev.stopPropagation());
+		closeBtn.addEventListener("click", (ev) => { ev.stopPropagation(); this.toggleNoteMenu(); });
+		// ── Top-level tabs: Notes | Settings ─────────────────────────────────────
+		const tabBar = head.createDiv();
+		Object.assign(tabBar.style, { display: "flex", gap: "4px", marginTop: "6px", fontWeight: "400", fontSize: "11px" } as Partial<CSSStyleDeclaration>);
+		tabBar.addEventListener("mousedown", (ev) => ev.stopPropagation());
+		// Don't let a double-click on the tab bar toggle the header's minimize.
+		tabBar.addEventListener("dblclick", (ev) => ev.stopPropagation());
+		// Two tab panes under a flex wrapper that fills the rest of the panel.
+		const bodyWrap = panel.createDiv();
+		Object.assign(bodyWrap.style, { display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: "0", overflow: "hidden" } as Partial<CSSStyleDeclaration>);
+		const notesTab = bodyWrap.createDiv();
+		Object.assign(notesTab.style, { display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: "0" } as Partial<CSSStyleDeclaration>);
+		const settingsTab = bodyWrap.createDiv({ cls: "gim-menu-settings" });
+		Object.assign(settingsTab.style, { display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" } as Partial<CSSStyleDeclaration>);
+		const tabBtns: Partial<Record<"notes" | "settings", HTMLElement>> = {};
+		const styleTabs = (): void => {
+			for (const key of ["notes", "settings"] as const) {
+				const b = tabBtns[key];
+				if (!b) continue;
+				const on = this.activeMenuTab === key;
+				Object.assign(b.style, {
+					background: on ? "#2d6cdf" : "transparent", color: on ? "#fff" : "#9db4d6",
+					border: "1px solid #3a4760", borderRadius: "4px", padding: "3px 10px", cursor: "pointer",
+				} as Partial<CSSStyleDeclaration>);
+			}
+		};
+		const showTab = (key: "notes" | "settings"): void => {
+			this.activeMenuTab = key;
+			notesTab.style.display = key === "notes" ? "flex" : "none";
+			settingsTab.style.display = key === "settings" ? "block" : "none";
+			if (key === "settings") this.renderSettingsBody(settingsTab);
+			else this.settingsHostEl = null;
+			styleTabs();
+		};
+		const mkTab = (key: "notes" | "settings", label: string): void => {
+			const b = tabBar.createEl("button", { text: label });
+			tabBtns[key] = b;
+			b.addEventListener("mousedown", (ev) => ev.stopPropagation());
+			b.addEventListener("click", (ev) => { ev.stopPropagation(); showTab(key); });
+		};
+		mkTab("notes", "Notes");
+		mkTab("settings", "Settings");
+		// Note-count + click hint, shown at the top of the Notes pane.
+		const notesHint = notesTab.createDiv({ text: `${nodes.length} notes — click to ${verb}` });
+		Object.assign(notesHint.style, { fontSize: "10px", color: "#7e8aa0", padding: "4px 8px 0" } as Partial<CSSStyleDeclaration>);
 		// ── Grouping selector (Folder / Tag) ────────────────────────────────────
 		// A small radio group in the header switches the tree between the FOLDER
 		// tree (by note path, default) and the TAG tree (by GROUP_BY membership
 		// keys). The chosen grouping survives rebuilds (this.noteMenuGroupBy) and
 		// reloads (settings.noteMenuGroupBy). Changing it re-renders the tree.
-		const groupBar = head.createDiv();
+		const groupBar = notesTab.createDiv();
 		Object.assign(groupBar.style, {
 			display: "flex", gap: "10px", marginTop: "4px", fontWeight: "400",
 			fontSize: "11px", color: "#9db4d6", cursor: "default",
@@ -2992,7 +3025,7 @@ export class MiniGraphView extends ItemView {
 		// same key the per-row checkboxes use. Does NOT call rebuild(); a plain
 		// requestDraw() is enough because the draw() skipNode filter re-reads
 		// hiddenNodes fresh every frame.
-		const bulkBar = head.createDiv();
+		const bulkBar = notesTab.createDiv();
 		Object.assign(bulkBar.style, {
 			display: "flex", gap: "6px", marginTop: "4px",
 		} as Partial<CSSStyleDeclaration>);
@@ -3038,7 +3071,7 @@ export class MiniGraphView extends ItemView {
 		});
 		// Search input lives in a relatively-positioned wrapper so the suggestion
 		// dropdown can be absolutely positioned directly beneath it.
-		const searchWrap = panel.createDiv();
+		const searchWrap = notesTab.createDiv();
 		Object.assign(searchWrap.style, { position: "relative", margin: "6px 8px", flex: "0 0 auto" } as Partial<CSSStyleDeclaration>);
 		const search = searchWrap.createEl("input", { attr: { type: "text", placeholder: "Search: word, #tag, key:value" } });
 		Object.assign(search.style, { display: "block", width: "100%", boxSizing: "border-box", padding: "4px 6px", background: "#0f1116", border: "1px solid #2a3447", borderRadius: "4px", color: "#e6edf3" } as Partial<CSSStyleDeclaration>);
@@ -3054,7 +3087,7 @@ export class MiniGraphView extends ItemView {
 			boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "70", overflow: "auto", maxHeight: "240px",
 			display: "none",
 		} as Partial<CSSStyleDeclaration>);
-		const body = panel.createDiv({ cls: "gim-notemenu-body" });
+		const body = notesTab.createDiv({ cls: "gim-notemenu-body" });
 		// flex:1 1 auto + minHeight:0 → the tree scroll area grows/shrinks with the
 		// panel height (set above / on resize) instead of a fixed maxHeight.
 		Object.assign(body.style, { overflow: "auto", padding: "4px 6px 8px", flex: "1 1 auto", minHeight: "0" } as Partial<CSSStyleDeclaration>);
@@ -3076,24 +3109,20 @@ export class MiniGraphView extends ItemView {
 		};
 		const applyMinimizedState = (): void => {
 			if (this.noteMenuMinimized) {
-				search.style.display = "none";
-				body.style.display = "none";
+				// Collapse to the header bar (title + tabs): hide the whole tab body.
+				bodyWrap.style.display = "none";
 				// Resize is meaningless while collapsed — hide the grip.
 				grip.style.display = "none";
 				const collapsed = noteMenuHeight(true, headerOnlyHeight(), rect.height, this.noteMenuRestoreHeight);
 				panel.style.height = `${collapsed}px`;
-				// Header-only hint: show the bare title (no count/verb, no icon).
-				headText.setText(`Notes (${nodes.length})`);
 			} else {
-				search.style.display = "";
-				body.style.display = "";
+				bodyWrap.style.display = "flex";
 				grip.style.display = "";
 				// Restore the remembered body height (fall back to the live rect).
 				const current = this.noteMenuRect?.height ?? rect.height;
 				const h = noteMenuHeight(false, headerOnlyHeight(), current, this.noteMenuRestoreHeight);
 				panel.style.height = `${h}px`;
 				if (this.noteMenuRect) this.noteMenuRect = { ...this.noteMenuRect, height: h };
-				headText.setText(`Notes (${nodes.length}) — click to ${verb}`);
 			}
 		};
 		head.addEventListener("dblclick", (ev: MouseEvent) => {
@@ -3452,6 +3481,9 @@ export class MiniGraphView extends ItemView {
 		if (this.noteMenuScrollTop > 0) {
 			body.scrollTop = this.noteMenuScrollTop;
 		}
+		// Show the active tab (Notes by default; preserved across rebuilds). This
+		// also renders the Settings body on demand when that tab is active.
+		showTab(this.activeMenuTab);
 	}
 
 	// Wire the note navigator's two pure mouse-drag affordances — NO icons or
