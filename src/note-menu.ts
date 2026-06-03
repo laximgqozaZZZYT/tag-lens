@@ -360,53 +360,54 @@ export function comboLabel(keys: string[], displays?: Map<string, string>): stri
 	return keys.map((k) => tagLabel(k, displays?.get(k))).join(" · ");
 }
 
-// Tag tree (multi-tag combination structure). Deterministic.
-//   - Top level: one folder per DISTINCT membership key, label "#A" (tagLabel).
-//   - Under #A: notes with membership EXACTLY {A} -> leaves directly; notes with
-//     2+ memberships including A -> COMBINATION SUBGROUP folders keyed by the
-//     note's FULL sorted membership set (label "#A · #B …"), duplicated under
-//     EVERY constituent tag.
-//   - Notes with no memberships -> UNTAGGED_BUCKET top-level folder.
-// Sort: tag folders by Map key asc; within a tag renderTree shows folders
-// (combos, sorted by "combo:<keys>" asc) before leaves (label asc, id asc).
-// `displays` (optional clusterLabels-style key->name map) affects labels only;
-// grouping is always by the raw membership keys.
+// Stable Map key for a multi-tag combination group. NUL-joined so two different
+// membership sets can never collide into one key (plain concatenation could:
+// {"a","bc"} and {"ab","c"} both → "abc"). Internal only; the display label
+// comes from comboLabel.
+function comboId(sortedKeys: string[]): string {
+	return `combo:${sortedKeys.join("\u0000")}`;
+}
+
+// Tag tree (EXACT-signature grouping). Deterministic.
+//   - One TOP-LEVEL group per DISTINCT exact membership set (signature):
+//       • a single-tag note {A}      → group keyed by the tag key, label "#A".
+//       • a multi-tag note {A,B,…}   → group keyed by comboId(set), label
+//                                       "#A · #B …" (an INTERSECTION group).
+//   - Each note is placed in EXACTLY ONE group (its signature) — multi-tag notes
+//     are NOT duplicated under each constituent tag. This keeps each note's
+//     visibility checkbox in a single place, so toggling an intersection group
+//     (e.g. "#A · #B") never visually changes the unrelated "#A" / "#B" groups,
+//     which hold only the notes tagged EXACTLY {A} / {B}. The structure mirrors
+//     the Intersection-lattice canvas, where each exact signature is one node.
+//   - Notes with no memberships -> UNTAGGED_BUCKET top-level group.
+// Sort: groups by Map key asc; within a group renderTree shows leaves (label asc,
+// id asc). `displays` (optional clusterLabels-style key->name map) affects labels
+// only; grouping is always by the raw membership keys.
 export function buildTagTree(notes: NoteRef[], displays?: Map<string, string>): TreeNode {
 	const root = emptyTree();
-	const tagFolder = (key: string): TreeNode => {
+	const ensureGroup = (key: string, label: string): TreeNode => {
 		let f = root.folders.get(key);
 		if (!f) {
 			f = emptyTree();
-			f.label = key === UNTAGGED_BUCKET ? UNTAGGED_BUCKET : tagLabel(key, displays?.get(key));
+			f.label = label;
 			root.folders.set(key, f);
 		}
 		return f;
 	};
-	const comboId = (sortedKeys: string[]): string => `combo:${sortedKeys.join("")}`;
 
 	for (const n of notes) {
 		const groups = (n.memberships ?? []).filter((g) => g.length > 0);
 		if (groups.length === 0) {
-			tagFolder(UNTAGGED_BUCKET).leaves.push({ id: n.id, label: leafLabel(n) });
+			ensureGroup(UNTAGGED_BUCKET, UNTAGGED_BUCKET).leaves.push({ id: n.id, label: leafLabel(n) });
 			continue;
 		}
 		const set = [...new Set(groups)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-		if (set.length === 1) {
-			tagFolder(set[0]).leaves.push({ id: n.id, label: leafLabel(n) });
-			continue;
-		}
-		const cid = comboId(set);
-		const clabel = comboLabel(set, displays);
-		for (const key of set) {
-			const parent = tagFolder(key);
-			let sub = parent.folders.get(cid);
-			if (!sub) {
-				sub = emptyTree();
-				sub.label = clabel;
-				parent.folders.set(cid, sub);
-			}
-			sub.leaves.push({ id: n.id, label: leafLabel(n) });
-		}
+		// One group per EXACT signature; the note lands in that single group only.
+		const [key, label] =
+			set.length === 1
+				? [set[0], tagLabel(set[0], displays?.get(set[0]))]
+				: [comboId(set), comboLabel(set, displays)];
+		ensureGroup(key, label).leaves.push({ id: n.id, label: leafLabel(n) });
 	}
 	return sortedTree(root);
 }

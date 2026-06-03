@@ -3091,6 +3091,14 @@ export class MiniGraphView extends ItemView {
 		// so checkbox states always reflect the persisted `hiddenNodes`.
 		const hiddenSetNow = (): Set<string> => new Set(this.settings.hiddenNodes);
 
+		// Live checkbox-state refreshers. Every rendered row (leaf + folder/group)
+		// registers a closure that recomputes its checked/indeterminate state from
+		// the CURRENT hiddenNodes. After ANY toggle we run them all so sibling/parent
+		// boxes update WITHOUT tearing down the tree DOM (which would collapse open
+		// folders). The list is reset whenever the tree body is re-rendered (draw()).
+		const checkboxRefreshers: (() => void)[] = [];
+		const refreshCheckboxes = (): void => { for (const r of checkboxRefreshers) r(); };
+
 		const leafRow = (container: HTMLElement, id: string, label: string, depth: number): HTMLElement => {
 			const row = container.createDiv();
 			const highlightId = this.currentMenuHighlightId();
@@ -3104,6 +3112,9 @@ export class MiniGraphView extends ItemView {
 			const noteKey = stripTabPrefix(id);
 			const cb = mkRowCheckbox(row);
 			cb.checked = !hiddenSetNow().has(noteKey);
+			// Register a live refresher so a group cascade (or a duplicate of this
+			// note elsewhere in the tree) updates THIS box without a tree rebuild.
+			checkboxRefreshers.push(() => { cb.checked = !hiddenSetNow().has(noteKey); });
 			cb.addEventListener("change", () => {
 				// Toggle this note's hide key (its PATH) so EVERY on-canvas copy of
 				// the note is hidden/shown at once in every mode.
@@ -3117,6 +3128,9 @@ export class MiniGraphView extends ItemView {
 				this.toggleArrayMember("hiddenNodes", noteKey, !cb.checked);
 				void this.save();
 				this.requestDraw();
+				// Reflect the new global state in every other visible box (parents
+				// go indeterminate, a duplicate leaf re-syncs) — no tree rebuild.
+				refreshCheckboxes();
 			});
 			// The label carries the row-click behaviour (focus/locate/open) + ellipsis.
 			const lbl = row.createSpan({ text: label });
@@ -3154,8 +3168,16 @@ export class MiniGraphView extends ItemView {
 					const st = folderCheckState(descKeys, hiddenSetNow());
 					fcb.indeterminate = st === "indeterminate";
 					fcb.checked = st === "checked";
+					// A PARTIAL group (some descendants hidden) must read clearly as
+					// "indeterminate", not as a full uncheck. Obsidian's themed checkbox
+					// does not render the native :indeterminate dash, so we add a theme-
+					// agnostic accent ring whenever the group is mixed.
+					fcb.style.outline = st === "indeterminate" ? "2px solid var(--interactive-accent)" : "";
+					fcb.style.outlineOffset = st === "indeterminate" ? "-1px" : "";
 				};
 				applyFolderState();
+				// Live-refresh this group's tri-state after any toggle elsewhere.
+				checkboxRefreshers.push(applyFolderState);
 				fcb.addEventListener("change", () => {
 					// Standard cascade: currently fully checked → hide all; otherwise
 					// (unchecked OR indeterminate) → show all. Update every descendant
@@ -3168,6 +3190,8 @@ export class MiniGraphView extends ItemView {
 					for (const k of descKeys) this.toggleArrayMember("hiddenNodes", k, hide);
 					void this.save();
 					this.requestDraw();
+					// Update this group's own box + its leaves/ancestors live.
+					refreshCheckboxes();
 				});
 				const lbl = row.createSpan({ text: `▸ ${display}` });
 				Object.assign(lbl.style, { flex: "1 1 auto", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as Partial<CSSStyleDeclaration>);
@@ -3195,6 +3219,8 @@ export class MiniGraphView extends ItemView {
 		};
 		const draw = (): void => {
 			body.empty();
+			// The tree DOM is rebuilt below — drop refreshers bound to the old rows.
+			checkboxRefreshers.length = 0;
 			const q = search.value.trim();
 			if (q) {
 				// Advanced search ALWAYS shows a flat, UNIQUE-by-path list — never

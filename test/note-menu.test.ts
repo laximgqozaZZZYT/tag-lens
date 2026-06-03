@@ -232,56 +232,95 @@ function comboKeysUnder(tree: TreeNode, tag: string): string[] {
 	ok(comboLabel(["a", "b", "c"]) === "#a · #b · #c", "comboLabel: 3-way joined by ' · '");
 }
 
-// (a) Tag tree: top-level tag folders are labeled "#A"; a single-tag note is a
-//     DIRECT leaf under its tag folder (NOT in a combo subgroup).
+// Helper: the single top-level intersection (combo) group key for a sorted set.
+function comboKeyOf(tree: TreeNode, sortedKeys: string[]): string | undefined {
+	const want = `combo:${sortedKeys.join("\u0000")}`; // NUL-joined, matches comboId
+	return tree.folders.has(want) ? want : undefined;
+}
+
+// (a) Tag tree: a single-tag note is a DIRECT leaf under its top-level "#A" group.
 {
 	const notes: NoteRef[] = [
 		{ id: "n2.md", label: "n2", memberships: ["a"] },
 	];
 	const t = buildTagTree(notes);
-	ok(labelAt(t, ["a"]) === "#a", "tag tree: tag folder renders as '#a'");
+	ok(labelAt(t, ["a"]) === "#a", "tag tree: single-tag group renders as '#a'");
 	ok(leavesAt(t, ["a"]).join(",") === "n2.md", "tag tree: {a}-only note is a DIRECT leaf under #a");
-	ok(comboKeysUnder(t, "a").length === 0, "tag tree: {a}-only note creates NO combo subgroup");
+	ok(comboKeysUnder(t, "a").length === 0, "tag tree: {a}-only group has no nested subgroups");
 }
 
-// (b) Tag tree: a {A,B} note's combo subgroup "#a · #b" appears under BOTH #a and
-//     #b (intended duplication); a {A}-only note stays a direct leaf under #a.
+// (b) Tag tree: a {A,B} note lives in ONE top-level intersection group "#a · #b"
+//     — NOT duplicated under #a or #b. A {A}-only note lives under its own "#a"
+//     group, which therefore does NOT contain the {A,B} note (so toggling
+//     "#a · #b" leaves "#a" untouched).
 {
 	const notes: NoteRef[] = [
 		{ id: "n1.md", label: "n1", memberships: ["a", "b"] },
 		{ id: "n2.md", label: "n2", memberships: ["a"] },
 	];
 	const t = buildTagTree(notes);
-	// Same combo Map key under both parents → identical subgroup placement.
-	const ca = comboKeysUnder(t, "a");
-	const cb = comboKeysUnder(t, "b");
-	ok(ca.length === 1 && cb.length === 1 && ca[0] === cb[0], "tag tree: {a,b} combo key is the SAME under #a and #b");
-	const cid = ca[0];
-	ok(labelAt(t, ["a", cid]) === "#a · #b", "tag tree: combo subgroup labeled '#a · #b'");
-	ok(labelAt(t, ["b", cid]) === "#a · #b", "tag tree: same combo label under #b");
-	ok(leavesAt(t, ["a", cid]).join(",") === "n1.md", "tag tree: combo under #a holds n1");
-	ok(leavesAt(t, ["b", cid]).join(",") === "n1.md", "tag tree: combo under #b holds n1 (duplicated)");
-	// n2 ({a}-only) is a DIRECT leaf under #a, not inside the combo subgroup.
-	ok(leavesAt(t, ["a"]).join(",") === "n2.md", "tag tree: {a}-only n2 stays a direct leaf under #a");
-	ok(leavesAt(t, ["a", cid]).indexOf("n2.md") < 0, "tag tree: {a}-only n2 NOT in the combo subgroup");
+	const cid = comboKeyOf(t, ["a", "b"]);
+	ok(cid !== undefined, "tag tree: {a,b} note creates a top-level '#a · #b' group");
+	ok(labelAt(t, [cid as string]) === "#a · #b", "tag tree: intersection group labeled '#a · #b'");
+	ok(leavesAt(t, [cid as string]).join(",") === "n1.md", "tag tree: '#a · #b' group holds n1");
+	// The intersection group is NOT nested under #a or #b.
+	ok(comboKeysUnder(t, "a").length === 0, "tag tree: no combo nested under #a (no duplication)");
+	ok(!t.folders.has("b"), "tag tree: no standalone '#b' group (b only occurs in the intersection)");
+	// #a holds ONLY the exactly-{a} note n2 — never the {a,b} note n1.
+	ok(leavesAt(t, ["a"]).join(",") === "n2.md", "tag tree: '#a' group holds only exactly-{a} note n2");
 }
 
-// (c) Tag tree: a {A,B,C} note's combo "#a · #b · #c" appears under ALL three.
+// (c) Tag tree: a {A,B,C} note lives in ONE top-level "#a · #b · #c" group.
 {
 	const notes: NoteRef[] = [
 		{ id: "m.md", label: "m", memberships: ["a", "b", "c"] },
 	];
 	const t = buildTagTree(notes);
-	const ca = comboKeysUnder(t, "a");
-	const cb = comboKeysUnder(t, "b");
-	const cc = comboKeysUnder(t, "c");
-	ok(ca.length === 1 && cb.length === 1 && cc.length === 1, "tag tree: 3-way combo present under a,b,c");
-	ok(ca[0] === cb[0] && cb[0] === cc[0], "tag tree: 3-way combo key identical under all three tags");
-	const cid = ca[0];
-	ok(labelAt(t, ["a", cid]) === "#a · #b · #c", "tag tree: 3-way combo label '#a · #b · #c'");
-	ok(leavesAt(t, ["a", cid]).join(",") === "m.md", "tag tree: combo under #a holds m");
-	ok(leavesAt(t, ["b", cid]).join(",") === "m.md", "tag tree: combo under #b holds m");
-	ok(leavesAt(t, ["c", cid]).join(",") === "m.md", "tag tree: combo under #c holds m");
+	const cid = comboKeyOf(t, ["a", "b", "c"]);
+	ok(cid !== undefined, "tag tree: {a,b,c} note creates a top-level 3-way group");
+	ok(labelAt(t, [cid as string]) === "#a · #b · #c", "tag tree: 3-way group label '#a · #b · #c'");
+	ok(leavesAt(t, [cid as string]).join(",") === "m.md", "tag tree: 3-way group holds m");
+	ok([...t.folders.keys()].length === 1, "tag tree: ONLY the 3-way group exists (no per-tag #a/#b/#c)");
+}
+
+// (c2) Tag tree: different signatures sharing a tag are SEPARATE groups, and a
+//      NUL-safe combo key prevents {a,bc} vs {ab,c} collisions.
+{
+	const notes: NoteRef[] = [
+		{ id: "p.md", label: "p", memberships: ["a", "bc"] },
+		{ id: "q.md", label: "q", memberships: ["ab", "c"] },
+	];
+	const t = buildTagTree(notes);
+	const k1 = comboKeyOf(t, ["a", "bc"]);
+	const k2 = comboKeyOf(t, ["ab", "c"]);
+	ok(k1 !== undefined && k2 !== undefined && k1 !== k2, "tag tree: {a,bc} and {ab,c} are DISTINCT group keys (no collision)");
+	ok(leavesAt(t, [k1 as string]).join(",") === "p.md", "tag tree: {a,bc} group holds only p");
+	ok(leavesAt(t, [k2 as string]).join(",") === "q.md", "tag tree: {ab,c} group holds only q");
+}
+
+// (c3) Toggling an INTERSECTION group leaves its constituent single-tag groups
+//      UNTOUCHED. Notes: n1{a,b}, n2{a}, n3{b}. Hiding the "#a · #b" group hides
+//      only n1; the "#a" group (n2) and "#b" group (n3) stay fully "checked".
+//      This is the user-reported fix: unchecking the intersection must NOT make
+//      #a / #b appear (partially) unchecked.
+{
+	const notes: NoteRef[] = [
+		{ id: "n1.md", label: "n1", memberships: ["a", "b"] },
+		{ id: "n2.md", label: "n2", memberships: ["a"] },
+		{ id: "n3.md", label: "n3", memberships: ["b"] },
+	];
+	const t = buildTagTree(notes);
+	const comboKey = [...t.folders.keys()].find((k) => k.startsWith("combo:"))!;
+	const comboKeys = collectDescendantNoteKeys(t.folders.get(comboKey)!);
+	const aKeys = collectDescendantNoteKeys(t.folders.get("a")!);
+	const bKeys = collectDescendantNoteKeys(t.folders.get("b")!);
+
+	// Simulate unchecking the intersection group → hide exactly its notes (n1).
+	const hidden = new Set<string>(comboKeys);
+
+	ok(folderCheckState(comboKeys, hidden) === "unchecked", "(c3) intersection group reads 'unchecked' after its own toggle");
+	ok(folderCheckState(aKeys, hidden) === "checked", "(c3) '#a' group stays 'checked' (n2 untouched)");
+	ok(folderCheckState(bKeys, hidden) === "checked", "(c3) '#b' group stays 'checked' (n3 untouched)");
 }
 
 // (d) Untagged bucket: notes with no memberships go under "(untagged)" (unchanged).
@@ -297,16 +336,20 @@ function comboKeysUnder(tree: TreeNode, tag: string): string[] {
 	ok(leavesAt(t, ["g"]).join(",") === "t1.md", "tag tree: tagged note under its group, not untagged");
 }
 
-// (e) clusterLabels-style display names flow into tag + combo labels.
+// (e) clusterLabels-style display names flow into the intersection group label.
 {
 	const notes: NoteRef[] = [
 		{ id: "p.md", label: "p", memberships: ["tag=proj", "tag=stat"] },
+		{ id: "s.md", label: "s", memberships: ["tag=proj"] },
 	];
 	const displays = new Map([["tag=proj", "project"], ["tag=stat", "status/active"]]);
 	const t = buildTagTree(notes, displays);
-	ok(labelAt(t, ["tag=proj"]) === "#project", "tag tree: display name → '#project'");
-	const cid = comboKeysUnder(t, "tag=proj")[0];
-	ok(labelAt(t, ["tag=proj", cid]) === "#project · #status/active", "tag tree: combo uses display names");
+	// Single-tag note → its own "#project" group uses the display name.
+	ok(labelAt(t, ["tag=proj"]) === "#project", "tag tree: single-tag group display name → '#project'");
+	// Multi-tag note → one top-level intersection group using both display names.
+	const cid = comboKeyOf(t, ["tag=proj", "tag=stat"]);
+	ok(cid !== undefined, "tag tree: {proj,stat} note creates a top-level intersection group");
+	ok(labelAt(t, [cid as string]) === "#project · #status/active", "tag tree: intersection label uses display names");
 }
 
 // (b) searchNotes dedupes a multi-group note to a single result.
@@ -623,19 +666,24 @@ const advNotes: NoteRef[] = [
 	const areaKeys = collectDescendantNoteKeys(ft.folders.get("Area")!).sort();
 	ok(areaKeys.join(",") === "Area/Sub/a.md,Area/Sub/b.md,Area/c.md", "collectDescendantNoteKeys: nested folders collected recursively");
 
-	// Tag tree: a {a,b} combo note appears under BOTH #a and #b. Collecting under
-	// #a returns its path ONCE (even though it's nested in a combo subgroup).
+	// Tag tree (exact-signature grouping): a {a,b} note lives in its OWN top-level
+	// "#a · #b" group; the "#a" group holds ONLY the exactly-{a} note. So
+	// collecting under "#a" returns just n2 — NOT the {a,b} note. This isolation
+	// is exactly what stops an intersection-group toggle from changing "#a".
 	const tagNotes: NoteRef[] = [
 		{ id: "n1.md", label: "n1", memberships: ["a", "b"] },
 		{ id: "n2.md", label: "n2", memberships: ["a"] },
 	];
 	const tt = buildTagTree(tagNotes);
 	const aKeys = collectDescendantNoteKeys(tt.folders.get("a")!).sort();
-	ok(aKeys.join(",") === "n1.md,n2.md", "collectDescendantNoteKeys: combo subgroup + direct leaf under #a both collected");
-	// The whole tag tree collects each distinct note ONCE despite cross-group dupes
-	// (n1 is under #a AND #b).
+	ok(aKeys.join(",") === "n2.md", "collectDescendantNoteKeys: '#a' group holds ONLY the exactly-{a} note (no combo leak)");
+	const comboKey = [...tt.folders.keys()].find((k) => k.startsWith("combo:"))!;
+	const comboNode = tt.folders.get(comboKey)!;
+	const comboKeys = collectDescendantNoteKeys(comboNode).sort();
+	ok(comboKeys.join(",") === "n1.md", "collectDescendantNoteKeys: intersection group holds ONLY the {a,b} note");
+	// The whole tag tree collects each distinct note ONCE.
 	const allKeys = collectDescendantNoteKeys(tt).sort();
-	ok(allKeys.join(",") === "n1.md,n2.md", "collectDescendantNoteKeys: cross-group note deduped to a single key");
+	ok(allKeys.join(",") === "n1.md,n2.md", "collectDescendantNoteKeys: whole tree collects each note once");
 }
 
 // collectDescendantNoteKeys: Euler copies under one folder collapse to ONE key.
@@ -784,18 +832,19 @@ const advNotes: NoteRef[] = [
 	}
 }
 
-// (e) Tag-tree combo leaf key matches the cascade key (multi-group note).
-//     A note with memberships ["a","b"] appears under both #a and #b via a combo
-//     subgroup. Its hide key from the leaf must equal what the cascade writes.
+// (e) Tag-tree intersection-group leaf key matches the cascade key (multi-tag note).
+//     A note with memberships ["a","b"] lives in ONE top-level "#a · #b" group.
+//     Its leaf hide key must equal what a cascade over that group writes.
 {
 	const comboNote: NoteRef = { id: "shared.md", label: "shared", memberships: ["a", "b"] };
 	const tt = buildTagTree([comboNote]);
-	const aNode = tt.folders.get("a")!;
-	const cascadeKeysUnderA = collectDescendantNoteKeys(aNode);
+	const comboKey = [...tt.folders.keys()].find((k) => k.startsWith("combo:"))!;
+	const comboNode = tt.folders.get(comboKey)!;
+	const cascadeKeys = collectDescendantNoteKeys(comboNode);
 
 	const leafKey = hideKey(comboNote);
-	ok(cascadeKeysUnderA.length === 1 && cascadeKeysUnderA[0] === leafKey,
-		"hide-key consistency: tag-tree combo note's cascade key equals its leafKey");
+	ok(cascadeKeys.length === 1 && cascadeKeys[0] === leafKey,
+		"hide-key consistency: intersection-group note's cascade key equals its leafKey");
 }
 
 // (f) nodeIsHidden correctly handles both PATH entries (from navigator) and
