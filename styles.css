@@ -421,78 +421,64 @@
 }
 
 /* ── Navigator tri-state checkboxes (Excel-filter style) ──────────────────────
-   We OWN the rendering so the three states are unmistakable:
+   Three visual states for the note/group visibility toggle:
      • checked       → accent box + white ✓ (note/group fully visible)
      • unchecked     → empty box           (fully hidden)
      • indeterminate → accent box + white – (SOME descendants hidden = partial)
-   Obsidian themes don't style :indeterminate (it otherwise looks unchecked), so
-   we override the native appearance entirely. High specificity + !important keep
-   this winning over core/theme `input[type=checkbox]` rules. */
-/* EVERY property is !important: Obsidian core/themes style
-   `input[type=checkbox]` AND `input[type=checkbox]::after` with their own
-   !important rules (e.g. `::after { content: none !important }`, which silently
-   ate our dash). Without !important on our ::after, the mark loses the cascade
-   regardless of selector specificity. */
-input.gim-nav-cb[type="checkbox"] {
-	appearance: none !important;
-	-webkit-appearance: none !important;
-	box-sizing: border-box !important;
-	width: 15px !important;
-	height: 15px !important;
-	min-width: 15px !important;
-	margin: 0 5px 0 0 !important;
-	padding: 0 !important;
-	flex: 0 0 auto !important;
-	position: relative !important;
-	border: 1px solid var(--checkbox-border-color, var(--background-modifier-border, #6b7280)) !important;
-	border-radius: 3px !important;
-	background-color: var(--background-primary, #1e1e1e) !important;
-	background-image: none !important;
-	-webkit-mask-image: none !important;
-	mask-image: none !important;
-	cursor: pointer !important;
+
+   Implementation: a custom <span> element (not <input type="checkbox">) so
+   Obsidian core/theme checkbox styles (`input[type=checkbox]` rules) never
+   match. This avoids cascade conflicts entirely — no !important needed.
+   State is driven by `data-state` ("checked" | "unchecked" | "indeterminate")
+   set from JS. Accessibility: role="checkbox", aria-checked, tabindex="0". */
+.gim-nav-cb {
+	display: inline-block;
+	box-sizing: border-box;
+	width: 15px;
+	height: 15px;
+	min-width: 15px;
+	margin: 0 5px 0 0;
+	padding: 0;
+	flex: 0 0 auto;
+	position: relative;
+	border: 1px solid var(--checkbox-border-color, var(--background-modifier-border, #6b7280));
+	border-radius: 3px;
+	background-color: var(--background-primary, #1e1e1e);
+	cursor: pointer;
+	vertical-align: middle;
 }
-/* Neutralise any theme ::before glyph so only our ::after mark shows. */
-input.gim-nav-cb[type="checkbox"]::before {
-	display: none !important;
-	content: none !important;
-}
-input.gim-nav-cb[type="checkbox"]:checked,
-input.gim-nav-cb[type="checkbox"]:indeterminate {
-	background-color: var(--interactive-accent, #4c78cf) !important;
-	border-color: var(--interactive-accent, #4c78cf) !important;
+.gim-nav-cb[data-state="checked"],
+.gim-nav-cb[data-state="indeterminate"] {
+	background-color: var(--interactive-accent, #4c78cf);
+	border-color: var(--interactive-accent, #4c78cf);
 }
 /* checked → white check mark */
-input.gim-nav-cb[type="checkbox"]:checked::after {
-	content: "" !important;
-	display: block !important;
-	position: absolute !important;
-	left: 4px !important;
-	top: 1px !important;
-	width: 4px !important;
-	height: 8px !important;
-	border: solid var(--text-on-accent, #ffffff) !important;
-	border-width: 0 2px 2px 0 !important;
-	border-radius: 0 !important;
-	background: none !important;
-	transform: rotate(45deg) !important;
-	box-sizing: border-box !important;
-	-webkit-mask-image: none !important;
-	mask-image: none !important;
+.gim-nav-cb[data-state="checked"]::after {
+	content: "";
+	display: block;
+	position: absolute;
+	left: 4px;
+	top: 1px;
+	width: 4px;
+	height: 8px;
+	border: solid var(--text-on-accent, #ffffff);
+	border-width: 0 2px 2px 0;
+	border-radius: 0;
+	background: none;
+	transform: rotate(45deg);
+	box-sizing: border-box;
 }
 /* indeterminate → white dash (the partial / mixed state) */
-input.gim-nav-cb[type="checkbox"]:indeterminate::after {
-	content: "" !important;
-	display: block !important;
-	position: absolute !important;
-	left: 3px !important;
-	top: 6px !important;
-	width: 7px !important;
-	height: 2px !important;
-	border: none !important;
-	border-radius: 1px !important;
-	background-color: var(--text-on-accent, #ffffff) !important;
-	transform: none !important;
-	-webkit-mask-image: none !important;
-	mask-image: none !important;
+.gim-nav-cb[data-state="indeterminate"]::after {
+	content: "";
+	display: block;
+	position: absolute;
+	left: 3px;
+	top: 6px;
+	width: 7px;
+	height: 2px;
+	border: none;
+	border-radius: 1px;
+	background-color: var(--text-on-accent, #ffffff);
+	transform: none;
 }

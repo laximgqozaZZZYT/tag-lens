@@ -1,7 +1,7 @@
 {
 	"id": "tag-lens",
 	"name": "Tag Lens",
-	"version": "0.3.2",
+	"version": "0.3.3",
 	"minAppVersion": "1.5.0",
 	"description": "Lightweight tag-membership visualisations: Icon Gallery, intersection lattice, co-occurrence heatmap, UpSet, BubbleSets.",
 	"author": "laximgqozaZZZYT",

@@ -98,7 +98,7 @@ import {
 	positionTip as positionTipFn,
 } from "./highlight";
 import { MarqueeController } from "./marquee-controller";
-import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type Suggestion } from "./note-menu";
+import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./note-menu";
 
 export const VIEW_TYPE_MINI = "tag-lens-view";
 
@@ -3079,14 +3079,36 @@ export class MiniGraphView extends ItemView {
 		// nor start a header MOVE drag. We stopPropagation on mousedown (so the
 		// header-drag listener and the row-click handler never see it) and on click
 		// (belt-and-braces). The visibility toggle is handled by the caller's
-		// `change` listener.
-		const mkRowCheckbox = (host: HTMLElement): HTMLInputElement => {
+		// `onToggle` callback.
+		//
+		// Custom <span> element (not <input type="checkbox">) — avoids cascade
+		// conflicts with Obsidian core/theme checkbox styles entirely. State is
+		// driven by `data-state` ("checked" | "unchecked" | "indeterminate")
+		// and styled in styles.css via `.gim-nav-cb[data-state="..."]`.
+		type CbState = "checked" | "unchecked" | "indeterminate";
+		const setCbState = (el: HTMLElement, state: CbState): void => {
+			el.dataset.state = state;
+			el.setAttribute("aria-checked", state === "indeterminate" ? "mixed" : state === "checked" ? "true" : "false");
+		};
+		const isCbChecked = (el: HTMLElement): boolean => el.dataset.state === "checked";
+		const mkRowCheckbox = (host: HTMLElement, onToggle: () => void): HTMLElement => {
 			// `gim-nav-cb` drives the custom tri-state rendering in styles.css
 			// (checked ✓ / empty / indeterminate –) so the partial state is
 			// unmistakable regardless of the active Obsidian theme.
-			const cb = host.createEl("input", { cls: "gim-nav-cb", attr: { type: "checkbox" } }) as HTMLInputElement;
+			const cb = host.createEl("span", {
+				cls: "gim-nav-cb",
+				attr: { role: "checkbox", "aria-checked": "false", tabindex: "0" },
+			});
+			cb.dataset.state = "unchecked";
 			cb.addEventListener("mousedown", (ev) => ev.stopPropagation());
-			cb.addEventListener("click", (ev) => ev.stopPropagation());
+			cb.addEventListener("click", (ev) => { ev.stopPropagation(); onToggle(); });
+			cb.addEventListener("keydown", (ev: KeyboardEvent) => {
+				if (ev.key === " " || ev.key === "Enter") {
+					ev.preventDefault();
+					ev.stopPropagation();
+					onToggle();
+				}
+			});
 			return cb;
 		};
 		// Current global hidden-set (path-or-id keys). Rebuilt fresh on every draw()
@@ -3112,12 +3134,7 @@ export class MiniGraphView extends ItemView {
 			// state is GLOBAL per note (driven by hiddenNodes, keyed by PATH) so a
 			// note appearing in multiple tag groups shows the same state everywhere.
 			const noteKey = stripTabPrefix(id);
-			const cb = mkRowCheckbox(row);
-			cb.checked = !hiddenSetNow().has(noteKey);
-			// Register a live refresher so a group cascade (or a duplicate of this
-			// note elsewhere in the tree) updates THIS box without a tree rebuild.
-			checkboxRefreshers.push(() => { cb.checked = !hiddenSetNow().has(noteKey); });
-			cb.addEventListener("change", () => {
+			const cb = mkRowCheckbox(row, () => {
 				// Toggle this note's hide key (its PATH) so EVERY on-canvas copy of
 				// the note is hidden/shown at once in every mode.
 				// IMPORTANT: do NOT call rebuild() here — the graph draw() already
@@ -3127,13 +3144,17 @@ export class MiniGraphView extends ItemView {
 				// collapsing all expanded folders and resetting the scroll position,
 				// which makes it impossible to uncheck several notes in a row inside
 				// an open folder.
-				this.toggleArrayMember("hiddenNodes", noteKey, !cb.checked);
+				this.toggleArrayMember("hiddenNodes", noteKey, isCbChecked(cb));
 				void this.save();
 				this.requestDraw();
 				// Reflect the new global state in every other visible box (parents
 				// go indeterminate, a duplicate leaf re-syncs) — no tree rebuild.
 				refreshCheckboxes();
 			});
+			setCbState(cb, hiddenSetNow().has(noteKey) ? "unchecked" : "checked");
+			// Register a live refresher so a group cascade (or a duplicate of this
+			// note elsewhere in the tree) updates THIS box without a tree rebuild.
+			checkboxRefreshers.push(() => { setCbState(cb, hiddenSetNow().has(noteKey) ? "unchecked" : "checked"); });
 			// The label carries the row-click behaviour (focus/locate/open) + ellipsis.
 			const lbl = row.createSpan({ text: label });
 			Object.assign(lbl.style, { flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as Partial<CSSStyleDeclaration>);
@@ -3143,13 +3164,58 @@ export class MiniGraphView extends ItemView {
 			lbl.addEventListener("click", () => this.focusNoteFromMenu(id));
 			return row;
 		};
+		// ── (all) subtree renderer (tag tree only) ──────────────────────────────
+		// Renders a collapsible "(all)" folder that lists ALL descendant notes of
+		// a parent node as a flat list. The (all) row itself has NO checkbox;
+		// individual leaf notes inside it carry the standard checkbox.
+		const renderAllFolder = (
+			container: HTMLElement,
+			leaves: TreeLeaf[],
+			depth: number,
+			parentPath: string,
+		): void => {
+			const allPath = buildFolderPathKey(parentPath, "(all)");
+			const row = container.createDiv();
+			row.dataset.menupath = allPath;
+			Object.assign(row.style, {
+				display: "flex", alignItems: "center",
+				padding: "2px 4px", paddingLeft: `${26 + depth * 12}px`,
+				color: "#7a8aa0", fontWeight: "600", fontStyle: "italic",
+			} as Partial<CSSStyleDeclaration>);
+			// (all) has NO checkbox — only a collapsible label
+			const lbl = row.createSpan({ text: `\u25b8 (all)` });
+			Object.assign(lbl.style, {
+				flex: "1 1 auto", cursor: "pointer",
+				overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+			} as Partial<CSSStyleDeclaration>);
+			const kids = container.createDiv();
+			kids.style.display = "none";
+			let built = false;
+			const openAll = (): void => {
+				kids.style.display = "block";
+				lbl.textContent = `\u25be (all)`;
+				if (!built) {
+					for (const lf of leaves) leafRow(kids, lf.id, lf.label, depth + 1);
+					built = true;
+				}
+			};
+			const closeAll = (): void => {
+				kids.style.display = "none";
+				lbl.textContent = `\u25b8 (all)`;
+			};
+			lbl.addEventListener("click", () => {
+				if (kids.style.display !== "none") closeAll(); else openAll();
+			});
+			if (this.noteMenuExpandedPaths.has(allPath)) openAll();
+		};
 		// The folders/leaves are already deterministically sorted by buildFolderTree
 		// / buildTagTree, so renderTree just walks them in insertion order.
 		// `parentPath` is the accumulated path prefix (folder keys joined by "/")
 		// used to stamp each folder row with a stable data-menupath attribute so
 		// removeNoteMenu() can snapshot which paths were open, and the restore
 		// pass after draw() can re-open them.
-		const renderTree = (container: HTMLElement, t: TreeNode, depth: number, parentPath = ""): void => {
+		// `isTagTree` enables the (all) subtree feature for tag-grouped views.
+		const renderTree = (container: HTMLElement, t: TreeNode, depth: number, parentPath = "", isTagTree = false): void => {
 			for (const [name, child] of t.folders.entries()) {
 				// Tag-tree folders carry a display label ("#project", "#A * #B");
 				// folder-tree nodes have none, so fall back to the Map key.
@@ -3165,18 +3231,7 @@ export class MiniGraphView extends ItemView {
 				// checked = all visible, unchecked = all hidden, indeterminate = mixed.
 				// Toggling cascades to EVERY descendant note (check-all / uncheck-all).
 				const descKeys = collectDescendantNoteKeys(child);
-				const fcb = mkRowCheckbox(row);
-				const applyFolderState = (): void => {
-					const st = folderCheckState(descKeys, hiddenSetNow());
-					// `.gim-nav-cb` CSS renders all three states: checked ✓, empty, and
-					// the indeterminate dash for a PARTIAL group (some descendants hidden).
-					fcb.indeterminate = st === "indeterminate";
-					fcb.checked = st === "checked";
-				};
-				applyFolderState();
-				// Live-refresh this group's tri-state after any toggle elsewhere.
-				checkboxRefreshers.push(applyFolderState);
-				fcb.addEventListener("change", () => {
+				const fcb = mkRowCheckbox(row, () => {
 					// Standard cascade: currently fully checked → hide all; otherwise
 					// (unchecked OR indeterminate) → show all. Update every descendant
 					// note key at once, save once.
@@ -3191,6 +3246,15 @@ export class MiniGraphView extends ItemView {
 					// Update this group's own box + its leaves/ancestors live.
 					refreshCheckboxes();
 				});
+				const applyFolderState = (): void => {
+					const st = folderCheckState(descKeys, hiddenSetNow());
+					// `.gim-nav-cb` CSS renders all three states: checked ✓, empty, and
+					// the indeterminate dash for a PARTIAL group (some descendants hidden).
+					setCbState(fcb, st);
+				};
+				applyFolderState();
+				// Live-refresh this group's tri-state after any toggle elsewhere.
+				checkboxRefreshers.push(applyFolderState);
 				const lbl = row.createSpan({ text: `▸ ${display}` });
 				Object.assign(lbl.style, { flex: "1 1 auto", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as Partial<CSSStyleDeclaration>);
 				const kids = container.createDiv();
@@ -3200,7 +3264,18 @@ export class MiniGraphView extends ItemView {
 				const openFolder = (): void => {
 					kids.style.display = "block";
 					lbl.textContent = `▾ ${display}`;
-					if (!built) { renderTree(kids, child, depth + 1, folderPath); built = true; }
+					if (!built) {
+						// (all) subtree: in tag-tree mode, folders with sub-folders get a
+						// collapsible "(all)" at the top listing every descendant note.
+						if (isTagTree && child.folders.size > 0) {
+							const allLeaves = collectDescendantLeaves(child);
+							if (allLeaves.length > 0) {
+								renderAllFolder(kids, allLeaves, depth + 1, folderPath);
+							}
+						}
+						renderTree(kids, child, depth + 1, folderPath, isTagTree);
+						built = true;
+					}
 				};
 				// Close this folder.
 				const closeFolder = (): void => {
@@ -3228,8 +3303,17 @@ export class MiniGraphView extends ItemView {
 				if (!hits.length) { body.createDiv({ text: "(no matches)" }); return; }
 				for (const n of hits) leafRow(body, n.id, n.label, 0);
 			} else {
-				const tree = this.noteMenuGroupBy === "tag" ? buildTagTree(nodes, this.clusterLabels) : buildFolderTree(nodes);
-				renderTree(body, tree, 0);
+				const isTag = this.noteMenuGroupBy === "tag";
+				const tree = isTag ? buildTagTree(nodes, this.clusterLabels) : buildFolderTree(nodes);
+				// Root-level (all): in tag-tree mode, insert a top-level (all)
+				// listing every note in the navigator before the tag folders.
+				if (isTag && tree.folders.size > 0) {
+					const allLeaves = collectDescendantLeaves(tree);
+					if (allLeaves.length > 0) {
+						renderAllFolder(body, allLeaves, 0, "");
+					}
+				}
+				renderTree(body, tree, 0, "", isTag);
 			}
 		};
 

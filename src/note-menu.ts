@@ -272,6 +272,30 @@ export function collectDescendantNoteKeys(node: TreeNode): string[] {
 	return out;
 }
 
+// All DISTINCT descendant TreeLeaf objects under a tree node. Same traversal as
+// collectDescendantNoteKeys but returns the leaf references themselves (for
+// rendering in the navigator's "(all)" subtree). De-duplicated by path
+// (stripTabPrefix), sorted label-asc then id-asc. Memoises visited nodes to
+// handle the shared-DAG structure safely.
+export function collectDescendantLeaves(node: TreeNode): TreeLeaf[] {
+	const seen = new Set<string>();
+	const out: TreeLeaf[] = [];
+	const visited = new Set<TreeNode>();
+	const walk = (t: TreeNode): void => {
+		if (visited.has(t)) return;
+		visited.add(t);
+		for (const lf of t.leaves) {
+			const key = stripTabPrefix(lf.id);
+			if (!seen.has(key)) { seen.add(key); out.push(lf); }
+		}
+		for (const child of t.folders.values()) walk(child);
+	};
+	walk(node);
+	out.sort((a, b) =>
+		a.label < b.label ? -1 : a.label > b.label ? 1 : (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+	return out;
+}
+
 // Tri-state for a folder/group/combo checkbox from its descendant note keys:
 //   • "checked"        — NO descendant is hidden (all visible). Also the state
 //                        for an EMPTY group (no descendants) → defaults checked.
