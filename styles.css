@@ -419,3 +419,61 @@
 	font-size: 10px;
 	line-height: 1.4;
 }
+
+/* ── Navigator tri-state checkboxes (Excel-filter style) ──────────────────────
+   We OWN the rendering so the three states are unmistakable:
+     • checked       → accent box + white ✓ (note/group fully visible)
+     • unchecked     → empty box           (fully hidden)
+     • indeterminate → accent box + white – (SOME descendants hidden = partial)
+   Obsidian themes don't style :indeterminate (it otherwise looks unchecked), so
+   we override the native appearance entirely. High specificity + !important keep
+   this winning over core/theme `input[type=checkbox]` rules. */
+input.gim-nav-cb[type="checkbox"] {
+	appearance: none !important;
+	-webkit-appearance: none !important;
+	box-sizing: border-box;
+	width: 15px;
+	height: 15px;
+	margin: 0 5px 0 0;
+	padding: 0;
+	flex: 0 0 auto;
+	position: relative;
+	border: 1px solid var(--checkbox-border-color, var(--background-modifier-border, #6b7280));
+	border-radius: 3px;
+	background-color: var(--background-primary, #1e1e1e);
+	cursor: pointer;
+}
+/* Neutralise any theme ::before/::after glyphs so only our marks show. */
+input.gim-nav-cb[type="checkbox"]::before {
+	display: none !important;
+	content: none !important;
+}
+input.gim-nav-cb[type="checkbox"]:checked,
+input.gim-nav-cb[type="checkbox"]:indeterminate {
+	background-color: var(--interactive-accent, #4c78cf) !important;
+	border-color: var(--interactive-accent, #4c78cf) !important;
+}
+/* checked → white check mark */
+input.gim-nav-cb[type="checkbox"]:checked::after {
+	content: "";
+	position: absolute;
+	left: 4px;
+	top: 1px;
+	width: 4px;
+	height: 8px;
+	border: solid var(--text-on-accent, #ffffff);
+	border-width: 0 2px 2px 0;
+	transform: rotate(45deg);
+	box-sizing: border-box;
+}
+/* indeterminate → white dash (the partial / mixed state) */
+input.gim-nav-cb[type="checkbox"]:indeterminate::after {
+	content: "";
+	position: absolute;
+	left: 3px;
+	top: 6px;
+	width: 7px;
+	height: 2px;
+	border-radius: 1px;
+	background-color: var(--text-on-accent, #ffffff);
+}

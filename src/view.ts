@@ -3081,8 +3081,10 @@ export class MiniGraphView extends ItemView {
 		// (belt-and-braces). The visibility toggle is handled by the caller's
 		// `change` listener.
 		const mkRowCheckbox = (host: HTMLElement): HTMLInputElement => {
-			const cb = host.createEl("input", { attr: { type: "checkbox" } }) as HTMLInputElement;
-			Object.assign(cb.style, { margin: "0 4px 0 0", flex: "0 0 auto", cursor: "pointer" } as Partial<CSSStyleDeclaration>);
+			// `gim-nav-cb` drives the custom tri-state rendering in styles.css
+			// (checked ✓ / empty / indeterminate –) so the partial state is
+			// unmistakable regardless of the active Obsidian theme.
+			const cb = host.createEl("input", { cls: "gim-nav-cb", attr: { type: "checkbox" } }) as HTMLInputElement;
 			cb.addEventListener("mousedown", (ev) => ev.stopPropagation());
 			cb.addEventListener("click", (ev) => ev.stopPropagation());
 			return cb;
@@ -3166,14 +3168,10 @@ export class MiniGraphView extends ItemView {
 				const fcb = mkRowCheckbox(row);
 				const applyFolderState = (): void => {
 					const st = folderCheckState(descKeys, hiddenSetNow());
+					// `.gim-nav-cb` CSS renders all three states: checked ✓, empty, and
+					// the indeterminate dash for a PARTIAL group (some descendants hidden).
 					fcb.indeterminate = st === "indeterminate";
 					fcb.checked = st === "checked";
-					// A PARTIAL group (some descendants hidden) must read clearly as
-					// "indeterminate", not as a full uncheck. Obsidian's themed checkbox
-					// does not render the native :indeterminate dash, so we add a theme-
-					// agnostic accent ring whenever the group is mixed.
-					fcb.style.outline = st === "indeterminate" ? "2px solid var(--interactive-accent)" : "";
-					fcb.style.outlineOffset = st === "indeterminate" ? "-1px" : "";
 				};
 				applyFolderState();
 				// Live-refresh this group's tri-state after any toggle elsewhere.
