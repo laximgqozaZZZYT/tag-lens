@@ -308,9 +308,13 @@ export class MiniGraphView extends ItemView {
 	// Per-node resolved NODE_DISPLAY snapshot. Filled once per rebuild from
 	// the override chain so cardFor / drawCard don't re-walk it per call.
 	private nodeDisplayCache: Map<string, NodeDisplay> = new Map();
-	// Current tab in the settings panel. "__all__" = 全体. Otherwise = a
-	// cluster groupKey produced by WHERE → GROUP_BY → HAVING.
+	// The selected LAYER (cluster groupKey) in the Settings → Layers sub-tab.
+	// Repurposed from the old "__all__"/groupKey chip selector; "__all__" now
+	// just means "no specific layer yet" and is replaced by the first cluster.
 	private activeTab: string = "__all__";
+	// Which Settings sub-tab is shown: View / Filter / Sort / Display / Layers.
+	// In-memory, preserved across graph rebuilds. Default View.
+	private settingsSubTab: "view" | "filter" | "sort" | "display" | "layers" = "view";
 	// UpSet mode: signature key (= `signature.join("|")`) of the column
 	// currently selected by the user (highlighted in the matrix; drives
 	// the detail panel listing in Phase C). null = nothing selected.
@@ -480,34 +484,121 @@ export class MiniGraphView extends ItemView {
 	// `applyTabFilter`/`renderTabButton` can query the live chips.
 	private renderSettingsBody(host: HTMLElement): void {
 		this.settingsHostEl = host;
-		const el = host;
-		el.empty();
+		host.empty();
 
-		// Tab bar: 全体 + one tab per cluster produced by WHERE → GROUP_BY →
-		// HAVING. If the previously active tab has been filtered out (e.g.
-		// the user tightened HAVING and its cluster disappeared), fall back
-		// to 全体 silently.
-		const validTabs = new Set<string>(["__all__"]);
-		for (const c of this.laid.clusters) validTabs.add(c.groupKey);
-		if (!validTabs.has(this.activeTab)) this.activeTab = "__all__";
+		// Sub-tab bar: View / Filter / Sort / Display / Layers. Underline style,
+		// matching the top-level Notes/Settings tabs but more compact.
+		const subBar = host.createDiv();
+		Object.assign(subBar.style, { display: "flex", flexWrap: "wrap", gap: "1px", marginBottom: "6px", borderBottom: "1px solid #2a3447" } as Partial<CSSStyleDeclaration>);
+		const content = host.createDiv({ cls: "gim-panel-content" });
+		type SubKey = "view" | "filter" | "sort" | "display" | "layers";
+		const SUBS: { key: SubKey; label: string }[] = [
+			{ key: "view", label: "View" },
+			{ key: "filter", label: "Filter" },
+			{ key: "sort", label: "Sort" },
+			{ key: "display", label: "Display" },
+			{ key: "layers", label: "Layers" },
+		];
+		const subBtns = new Map<string, HTMLElement>();
+		const styleSubs = (): void => {
+			for (const { key } of SUBS) {
+				const b = subBtns.get(key);
+				if (!b) continue;
+				const on = this.settingsSubTab === key;
+				Object.assign(b.style, {
+					background: "transparent", border: "none",
+					borderBottom: on ? "2px solid #2d6cdf" : "2px solid transparent",
+					borderRadius: "0", padding: "4px 8px", marginBottom: "-1px",
+					color: on ? "#e6edf3" : "#9db4d6", fontWeight: on ? "600" : "400",
+					cursor: "pointer", fontSize: "10.5px", lineHeight: "1.3",
+				} as Partial<CSSStyleDeclaration>);
+			}
+		};
+		const renderSub = (): void => {
+			content.empty();
+			switch (this.settingsSubTab) {
+				case "view": this.renderSettingsView(content); break;
+				case "filter": this.renderSettingsFilter(content); break;
+				case "sort": this.renderSettingsSort(content); break;
+				case "display": this.renderSettingsDisplay(content); break;
+				case "layers": this.renderSettingsLayers(content); break;
+			}
+		};
+		for (const { key, label } of SUBS) {
+			const b = subBar.createEl("button", { text: label });
+			subBtns.set(key, b);
+			b.addEventListener("click", () => { this.settingsSubTab = key; styleSubs(); renderSub(); });
+			b.addEventListener("mouseenter", () => { if (this.settingsSubTab !== key) { b.style.color = "#cdd9ec"; b.style.borderBottomColor = "#3a4760"; } });
+			b.addEventListener("mouseleave", () => styleSubs());
+		}
+		styleSubs();
+		renderSub();
+	}
+
+	// ── Settings sub-tabs (split out of the old single renderAllTab scroll) ──────
+	private renderSettingsView(el: HTMLElement): void {
+		this.renderViewModeSection(el);
+		if (this.settings.viewMode === "bipartite") this.renderBipartiteSection(el);
+		if (this.settings.viewMode === "lattice") this.renderLatticeSection(el);
+	}
+
+	private renderSettingsFilter(el: HTMLElement): void {
+		const isMatrix = this.settings.viewMode === "matrix";
+		const isHeatmap = this.settings.viewMode === "heatmap";
+		this.renderExprSection(el, "WHERE", this.settings.where, this.whereError, { autoKey: "whereAuto" });
+		this.renderExprSection(el, "GROUP_BY", this.settings.groupBy, this.groupByError, { autoKey: "groupByAuto" });
+		const havingSection = this.renderExprSection(el, "HAVING", this.settings.having, this.havingError, {
+			placeholder: "e.g. count >= 3", autoKey: "havingAuto",
+		});
+		// Matrix "min column size" / heatmap "min tag size" are tag filters.
+		if (isMatrix) this.renderMatrixMinColumnControl(havingSection);
+		if (isHeatmap) this.renderHeatmapMinTagControl(havingSection);
+	}
+
+	private renderSettingsSort(el: HTMLElement): void {
+		this.renderOrderBySection(el);
+		this.renderExprSection(el, "LIMIT", this.settings.limit, this.limitError, {
+			placeholder: "limit 10 / brief 30", autoKey: "limitAuto",
+		});
+	}
+
+	private renderSettingsDisplay(el: HTMLElement): void {
+		const isMatrix = this.settings.viewMode === "matrix";
+		const isHeatmap = this.settings.viewMode === "heatmap";
+		const isLattice = this.settings.viewMode === "lattice";
+		// Matrix dots / heatmap cells / lattice nodes size by intrinsic metrics,
+		// so NODE DISPLAY (size by / m×n) is hidden for those modes.
+		if (!isMatrix && !isHeatmap && !isLattice) this.renderNodeDisplaySection(el);
+		this.renderMinFontSection(el);
+		const gdSection = this.renderToggleSection(el, "Graph display", [
+			{ key: "showNodes", label: "Show nodes" },
+			{ key: "showEnclosures", label: "Show enclosures" },
+			{ key: "showEdges", label: "Show edges" },
+			{ key: "showGrid", label: "Show grid" },
+		]);
+		if (isMatrix) this.renderMatrixDisplayToggles(gdSection);
+		if (isHeatmap) this.renderHeatmapDisplayToggles(gdSection);
+	}
+
+	// Layers sub-tab: a cluster picker (chips) + the selected cluster's
+	// per-layer settings (aggregate / inherit / node-display override).
+	private renderSettingsLayers(el: HTMLElement): void {
+		const clusters = this.laid.clusters;
+		if (clusters.length === 0) {
+			const hint = el.createDiv({ cls: "gim-panel-hint" });
+			hint.setText("No layers in the current graph (set GROUP_BY to create clusters).");
+			return;
+		}
+		// Keep the selected layer valid; default to the first cluster.
+		const validKeys = new Set(clusters.map((c) => c.groupKey));
+		if (!validKeys.has(this.activeTab)) this.activeTab = clusters[0].groupKey;
 
 		const tabBar = el.createDiv({ cls: "gim-panel-tabs" });
-
-		// Search filter for layer tabs — only needed when there is at least
-		// one cluster tab to filter against. The 全体 tab is always pinned
-		// and never hidden by the filter.
-		if (this.laid.clusters.length > 0) {
-			const filterInput = tabBar.createEl("input", {
-				cls: "gim-panel-tab-filter",
-				type: "search",
-			}) as HTMLInputElement;
+		if (clusters.length > 1) {
+			const filterInput = tabBar.createEl("input", { cls: "gim-panel-tab-filter", type: "search" }) as HTMLInputElement;
 			filterInput.setAttribute("placeholder", "Filter layers… (type to search)");
 			filterInput.value = this.tabFilter;
-			filterInput.addEventListener("input", () => {
-				this.tabFilter = filterInput.value;
-				this.applyTabFilter();
-			});
-			// Esc clears the filter without exiting the input.
+			filterInput.addEventListener("input", () => { this.tabFilter = filterInput.value; this.applyTabFilter(); });
 			filterInput.addEventListener("keydown", (e) => {
 				if (e.key === "Escape" && this.tabFilter !== "") {
 					e.preventDefault();
@@ -517,21 +608,14 @@ export class MiniGraphView extends ItemView {
 				}
 			});
 		}
-
 		const chipsEl = tabBar.createDiv({ cls: "gim-panel-tabs-chips" });
-		this.renderTabButton(chipsEl, "__all__", "All", null, null);
-		for (const c of this.laid.clusters) {
-			const labelText = `${c.label} (${c.memberCount})`;
-			this.renderTabButton(chipsEl, c.groupKey, labelText, clusterHue(c.groupKey), c.label);
+		for (const c of clusters) {
+			this.renderTabButton(chipsEl, c.groupKey, `${c.label} (${c.memberCount})`, clusterHue(c.groupKey), c.label);
 		}
 		this.applyTabFilter();
 
 		const content = el.createDiv({ cls: "gim-panel-content" });
-		if (this.activeTab === "__all__") {
-			this.renderAllTab(content);
-		} else {
-			this.renderLayerTab(content, this.activeTab);
-		}
+		this.renderLayerTab(content, this.activeTab);
 	}
 
 	// Re-render the settings tab in place after a settings change. No-op unless
@@ -587,57 +671,6 @@ export class MiniGraphView extends ItemView {
 			const text = btn.dataset.filterText ?? "";
 			btn.style.display = q === "" || text.includes(q) ? "" : "none";
 		});
-	}
-
-	private renderAllTab(el: HTMLElement): void {
-		const isMatrix = this.settings.viewMode === "matrix";
-		const isHeatmap = this.settings.viewMode === "heatmap";
-		const isLattice = this.settings.viewMode === "lattice";
-		this.renderViewModeSection(el);
-		if (this.settings.viewMode === "bipartite") this.renderBipartiteSection(el);
-		if (isLattice) this.renderLatticeSection(el);
-		this.renderExprSection(el, "WHERE", this.settings.where, this.whereError, {
-			autoKey: "whereAuto",
-		});
-		this.renderExprSection(el, "GROUP_BY", this.settings.groupBy, this.groupByError, {
-			autoKey: "groupByAuto",
-		});
-		const havingSection = this.renderExprSection(
-			el,
-			"HAVING",
-			this.settings.having,
-			this.havingError,
-			{ placeholder: "e.g. count >= 3", autoKey: "havingAuto" },
-		);
-		// Matrix "min column size" / heatmap "min tag size" are tag filters (not
-		// orders), so they live with the other filters (inside HAVING).
-		if (isMatrix) this.renderMatrixMinColumnControl(havingSection);
-		if (isHeatmap) this.renderHeatmapMinTagControl(havingSection);
-		// ORDER_BY owns row ordering for every mode. In matrix mode it renders
-		// the matrix sort options (co-occurrence / block-priority) + group /
-		// collapse toggles; otherwise the standard field/dir controls.
-		this.renderOrderBySection(el);
-		this.renderExprSection(el, "LIMIT", this.settings.limit, this.limitError, {
-			placeholder: "limit 10 / brief 30",
-			autoKey: "limitAuto",
-		});
-		// Matrix dots / heatmap cells / lattice nodes are drawn at sizes
-		// driven by their own intrinsic metrics (presence / co-occurrence /
-		// intersection-count), independent of NODE DISPLAY. Hide that section
-		// so Size by / m×n can't imply they affect those views.
-		if (!isMatrix && !isHeatmap && !isLattice) this.renderNodeDisplaySection(el);
-		this.renderMinFontSection(el);
-		const gdSection = this.renderToggleSection(el, "Graph display", [
-			{ key: "showNodes", label: "Show nodes" },
-			{ key: "showEnclosures", label: "Show enclosures" },
-			{ key: "showEdges", label: "Show edges" },
-			{ key: "showGrid", label: "Show grid" },
-		]);
-		// Matrix grouping / collapsing are DISPLAY operations → live with the
-		// Show toggles, matrix-only.
-		if (isMatrix) this.renderMatrixDisplayToggles(gdSection);
-		// Heatmap colour-scale (Jaccard vs raw count) is a display operation too.
-		if (isHeatmap) this.renderHeatmapDisplayToggles(gdSection);
 	}
 
 	private renderMinFontSection(parent: HTMLElement): void {
