@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFile, debounce } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon } from "obsidian";
 import { buildGraph } from "./parser";
 import {
 	layout,
@@ -468,6 +468,26 @@ export class MiniGraphView extends ItemView {
 		} else {
 			this.removeNoteMenu();
 		}
+	}
+
+	// Toggle pin-to-right (dock) ⇄ floating. Rebuild the menu so its geometry +
+	// drag/resize wiring switch, and requestDraw so the canvas re-reserves width.
+	private togglePin(): void {
+		this.settings.noteMenuPinned = !this.settings.noteMenuPinned;
+		void this.save();
+		this.removeNoteMenu();
+		this.requestDraw();
+	}
+
+	// Canvas width reserved on the right for the docked (pinned) menu — 0 when
+	// floating or hidden, so the floating menu just overlays. Clamped to the
+	// container so a huge persisted width can't hide the whole figure.
+	private pinnedMenuWidth(): number {
+		if (!this.settings.noteMenuPinned || !this.settings.noteMenuVisible) return 0;
+		const cw = this.canvas.clientWidth || this.root.clientWidth || 0;
+		if (cw <= 0) return 0;
+		const w = this.settings.noteMenuPinnedWidth ?? 320;
+		return Math.min(Math.max(180, w), Math.max(180, Math.floor(cw * 0.8)));
 	}
 
 	async onClose(): Promise<void> {
@@ -1952,8 +1972,7 @@ export class MiniGraphView extends ItemView {
 		const w = maxX - minX;
 		const h = maxY - minY;
 		if (!isFinite(w) || w <= 0 || h <= 0) return false;
-		const panelW =
-			0;
+		const panelW = this.pinnedMenuWidth();
 		const visW = Math.max(1, this.canvas.clientWidth - panelW);
 		const visH = Math.max(1, this.canvas.clientHeight);
 		const fitZoom = Math.min(visW / w, visH / h);
@@ -2026,8 +2045,7 @@ export class MiniGraphView extends ItemView {
 			// initial panX anchors the leftmost node just past the gutter so
 			// the gutter never overlaps any node at default zoom.
 			const L = this.laid.lattice;
-			const panelW =
-				0;
+			const panelW = this.pinnedMenuWidth();
 			const visW = Math.max(1, this.canvas.clientWidth - panelW);
 			const visH = Math.max(1, this.canvas.clientHeight);
 			const pad = 8;
@@ -2093,7 +2111,7 @@ export class MiniGraphView extends ItemView {
 		// The settings panel overlays the right side of the canvas without
 		// pushing it, so subtract its width from the effective fit area and
 		// centre against the visible half.
-		const panelW = 0;
+		const panelW = this.pinnedMenuWidth();
 		const visW = Math.max(1, this.canvas.clientWidth - panelW);
 		const visH = this.canvas.clientHeight;
 		// Reserve canvas-pixel padding (zoom-independent). Top gets extra room
@@ -2121,14 +2139,17 @@ export class MiniGraphView extends ItemView {
 	// left edge of column A) at screen x = headerW. That gives the upper-
 	// bound constraint panX ≤ headerW − minCol*W*zoom. Same logic for Y.
 	private clampPan(): void {
+		const panelW = this.pinnedMenuWidth();
+		const visW = Math.max(1, this.canvas.clientWidth - panelW);
+
 		// Connection matrix: spreadsheet scroll — never reveal empty space
 		// before row/col 0 or past the last row/col.
 		if (this.laid.matrix) {
 			const m = this.laid.matrix;
-			const g = matrixGeom(m, this.zoom, this.canvas.clientWidth);
+			const g = matrixGeom(m, this.zoom, visW);
 			const colsW = m.cols.length * g.colScreenW;
 			const rowsH = this.matrixLines.length * g.rowScreenH; // floored pitch
-			const minPanX = Math.min(g.labelBand, this.canvas.clientWidth - colsW);
+			const minPanX = Math.min(g.labelBand, visW - colsW);
 			this.panX = Math.min(g.labelBand, Math.max(minPanX, this.panX));
 			const minPanY = Math.min(g.headerH, this.canvas.clientHeight - rowsH);
 			this.panY = Math.min(g.headerH, Math.max(minPanY, this.panY));
@@ -2137,9 +2158,9 @@ export class MiniGraphView extends ItemView {
 		if (this.laid.heatmap) {
 			// Spreadsheet scroll over the square grid.
 			const h = this.laid.heatmap;
-			const g = heatmapGeom(h, this.zoom, this.canvas.clientWidth);
+			const g = heatmapGeom(h, this.zoom, visW);
 			const grid = h.n * g.cellPx;
-			const minPanX = Math.min(g.labelBand, this.canvas.clientWidth - grid);
+			const minPanX = Math.min(g.labelBand, visW - grid);
 			this.panX = Math.min(g.labelBand, Math.max(minPanX, this.panX));
 			const minPanY = Math.min(g.headerH, this.canvas.clientHeight - grid);
 			this.panY = Math.min(g.headerH, Math.max(minPanY, this.panY));
@@ -2950,29 +2971,59 @@ export class MiniGraphView extends ItemView {
 			? clampRect(seed, container, NOTE_MENU_MIN)
 			: seed;
 		this.noteMenuRect = rect;
-		Object.assign(panel.style, {
-			position: "absolute",
-			left: `${rect.left}px`, top: `${rect.top}px`,
-			width: `${rect.width}px`, height: `${rect.height}px`,
-			display: "flex", flexDirection: "column", overflow: "hidden",
-			background: "rgba(20,24,33,0.96)", border: "1px solid #3a4760", borderRadius: "6px",
-			boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "60", font: "12px sans-serif", color: "#e6edf3",
-		} as Partial<CSSStyleDeclaration>);
+		const pinned = !!this.settings.noteMenuPinned;
+		// Docked width when pinned (clamped to ≤80% of the container).
+		const pinnedW = Math.min(
+			Math.max(NOTE_MENU_MIN.width, this.settings.noteMenuPinnedWidth ?? 320),
+			Math.max(NOTE_MENU_MIN.width, Math.floor((container.width || 320) * 0.8)),
+		);
+		if (pinned) {
+			// Dock to the RIGHT edge: full height, fixed width, square corners, a
+			// left border only — the canvas reserves `pinnedMenuWidth()` so the
+			// figure isn't covered (like a standard docked side panel).
+			Object.assign(panel.style, {
+				position: "absolute",
+				left: "", right: "0", top: "0", bottom: "0", height: "", width: `${pinnedW}px`,
+				display: "flex", flexDirection: "column", overflow: "hidden",
+				background: "rgba(20,24,33,0.98)",
+				border: "none", borderLeft: "1px solid #3a4760", borderRadius: "0",
+				boxShadow: "-4px 0 16px rgba(0,0,0,0.5)", zIndex: "60", font: "12px sans-serif", color: "#e6edf3",
+			} as Partial<CSSStyleDeclaration>);
+		} else {
+			Object.assign(panel.style, {
+				position: "absolute",
+				left: `${rect.left}px`, top: `${rect.top}px`, right: "", bottom: "",
+				width: `${rect.width}px`, height: `${rect.height}px`,
+				display: "flex", flexDirection: "column", overflow: "hidden",
+				background: "rgba(20,24,33,0.96)", border: "1px solid #3a4760", borderRadius: "6px",
+				boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "60", font: "12px sans-serif", color: "#e6edf3",
+			} as Partial<CSSStyleDeclaration>);
+		}
 		const head = panel.createDiv();
-		// The header IS the drag handle (no icon): cursor:move, text unselectable
-		// so a drag doesn't paint a selection. flex:0 0 auto keeps it fixed height.
+		// When floating, the header IS the drag handle (cursor:move); when pinned
+		// the panel is docked so it can't be moved (cursor:default).
 		Object.assign(head.style, {
 			padding: "6px 8px", borderBottom: "1px solid #2a3447", fontWeight: "600",
-			cursor: "move", userSelect: "none", flex: "0 0 auto",
+			cursor: pinned ? "default" : "move", userSelect: "none", flex: "0 0 auto",
 		} as Partial<CSSStyleDeclaration>);
 		// Header verb is mode-appropriate: droste focuses, other modes either
 		// locate the card on canvas or open the file.
 		const verb = isDroste ? "focus" : "locate/open";
-		// Title row: name on the left, × close on the right.
+		// Title row: name on the left, pin + × on the right.
 		const titleRow = head.createDiv();
 		Object.assign(titleRow.style, { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" } as Partial<CSSStyleDeclaration>);
 		titleRow.createSpan({ text: "Tag Lens" });
-		const closeBtn = titleRow.createSpan({ text: "×" });
+		const headBtns = titleRow.createDiv();
+		Object.assign(headBtns.style, { display: "flex", alignItems: "center", gap: "2px", flex: "0 0 auto" } as Partial<CSSStyleDeclaration>);
+		// Pin/unpin: dock the menu to the right edge (standard pin affordance).
+		const pinBtn = headBtns.createSpan();
+		Object.assign(pinBtn.style, { cursor: "pointer", color: pinned ? "#2d6cdf" : "#9db4d6", display: "inline-flex", alignItems: "center", padding: "0 2px" } as Partial<CSSStyleDeclaration>);
+		setIcon(pinBtn, pinned ? "pin-off" : "pin");
+		pinBtn.setAttr("aria-label", pinned ? "Unpin (float)" : "Pin to right");
+		pinBtn.addEventListener("mousedown", (ev) => ev.stopPropagation());
+		pinBtn.addEventListener("dblclick", (ev) => ev.stopPropagation());
+		pinBtn.addEventListener("click", (ev) => { ev.stopPropagation(); this.togglePin(); });
+		const closeBtn = headBtns.createSpan({ text: "×" });
 		Object.assign(closeBtn.style, { cursor: "pointer", fontWeight: "700", fontSize: "16px", lineHeight: "1", padding: "0 4px", color: "#9db4d6", flex: "0 0 auto" } as Partial<CSSStyleDeclaration>);
 		closeBtn.setAttr("aria-label", "Close menu");
 		closeBtn.addEventListener("mousedown", (ev) => ev.stopPropagation());
@@ -3135,8 +3186,9 @@ export class MiniGraphView extends ItemView {
 		// flex:1 1 auto + minHeight:0 → the tree scroll area grows/shrinks with the
 		// panel height (set above / on resize) instead of a fixed maxHeight.
 		Object.assign(body.style, { overflow: "auto", padding: "4px 6px 8px", flex: "1 1 auto", minHeight: "0" } as Partial<CSSStyleDeclaration>);
-		// Mouse-drag MOVE (header) + RESIZE (corner). No icons/buttons: the header
-		// itself is the move handle, an invisible corner zone is the resize handle.
+		// FLOATING: header-drag MOVE + bottom-right RESIZE + double-click MINIMIZE.
+		// PINNED: none of those (it's docked) — a left-edge handle resizes width.
+		if (!pinned) {
 		const grip = this.wireNoteMenuDrag(panel, head, search, NOTE_MENU_MIN);
 
 		// ── MINIMIZE: header DOUBLE-CLICK toggles minimized ⇄ restored ───────────
@@ -3185,6 +3237,40 @@ export class MiniGraphView extends ItemView {
 		// Reapply the persisted/in-memory minimized state on every (re)build so it
 		// survives rebuilds and reloads.
 		applyMinimizedState();
+		} else {
+			// PINNED: a thin left-edge handle resizes the docked column width.
+			// Dragging LEFT widens; the canvas reservation + pan update live.
+			const lgrip = panel.createDiv();
+			Object.assign(lgrip.style, {
+				position: "absolute", left: "0", top: "0", bottom: "0", width: "6px",
+				cursor: "ew-resize", zIndex: "61", background: "transparent",
+			} as Partial<CSSStyleDeclaration>);
+			lgrip.addEventListener("mousedown", (ev: MouseEvent) => {
+				if (ev.button !== 0) return;
+				ev.preventDefault();
+				ev.stopPropagation();
+				const startX = ev.clientX;
+				const startW = panel.offsetWidth;
+				const onMove = (e: MouseEvent): void => {
+					const cw = this.root.clientWidth || 0;
+					const raw = startW + (startX - e.clientX); // drag left → wider
+					const w = Math.min(
+						Math.max(NOTE_MENU_MIN.width, raw),
+						Math.max(NOTE_MENU_MIN.width, Math.floor((cw || 320) * 0.8)),
+					);
+					panel.style.width = `${w}px`;
+					this.settings.noteMenuPinnedWidth = w;
+					this.requestDraw(); // re-reserve canvas width + re-pan the figure
+				};
+				const onUp = (): void => {
+					window.removeEventListener("mousemove", onMove, true);
+					window.removeEventListener("mouseup", onUp, true);
+					void this.save();
+				};
+				window.addEventListener("mousemove", onMove, true);
+				window.addEventListener("mouseup", onUp, true);
+			});
+		}
 		// A row checkbox that must NOT trigger the row's click (focus/locate/open)
 		// nor start a header MOVE drag. We stopPropagation on mousedown (so the
 		// header-drag listener and the row-click handler never see it) and on click

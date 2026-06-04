@@ -207,6 +207,12 @@ export interface MiniSettings {
 	// Optional and NOT in DEFAULT_SETTINGS, so existing vaults load unchanged
 	// (absent ⇒ "folder").
 	noteMenuGroupBy?: "folder" | "tag";
+	// Pin-to-right: when true the unified menu docks to the right edge (full
+	// height, reserves canvas width) instead of floating; toggled by a pin icon
+	// in the header. `noteMenuPinnedWidth` is the docked column width (px).
+	// Optional + defaulted in main.ts merge, so existing vaults load unchanged.
+	noteMenuPinned?: boolean;
+	noteMenuPinnedWidth?: number;
 }
 
 export type ViewMode =
@@ -431,7 +437,7 @@ export const HEATMAP_ORDER_CRITERIA: Array<{ value: string; text: string }> = [
 // Id prefix for bipartite SET nodes (one per tag). NUL bytes guarantee it can
 // never collide with a real vault file path; the authoritative kind check is
 // `LaidOut.setNodeIds.has(id)`, not parsing this prefix.
-export const SET_PREFIX = " tag ";
+export const SET_PREFIX = "\u0000tag\u0000";
 
 // Card text geometry. Title and body lines use different sizes/weights.
 export const CARD_RADIUS_PX = 4;
