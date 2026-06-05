@@ -2968,7 +2968,7 @@ export class MiniGraphView extends ItemView {
 		const sepIdx = n.id.indexOf("\t");
 		const baseId = sepIdx >= 0 ? n.id.slice(sepIdx + 1) : n.id;
 		const scale = this.getCardScale(baseId);
-		const mode = this.displayMode.get(baseId) ?? "full";
+
 
 		// Bipartite SET (tag) nodes render coloured by their tag hue so they
 		// read as set cores; NOTE nodes use the default dark card.
