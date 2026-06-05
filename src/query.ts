@@ -250,7 +250,7 @@ export function isMatched(r: EvalResult): boolean {
 // Substitute `$<field>` placeholders in a label string with bound values.
 // Unknown placeholders are left as-is.
 export function substituteLabel(template: string, bindings: Map<string, string>): string {
-	return template.replace(/\$([A-Za-z_][A-Za-z0-9_-]*)/g, (m, name) => {
+	return template.replace(/\$([A-Za-z_][A-Za-z0-9_-]*)/g, (m: string, name: string) => {
 		return bindings.get(name) ?? m;
 	});
 }

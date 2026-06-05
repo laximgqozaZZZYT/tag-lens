@@ -71,10 +71,6 @@ export function buildInitialSubPositions(
 // Set-intersection check: do two sorted memberships arrays share at
 // least one cluster key? Linear scan since both arrays are tiny (≤
 // handful of memberships per card).
-function sharesAnyMembership(a: string[], b: string[]): boolean {
-	for (const x of a) if (b.includes(x)) return true;
-	return false;
-}
 
 // AABB collision-resolution loop. For every pair of overlapping
 // sub-group bboxes, push them apart along the shorter overlap axis.

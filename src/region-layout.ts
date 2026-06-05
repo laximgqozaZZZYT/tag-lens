@@ -215,7 +215,7 @@ export function regionLayout(
 	}
 
 	return {
-		setRects: bestRects ?? new Map(),
+		setRects: bestRects ?? new Map<string, RegionRect>(),
 		zones,
 		hasNoneBucket,
 		aggregatePreservedCounts,

@@ -626,66 +626,6 @@ function bridgeComponents(
 	return out;
 }
 
-// Find the path from startSet to endSet that crosses the minimum number
-// of foreign cells (0-1 BFS / deque BFS). Non-foreign cells cost 0;
-// foreign cells cost 1. Search space is bounded to the bounding box of
-// startSet ∪ endSet padded by `pad` cells. Returns the path as a list of
-// cell keys, or an empty array if endSet is unreachable within the bound.
-function minForeignPath(
-	startSet: Set<string>,
-	endSet: Set<string>,
-	foreignCells: Set<string>,
-	pad: number,
-): string[] {
-	// Bounding box.
-	let minC = Infinity, maxC = -Infinity, minR = Infinity, maxR = -Infinity;
-	for (const k of startSet) {
-		const [c, r] = k.split(",").map(Number);
-		if (c < minC) minC = c; if (c > maxC) maxC = c;
-		if (r < minR) minR = r; if (r > maxR) maxR = r;
-	}
-	for (const k of endSet) {
-		if (foreignCells.has(k)) continue; // only target non-foreign endSet cells
-		const [c, r] = k.split(",").map(Number);
-		if (c < minC) minC = c; if (c > maxC) maxC = c;
-		if (r < minR) minR = r; if (r > maxR) maxR = r;
-	}
-	minC -= pad; maxC += pad; minR -= pad; maxR += pad;
-
-	// 0-1 BFS: deque with non-foreign neighbours pushed to front, foreign to back.
-	const prev = new Map<string, string | null>();
-	const deque: string[] = [];
-	for (const k of startSet) {
-		if (prev.has(k)) continue;
-		prev.set(k, null);
-		deque.unshift(k);
-	}
-	let found = "";
-	outer: while (deque.length > 0) {
-		const cur = deque.shift()!;
-		const [c, r] = cur.split(",").map(Number);
-		for (const [dc, dr] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
-			const nc = c + dc, nr = r + dr;
-			if (nc < minC || nc > maxC || nr < minR || nr > maxR) continue;
-			const nk = `${nc},${nr}`;
-			if (prev.has(nk)) continue;
-			prev.set(nk, cur);
-			if (endSet.has(nk) && !foreignCells.has(nk)) { found = nk; break outer; }
-			// Cost 0 (non-foreign): push to front; Cost 1 (foreign): push to back.
-			if (foreignCells.has(nk)) deque.push(nk);
-			else deque.unshift(nk);
-		}
-	}
-	if (!found) return [];
-	// Reconstruct path.
-	const path: string[] = [];
-	let cur: string | null = found;
-	while (cur !== null && !startSet.has(cur)) {
-		path.push(cur);
-		cur = prev.get(cur) ?? null;
-	}
-	return path;
-}
 
 // Remove foreign cells from a polygon that are not essential for
 // connectivity between owned cells.

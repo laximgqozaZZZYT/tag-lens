@@ -123,7 +123,7 @@ function collectTags(cache: CachedMetadata | null): string[] {
 	if (!cache) return [];
 	const out: string[] = [];
 	if (cache.tags) for (const t of cache.tags) out.push(stripHash(t.tag));
-	const fm = cache.frontmatter?.tags;
+	const fm = cache.frontmatter?.tags as unknown;
 	if (Array.isArray(fm)) for (const t of fm) out.push(stripHash(String(t)));
 	else if (typeof fm === "string") out.push(stripHash(fm));
 	return out;

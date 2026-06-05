@@ -80,12 +80,12 @@ export function getSortKey(
 			return Math.random();
 		case "title": {
 			const cache = deps.app.metadataCache.getFileCache(f);
-			const v = cache?.frontmatter?.title;
+			const v = cache?.frontmatter?.title as unknown;
 			return v != null ? String(v) : f.basename;
 		}
 		default: {
 			const cache = deps.app.metadataCache.getFileCache(f);
-			const v = cache?.frontmatter?.[field];
+			const v = cache?.frontmatter?.[field] as unknown;
 			if (v == null) return "";
 			return Array.isArray(v) ? String(v[0]) : String(v);
 		}

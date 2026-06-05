@@ -1,6 +1,6 @@
 {
 	"name": "tag-lens",
-	"version": "0.3.6",
+	"version": "0.3.7",
 	"private": true,
 	"description": "Lightweight tag-membership visualisations: intersection lattice, co-occurrence heatmap, UpSet, BubbleSets.",
 	"author": "laximgqozaZZZYT",

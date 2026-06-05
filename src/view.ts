@@ -9,13 +9,11 @@ import {
 } from "./layout";
 import type { MiniSettings, GraphNode, GraphData, ViewMode } from "./types";
 import {
-	NONE_BUCKET,
 	VIEW_MODES,
-	SET_PREFIX,
 	MATRIX_ORDER_CRITERIA,
 	HEATMAP_ORDER_CRITERIA,
 } from "./types";
-import { CARD_MIN_W, CARD_MAX_W, CARD_CELL_W, CARD_CELL_H } from "./types";
+import { CARD_CELL_W, CARD_CELL_H } from "./types";
 import { type LimitRule, applyLimitRules } from "./limit";
 import { filterMemberships, filterLabels } from "./query-filters";
 import {
@@ -620,7 +618,7 @@ export class MiniGraphView extends ItemView {
 
 		const tabBar = el.createDiv({ cls: "gim-panel-tabs" });
 		if (clusters.length > 1) {
-			const filterInput = tabBar.createEl("input", { cls: "gim-panel-tab-filter", type: "search" }) as HTMLInputElement;
+			const filterInput = tabBar.createEl("input", { cls: "gim-panel-tab-filter", type: "search" });
 			filterInput.setAttribute("placeholder", "Filter layers… (type to search)");
 			filterInput.value = this.tabFilter;
 			filterInput.addEventListener("input", () => { this.tabFilter = filterInput.value; this.applyTabFilter(); });
@@ -660,7 +658,7 @@ export class MiniGraphView extends ItemView {
 	// DISTINCT tag count. Offenders are listed so the alert is actionable.
 	private computeCognitiveLoad(k: number): {
 		score: number;
-		global: { totalNotes: number; totalFolders: number; totalLinks: number; distinctTags: number };
+		globalStats: { totalNotes: number; totalFolders: number; totalLinks: number; distinctTags: number };
 		triggered: { id: string; label: string; severity: "CRITICAL" | "WARNING"; summary: string; detail: string; advice: string; offenders: string[] }[];
 	} {
 		const files = this.app.vault.getMarkdownFiles();
@@ -705,7 +703,7 @@ export class MiniGraphView extends ItemView {
 		const distinctTags = Math.max(1, tagNoteCount.size);
 
 		const triggered: { id: string; label: string; severity: "CRITICAL" | "WARNING"; summary: string; detail: string; advice: string; offenders: string[] }[] = [];
-		if (totalNotes === 0) return { score: 0, global: { totalNotes, totalFolders, totalLinks, distinctTags }, triggered };
+		if (totalNotes === 0) return { score: 0, globalStats: { totalNotes, totalFolders, totalLinks, distinctTags }, triggered };
 		const linkDensity = totalLinks / totalNotes;
 		const basename = (p: string): string => { const s = p.split("/").pop() ?? p; return s.endsWith(".md") ? s.slice(0, -3) : s; };
 		const topN = <T>(arr: T[], score: (x: T) => number, label: (x: T) => string): string[] => {
@@ -778,7 +776,7 @@ export class MiniGraphView extends ItemView {
 			});
 		}
 
-		return { score: Math.min(100, triggered.length * 20), global: { totalNotes, totalFolders, totalLinks, distinctTags }, triggered };
+		return { score: Math.min(100, triggered.length * 20), globalStats: { totalNotes, totalFolders, totalLinks, distinctTags }, triggered };
 	}
 
 	// Render the Insight tab: score gauge + K slider + active alerts (live, from
@@ -795,7 +793,7 @@ export class MiniGraphView extends ItemView {
 				.setAttr("style", "font-size:11px;color:#f87171;padding:8px");
 			return;
 		}
-		const { score, global, triggered } = computed;
+		const { score, globalStats, triggered } = computed;
 		const band = score < 40 ? { c: "#34d399", b: "#10b981", t: "Low" }
 			: score < 80 ? { c: "#fbbf24", b: "#f59e0b", t: "Moderate" }
 				: { c: "#f87171", b: "#ef4444", t: "High / Critical" };
@@ -815,14 +813,14 @@ export class MiniGraphView extends ItemView {
 		track.setCssStyles({ height: "8px", width: "100%", borderRadius: "999px", background: "#2a3447", overflow: "hidden" });
 		const fill = track.createDiv();
 		fill.setCssStyles({ height: "100%", width: `${score}%`, background: band.b, borderRadius: "999px", transition: "width .15s" });
-		gauge.createDiv({ text: `Vault: ${global.totalNotes} notes · ${global.totalFolders} folders · ${global.totalLinks} links · ${global.distinctTags} tags` })
+		gauge.createDiv({ text: `Vault: ${globalStats.totalNotes} notes · ${globalStats.totalFolders} folders · ${globalStats.totalLinks} links · ${globalStats.distinctTags} tags` })
 			.setAttr("style", "font-size:9px;color:#5b6678;margin-top:6px;font-family:monospace");
 
 		// ── K sensitivity slider + refresh ──
 		const ctrl = host.createDiv();
 		ctrl.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", fontSize: "11px", color: "#9db4d6" });
 		ctrl.createSpan({ text: "Sensitivity (K)" });
-		const kIn = ctrl.createEl("input", { attr: { type: "range", min: "1", max: "5", step: "0.1", value: String(k) } }) as HTMLInputElement;
+		const kIn = ctrl.createEl("input", { attr: { type: "range", min: "1", max: "5", step: "0.1", value: String(k) } });
 		kIn.setCssStyles({ flex: "1 1 auto", accentColor: "#2d6cdf", cursor: "pointer" });
 		const kVal = ctrl.createSpan({ text: k.toFixed(1) });
 		kVal.setCssStyles({ fontFamily: "monospace", color: "#7fb4ff", width: "26px", textAlign: "right" });
@@ -982,7 +980,7 @@ export class MiniGraphView extends ItemView {
 		const input = wrap.createEl("input", {
 			type: "number",
 			attr: { min: "0", max: "48", step: "1" },
-		}) as HTMLInputElement;
+		});
 		input.value = String(this.settings.minFontPx);
 		input.setCssStyles({ width: "60px" });
 		const hint = wrap.createSpan({
@@ -1043,7 +1041,7 @@ export class MiniGraphView extends ItemView {
 		// the two visually merge into one nested region.
 		const inhRow = togs.createDiv({ cls: "gim-order-row" });
 		inhRow.createSpan({ text: "Inherit from", cls: "gim-order-field" });
-		const inhSel = inhRow.createEl("select", { cls: "gim-order-dir" }) as HTMLSelectElement;
+		const inhSel = inhRow.createEl("select", { cls: "gim-order-dir" });
 		const noneOpt = inhSel.createEl("option", { value: "", text: "(none)" });
 		const current = this.settings.inheritFrom[groupKey] ?? "";
 		if (current === "") noneOpt.selected = true;
@@ -1104,7 +1102,7 @@ export class MiniGraphView extends ItemView {
 		const list = cardsSec.createDiv({ cls: "gim-layer-cards" });
 		for (const n of layerNodes) {
 			const row = list.createEl("label", { cls: "gim-toggle-row" });
-			const cb = row.createEl("input", { type: "checkbox" }) as HTMLInputElement;
+			const cb = row.createEl("input", { type: "checkbox" });
 			cb.checked = !this.settings.hiddenNodes.includes(n.id);
 			cb.addEventListener("change", () => {
 				this.toggleArrayMember("hiddenNodes", n.id, !cb.checked);
@@ -1124,7 +1122,7 @@ export class MiniGraphView extends ItemView {
 		onChange: () => void,
 	): void {
 		const row = parent.createEl("label", { cls: "gim-toggle-row" });
-		const cb = row.createEl("input", { type: "checkbox" }) as HTMLInputElement;
+		const cb = row.createEl("input", { type: "checkbox" });
 		cb.checked = this.settings[field].includes(groupKey);
 		cb.addEventListener("change", () => {
 			this.toggleArrayMember(field, groupKey, cb.checked);
@@ -1186,10 +1184,10 @@ export class MiniGraphView extends ItemView {
 		// "Size (m × n)". For layer scope, empty value means "use inherited".
 		const sizeRow = section.createDiv({ cls: "gim-order-row" });
 		sizeRow.createSpan({ text: "Size (m × n)", cls: "gim-order-field" });
-		const mIn = sizeRow.createEl("input", { type: "number" }) as HTMLInputElement;
+		const mIn = sizeRow.createEl("input", { type: "number" });
 		const nIn = (() => {
 			sizeRow.createSpan({ text: "×" });
-			return sizeRow.createEl("input", { type: "number" }) as HTMLInputElement;
+			return sizeRow.createEl("input", { type: "number" });
 		})();
 		mIn.min = nIn.min = "1";
 		mIn.max = nIn.max = "8";
@@ -1235,7 +1233,7 @@ export class MiniGraphView extends ItemView {
 
 		const modeRow = section.createDiv({ cls: "gim-order-row" });
 		modeRow.createSpan({ text: "Size by", cls: "gim-order-field" });
-		const sel = modeRow.createEl("select", { cls: "gim-order-dir" }) as HTMLSelectElement;
+		const sel = modeRow.createEl("select", { cls: "gim-order-dir" });
 		if (scope) {
 			sel.createEl("option", {
 				value: "",
@@ -1352,7 +1350,7 @@ export class MiniGraphView extends ItemView {
 	private renderMatrixMinColumnControl(section: HTMLElement): void {
 		const row = section.createDiv({ cls: "gim-order-row" });
 		row.createSpan({ text: "Min column size", cls: "gim-order-field" });
-		const inp = row.createEl("input", { type: "number" }) as HTMLInputElement;
+		const inp = row.createEl("input", { type: "number" });
 		inp.min = "1";
 		inp.setCssStyles({ width: "56px" });
 		inp.value = String(this.settings.matrixMinColumnSize);
@@ -1399,7 +1397,7 @@ export class MiniGraphView extends ItemView {
 	private renderHeatmapMinTagControl(section: HTMLElement): void {
 		const row = section.createDiv({ cls: "gim-order-row" });
 		row.createSpan({ text: "Min tag size", cls: "gim-order-field" });
-		const inp = row.createEl("input", { type: "number" }) as HTMLInputElement;
+		const inp = row.createEl("input", { type: "number" });
 		inp.min = "1";
 		inp.setCssStyles({ width: "56px" });
 		inp.value = String(this.settings.heatmapMinTagSize);
@@ -1434,7 +1432,7 @@ export class MiniGraphView extends ItemView {
 		// LOD mode (auto / overview / density / individual).
 		const lodRow = section.createDiv({ cls: "gim-row" });
 		lodRow.createSpan({ text: "Node LOD" });
-		const lodSel = lodRow.createEl("select") as HTMLSelectElement;
+		const lodSel = lodRow.createEl("select");
 		const lodOpts: Array<[string, string]> = [
 			["auto", "Auto (zoom-based)"],
 			["overview", "Overview"],
@@ -1458,7 +1456,7 @@ export class MiniGraphView extends ItemView {
 		const minIn = minRow.createEl("input", {
 			type: "number",
 			attr: { min: "1", step: "1" },
-		}) as HTMLInputElement;
+		});
 		minIn.value = String(this.settings.latticeMinNodeSize);
 		minIn.setCssStyles({ width: "60px" });
 		minIn.addEventListener("change", () => {
@@ -1475,7 +1473,7 @@ export class MiniGraphView extends ItemView {
 		const capIn = capRow.createEl("input", {
 			type: "number",
 			attr: { min: "1", step: "1" },
-		}) as HTMLInputElement;
+		});
 		capIn.value = String(this.settings.latticeMaxNodesPerTier);
 		capIn.setCssStyles({ width: "60px" });
 		capIn.addEventListener("change", () => {
@@ -1493,7 +1491,7 @@ export class MiniGraphView extends ItemView {
 		const namedIn = namedRow.createEl("input", {
 			type: "number",
 			attr: { min: "1", step: "1" },
-		}) as HTMLInputElement;
+		});
 		namedIn.value = String(this.settings.latticeNamedMax);
 		namedIn.setCssStyles({ width: "60px" });
 		namedIn.addEventListener("change", () => {
@@ -1537,7 +1535,7 @@ export class MiniGraphView extends ItemView {
 		const input = item.createEl("input", {
 			type: "radio",
 			attr: { name: "gim-viewmode" },
-		}) as HTMLInputElement;
+		});
 		input.value = opt.id;
 		input.checked = this.settings.viewMode === opt.id;
 		input.addEventListener("change", () => {
@@ -1608,7 +1606,7 @@ export class MiniGraphView extends ItemView {
 		// Layout method (placement only; the edge set is identical either way).
 		const layRow = section.createDiv({ cls: "gim-order-row" });
 		layRow.createSpan({ text: "Layout", cls: "gim-order-field" });
-		const laySel = layRow.createEl("select") as HTMLSelectElement;
+		const laySel = layRow.createEl("select");
 		for (const [val, label] of [
 			["force", "Force"],
 			["concentric", "Concentric"],
@@ -1628,7 +1626,7 @@ export class MiniGraphView extends ItemView {
 
 		const row = section.createDiv({ cls: "gim-order-row" });
 		row.createSpan({ text: "Max tags", cls: "gim-order-field" });
-		const inp = row.createEl("input", { type: "number" }) as HTMLInputElement;
+		const inp = row.createEl("input", { type: "number" });
 		inp.min = "1";
 		inp.setCssStyles({ width: "56px" });
 		inp.value = String(this.settings.bipartiteMaxTags);
@@ -2515,7 +2513,7 @@ export class MiniGraphView extends ItemView {
 	private requestDraw(): void {
 		this.clampPan();
 		cancelAnimationFrame(this.rafId);
-		this.rafId = requestAnimationFrame(() => this.draw());
+		this.rafId = activeWindow.requestAnimationFrame(() => this.draw());
 	}
 
 	private draw(): void {
@@ -3925,7 +3923,7 @@ export class MiniGraphView extends ItemView {
 			}
 		});
 		// Close on blur — small delay so a suggestion mousedown/click lands first.
-		search.addEventListener("blur", () => { activeWindow.setTimeout(closeSuggest, 150); });
+		search.addEventListener("blur", () => { window.setTimeout(closeSuggest, 150); });
 		// Open the dropdown again when the field regains focus with a live token.
 		search.addEventListener("focus", () => { if (currentToken(search.value).length > 0) openSuggest(); });
 		draw();
@@ -4436,7 +4434,7 @@ export class MiniGraphView extends ItemView {
 
 	private scheduleHover(target: NonNullable<HoverTarget>, sx: number, sy: number): void {
 		const gen = ++this.hoverGen;
-		this.hoverTimer = activeWindow.setTimeout(() => {
+		this.hoverTimer = window.setTimeout(() => {
 			if (gen !== this.hoverGen) return;
 			void this.showHover(target, sx, sy);
 		}, HOVER_DELAY_MS);
@@ -4445,7 +4443,7 @@ export class MiniGraphView extends ItemView {
 	private cancelHover(): void {
 		this.hoverGen++;
 		if (this.hoverTimer) {
-			activeWindow.clearTimeout(this.hoverTimer);
+			window.clearTimeout(this.hoverTimer);
 			this.hoverTimer = 0;
 		}
 		if (this.tipEl) {

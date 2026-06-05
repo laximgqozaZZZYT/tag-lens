@@ -240,51 +240,6 @@ function wrapTo(v: number, period: number, min: number): number {
 	return out;
 }
 
-// Shared footprint extent: cell range encompassing every node's full
-// (multi-cell) footprint AND every cluster bbox. Used by both the grid +
-// header drawers.
-//
-// Cluster bboxes are included because their padding (= clusterSpacing
-// + nesting depth) can extend the visible outline 1–3 cells beyond the
-// rightmost / bottom-most card. Without that, a cluster border would
-// stroke OUTSIDE the lattice — visually "outside the grid".
-function footprintExtent(
-	laid: LaidOut,
-	W: number,
-	H: number,
-): { minCol: number; maxCol: number; minRow: number; maxRow: number } {
-	let minCol = Infinity,
-		maxCol = -Infinity,
-		minRow = Infinity,
-		maxRow = -Infinity;
-	for (const n of laid.nodes) {
-		const colSpan = Math.max(1, Math.ceil(n.width / W));
-		const rowSpan = Math.max(1, Math.ceil(n.height / H));
-		const startCol = Math.round(n.x / W - colSpan / 2);
-		const startRow = Math.round(n.y / H - rowSpan / 2);
-		const endCol = startCol + colSpan - 1;
-		const endRow = startRow + rowSpan - 1;
-		if (startCol < minCol) minCol = startCol;
-		if (endCol > maxCol) maxCol = endCol;
-		if (startRow < minRow) minRow = startRow;
-		if (endRow > maxRow) maxRow = endRow;
-	}
-	// Cluster bboxes — their padding can extend beyond the card footprint.
-	// Floor / ceil convert the pixel rect back into the cell range it
-	// overlaps. (`c.x + c.width` is the bbox right edge; subtract 1 to
-	// get the LAST cell it intersects, since cell c spans [c*W, (c+1)*W).)
-	for (const c of laid.clusters) {
-		const cStartCol = Math.floor(c.x / W);
-		const cEndCol = Math.ceil((c.x + c.width) / W) - 1;
-		const cStartRow = Math.floor(c.y / H);
-		const cEndRow = Math.ceil((c.y + c.height) / H) - 1;
-		if (cStartCol < minCol) minCol = cStartCol;
-		if (cEndCol > maxCol) maxCol = cEndCol;
-		if (cStartRow < minRow) minRow = cStartRow;
-		if (cEndRow > maxRow) maxRow = cEndRow;
-	}
-	return { minCol, maxCol, minRow, maxRow };
-}
 
 // Map-style top-left cluster labels with collision avoidance.
 // Smaller clusters yield to larger ones (= the larger label keeps its
