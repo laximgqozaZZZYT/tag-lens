@@ -661,7 +661,7 @@ export class MiniGraphView extends ItemView {
 	private computeCognitiveLoad(k: number): {
 		score: number;
 		global: { totalNotes: number; totalFolders: number; totalLinks: number; distinctTags: number };
-		triggered: { id: string; label: string; severity: "CRITICAL" | "WARNING"; message: string; offenders: string[] }[];
+		triggered: { id: string; label: string; severity: "CRITICAL" | "WARNING"; summary: string; detail: string; advice: string; offenders: string[] }[];
 	} {
 		const files = this.app.vault.getMarkdownFiles();
 		const totalNotes = files.length;
