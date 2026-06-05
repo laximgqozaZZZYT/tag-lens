@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon, Notice } from "obsidian";
 import { buildGraph } from "./parser";
 import {
 	layout,
@@ -234,7 +234,12 @@ export class MiniGraphView extends ItemView {
 	// Which top-level tab the unified menu shows: the note navigator ("notes") or
 	// the graph settings ("settings"). In-memory only — opening via the toolbar
 	// gear always resets to "notes"; a manual switch survives graph rebuilds.
-	private activeMenuTab: "notes" | "settings" = "notes";
+	private activeMenuTab: "notes" | "settings" | "message" = "notes";
+	// Sensitivity coefficient K for the Message tab's cognitive-load thresholds
+	// (1.0–5.0). In-memory; survives rebuilds, adjustable via the tab's slider.
+	private clMessageK = 2.0;
+	// Only show the global Notice once per Obsidian session to prevent spam.
+	private hasShownCognitiveAlert = false;
 	// The live container the settings tab renders into (replaces the old docking
 	// panel's `panelEl` as the host that `applyTabFilter`/`renderTabButton` query).
 	private settingsHostEl: HTMLElement | null = null;
@@ -645,6 +650,204 @@ export class MiniGraphView extends ItemView {
 	private refreshSettingsTab(): void {
 		if (this.noteMenu && this.activeMenuTab === "settings" && this.settingsHostEl) {
 			this.renderSettingsBody(this.settingsHostEl);
+		}
+	}
+
+	// ── Message tab: cognitive-load model over the REAL vault ────────────────────
+	// Each of 5 condition TYPES adds 20 points (max 100) when ANY entity in the
+	// vault meets its threshold (formulas + alert text per spec; K scales them).
+	// `coOccurringTags` (the spec's per-note tag variance) is mapped to the vault's
+	// DISTINCT tag count. Offenders are listed so the alert is actionable.
+	private computeCognitiveLoad(k: number): {
+		score: number;
+		global: { totalNotes: number; totalFolders: number; totalLinks: number; distinctTags: number };
+		triggered: { id: string; label: string; severity: "CRITICAL" | "WARNING"; message: string; offenders: string[] }[];
+	} {
+		const files = this.app.vault.getMarkdownFiles();
+		const totalNotes = files.length;
+		// Folders that directly contain ≥1 markdown file → file count per folder.
+		const folderCounts = new Map<string, number>();
+		for (const f of files) {
+			const dir = f.parent ? f.parent.path : "/";
+			folderCounts.set(dir, (folderCounts.get(dir) ?? 0) + 1);
+		}
+		const totalFolders = Math.max(1, folderCounts.size);
+		// Links: resolvedLinks = { src: { tgt: count } }. Total + per-note in/out.
+		const resolved = this.app.metadataCache.resolvedLinks as Record<string, Record<string, number>>;
+		let totalLinks = 0;
+		const outCount = new Map<string, number>();
+		const inCount = new Map<string, number>();
+		for (const src of Object.keys(resolved)) {
+			const targets = resolved[src];
+			let o = 0;
+			for (const tgt of Object.keys(targets)) {
+				const c = targets[tgt];
+				totalLinks += c;
+				o += c;
+				inCount.set(tgt, (inCount.get(tgt) ?? 0) + c);
+			}
+			outCount.set(src, o);
+		}
+		// Tags per note + per-tag note counts + distinct tags.
+		const stripHash = (t: string): string => (t.startsWith("#") ? t.slice(1) : t);
+		const tagNoteCount = new Map<string, number>();
+		const noteTagCount = new Map<string, number>();
+		for (const f of files) {
+			const cache = this.app.metadataCache.getFileCache(f);
+			const tags = new Set<string>();
+			if (cache?.tags) for (const t of cache.tags) tags.add(stripHash(t.tag));
+			const fmTags = (cache?.frontmatter as Record<string, unknown> | undefined)?.tags;
+			if (Array.isArray(fmTags)) for (const t of fmTags) tags.add(stripHash(String(t)));
+			else if (typeof fmTags === "string") tags.add(stripHash(fmTags));
+			noteTagCount.set(f.path, tags.size);
+			for (const t of tags) tagNoteCount.set(t, (tagNoteCount.get(t) ?? 0) + 1);
+		}
+		const distinctTags = Math.max(1, tagNoteCount.size);
+
+		const triggered: { id: string; label: string; severity: "CRITICAL" | "WARNING"; message: string; offenders: string[] }[] = [];
+		if (totalNotes === 0) return { score: 0, global: { totalNotes, totalFolders, totalLinks, distinctTags }, triggered };
+		const linkDensity = totalLinks / totalNotes;
+		const basename = (p: string): string => { const s = p.split("/").pop() ?? p; return s.endsWith(".md") ? s.slice(0, -3) : s; };
+		const topN = <T>(arr: T[], score: (x: T) => number, label: (x: T) => string, n = 6): string[] => {
+			const sorted = [...arr].sort((a, b) => score(b) - score(a)).slice(0, n).map(label);
+			if (arr.length > n) sorted.push(`…and ${arr.length - n} more`);
+			return sorted;
+		};
+
+		// [Architectural Imbalance] folder files > (notes/folders)*K
+		{
+			const thr = (totalNotes / totalFolders) * k;
+			const hits = [...folderCounts.entries()].filter(([, c]) => c > thr);
+			if (hits.length > 0) triggered.push({
+				id: "architecturalImbalance", label: "Architectural Imbalance", severity: "CRITICAL",
+				message: "[CRITICAL] This folder holds a disproportionate number of files compared to the vault average. Advice: Refactor by creating logical sub-folders.",
+				offenders: topN(hits, ([, c]) => c, ([p, c]) => `${p === "/" ? "(root)" : p} (${c} files)`),
+			});
+		}
+		// [Contextual Ambiguity] notes per tag > (notes/10)*K
+		{
+			const thr = (totalNotes / 10) * k;
+			const hits = [...tagNoteCount.entries()].filter(([, c]) => c > thr);
+			if (hits.length > 0) triggered.push({
+				id: "contextualAmbiguity", label: "Contextual Ambiguity", severity: "WARNING",
+				message: "[WARNING] This tag is applied to an excessive percentage of your total notes (Tag Abstractness). Advice: Delete the tag or split it into more specific sub-tags.",
+				offenders: topN(hits, ([, c]) => c, ([t, c]) => `#${t} (${c} notes)`),
+			});
+		}
+		// [Network Hub] link/backlink > (links/notes)*K^2
+		{
+			const thr = linkDensity * Math.pow(k, 2);
+			const hits = files
+				.map((f) => ({ f, lc: (outCount.get(f.path) ?? 0) + (inCount.get(f.path) ?? 0) }))
+				.filter((x) => x.lc > thr);
+			if (hits.length > 0) triggered.push({
+				id: "networkHub", label: "Network Hub", severity: "CRITICAL",
+				message: "[CRITICAL] The link density of this note vastly exceeds the vault average. Advice: Isolate this hub note or visualize it using a subset graph.",
+				offenders: topN(hits, (x) => x.lc, (x) => `${basename(x.f.path)} (${x.lc} links)`),
+			});
+		}
+		// [Monolith Note] size > 15*K AND link/backlink < (links/notes)/K
+		{
+			const hits = files
+				.map((f) => ({ f, kb: f.stat.size / 1024, lc: (outCount.get(f.path) ?? 0) + (inCount.get(f.path) ?? 0) }))
+				.filter((x) => x.kb > 15 * k && x.lc < linkDensity / k);
+			if (hits.length > 0) triggered.push({
+				id: "monolithNote", label: "Monolith Note", severity: "WARNING",
+				message: "[WARNING] This note is a monolith. It has a large file size but very few links. Advice: Break down the content into smaller, linked atomic notes.",
+				offenders: topN(hits, (x) => x.kb, (x) => `${basename(x.f.path)} (${Math.round(x.kb)} KB, ${x.lc} links)`),
+			});
+		}
+		// [Interface Bloat] tags in note > (distinctTags / K)
+		{
+			const thr = distinctTags / k;
+			const hits = files
+				.map((f) => ({ f, tc: noteTagCount.get(f.path) ?? 0 }))
+				.filter((x) => x.tc > thr);
+			if (hits.length > 0) triggered.push({
+				id: "interfaceBloat", label: "Interface Bloat", severity: "WARNING",
+				message: "[WARNING] Note contains excessive tags relative to co-occurring tag variance. Advice: Group related tags or use a hierarchical structure.",
+				offenders: topN(hits, (x) => x.tc, (x) => `${basename(x.f.path)} (${x.tc} tags)`),
+			});
+		}
+
+		return { score: Math.min(100, triggered.length * 20), global: { totalNotes, totalFolders, totalLinks, distinctTags }, triggered };
+	}
+
+	// Render the Message tab: score gauge + K slider + active alerts (live, from
+	// the real vault). No history — recomputed every render, so it always reflects
+	// the current vault + K.
+	private renderMessageBody(host: HTMLElement): void {
+		host.empty();
+		const k = this.clMessageK;
+		let computed: ReturnType<MiniGraphView["computeCognitiveLoad"]>;
+		try {
+			computed = this.computeCognitiveLoad(k);
+		} catch (e) {
+			host.createDiv({ text: `Could not compute cognitive load: ${e instanceof Error ? e.message : String(e)}` })
+				.setAttr("style", "font-size:11px;color:#f87171;padding:8px");
+			return;
+		}
+		const { score, global, triggered } = computed;
+		const band = score < 40 ? { c: "#34d399", b: "#10b981", t: "Low" }
+			: score < 80 ? { c: "#fbbf24", b: "#f59e0b", t: "Moderate" }
+				: { c: "#f87171", b: "#ef4444", t: "High / Critical" };
+
+		// ── Score gauge ──
+		const gauge = host.createDiv();
+		Object.assign(gauge.style, { border: "1px solid #3a4760", borderRadius: "8px", background: "#161c2a", padding: "10px", marginBottom: "8px" } as Partial<CSSStyleDeclaration>);
+		const gTop = gauge.createDiv();
+		Object.assign(gTop.style, { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "6px" } as Partial<CSSStyleDeclaration>);
+		const gLeft = gTop.createDiv();
+		gLeft.createDiv({ text: "Total Cognitive Load Score" }).setAttr("style", "font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:#7e8aa0");
+		const sc = gLeft.createDiv({ text: `${score} ` });
+		Object.assign(sc.style, { fontSize: "22px", fontWeight: "700", color: band.c } as Partial<CSSStyleDeclaration>);
+		sc.createSpan({ text: "/ 100" }).setAttr("style", "font-size:11px;font-weight:400;color:#5b6678");
+		gTop.createDiv({ text: band.t }).setAttr("style", `font-size:12px;font-weight:600;color:${band.c}`);
+		const track = gauge.createDiv();
+		Object.assign(track.style, { height: "8px", width: "100%", borderRadius: "999px", background: "#2a3447", overflow: "hidden" } as Partial<CSSStyleDeclaration>);
+		const fill = track.createDiv();
+		Object.assign(fill.style, { height: "100%", width: `${score}%`, background: band.b, borderRadius: "999px", transition: "width .15s" } as Partial<CSSStyleDeclaration>);
+		gauge.createDiv({ text: `Vault: ${global.totalNotes} notes · ${global.totalFolders} folders · ${global.totalLinks} links · ${global.distinctTags} tags` })
+			.setAttr("style", "font-size:9px;color:#5b6678;margin-top:6px;font-family:monospace");
+
+		// ── K sensitivity slider + refresh ──
+		const ctrl = host.createDiv();
+		Object.assign(ctrl.style, { display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", fontSize: "11px", color: "#9db4d6" } as Partial<CSSStyleDeclaration>);
+		ctrl.createSpan({ text: "Sensitivity (K)" });
+		const kIn = ctrl.createEl("input", { attr: { type: "range", min: "1", max: "5", step: "0.1", value: String(k) } }) as HTMLInputElement;
+		Object.assign(kIn.style, { flex: "1 1 auto", accentColor: "#2d6cdf", cursor: "pointer" } as Partial<CSSStyleDeclaration>);
+		const kVal = ctrl.createSpan({ text: k.toFixed(1) });
+		Object.assign(kVal.style, { fontFamily: "monospace", color: "#7fb4ff", width: "26px", textAlign: "right" } as Partial<CSSStyleDeclaration>);
+		// Update K + label live while dragging (cheap), but only RE-SCAN the vault
+		// on release (`change`) so a large vault doesn't recompute per pixel.
+		kIn.addEventListener("input", () => { this.clMessageK = Number(kIn.value); kVal.setText(this.clMessageK.toFixed(1)); });
+		kIn.addEventListener("change", () => this.renderMessageBody(host));
+		const refresh = ctrl.createEl("button", { text: "Refresh" });
+		Object.assign(refresh.style, { fontSize: "10px", padding: "2px 8px", background: "#1a2236", border: "1px solid #3a4760", borderRadius: "4px", color: "#9db4d6", cursor: "pointer" } as Partial<CSSStyleDeclaration>);
+		refresh.addEventListener("click", () => this.renderMessageBody(host));
+
+		// ── Alerts (active only) ──
+		if (triggered.length === 0) {
+			const ok = host.createDiv();
+			Object.assign(ok.style, { display: "flex", gap: "8px", alignItems: "flex-start", border: "1px solid #1f6b4f", background: "rgba(16,185,129,0.12)", borderRadius: "6px", padding: "10px" } as Partial<CSSStyleDeclaration>);
+			ok.createSpan().setAttr("style", "width:10px;height:10px;border-radius:2px;background:#34d399;flex:0 0 auto;margin-top:2px;display:inline-block");
+			ok.createSpan({ text: "[OK] System status: Normal. Cognitive load is optimal." }).setAttr("style", "font-size:12px;line-height:1.5;color:#a7f3d0");
+			return;
+		}
+		for (const cond of triggered) {
+			const critical = cond.severity === "CRITICAL";
+			const card = host.createDiv();
+			Object.assign(card.style, {
+				display: "flex", gap: "8px", alignItems: "flex-start", marginBottom: "8px", borderRadius: "6px", padding: "10px",
+				border: `1px solid ${critical ? "#7f2a2a" : "#7a5a1f"}`, background: critical ? "rgba(239,68,68,0.10)" : "rgba(245,158,11,0.10)",
+			} as Partial<CSSStyleDeclaration>);
+			card.createSpan().setAttr("style", `width:10px;height:10px;border-radius:2px;flex:0 0 auto;margin-top:3px;display:inline-block;background:${critical ? "#ef4444" : "#fbbf24"}`);
+			const body = card.createDiv();
+			body.createDiv({ text: cond.label }).setAttr("style", `font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:3px;color:${critical ? "#fca5a5" : "#fcd34d"}`);
+			body.createDiv({ text: cond.message }).setAttr("style", `font-size:12px;line-height:1.5;color:${critical ? "#fecaca" : "#fde68a"}`);
+			const list = body.createDiv();
+			Object.assign(list.style, { marginTop: "5px", fontSize: "10px", color: "#9db4d6", fontFamily: "monospace", lineHeight: "1.5" } as Partial<CSSStyleDeclaration>);
+			for (const o of cond.offenders) list.createDiv({ text: `• ${o}` });
 		}
 	}
 
@@ -1526,6 +1729,20 @@ export class MiniGraphView extends ItemView {
 		});
 		if (rebuildSig === this.lastRebuildSig) return;
 		this.lastRebuildSig = rebuildSig;
+
+		// Alert the user globally (once per session) if the cognitive load is critical.
+		if (!this.hasShownCognitiveAlert) {
+			try {
+				const cl = this.computeCognitiveLoad(this.clMessageK);
+				if (cl.score >= 80) { // High / Critical
+					new Notice("⚠️ Cognitive Load is CRITICAL. Please check the Message tab in Tag Lens for advice.", 8000);
+					this.hasShownCognitiveAlert = true;
+				}
+			} catch (e) {
+				// Ignore metric errors so the rebuild doesn't fail
+			}
+		}
+
 		// Pristine post-buildGraph graph (post WHERE/GROUP_BY, pre any HAVING/LIMIT
 		// mutation). The navigator's mode-invariant (non-droste) note set is derived
 		// from THIS via menuLimitedNodes() below, so switching between non-droste
@@ -3067,9 +3284,13 @@ export class MiniGraphView extends ItemView {
 		Object.assign(notesTab.style, { display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: "0" } as Partial<CSSStyleDeclaration>);
 		const settingsTab = bodyWrap.createDiv({ cls: "gim-menu-settings" });
 		Object.assign(settingsTab.style, { display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" } as Partial<CSSStyleDeclaration>);
-		const tabBtns: Partial<Record<"notes" | "settings", HTMLElement>> = {};
+		const messageTab = bodyWrap.createDiv();
+		Object.assign(messageTab.style, { display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" } as Partial<CSSStyleDeclaration>);
+		type MenuTab = "notes" | "settings" | "message";
+		const TABS: MenuTab[] = ["notes", "settings", "message"];
+		const tabBtns: Partial<Record<MenuTab, HTMLElement>> = {};
 		const styleTabs = (): void => {
-			for (const key of ["notes", "settings"] as const) {
+			for (const key of TABS) {
 				const b = tabBtns[key];
 				if (!b) continue;
 				const on = this.activeMenuTab === key;
@@ -3082,15 +3303,17 @@ export class MiniGraphView extends ItemView {
 				} as Partial<CSSStyleDeclaration>);
 			}
 		};
-		const showTab = (key: "notes" | "settings"): void => {
+		const showTab = (key: MenuTab): void => {
 			this.activeMenuTab = key;
 			notesTab.style.display = key === "notes" ? "flex" : "none";
 			settingsTab.style.display = key === "settings" ? "block" : "none";
+			messageTab.style.display = key === "message" ? "block" : "none";
 			if (key === "settings") this.renderSettingsBody(settingsTab);
 			else this.settingsHostEl = null;
+			if (key === "message") this.renderMessageBody(messageTab);
 			styleTabs();
 		};
-		const mkTab = (key: "notes" | "settings", label: string): void => {
+		const mkTab = (key: MenuTab, label: string): void => {
 			const b = tabBar.createEl("button", { text: label });
 			tabBtns[key] = b;
 			b.addEventListener("mousedown", (ev) => ev.stopPropagation());
@@ -3103,6 +3326,7 @@ export class MiniGraphView extends ItemView {
 		};
 		mkTab("notes", "Notes");
 		mkTab("settings", "Settings");
+		mkTab("message", "Message");
 		// Note-count + click hint, shown at the top of the Notes pane.
 		const notesHint = notesTab.createDiv({ text: `${nodes.length} notes — click to ${verb}` });
 		Object.assign(notesHint.style, { fontSize: "10px", color: "#7e8aa0", padding: "4px 8px 0" } as Partial<CSSStyleDeclaration>);
