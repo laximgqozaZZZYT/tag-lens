@@ -117,7 +117,7 @@ export function shelfPack(
 		maxCardW,
 		Math.ceil(Math.sqrt(totalArea) * 1.15),
 	);
-	const positions: { x: number; y: number }[] = new Array(sizes.length);
+	const positions: { x: number; y: number }[] = new Array<{ x: number; y: number }>(sizes.length);
 	let curX = 0;
 	let curY = 0;
 	let rowH = 0;

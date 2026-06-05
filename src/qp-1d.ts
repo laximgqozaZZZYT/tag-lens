@@ -111,41 +111,7 @@ export function solve1D(
 	writeBack();
 }
 
-// 各セグメント (連続端点ペア) を覆う基底集合の組を計算 → ゾーン key。
-// セグメント長を合計して extent(zone) を得る。
-function computeExtents(
-	x: Float64Array,
-	n: number,
-	idxBySet: Map<string, number>,
-): Map<string, number> {
-	// 端点リストを (位置, set, kind) で集める。kind: 0=start, 1=end。
-	const eps: { pos: number; set: number; kind: 0 | 1 }[] = [];
-	for (let i = 0; i < n; i++) {
-		eps.push({ pos: x[2 * i], set: i, kind: 0 });
-		eps.push({ pos: x[2 * i + 1], set: i, kind: 1 });
-	}
-	eps.sort((a, b) => a.pos - b.pos || a.kind - b.kind);
 
-	const active = new Set<number>();
-	const extents = new Map<string, number>();
-	for (let s = 0; s < eps.length - 1; s++) {
-		const e = eps[s];
-		if (e.kind === 0) active.add(e.set);
-		else active.delete(e.set);
-		const next = eps[s + 1];
-		const len = next.pos - e.pos;
-		if (len <= 0) continue;
-		if (active.size === 0) continue;
-		// active set → ゾーン key (基底集合 ID は intervals[i].setKey)。
-		const memb: string[] = [];
-		for (const idx of active) {
-			// idxBySet の逆引きが必要。idxBySet は set→idx だが我々は idx→key が欲しい。
-			// Workaround: 呼び出し側で index→key 配列を持つ。ここは別経路で。
-			memb.push(String(idx)); // 仮プレースホルダ — 下記で本物に置換する。
-		}
-	}
-	return extents;
-}
 
 // 上の computeExtents は 暫定。実用版を以下に書き直し。
 function computeExtentsByKey(

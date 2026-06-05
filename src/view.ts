@@ -21,7 +21,7 @@ import {
 	getSortKey as getSortKeyFn,
 	computeDroppedClusters as computeDroppedClustersFn,
 } from "./query-pipeline";
-import { colLetters, clusterHue } from "./canvas-utils";
+import { clusterHue } from "./canvas-utils";
 import { expandClustersByInheritance } from "./cluster-bbox";
 import { runAggregateSnap } from "./aggregate-snap";
 import {
@@ -671,7 +671,7 @@ export class MiniGraphView extends ItemView {
 		}
 		const totalFolders = Math.max(1, folderCounts.size);
 		// Links: resolvedLinks = { src: { tgt: count } }. Total + per-note in/out.
-		const resolved = this.app.metadataCache.resolvedLinks as Record<string, Record<string, number>>;
+		const resolved = this.app.metadataCache.resolvedLinks;
 		let totalLinks = 0;
 		const outCount = new Map<string, number>();
 		const inCount = new Map<string, number>();
@@ -1816,7 +1816,7 @@ export class MiniGraphView extends ItemView {
 					new Notice("⚠️ Cognitive Load is CRITICAL. Please check the Insight tab in Tag Lens for advice.", 8000);
 					this.hasShownCognitiveAlert = true;
 				}
-			} catch (e) {
+			} catch (_e) {
 				// Ignore metric errors so the rebuild doesn't fail
 			}
 		}
@@ -2513,7 +2513,7 @@ export class MiniGraphView extends ItemView {
 	private requestDraw(): void {
 		this.clampPan();
 		cancelAnimationFrame(this.rafId);
-		this.rafId = activeWindow.requestAnimationFrame(() => this.draw());
+		this.rafId = window.requestAnimationFrame(() => this.draw());
 	}
 
 	private draw(): void {
@@ -2969,7 +2969,7 @@ export class MiniGraphView extends ItemView {
 		const baseId = sepIdx >= 0 ? n.id.slice(sepIdx + 1) : n.id;
 		const scale = this.getCardScale(baseId);
 		const mode = this.displayMode.get(baseId) ?? "full";
-		const card = this.cardCache.get(`${baseId}:${mode}:${scale.toFixed(4)}`);
+		const _card = this.cardCache.get(`${baseId}:${mode}:${scale.toFixed(4)}`);
 		// Bipartite SET (tag) nodes render coloured by their tag hue so they
 		// read as set cores; NOTE nodes use the default dark card.
 		const isSet = this.laid.setNodeIds?.has(n.id) ?? false;
@@ -3008,7 +3008,7 @@ export class MiniGraphView extends ItemView {
 		// ORIGINAL file path, not the prefixed copy id.
 		const sepIdx = id.indexOf("\t");
 		const path = sepIdx >= 0 ? id.slice(sepIdx + 1) : id;
-		this.app.workspace.openLinkText(path, "", false);
+		void this.app.workspace.openLinkText(path, "", false);
 	}
 
 	// Centre the gallery viewport on node `id`'s cell at a readable zoom.
