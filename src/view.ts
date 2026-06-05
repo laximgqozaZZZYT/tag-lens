@@ -234,10 +234,10 @@ export class MiniGraphView extends ItemView {
 	// Which top-level tab the unified menu shows: the note navigator ("notes") or
 	// the graph settings ("settings"). In-memory only — opening via the toolbar
 	// gear always resets to "notes"; a manual switch survives graph rebuilds.
-	private activeMenuTab: "notes" | "settings" | "message" = "notes";
-	// Sensitivity coefficient K for the Message tab's cognitive-load thresholds
+	private activeMenuTab: "notes" | "settings" | "insight" = "notes";
+	// Sensitivity coefficient K for the Insight tab's cognitive-load thresholds
 	// (1.0–5.0). In-memory; survives rebuilds, adjustable via the tab's slider.
-	private clMessageK = 2.0;
+	private clInsightK = 2.0;
 	// Only show the global Notice once per Obsidian session to prevent spam.
 	private hasShownCognitiveAlert = false;
 	// The live container the settings tab renders into (replaces the old docking
@@ -653,7 +653,7 @@ export class MiniGraphView extends ItemView {
 		}
 	}
 
-	// ── Message tab: cognitive-load model over the REAL vault ────────────────────
+	// ── Insight tab: cognitive-load model over the REAL vault ────────────────────
 	// Each of 5 condition TYPES adds 20 points (max 100) when ANY entity in the
 	// vault meets its threshold (formulas + alert text per spec; K scales them).
 	// `coOccurringTags` (the spec's per-note tag variance) is mapped to the vault's
@@ -778,12 +778,12 @@ export class MiniGraphView extends ItemView {
 		return { score: Math.min(100, triggered.length * 20), global: { totalNotes, totalFolders, totalLinks, distinctTags }, triggered };
 	}
 
-	// Render the Message tab: score gauge + K slider + active alerts (live, from
+	// Render the Insight tab: score gauge + K slider + active alerts (live, from
 	// the real vault). No history — recomputed every render, so it always reflects
 	// the current vault + K.
-	private renderMessageBody(host: HTMLElement): void {
+	private renderInsightBody(host: HTMLElement): void {
 		host.empty();
-		const k = this.clMessageK;
+		const k = this.clInsightK;
 		let computed: ReturnType<MiniGraphView["computeCognitiveLoad"]>;
 		try {
 			computed = this.computeCognitiveLoad(k);
@@ -825,11 +825,11 @@ export class MiniGraphView extends ItemView {
 		Object.assign(kVal.style, { fontFamily: "monospace", color: "#7fb4ff", width: "26px", textAlign: "right" } as Partial<CSSStyleDeclaration>);
 		// Update K + label live while dragging (cheap), but only RE-SCAN the vault
 		// on release (`change`) so a large vault doesn't recompute per pixel.
-		kIn.addEventListener("input", () => { this.clMessageK = Number(kIn.value); kVal.setText(this.clMessageK.toFixed(1)); });
-		kIn.addEventListener("change", () => this.renderMessageBody(host));
+		kIn.addEventListener("input", () => { this.clInsightK = Number(kIn.value); kVal.setText(this.clInsightK.toFixed(1)); });
+		kIn.addEventListener("change", () => this.renderInsightBody(host));
 		const refresh = ctrl.createEl("button", { text: "Refresh" });
 		Object.assign(refresh.style, { fontSize: "10px", padding: "2px 8px", background: "#1a2236", border: "1px solid #3a4760", borderRadius: "4px", color: "#9db4d6", cursor: "pointer" } as Partial<CSSStyleDeclaration>);
-		refresh.addEventListener("click", () => this.renderMessageBody(host));
+		refresh.addEventListener("click", () => this.renderInsightBody(host));
 
 		// ── Alerts (active only) ──
 		if (triggered.length === 0) {
@@ -853,9 +853,20 @@ export class MiniGraphView extends ItemView {
 			const titleRow = body.createDiv();
 			Object.assign(titleRow.style, { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" });
 			titleRow.createDiv({ text: cond.label }).setAttr("style", `font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${critical ? "#fca5a5" : "#fcd34d"}`);
-			const infoBtn = titleRow.createEl("button", { cls: "clickable-icon" });
+			const btnGroup = titleRow.createDiv();
+			Object.assign(btnGroup.style, { display: "flex", gap: "8px", alignItems: "center" });
+
+			const infoBtn = btnGroup.createEl("button", { cls: "clickable-icon" });
 			setIcon(infoBtn, "info");
 			Object.assign(infoBtn.style, { background: "none", border: "none", padding: "0", cursor: "pointer", color: critical ? "#fca5a5" : "#fcd34d", display: "flex", alignItems: "center" });
+
+			const dismissBtn = btnGroup.createEl("button", { cls: "clickable-icon", title: "Dismiss" });
+			setIcon(dismissBtn, "x");
+			Object.assign(dismissBtn.style, { background: "none", border: "none", padding: "0", cursor: "pointer", color: critical ? "#fca5a5" : "#fcd34d", display: "flex", alignItems: "center" });
+
+			dismissBtn.addEventListener("click", () => {
+				card.remove();
+			});
 
 			body.createDiv({ text: cond.message }).setAttr("style", `font-size:12px;line-height:1.5;color:${critical ? "#fecaca" : "#fde68a"}`);
 
@@ -1756,9 +1767,9 @@ export class MiniGraphView extends ItemView {
 		// Alert the user globally (once per session) if the cognitive load is critical.
 		if (!this.hasShownCognitiveAlert) {
 			try {
-				const cl = this.computeCognitiveLoad(this.clMessageK);
+				const cl = this.computeCognitiveLoad(this.clInsightK);
 				if (cl.score >= 80) { // High / Critical
-					new Notice("⚠️ Cognitive Load is CRITICAL. Please check the Message tab in Tag Lens for advice.", 8000);
+					new Notice("⚠️ Cognitive Load is CRITICAL. Please check the Insight tab in Tag Lens for advice.", 8000);
 					this.hasShownCognitiveAlert = true;
 				}
 			} catch (e) {
@@ -3307,10 +3318,10 @@ export class MiniGraphView extends ItemView {
 		Object.assign(notesTab.style, { display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: "0" } as Partial<CSSStyleDeclaration>);
 		const settingsTab = bodyWrap.createDiv({ cls: "gim-menu-settings" });
 		Object.assign(settingsTab.style, { display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" } as Partial<CSSStyleDeclaration>);
-		const messageTab = bodyWrap.createDiv();
-		Object.assign(messageTab.style, { display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" } as Partial<CSSStyleDeclaration>);
-		type MenuTab = "notes" | "settings" | "message";
-		const TABS: MenuTab[] = ["notes", "settings", "message"];
+		const insightTab = bodyWrap.createDiv();
+		Object.assign(insightTab.style, { display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" } as Partial<CSSStyleDeclaration>);
+		type MenuTab = "notes" | "settings" | "insight";
+		const TABS: MenuTab[] = ["notes", "settings", "insight"];
 		const tabBtns: Partial<Record<MenuTab, HTMLElement>> = {};
 		const styleTabs = (): void => {
 			for (const key of TABS) {
@@ -3330,10 +3341,10 @@ export class MiniGraphView extends ItemView {
 			this.activeMenuTab = key;
 			notesTab.style.display = key === "notes" ? "flex" : "none";
 			settingsTab.style.display = key === "settings" ? "block" : "none";
-			messageTab.style.display = key === "message" ? "block" : "none";
+			insightTab.style.display = key === "insight" ? "block" : "none";
 			if (key === "settings") this.renderSettingsBody(settingsTab);
 			else this.settingsHostEl = null;
-			if (key === "message") this.renderMessageBody(messageTab);
+			if (key === "insight") this.renderInsightBody(insightTab);
 			styleTabs();
 		};
 		const mkTab = (key: MenuTab, label: string): void => {
@@ -3349,7 +3360,7 @@ export class MiniGraphView extends ItemView {
 		};
 		mkTab("notes", "Notes");
 		mkTab("settings", "Settings");
-		mkTab("message", "Message");
+		mkTab("insight", "Insight");
 		// Note-count + click hint, shown at the top of the Notes pane.
 		const notesHint = notesTab.createDiv({ text: `${nodes.length} notes — click to ${verb}` });
 		Object.assign(notesHint.style, { fontSize: "10px", color: "#7e8aa0", padding: "4px 8px 0" } as Partial<CSSStyleDeclaration>);
