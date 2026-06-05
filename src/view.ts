@@ -704,14 +704,12 @@ export class MiniGraphView extends ItemView {
 		}
 		const distinctTags = Math.max(1, tagNoteCount.size);
 
-		const triggered: { id: string; label: string; severity: "CRITICAL" | "WARNING"; message: string; advice: string; offenders: string[] }[] = [];
+		const triggered: { id: string; label: string; severity: "CRITICAL" | "WARNING"; summary: string; detail: string; advice: string; offenders: string[] }[] = [];
 		if (totalNotes === 0) return { score: 0, global: { totalNotes, totalFolders, totalLinks, distinctTags }, triggered };
 		const linkDensity = totalLinks / totalNotes;
 		const basename = (p: string): string => { const s = p.split("/").pop() ?? p; return s.endsWith(".md") ? s.slice(0, -3) : s; };
-		const topN = <T>(arr: T[], score: (x: T) => number, label: (x: T) => string, n = 6): string[] => {
-			const sorted = [...arr].sort((a, b) => score(b) - score(a)).slice(0, n).map(label);
-			if (arr.length > n) sorted.push(`…and ${arr.length - n} more`);
-			return sorted;
+		const topN = <T>(arr: T[], score: (x: T) => number, label: (x: T) => string): string[] => {
+			return [...arr].sort((a, b) => score(b) - score(a)).map(label);
 		};
 
 		// [Architectural Imbalance] folder files > (notes/folders)*K
@@ -720,7 +718,8 @@ export class MiniGraphView extends ItemView {
 			const hits = [...folderCounts.entries()].filter(([, c]) => c > thr);
 			if (hits.length > 0) triggered.push({
 				id: "architecturalImbalance", label: "Architectural Imbalance", severity: "CRITICAL",
-				message: "This folder holds a disproportionate number of files compared to the vault average.",
+				summary: "Overcrowded folder",
+				detail: "This folder holds a disproportionate number of files compared to the vault average.",
 				advice: "Refactor by creating logical sub-folders.",
 				offenders: topN(hits, ([, c]) => c, ([p, c]) => `${p === "/" ? "(root)" : p} (${c} files)`),
 			});
@@ -731,7 +730,8 @@ export class MiniGraphView extends ItemView {
 			const hits = [...tagNoteCount.entries()].filter(([, c]) => c > thr);
 			if (hits.length > 0) triggered.push({
 				id: "contextualAmbiguity", label: "Contextual Ambiguity", severity: "WARNING",
-				message: "This tag is applied to an excessive percentage of your total notes (Tag Abstractness).",
+				summary: "Tag is too broad",
+				detail: "This tag is applied to an excessive percentage of your total notes (Tag Abstractness).",
 				advice: "Delete the tag or split it into more specific sub-tags.",
 				offenders: topN(hits, ([, c]) => c, ([t, c]) => `#${t} (${c} notes)`),
 			});
@@ -744,7 +744,8 @@ export class MiniGraphView extends ItemView {
 				.filter((x) => x.lc > thr);
 			if (hits.length > 0) triggered.push({
 				id: "networkHub", label: "Network Hub", severity: "CRITICAL",
-				message: "The link density of this note vastly exceeds the vault average.",
+				summary: "Excessive links",
+				detail: "The link density of this note vastly exceeds the vault average.",
 				advice: "Isolate this hub note or visualize it using a subset graph.",
 				offenders: topN(hits, (x) => x.lc, (x) => `${basename(x.f.path)} (${x.lc} links)`),
 			});
@@ -756,7 +757,8 @@ export class MiniGraphView extends ItemView {
 				.filter((x) => x.kb > 15 * k && x.lc < linkDensity / k);
 			if (hits.length > 0) triggered.push({
 				id: "monolithNote", label: "Monolith Note", severity: "WARNING",
-				message: "This note is a monolith. It has a large file size but very few links.",
+				summary: "Monolithic note",
+				detail: "This note is a monolith. It has a large file size but very few links.",
 				advice: "Break down the content into smaller, linked atomic notes.",
 				offenders: topN(hits, (x) => x.kb, (x) => `${basename(x.f.path)} (${Math.round(x.kb)} KB, ${x.lc} links)`),
 			});
@@ -769,7 +771,8 @@ export class MiniGraphView extends ItemView {
 				.filter((x) => x.tc > thr);
 			if (hits.length > 0) triggered.push({
 				id: "interfaceBloat", label: "Interface Bloat", severity: "WARNING",
-				message: "Note contains excessive tags relative to co-occurring tag variance.",
+				summary: "Too many tags",
+				detail: "Note contains excessive tags relative to co-occurring tag variance.",
 				advice: "Group related tags or use a hierarchical structure.",
 				offenders: topN(hits, (x) => x.tc, (x) => `${basename(x.f.path)} (${x.tc} tags)`),
 			});
@@ -839,50 +842,92 @@ export class MiniGraphView extends ItemView {
 			ok.createSpan({ text: "[OK] System status: Normal. Cognitive load is optimal." }).setAttr("style", "font-size:12px;line-height:1.5;color:#a7f3d0");
 			return;
 		}
+
+		interface AlertItem { label: string; severity: "CRITICAL" | "WARNING"; summary: string; detail: string; advice: string; offender: string; }
+		const allCards: AlertItem[] = [];
 		for (const cond of triggered) {
-			const critical = cond.severity === "CRITICAL";
-			const card = host.createDiv();
-			Object.assign(card.style, {
-				display: "flex", gap: "8px", alignItems: "flex-start", marginBottom: "8px", borderRadius: "6px", padding: "10px",
-				border: `1px solid ${critical ? "#7f2a2a" : "#7a5a1f"}`, background: critical ? "rgba(239,68,68,0.10)" : "rgba(245,158,11,0.10)",
-			} as Partial<CSSStyleDeclaration>);
-			card.createSpan().setAttr("style", `width:10px;height:10px;border-radius:2px;flex:0 0 auto;margin-top:3px;display:inline-block;background:${critical ? "#ef4444" : "#fbbf24"}`);
-			const body = card.createDiv();
-			body.style.flex = "1 1 auto";
-
-			const titleRow = body.createDiv();
-			Object.assign(titleRow.style, { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" });
-			titleRow.createDiv({ text: cond.label }).setAttr("style", `font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${critical ? "#fca5a5" : "#fcd34d"}`);
-			const btnGroup = titleRow.createDiv();
-			Object.assign(btnGroup.style, { display: "flex", gap: "8px", alignItems: "center" });
-
-			const infoBtn = btnGroup.createEl("button", { cls: "clickable-icon" });
-			setIcon(infoBtn, "info");
-			Object.assign(infoBtn.style, { background: "none", border: "none", padding: "0", cursor: "pointer", color: critical ? "#fca5a5" : "#fcd34d", display: "flex", alignItems: "center" });
-
-			const dismissBtn = btnGroup.createEl("button", { cls: "clickable-icon", title: "Dismiss" });
-			setIcon(dismissBtn, "x");
-			Object.assign(dismissBtn.style, { background: "none", border: "none", padding: "0", cursor: "pointer", color: critical ? "#fca5a5" : "#fcd34d", display: "flex", alignItems: "center" });
-
-			dismissBtn.addEventListener("click", () => {
-				card.remove();
-			});
-
-			body.createDiv({ text: cond.message }).setAttr("style", `font-size:12px;line-height:1.5;color:${critical ? "#fecaca" : "#fde68a"}`);
-
-			const adviceDiv = body.createDiv();
-			Object.assign(adviceDiv.style, { display: "none", fontSize: "11px", color: critical ? "#fca5a5" : "#fcd34d", marginTop: "4px", padding: "6px", background: "rgba(0,0,0,0.15)", borderRadius: "4px" });
-			adviceDiv.createSpan({ text: "Recommendation: " }).setAttr("style", "font-weight:bold");
-			adviceDiv.createSpan({ text: cond.advice });
-
-			infoBtn.addEventListener("click", () => {
-				adviceDiv.style.display = adviceDiv.style.display === "none" ? "block" : "none";
-			});
-
-			const list = body.createDiv();
-			Object.assign(list.style, { marginTop: "5px", fontSize: "10px", color: "#9db4d6", fontFamily: "monospace", lineHeight: "1.5" } as Partial<CSSStyleDeclaration>);
-			for (const o of cond.offenders) list.createDiv({ text: `• ${o}` });
+			for (const o of cond.offenders) {
+				allCards.push({ label: cond.label, severity: cond.severity, summary: cond.summary, detail: cond.detail, advice: cond.advice, offender: o });
+			}
 		}
+
+		const listContainer = host.createDiv();
+		const BATCH_SIZE = 20;
+		let loadedCount = 0;
+
+		const renderBatch = () => {
+			const batch = allCards.slice(loadedCount, loadedCount + BATCH_SIZE);
+			for (const item of batch) {
+				const critical = item.severity === "CRITICAL";
+				const card = listContainer.createDiv();
+				Object.assign(card.style, {
+					display: "flex", gap: "8px", alignItems: "flex-start", marginBottom: "8px", borderRadius: "6px", padding: "10px",
+					border: `1px solid ${critical ? "#7f2a2a" : "#7a5a1f"}`, background: critical ? "rgba(239,68,68,0.10)" : "rgba(245,158,11,0.10)",
+				} as Partial<CSSStyleDeclaration>);
+				card.createSpan().setAttr("style", `width:10px;height:10px;border-radius:2px;flex:0 0 auto;margin-top:3px;display:inline-block;background:${critical ? "#ef4444" : "#fbbf24"}`);
+				const body = card.createDiv();
+				body.style.flex = "1 1 auto";
+
+				const titleRow = body.createDiv();
+				Object.assign(titleRow.style, { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" });
+				titleRow.createDiv({ text: item.label }).setAttr("style", `font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${critical ? "#fca5a5" : "#fcd34d"}`);
+				const btnGroup = titleRow.createDiv();
+				Object.assign(btnGroup.style, { display: "flex", gap: "8px", alignItems: "center" });
+
+				const dismissBtn = btnGroup.createEl("button", { cls: "clickable-icon", title: "Dismiss" });
+				setIcon(dismissBtn, "x");
+				Object.assign(dismissBtn.style, { background: "none", border: "none", padding: "0", cursor: "pointer", color: critical ? "#fca5a5" : "#fcd34d", display: "flex", alignItems: "center" });
+
+				dismissBtn.addEventListener("click", () => {
+					card.remove();
+				});
+
+				const summaryDiv = body.createDiv({ text: item.summary });
+				Object.assign(summaryDiv.style, { 
+					fontSize: "12px", 
+					lineHeight: "1.5", 
+					color: critical ? "#fecaca" : "#fde68a",
+					cursor: "pointer",
+					textDecoration: "underline dashed",
+					textUnderlineOffset: "2px"
+				});
+				
+				const offenderDiv = body.createDiv({ text: `• Target: ${item.offender}` });
+				Object.assign(offenderDiv.style, { marginTop: "5px", fontSize: "10px", color: "#9db4d6", fontFamily: "monospace", lineHeight: "1.5" });
+
+				const detailsDiv = body.createDiv();
+				Object.assign(detailsDiv.style, { display: "none", marginTop: "8px", padding: "6px", background: "rgba(0,0,0,0.15)", borderRadius: "4px" });
+				
+				const detailText = detailsDiv.createDiv({ text: item.detail });
+				Object.assign(detailText.style, { fontSize: "11px", color: critical ? "#fca5a5" : "#fcd34d", marginBottom: "4px" });
+				
+				const adviceText = detailsDiv.createDiv();
+				Object.assign(adviceText.style, { fontSize: "11px", color: critical ? "#fca5a5" : "#fcd34d" });
+				adviceText.createSpan({ text: "Recommendation: " }).setAttr("style", "font-weight:bold");
+				adviceText.createSpan({ text: item.advice });
+
+				summaryDiv.addEventListener("click", () => {
+					detailsDiv.style.display = detailsDiv.style.display === "none" ? "block" : "none";
+				});
+			}
+			loadedCount += batch.length;
+			if (loadedCount >= allCards.length && sentinel) {
+				sentinel.style.display = "none";
+			}
+		};
+
+		const sentinel = host.createDiv();
+		Object.assign(sentinel.style, { height: "20px", width: "100%" });
+
+		const observer = new IntersectionObserver((entries) => {
+			if (entries[0].isIntersecting && loadedCount < allCards.length) {
+				renderBatch();
+			}
+		}, { root: host, rootMargin: "100px" });
+		observer.observe(sentinel);
+
+		// Initial render
+		renderBatch();
 	}
 
 	private renderTabButton(
