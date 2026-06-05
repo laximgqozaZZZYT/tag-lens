@@ -1816,7 +1816,7 @@ export class MiniGraphView extends ItemView {
 					new Notice("⚠️ Cognitive Load is CRITICAL. Please check the Insight tab in Tag Lens for advice.", 8000);
 					this.hasShownCognitiveAlert = true;
 				}
-			} catch (_e) {
+			} catch {
 				// Ignore metric errors so the rebuild doesn't fail
 			}
 		}
@@ -2969,7 +2969,7 @@ export class MiniGraphView extends ItemView {
 		const baseId = sepIdx >= 0 ? n.id.slice(sepIdx + 1) : n.id;
 		const scale = this.getCardScale(baseId);
 		const mode = this.displayMode.get(baseId) ?? "full";
-		const _card = this.cardCache.get(`${baseId}:${mode}:${scale.toFixed(4)}`);
+
 		// Bipartite SET (tag) nodes render coloured by their tag hue so they
 		// read as set cores; NOTE nodes use the default dark card.
 		const isSet = this.laid.setNodeIds?.has(n.id) ?? false;
