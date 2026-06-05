@@ -704,7 +704,7 @@ export class MiniGraphView extends ItemView {
 		}
 		const distinctTags = Math.max(1, tagNoteCount.size);
 
-		const triggered: { id: string; label: string; severity: "CRITICAL" | "WARNING"; message: string; offenders: string[] }[] = [];
+		const triggered: { id: string; label: string; severity: "CRITICAL" | "WARNING"; message: string; advice: string; offenders: string[] }[] = [];
 		if (totalNotes === 0) return { score: 0, global: { totalNotes, totalFolders, totalLinks, distinctTags }, triggered };
 		const linkDensity = totalLinks / totalNotes;
 		const basename = (p: string): string => { const s = p.split("/").pop() ?? p; return s.endsWith(".md") ? s.slice(0, -3) : s; };
@@ -720,7 +720,8 @@ export class MiniGraphView extends ItemView {
 			const hits = [...folderCounts.entries()].filter(([, c]) => c > thr);
 			if (hits.length > 0) triggered.push({
 				id: "architecturalImbalance", label: "Architectural Imbalance", severity: "CRITICAL",
-				message: "[CRITICAL] This folder holds a disproportionate number of files compared to the vault average. Advice: Refactor by creating logical sub-folders.",
+				message: "This folder holds a disproportionate number of files compared to the vault average.",
+				advice: "Refactor by creating logical sub-folders.",
 				offenders: topN(hits, ([, c]) => c, ([p, c]) => `${p === "/" ? "(root)" : p} (${c} files)`),
 			});
 		}
@@ -730,7 +731,8 @@ export class MiniGraphView extends ItemView {
 			const hits = [...tagNoteCount.entries()].filter(([, c]) => c > thr);
 			if (hits.length > 0) triggered.push({
 				id: "contextualAmbiguity", label: "Contextual Ambiguity", severity: "WARNING",
-				message: "[WARNING] This tag is applied to an excessive percentage of your total notes (Tag Abstractness). Advice: Delete the tag or split it into more specific sub-tags.",
+				message: "This tag is applied to an excessive percentage of your total notes (Tag Abstractness).",
+				advice: "Delete the tag or split it into more specific sub-tags.",
 				offenders: topN(hits, ([, c]) => c, ([t, c]) => `#${t} (${c} notes)`),
 			});
 		}
@@ -742,7 +744,8 @@ export class MiniGraphView extends ItemView {
 				.filter((x) => x.lc > thr);
 			if (hits.length > 0) triggered.push({
 				id: "networkHub", label: "Network Hub", severity: "CRITICAL",
-				message: "[CRITICAL] The link density of this note vastly exceeds the vault average. Advice: Isolate this hub note or visualize it using a subset graph.",
+				message: "The link density of this note vastly exceeds the vault average.",
+				advice: "Isolate this hub note or visualize it using a subset graph.",
 				offenders: topN(hits, (x) => x.lc, (x) => `${basename(x.f.path)} (${x.lc} links)`),
 			});
 		}
@@ -753,7 +756,8 @@ export class MiniGraphView extends ItemView {
 				.filter((x) => x.kb > 15 * k && x.lc < linkDensity / k);
 			if (hits.length > 0) triggered.push({
 				id: "monolithNote", label: "Monolith Note", severity: "WARNING",
-				message: "[WARNING] This note is a monolith. It has a large file size but very few links. Advice: Break down the content into smaller, linked atomic notes.",
+				message: "This note is a monolith. It has a large file size but very few links.",
+				advice: "Break down the content into smaller, linked atomic notes.",
 				offenders: topN(hits, (x) => x.kb, (x) => `${basename(x.f.path)} (${Math.round(x.kb)} KB, ${x.lc} links)`),
 			});
 		}
@@ -765,7 +769,8 @@ export class MiniGraphView extends ItemView {
 				.filter((x) => x.tc > thr);
 			if (hits.length > 0) triggered.push({
 				id: "interfaceBloat", label: "Interface Bloat", severity: "WARNING",
-				message: "[WARNING] Note contains excessive tags relative to co-occurring tag variance. Advice: Group related tags or use a hierarchical structure.",
+				message: "Note contains excessive tags relative to co-occurring tag variance.",
+				advice: "Group related tags or use a hierarchical structure.",
 				offenders: topN(hits, (x) => x.tc, (x) => `${basename(x.f.path)} (${x.tc} tags)`),
 			});
 		}
@@ -843,8 +848,26 @@ export class MiniGraphView extends ItemView {
 			} as Partial<CSSStyleDeclaration>);
 			card.createSpan().setAttr("style", `width:10px;height:10px;border-radius:2px;flex:0 0 auto;margin-top:3px;display:inline-block;background:${critical ? "#ef4444" : "#fbbf24"}`);
 			const body = card.createDiv();
-			body.createDiv({ text: cond.label }).setAttr("style", `font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:3px;color:${critical ? "#fca5a5" : "#fcd34d"}`);
+			body.style.flex = "1 1 auto";
+
+			const titleRow = body.createDiv();
+			Object.assign(titleRow.style, { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" });
+			titleRow.createDiv({ text: cond.label }).setAttr("style", `font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${critical ? "#fca5a5" : "#fcd34d"}`);
+			const infoBtn = titleRow.createEl("button", { cls: "clickable-icon" });
+			setIcon(infoBtn, "info");
+			Object.assign(infoBtn.style, { background: "none", border: "none", padding: "0", cursor: "pointer", color: critical ? "#fca5a5" : "#fcd34d", display: "flex", alignItems: "center" });
+
 			body.createDiv({ text: cond.message }).setAttr("style", `font-size:12px;line-height:1.5;color:${critical ? "#fecaca" : "#fde68a"}`);
+
+			const adviceDiv = body.createDiv();
+			Object.assign(adviceDiv.style, { display: "none", fontSize: "11px", color: critical ? "#fca5a5" : "#fcd34d", marginTop: "4px", padding: "6px", background: "rgba(0,0,0,0.15)", borderRadius: "4px" });
+			adviceDiv.createSpan({ text: "Recommendation: " }).setAttr("style", "font-weight:bold");
+			adviceDiv.createSpan({ text: cond.advice });
+
+			infoBtn.addEventListener("click", () => {
+				adviceDiv.style.display = adviceDiv.style.display === "none" ? "block" : "none";
+			});
+
 			const list = body.createDiv();
 			Object.assign(list.style, { marginTop: "5px", fontSize: "10px", color: "#9db4d6", fontFamily: "monospace", lineHeight: "1.5" } as Partial<CSSStyleDeclaration>);
 			for (const o of cond.offenders) list.createDiv({ text: `• ${o}` });
