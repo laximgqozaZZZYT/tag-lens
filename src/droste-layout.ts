@@ -221,7 +221,7 @@ export function buildGallery(data: GraphData, labels?: Map<string, string>): Dro
 	const cells: GalleryCell[] = data.nodes.map((n, i) => ({
 		id: n.id, label: n.label, col: i % cols, row: Math.floor(i / cols),
 	}));
-	return { cells, cols, rows, nodeKeys, nodeLabel, labels: labels ?? new Map(), links, backlinks };
+	return { cells, cols, rows, nodeKeys, nodeLabel, labels: labels ?? new Map<string, string>(), links, backlinks };
 }
 
 // Build one node's icon diagram (spec §1). Group every OTHER node M by the part of the

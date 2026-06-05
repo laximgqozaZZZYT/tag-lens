@@ -14,7 +14,7 @@ import {
 // cluster bboxes). Visible breathing room on the right / bottom + an
 // extra header strip on the left / top so column A / row 1 stay empty
 // AND there's a "next blank cell" hint at every edge.
-const GRID_BUFFER_CELLS = 2;
+
 
 // Excel-style cell grid drawn across the entire VISIBLE viewport
 // (= not just the content footprint). Combined with the wrap-aware

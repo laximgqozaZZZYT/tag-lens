@@ -142,11 +142,9 @@ export function routeZ(
 	// cards (scale > 1) expose the right boundary as exit channel rather
 	// than a channel that lies INSIDE the card.
 	const colSpanA = Math.max(1, Math.ceil(a.w / slotW));
-	const rowSpanA = Math.max(1, Math.ceil(a.h / slotH));
 	const startColA = Math.round(a.x / slotW - colSpanA / 2);
 	const endColA = startColA + colSpanA - 1;
 	const colSpanB = Math.max(1, Math.ceil(b.w / slotW));
-	const rowSpanB = Math.max(1, Math.ceil(b.h / slotH));
 	const startColB = Math.round(b.x / slotW - colSpanB / 2);
 	const endColB = startColB + colSpanB - 1;
 

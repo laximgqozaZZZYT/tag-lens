@@ -33,7 +33,6 @@ interface XY {
 // Clustered islands: radial gap between concentric rings as a multiple of the
 // intra-ring node spacing. ≈3 opens a clear gap between rings so nodes read as
 // separated points and the ring structure is visible. Tunable.
-const RING_SPACING_FACTOR = 3.0;
 
 export function layoutBipartite(data: GraphData, opts: LayoutOptions): LaidOut {
 	const labels = opts.clusterLabels ?? new Map<string, string>();
@@ -407,7 +406,7 @@ function placeConcentric(
 	const cap = Math.max(8, Math.floor((TWO_PI * rOuterBase) / noteStep));
 	const ringLevels = Math.max(1, Math.ceil(nNotes / cap));
 	const ringGap = dims.noteH + dims.gap * 1.5;
-	const notePos: XY[] = new Array(nNotes);
+	const notePos: XY[] = new Array<XY>(nNotes);
 	noteOrderIdx.forEach((orig, p) => {
 		const a = (p / Math.max(1, nNotes)) * TWO_PI - Math.PI / 2;
 		const r = rOuterBase + (p % ringLevels) * ringGap;
@@ -482,7 +481,7 @@ function placeClustered(
 			const ti = tagIdx.get(m);
 			if (ti !== undefined) tagNotes[ti].add(n.id);
 		}
-	const J: number[][] = tags.map(() => new Array(nTags).fill(0));
+	const J: number[][] = tags.map(() => new Array<number>(nTags).fill(0));
 	for (let i = 0; i < nTags; i++)
 		for (let j = i + 1; j < nTags; j++) {
 			const a = tagNotes[i];
@@ -535,8 +534,8 @@ function placeClustered(
 	const NOTE_MAX_W = 190;
 	const SET_MAX_W = 320;
 	const meas =
-		typeof document !== "undefined"
-			? document.createElement("canvas").getContext("2d")
+		typeof activeDocument !== "undefined"
+			? activeDocument.createElement("canvas").getContext("2d")
 			: null;
 	const widthOf = (text: string, max: number): number => {
 		let tw = text.length * REF_FONT * 0.58; // fallback when no canvas
@@ -570,8 +569,8 @@ function placeClustered(
 	// + a gap so rings stay visually separated. Each ring is golden-angle
 	// staggered so cards don't line up into radial spokes.
 	const GOLDEN = Math.PI * (3 - Math.sqrt(5));
-	const offset: XY[] = new Array(data.nodes.length);
-	const islandR = new Array(nTags).fill(dims.setW);
+	const offset: XY[] = new Array<XY>(data.nodes.length);
+	const islandR = new Array<number>(nTags).fill(dims.setW);
 	const packIsland = (mem: number[], centerHalfW: number): number => {
 		let maxMemW = 0;
 		for (const i of mem) maxMemW = Math.max(maxMemW, noteDims[i].w);
@@ -625,7 +624,7 @@ function placeClustered(
 	tags.forEach((t, i) => setPos.set(t, { x: subs[i].cx, y: subs[i].cy }));
 
 	// Note positions = island centre + ring offset.
-	const notePos: XY[] = new Array(data.nodes.length);
+	const notePos: XY[] = new Array<XY>(data.nodes.length);
 	data.nodes.forEach((_, i) => {
 		const mt = mainTagByNote[i];
 		if (mt !== null) {

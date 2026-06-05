@@ -6,7 +6,11 @@ export default class GraphIslandMiniPlugin extends Plugin {
 	settings: MiniSettings = DEFAULT_SETTINGS;
 	private views: MiniGraphView[] = [];
 
-	async onload(): Promise<void> {
+	onload(): void {
+		void this.init();
+	}
+
+	private async init(): Promise<void> {
 		await this.loadSettings();
 
 		this.registerView(VIEW_TYPE_MINI, (leaf) => {
@@ -15,17 +19,17 @@ export default class GraphIslandMiniPlugin extends Plugin {
 			return v;
 		});
 
-		this.addRibbonIcon("git-fork", "Tag Lens", () => this.activateView());
+		this.addRibbonIcon("git-fork", "Tag Lens", () => void this.activateView());
 		this.addCommand({
-			id: "open-tag-lens",
-			name: "Open Tag Lens",
-			callback: () => this.activateView(),
+			id: "open",
+			name: "Open",
+			callback: () => void this.activateView(),
 		});
 
 		this.addSettingTab(new MiniSettingTab(this));
 	}
 
-	async onunload(): Promise<void> {
+	onunload(): void {
 		this.views = [];
 	}
 
@@ -46,7 +50,7 @@ export default class GraphIslandMiniPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		const raw = await this.loadData();
+		const raw: unknown = await this.loadData();
 		const merged = { ...DEFAULT_SETTINGS, ...(raw ?? {}) } as Record<string, unknown>;
 		// Strip legacy / removed fields so they don't leak back into data.json.
 		delete merged.collapsedGroups;
@@ -144,11 +148,11 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		if (
 			typeof merged.heatmapMinTagSize !== "number" ||
 			!Number.isFinite(merged.heatmapMinTagSize) ||
-			(merged.heatmapMinTagSize as number) < 1
+			merged.heatmapMinTagSize < 1
 		) {
 			merged.heatmapMinTagSize = 2;
 		} else {
-			merged.heatmapMinTagSize = Math.max(1, Math.floor(merged.heatmapMinTagSize as number));
+			merged.heatmapMinTagSize = Math.max(1, Math.floor(merged.heatmapMinTagSize));
 		}
 		if (merged.heatmapCriterion !== "co-occurrence" && merged.heatmapCriterion !== "size")
 			merged.heatmapCriterion = "co-occurrence";

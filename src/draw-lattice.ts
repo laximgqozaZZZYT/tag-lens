@@ -7,7 +7,7 @@
 // can never collapse into a lone "…". Each LOD has its own body painter
 // (bar / waffle / cells), and subset links use cubic-bezier S-curves with
 // hover-only emphasis instead of dim straight lines.
-import type { LatticeMeta, LatticeNodeMeta, LatticeLod } from "./layout";
+import type { LatticeMeta, LatticeNodeMeta } from "./layout";
 import {
 	clusterHue,
 	truncateToWidth,

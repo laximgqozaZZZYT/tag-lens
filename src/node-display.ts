@@ -66,11 +66,9 @@ export function resolveNodeDisplay(
 		return undefined;
 	};
 	return {
-		nodeRows: (lookup("nodeRows") as number | undefined) ?? defaults.nodeRows,
-		nodeCols: (lookup("nodeCols") as number | undefined) ?? defaults.nodeCols,
-		nodeSizeMode:
-			(lookup("nodeSizeMode") as NodeSizeMode | undefined) ??
-			defaults.nodeSizeMode,
+		nodeRows: lookup("nodeRows") ?? defaults.nodeRows,
+		nodeCols: lookup("nodeCols") ?? defaults.nodeCols,
+		nodeSizeMode: lookup("nodeSizeMode") ?? defaults.nodeSizeMode,
 	};
 }
 
@@ -122,10 +120,8 @@ export function resolveFromCluster(
 		return undefined;
 	};
 	return {
-		nodeRows: (lookup("nodeRows") as number | undefined) ?? defaults.nodeRows,
-		nodeCols: (lookup("nodeCols") as number | undefined) ?? defaults.nodeCols,
-		nodeSizeMode:
-			(lookup("nodeSizeMode") as NodeSizeMode | undefined) ??
-			defaults.nodeSizeMode,
+		nodeRows: lookup("nodeRows") ?? defaults.nodeRows,
+		nodeCols: lookup("nodeCols") ?? defaults.nodeCols,
+		nodeSizeMode: lookup("nodeSizeMode") ?? defaults.nodeSizeMode,
 	};
 }

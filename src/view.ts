@@ -390,16 +390,16 @@ export class MiniGraphView extends ItemView {
 	async onOpen(): Promise<void> {
 		const root = this.containerEl.children[1] as HTMLElement;
 		root.empty();
-		root.style.padding = "0";
-		root.style.overflow = "hidden";
-		root.style.position = "relative";
+		root.setCssStyles({ padding: "0" });
+		root.setCssStyles({ overflow: "hidden" });
+		root.setCssStyles({ position: "relative" });
 		this.root = root;
 
 		this.canvas = root.createEl("canvas");
-		this.canvas.style.width = "100%";
-		this.canvas.style.height = "100%";
-		this.canvas.style.display = "block";
-		this.canvas.style.cursor = "grab";
+		this.canvas.setCssStyles({ width: "100%" });
+		this.canvas.setCssStyles({ height: "100%" });
+		this.canvas.setCssStyles({ display: "block" });
+		this.canvas.setCssStyles({ cursor: "grab" });
 		this.ctx = this.canvas.getContext("2d")!;
 
 		// Marquee controller wires canvas + root + the view's coordinate /
@@ -514,7 +514,7 @@ export class MiniGraphView extends ItemView {
 		// Sub-tab bar: View / Filter / Sort / Display / Layers. Underline style,
 		// matching the top-level Notes/Settings tabs but more compact.
 		const subBar = host.createDiv();
-		Object.assign(subBar.style, { display: "flex", flexWrap: "wrap", gap: "1px", marginBottom: "6px", borderBottom: "1px solid #2a3447" } as Partial<CSSStyleDeclaration>);
+		subBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", marginBottom: "6px", borderBottom: "1px solid #2a3447" });
 		const content = host.createDiv({ cls: "gim-panel-content" });
 		type SubKey = "view" | "filter" | "sort" | "display" | "layers";
 		const SUBS: { key: SubKey; label: string }[] = [
@@ -530,13 +530,13 @@ export class MiniGraphView extends ItemView {
 				const b = subBtns.get(key);
 				if (!b) continue;
 				const on = this.settingsSubTab === key;
-				Object.assign(b.style, {
+				b.setCssStyles({
 					background: "transparent", border: "none",
 					borderBottom: on ? "2px solid #2d6cdf" : "2px solid transparent",
 					borderRadius: "0", padding: "4px 8px", marginBottom: "-1px",
 					color: on ? "#e6edf3" : "#9db4d6", fontWeight: on ? "600" : "400",
 					cursor: "pointer", fontSize: "10.5px", lineHeight: "1.3",
-				} as Partial<CSSStyleDeclaration>);
+				});
 			}
 		};
 		const renderSub = (): void => {
@@ -553,7 +553,7 @@ export class MiniGraphView extends ItemView {
 			const b = subBar.createEl("button", { text: label });
 			subBtns.set(key, b);
 			b.addEventListener("click", () => { this.settingsSubTab = key; styleSubs(); renderSub(); });
-			b.addEventListener("mouseenter", () => { if (this.settingsSubTab !== key) { b.style.color = "#cdd9ec"; b.style.borderBottomColor = "#3a4760"; } });
+			b.addEventListener("mouseenter", () => { if (this.settingsSubTab !== key) { b.setCssStyles({ color: "#cdd9ec" }); b.setCssStyles({ borderBottomColor: "#3a4760" }); } });
 			b.addEventListener("mouseleave", () => styleSubs());
 		}
 		styleSubs();
@@ -802,42 +802,42 @@ export class MiniGraphView extends ItemView {
 
 		// ── Score gauge ──
 		const gauge = host.createDiv();
-		Object.assign(gauge.style, { border: "1px solid #3a4760", borderRadius: "8px", background: "#161c2a", padding: "10px", marginBottom: "8px" } as Partial<CSSStyleDeclaration>);
+		gauge.setCssStyles({ border: "1px solid #3a4760", borderRadius: "8px", background: "#161c2a", padding: "10px", marginBottom: "8px" });
 		const gTop = gauge.createDiv();
-		Object.assign(gTop.style, { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "6px" } as Partial<CSSStyleDeclaration>);
+		gTop.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "6px" });
 		const gLeft = gTop.createDiv();
 		gLeft.createDiv({ text: "Total Cognitive Load Score" }).setAttr("style", "font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:#7e8aa0");
 		const sc = gLeft.createDiv({ text: `${score} ` });
-		Object.assign(sc.style, { fontSize: "22px", fontWeight: "700", color: band.c } as Partial<CSSStyleDeclaration>);
+		sc.setCssStyles({ fontSize: "22px", fontWeight: "700", color: band.c });
 		sc.createSpan({ text: "/ 100" }).setAttr("style", "font-size:11px;font-weight:400;color:#5b6678");
 		gTop.createDiv({ text: band.t }).setAttr("style", `font-size:12px;font-weight:600;color:${band.c}`);
 		const track = gauge.createDiv();
-		Object.assign(track.style, { height: "8px", width: "100%", borderRadius: "999px", background: "#2a3447", overflow: "hidden" } as Partial<CSSStyleDeclaration>);
+		track.setCssStyles({ height: "8px", width: "100%", borderRadius: "999px", background: "#2a3447", overflow: "hidden" });
 		const fill = track.createDiv();
-		Object.assign(fill.style, { height: "100%", width: `${score}%`, background: band.b, borderRadius: "999px", transition: "width .15s" } as Partial<CSSStyleDeclaration>);
+		fill.setCssStyles({ height: "100%", width: `${score}%`, background: band.b, borderRadius: "999px", transition: "width .15s" });
 		gauge.createDiv({ text: `Vault: ${global.totalNotes} notes · ${global.totalFolders} folders · ${global.totalLinks} links · ${global.distinctTags} tags` })
 			.setAttr("style", "font-size:9px;color:#5b6678;margin-top:6px;font-family:monospace");
 
 		// ── K sensitivity slider + refresh ──
 		const ctrl = host.createDiv();
-		Object.assign(ctrl.style, { display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", fontSize: "11px", color: "#9db4d6" } as Partial<CSSStyleDeclaration>);
+		ctrl.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", fontSize: "11px", color: "#9db4d6" });
 		ctrl.createSpan({ text: "Sensitivity (K)" });
 		const kIn = ctrl.createEl("input", { attr: { type: "range", min: "1", max: "5", step: "0.1", value: String(k) } }) as HTMLInputElement;
-		Object.assign(kIn.style, { flex: "1 1 auto", accentColor: "#2d6cdf", cursor: "pointer" } as Partial<CSSStyleDeclaration>);
+		kIn.setCssStyles({ flex: "1 1 auto", accentColor: "#2d6cdf", cursor: "pointer" });
 		const kVal = ctrl.createSpan({ text: k.toFixed(1) });
-		Object.assign(kVal.style, { fontFamily: "monospace", color: "#7fb4ff", width: "26px", textAlign: "right" } as Partial<CSSStyleDeclaration>);
+		kVal.setCssStyles({ fontFamily: "monospace", color: "#7fb4ff", width: "26px", textAlign: "right" });
 		// Update K + label live while dragging (cheap), but only RE-SCAN the vault
 		// on release (`change`) so a large vault doesn't recompute per pixel.
 		kIn.addEventListener("input", () => { this.clInsightK = Number(kIn.value); kVal.setText(this.clInsightK.toFixed(1)); });
 		kIn.addEventListener("change", () => this.renderInsightBody(host));
 		const refresh = ctrl.createEl("button", { text: "Refresh" });
-		Object.assign(refresh.style, { fontSize: "10px", padding: "2px 8px", background: "#1a2236", border: "1px solid #3a4760", borderRadius: "4px", color: "#9db4d6", cursor: "pointer" } as Partial<CSSStyleDeclaration>);
+		refresh.setCssStyles({ fontSize: "10px", padding: "2px 8px", background: "#1a2236", border: "1px solid #3a4760", borderRadius: "4px", color: "#9db4d6", cursor: "pointer" });
 		refresh.addEventListener("click", () => this.renderInsightBody(host));
 
 		// ── Alerts (active only) ──
 		if (triggered.length === 0) {
 			const ok = host.createDiv();
-			Object.assign(ok.style, { display: "flex", gap: "8px", alignItems: "flex-start", border: "1px solid #1f6b4f", background: "rgba(16,185,129,0.12)", borderRadius: "6px", padding: "10px" } as Partial<CSSStyleDeclaration>);
+			ok.setCssStyles({ display: "flex", gap: "8px", alignItems: "flex-start", border: "1px solid #1f6b4f", background: "rgba(16,185,129,0.12)", borderRadius: "6px", padding: "10px" });
 			ok.createSpan().setAttr("style", "width:10px;height:10px;border-radius:2px;background:#34d399;flex:0 0 auto;margin-top:2px;display:inline-block");
 			ok.createSpan({ text: "[OK] System status: Normal. Cognitive load is optimal." }).setAttr("style", "font-size:12px;line-height:1.5;color:#a7f3d0");
 			return;
@@ -860,30 +860,30 @@ export class MiniGraphView extends ItemView {
 			for (const item of batch) {
 				const critical = item.severity === "CRITICAL";
 				const card = listContainer.createDiv();
-				Object.assign(card.style, {
+				card.setCssStyles({
 					display: "flex", gap: "8px", alignItems: "flex-start", marginBottom: "8px", borderRadius: "6px", padding: "10px",
 					border: `1px solid ${critical ? "#7f2a2a" : "#7a5a1f"}`, background: critical ? "rgba(239,68,68,0.10)" : "rgba(245,158,11,0.10)",
-				} as Partial<CSSStyleDeclaration>);
+				});
 				card.createSpan().setAttr("style", `width:10px;height:10px;border-radius:2px;flex:0 0 auto;margin-top:3px;display:inline-block;background:${critical ? "#ef4444" : "#fbbf24"}`);
 				const body = card.createDiv();
-				body.style.flex = "1 1 auto";
+				body.setCssStyles({ flex: "1 1 auto" });
 
 				const titleRow = body.createDiv();
-				Object.assign(titleRow.style, { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" });
+				titleRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" });
 				titleRow.createDiv({ text: item.label }).setAttr("style", `font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${critical ? "#fca5a5" : "#fcd34d"}`);
 				const btnGroup = titleRow.createDiv();
-				Object.assign(btnGroup.style, { display: "flex", gap: "8px", alignItems: "center" });
+				btnGroup.setCssStyles({ display: "flex", gap: "8px", alignItems: "center" });
 
 				const dismissBtn = btnGroup.createEl("button", { cls: "clickable-icon", title: "Dismiss" });
 				setIcon(dismissBtn, "x");
-				Object.assign(dismissBtn.style, { background: "none", border: "none", padding: "0", cursor: "pointer", color: critical ? "#fca5a5" : "#fcd34d", display: "flex", alignItems: "center" });
+				dismissBtn.setCssStyles({ background: "none", border: "none", padding: "0", cursor: "pointer", color: critical ? "#fca5a5" : "#fcd34d", display: "flex", alignItems: "center" });
 
 				dismissBtn.addEventListener("click", () => {
 					card.remove();
 				});
 
 				const summaryDiv = body.createDiv({ text: item.summary });
-				Object.assign(summaryDiv.style, { 
+				summaryDiv.setCssStyles({ 
 					fontSize: "12px", 
 					lineHeight: "1.5", 
 					color: critical ? "#fecaca" : "#fde68a",
@@ -893,31 +893,31 @@ export class MiniGraphView extends ItemView {
 				});
 				
 				const offenderDiv = body.createDiv({ text: `• Target: ${item.offender}` });
-				Object.assign(offenderDiv.style, { marginTop: "5px", fontSize: "10px", color: "#9db4d6", fontFamily: "monospace", lineHeight: "1.5" });
+				offenderDiv.setCssStyles({ marginTop: "5px", fontSize: "10px", color: "#9db4d6", fontFamily: "monospace", lineHeight: "1.5" });
 
 				const detailsDiv = body.createDiv();
-				Object.assign(detailsDiv.style, { display: "none", marginTop: "8px", padding: "6px", background: "rgba(0,0,0,0.15)", borderRadius: "4px" });
+				detailsDiv.setCssStyles({ display: "none", marginTop: "8px", padding: "6px", background: "rgba(0,0,0,0.15)", borderRadius: "4px" });
 				
 				const detailText = detailsDiv.createDiv({ text: item.detail });
-				Object.assign(detailText.style, { fontSize: "11px", color: critical ? "#fca5a5" : "#fcd34d", marginBottom: "4px" });
+				detailText.setCssStyles({ fontSize: "11px", color: critical ? "#fca5a5" : "#fcd34d", marginBottom: "4px" });
 				
 				const adviceText = detailsDiv.createDiv();
-				Object.assign(adviceText.style, { fontSize: "11px", color: critical ? "#fca5a5" : "#fcd34d" });
+				adviceText.setCssStyles({ fontSize: "11px", color: critical ? "#fca5a5" : "#fcd34d" });
 				adviceText.createSpan({ text: "Recommendation: " }).setAttr("style", "font-weight:bold");
 				adviceText.createSpan({ text: item.advice });
 
 				summaryDiv.addEventListener("click", () => {
-					detailsDiv.style.display = detailsDiv.style.display === "none" ? "block" : "none";
+					detailsDiv.setCssStyles({ display: detailsDiv.style.display === "none" ? "block" : "none" });
 				});
 			}
 			loadedCount += batch.length;
 			if (loadedCount >= allCards.length && sentinel) {
-				sentinel.style.display = "none";
+				sentinel.setCssStyles({ display: "none" });
 			}
 		};
 
 		const sentinel = host.createDiv();
-		Object.assign(sentinel.style, { height: "20px", width: "100%" });
+		sentinel.setCssStyles({ height: "20px", width: "100%" });
 
 		const observer = new IntersectionObserver((entries) => {
 			if (entries[0].isIntersecting && loadedCount < allCards.length) {
@@ -941,7 +941,7 @@ export class MiniGraphView extends ItemView {
 		if (this.activeTab === key) btn.addClass("active");
 		if (hue !== null) {
 			const sw = btn.createSpan({ cls: "gim-panel-tab-swatch" });
-			sw.style.background = `hsl(${hue}, 70%, 62%)`;
+			sw.setCssStyles({ background: `hsl(${hue}, 70%, 62%)` });
 		}
 		btn.createSpan({ text: label });
 		// filterText = null ⇒ pinned (never filtered, e.g. the 全体 tab).
@@ -967,11 +967,11 @@ export class MiniGraphView extends ItemView {
 		const chips = this.settingsHostEl.querySelectorAll<HTMLElement>(".gim-panel-tab");
 		chips.forEach((btn) => {
 			if (btn.dataset.alwaysVisible === "1" || btn.classList.contains("active")) {
-				btn.style.display = "";
+				btn.setCssStyles({ display: "" });
 				return;
 			}
 			const text = btn.dataset.filterText ?? "";
-			btn.style.display = q === "" || text.includes(q) ? "" : "none";
+			btn.setCssStyles({ display: q === "" || text.includes(q) ? "" : "none" });
 		});
 	}
 
@@ -984,14 +984,14 @@ export class MiniGraphView extends ItemView {
 			attr: { min: "0", max: "48", step: "1" },
 		}) as HTMLInputElement;
 		input.value = String(this.settings.minFontPx);
-		input.style.width = "60px";
+		input.setCssStyles({ width: "60px" });
 		const hint = wrap.createSpan({
 			cls: "gim-min-font-hint",
 			text: "Floor for every label / card font",
 		});
-		hint.style.marginLeft = "8px";
-		hint.style.color = "var(--text-muted, #7a8aa0)";
-		hint.style.fontSize = "11px";
+		hint.setCssStyles({ marginLeft: "8px" });
+		hint.setCssStyles({ color: "var(--text-muted, #7a8aa0)" });
+		hint.setCssStyles({ fontSize: "11px" });
 		input.addEventListener("change", () => {
 			const v = Math.max(0, Math.min(48, Math.floor(Number(input.value) || 0)));
 			input.value = String(v);
@@ -1016,7 +1016,7 @@ export class MiniGraphView extends ItemView {
 		const meta = head.createDiv({ cls: "gim-layer-meta" });
 		const swatch = meta.createSpan({ cls: "gim-layer-swatch" });
 		const hue = clusterHue(cluster.groupKey);
-		swatch.style.background = `hsl(${hue}, 70%, 62%)`;
+		swatch.setCssStyles({ background: `hsl(${hue}, 70%, 62%)` });
 		meta.createSpan({ text: cluster.label });
 		meta.createSpan({
 			cls: "gim-layer-count",
@@ -1194,7 +1194,8 @@ export class MiniGraphView extends ItemView {
 		mIn.min = nIn.min = "1";
 		mIn.max = nIn.max = "8";
 		mIn.step = nIn.step = "1";
-		mIn.style.width = nIn.style.width = "50px";
+		mIn.setCssStyles({ width: "50px" });
+		nIn.setCssStyles({ width: "50px" });
 		if (scope) {
 			const ov = this.settings.nodeDisplayOverrides[scope.groupKey];
 			mIn.value = ov?.nodeRows !== undefined ? String(ov.nodeRows) : "";
@@ -1353,7 +1354,7 @@ export class MiniGraphView extends ItemView {
 		row.createSpan({ text: "Min column size", cls: "gim-order-field" });
 		const inp = row.createEl("input", { type: "number" }) as HTMLInputElement;
 		inp.min = "1";
-		inp.style.width = "56px";
+		inp.setCssStyles({ width: "56px" });
 		inp.value = String(this.settings.matrixMinColumnSize);
 		inp.addEventListener("change", () => {
 			const v = Math.max(1, Math.floor(Number(inp.value) || 1));
@@ -1400,7 +1401,7 @@ export class MiniGraphView extends ItemView {
 		row.createSpan({ text: "Min tag size", cls: "gim-order-field" });
 		const inp = row.createEl("input", { type: "number" }) as HTMLInputElement;
 		inp.min = "1";
-		inp.style.width = "56px";
+		inp.setCssStyles({ width: "56px" });
 		inp.value = String(this.settings.heatmapMinTagSize);
 		inp.addEventListener("change", () => {
 			const v = Math.max(1, Math.floor(Number(inp.value) || 1));
@@ -1459,7 +1460,7 @@ export class MiniGraphView extends ItemView {
 			attr: { min: "1", step: "1" },
 		}) as HTMLInputElement;
 		minIn.value = String(this.settings.latticeMinNodeSize);
-		minIn.style.width = "60px";
+		minIn.setCssStyles({ width: "60px" });
 		minIn.addEventListener("change", () => {
 			const v = Math.max(1, Math.floor(Number(minIn.value) || 1));
 			this.settings.latticeMinNodeSize = v;
@@ -1476,7 +1477,7 @@ export class MiniGraphView extends ItemView {
 			attr: { min: "1", step: "1" },
 		}) as HTMLInputElement;
 		capIn.value = String(this.settings.latticeMaxNodesPerTier);
-		capIn.style.width = "60px";
+		capIn.setCssStyles({ width: "60px" });
 		capIn.addEventListener("change", () => {
 			const v = Math.max(1, Math.floor(Number(capIn.value) || 1));
 			this.settings.latticeMaxNodesPerTier = v;
@@ -1494,7 +1495,7 @@ export class MiniGraphView extends ItemView {
 			attr: { min: "1", step: "1" },
 		}) as HTMLInputElement;
 		namedIn.value = String(this.settings.latticeNamedMax);
-		namedIn.style.width = "60px";
+		namedIn.setCssStyles({ width: "60px" });
 		namedIn.addEventListener("change", () => {
 			const v = Math.max(1, Math.floor(Number(namedIn.value) || 1));
 			this.settings.latticeNamedMax = v;
@@ -1578,23 +1579,23 @@ export class MiniGraphView extends ItemView {
 		const expSelected = experimental.some((o) => o.id === this.settings.viewMode);
 
 		const header = section.createDiv({ cls: "gim-viewmode-exp-header" });
-		Object.assign(header.style, {
+		header.setCssStyles({
 			cursor: "pointer",
 			userSelect: "none",
 			margin: "8px 0 4px",
 			fontSize: "12px",
 			color: "#9eb0c4",
-		} as Partial<CSSStyleDeclaration>);
+		});
 		const caret = header.createSpan({ text: expSelected ? "▾ " : "▸ " });
 		header.createSpan({ text: "Experimental (beta)" });
 
 		const expGroup = section.createDiv({ cls: "gim-viewmode-options" });
-		expGroup.style.display = expSelected ? "" : "none";
+		expGroup.setCssStyles({ display: expSelected ? "" : "none" });
 		for (const opt of experimental) this.renderViewModeOption(expGroup, opt);
 
 		header.addEventListener("click", () => {
 			const open = expGroup.style.display === "none";
-			expGroup.style.display = open ? "" : "none";
+			expGroup.setCssStyles({ display: open ? "" : "none" });
 			caret.setText(open ? "▾ " : "▸ ");
 		});
 	}
@@ -1629,7 +1630,7 @@ export class MiniGraphView extends ItemView {
 		row.createSpan({ text: "Max tags", cls: "gim-order-field" });
 		const inp = row.createEl("input", { type: "number" }) as HTMLInputElement;
 		inp.min = "1";
-		inp.style.width = "56px";
+		inp.setCssStyles({ width: "56px" });
 		inp.value = String(this.settings.bipartiteMaxTags);
 		inp.addEventListener("change", () => {
 			const v = Math.max(1, Math.floor(Number(inp.value) || 1));
@@ -1672,7 +1673,7 @@ export class MiniGraphView extends ItemView {
 			enabled: boolean,
 		): void => {
 			const row = section.createEl("label", { cls: "gim-toggle-row" });
-			if (!enabled) row.style.opacity = "0.45";
+			if (!enabled) row.setCssStyles({ opacity: "0.45" });
 			const cb = row.createEl("input", { type: "checkbox" });
 			cb.checked = get();
 			cb.disabled = !enabled;
@@ -2218,7 +2219,7 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private resize(): void {
-		const dpr = window.devicePixelRatio || 1;
+		const dpr = activeWindow.devicePixelRatio || 1;
 		const w = this.canvas.clientWidth;
 		const h = this.canvas.clientHeight;
 		this.canvas.width = Math.max(1, Math.floor(w * dpr));
@@ -2519,7 +2520,7 @@ export class MiniGraphView extends ItemView {
 
 	private draw(): void {
 		const ctx = this.ctx;
-		const dpr = window.devicePixelRatio || 1;
+		const dpr = activeWindow.devicePixelRatio || 1;
 		const cw = this.canvas.width;
 		const ch = this.canvas.height;
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -3299,50 +3300,50 @@ export class MiniGraphView extends ItemView {
 			// Dock to the RIGHT edge: full height, fixed width, square corners, a
 			// left border only — the canvas reserves `pinnedMenuWidth()` so the
 			// figure isn't covered (like a standard docked side panel).
-			Object.assign(panel.style, {
+			panel.setCssStyles({
 				position: "absolute",
 				left: "", right: "0", top: "0", bottom: "0", height: "", width: `${pinnedW}px`,
 				display: "flex", flexDirection: "column", overflow: "hidden",
 				background: "rgba(20,24,33,0.98)",
 				border: "none", borderLeft: "1px solid #3a4760", borderRadius: "0",
 				boxShadow: "-4px 0 16px rgba(0,0,0,0.5)", zIndex: "60", font: "12px sans-serif", color: "#e6edf3",
-			} as Partial<CSSStyleDeclaration>);
+			});
 		} else {
-			Object.assign(panel.style, {
+			panel.setCssStyles({
 				position: "absolute",
 				left: `${rect.left}px`, top: `${rect.top}px`, right: "", bottom: "",
 				width: `${rect.width}px`, height: `${rect.height}px`,
 				display: "flex", flexDirection: "column", overflow: "hidden",
 				background: "rgba(20,24,33,0.96)", border: "1px solid #3a4760", borderRadius: "6px",
 				boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "60", font: "12px sans-serif", color: "#e6edf3",
-			} as Partial<CSSStyleDeclaration>);
+			});
 		}
 		const head = panel.createDiv();
 		// When floating, the header IS the drag handle (cursor:move); when pinned
 		// the panel is docked so it can't be moved (cursor:default).
-		Object.assign(head.style, {
+		head.setCssStyles({
 			padding: "6px 8px", borderBottom: "1px solid #2a3447", fontWeight: "600",
 			cursor: pinned ? "default" : "move", userSelect: "none", flex: "0 0 auto",
-		} as Partial<CSSStyleDeclaration>);
+		});
 		// Header verb is mode-appropriate: droste focuses, other modes either
 		// locate the card on canvas or open the file.
 		const verb = isDroste ? "focus" : "locate/open";
 		// Title row: name on the left, pin + × on the right.
 		const titleRow = head.createDiv();
-		Object.assign(titleRow.style, { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" } as Partial<CSSStyleDeclaration>);
+		titleRow.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" });
 		titleRow.createSpan({ text: "Tag Lens" });
 		const headBtns = titleRow.createDiv();
-		Object.assign(headBtns.style, { display: "flex", alignItems: "center", gap: "2px", flex: "0 0 auto" } as Partial<CSSStyleDeclaration>);
+		headBtns.setCssStyles({ display: "flex", alignItems: "center", gap: "2px", flex: "0 0 auto" });
 		// Pin/unpin: dock the menu to the right edge (standard pin affordance).
 		const pinBtn = headBtns.createSpan();
-		Object.assign(pinBtn.style, { cursor: "pointer", color: pinned ? "#2d6cdf" : "#9db4d6", display: "inline-flex", alignItems: "center", padding: "0 2px" } as Partial<CSSStyleDeclaration>);
+		pinBtn.setCssStyles({ cursor: "pointer", color: pinned ? "#2d6cdf" : "#9db4d6", display: "inline-flex", alignItems: "center", padding: "0 2px" });
 		setIcon(pinBtn, pinned ? "pin-off" : "pin");
 		pinBtn.setAttr("aria-label", pinned ? "Unpin (float)" : "Pin to right");
 		pinBtn.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		pinBtn.addEventListener("dblclick", (ev) => ev.stopPropagation());
 		pinBtn.addEventListener("click", (ev) => { ev.stopPropagation(); this.togglePin(); });
 		const closeBtn = headBtns.createSpan({ text: "×" });
-		Object.assign(closeBtn.style, { cursor: "pointer", fontWeight: "700", fontSize: "16px", lineHeight: "1", padding: "0 4px", color: "#9db4d6", flex: "0 0 auto" } as Partial<CSSStyleDeclaration>);
+		closeBtn.setCssStyles({ cursor: "pointer", fontWeight: "700", fontSize: "16px", lineHeight: "1", padding: "0 4px", color: "#9db4d6", flex: "0 0 auto" });
 		closeBtn.setAttr("aria-label", "Close menu");
 		closeBtn.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		closeBtn.addEventListener("dblclick", (ev) => ev.stopPropagation());
@@ -3352,19 +3353,19 @@ export class MiniGraphView extends ItemView {
 		// Underline-style tabs: the bar carries the divider line that the active
 		// tab's accent underline sits on (marginBottom:-1px lines them up), so the
 		// active tab reads as connected to the body below.
-		Object.assign(tabBar.style, { display: "flex", gap: "2px", marginTop: "8px", fontWeight: "400", fontSize: "11px", borderBottom: "1px solid #2a3447" } as Partial<CSSStyleDeclaration>);
+		tabBar.setCssStyles({ display: "flex", gap: "2px", marginTop: "8px", fontWeight: "400", fontSize: "11px", borderBottom: "1px solid #2a3447" });
 		tabBar.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		// Don't let a double-click on the tab bar toggle the header's minimize.
 		tabBar.addEventListener("dblclick", (ev) => ev.stopPropagation());
 		// Two tab panes under a flex wrapper that fills the rest of the panel.
 		const bodyWrap = panel.createDiv();
-		Object.assign(bodyWrap.style, { display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: "0", overflow: "hidden" } as Partial<CSSStyleDeclaration>);
+		bodyWrap.setCssStyles({ display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: "0", overflow: "hidden" });
 		const notesTab = bodyWrap.createDiv();
-		Object.assign(notesTab.style, { display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: "0" } as Partial<CSSStyleDeclaration>);
+		notesTab.setCssStyles({ display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: "0" });
 		const settingsTab = bodyWrap.createDiv({ cls: "gim-menu-settings" });
-		Object.assign(settingsTab.style, { display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" } as Partial<CSSStyleDeclaration>);
+		settingsTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
 		const insightTab = bodyWrap.createDiv();
-		Object.assign(insightTab.style, { display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" } as Partial<CSSStyleDeclaration>);
+		insightTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
 		type MenuTab = "notes" | "settings" | "insight";
 		const TABS: MenuTab[] = ["notes", "settings", "insight"];
 		const tabBtns: Partial<Record<MenuTab, HTMLElement>> = {};
@@ -3373,20 +3374,20 @@ export class MiniGraphView extends ItemView {
 				const b = tabBtns[key];
 				if (!b) continue;
 				const on = this.activeMenuTab === key;
-				Object.assign(b.style, {
+				b.setCssStyles({
 					background: "transparent", border: "none",
 					borderBottom: on ? "2px solid #2d6cdf" : "2px solid transparent",
 					borderRadius: "0", padding: "6px 14px", marginBottom: "-1px",
 					color: on ? "#e6edf3" : "#9db4d6", fontWeight: on ? "600" : "400",
 					cursor: "pointer", fontSize: "11px", lineHeight: "1.3",
-				} as Partial<CSSStyleDeclaration>);
+				});
 			}
 		};
 		const showTab = (key: MenuTab): void => {
 			this.activeMenuTab = key;
-			notesTab.style.display = key === "notes" ? "flex" : "none";
-			settingsTab.style.display = key === "settings" ? "block" : "none";
-			insightTab.style.display = key === "insight" ? "block" : "none";
+			notesTab.setCssStyles({ display: key === "notes" ? "flex" : "none" });
+			settingsTab.setCssStyles({ display: key === "settings" ? "block" : "none" });
+			insightTab.setCssStyles({ display: key === "insight" ? "block" : "none" });
 			if (key === "settings") this.renderSettingsBody(settingsTab);
 			else this.settingsHostEl = null;
 			if (key === "insight") this.renderInsightBody(insightTab);
@@ -3399,7 +3400,7 @@ export class MiniGraphView extends ItemView {
 			b.addEventListener("click", (ev) => { ev.stopPropagation(); showTab(key); });
 			// Hover affordance for the inactive tab (active styling wins via styleTabs).
 			b.addEventListener("mouseenter", () => {
-				if (this.activeMenuTab !== key) { b.style.color = "#cdd9ec"; b.style.borderBottomColor = "#3a4760"; }
+				if (this.activeMenuTab !== key) { b.setCssStyles({ color: "#cdd9ec" }); b.setCssStyles({ borderBottomColor: "#3a4760" }); }
 			});
 			b.addEventListener("mouseleave", () => styleTabs());
 		};
@@ -3408,21 +3409,21 @@ export class MiniGraphView extends ItemView {
 		mkTab("insight", "Insight");
 		// Note-count + click hint, shown at the top of the Notes pane.
 		const notesHint = notesTab.createDiv({ text: `${nodes.length} notes — click to ${verb}` });
-		Object.assign(notesHint.style, { fontSize: "10px", color: "#7e8aa0", padding: "4px 8px 0" } as Partial<CSSStyleDeclaration>);
+		notesHint.setCssStyles({ fontSize: "10px", color: "#7e8aa0", padding: "4px 8px 0" });
 		// ── Grouping selector (Folder / Tag) ────────────────────────────────────
 		// A small radio group in the header switches the tree between the FOLDER
 		// tree (by note path, default) and the TAG tree (by GROUP_BY membership
 		// keys). The chosen grouping survives rebuilds (this.noteMenuGroupBy) and
 		// reloads (settings.noteMenuGroupBy). Changing it re-renders the tree.
 		const groupBar = notesTab.createDiv();
-		Object.assign(groupBar.style, {
+		groupBar.setCssStyles({
 			display: "flex", gap: "10px", marginTop: "4px", fontWeight: "400",
 			fontSize: "11px", color: "#9db4d6", cursor: "default",
-		} as Partial<CSSStyleDeclaration>);
+		});
 		const groupName = "gim-notemenu-group";
 		const mkGroupRadio = (value: "folder" | "tag", labelText: string): void => {
 			const lab = groupBar.createEl("label");
-			Object.assign(lab.style, { display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer", userSelect: "none" } as Partial<CSSStyleDeclaration>);
+			lab.setCssStyles({ display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer", userSelect: "none" });
 			const radio = lab.createEl("input", { attr: { type: "radio", name: groupName, value } });
 			radio.checked = this.noteMenuGroupBy === value;
 			lab.createSpan({ text: labelText });
@@ -3446,17 +3447,17 @@ export class MiniGraphView extends ItemView {
 		// requestDraw() is enough because the draw() skipNode filter re-reads
 		// hiddenNodes fresh every frame.
 		const bulkBar = notesTab.createDiv();
-		Object.assign(bulkBar.style, {
+		bulkBar.setCssStyles({
 			display: "flex", gap: "6px", marginTop: "4px",
-		} as Partial<CSSStyleDeclaration>);
+		});
 		const mkBulkBtn = (label: string, handler: () => void): void => {
 			const btn = bulkBar.createEl("button");
 			btn.textContent = label;
-			Object.assign(btn.style, {
+			btn.setCssStyles({
 				fontSize: "10px", padding: "2px 6px", cursor: "pointer",
 				background: "#1a2236", border: "1px solid #3a4760",
 				borderRadius: "3px", color: "#9db4d6", lineHeight: "1.4",
-			} as Partial<CSSStyleDeclaration>);
+			});
 			// Prevent the button click from starting a header move-drag.
 			btn.addEventListener("mousedown", (ev) => ev.stopPropagation());
 			btn.addEventListener("click", (ev) => {
@@ -3492,25 +3493,25 @@ export class MiniGraphView extends ItemView {
 		// Search input lives in a relatively-positioned wrapper so the suggestion
 		// dropdown can be absolutely positioned directly beneath it.
 		const searchWrap = notesTab.createDiv();
-		Object.assign(searchWrap.style, { position: "relative", margin: "6px 8px", flex: "0 0 auto" } as Partial<CSSStyleDeclaration>);
+		searchWrap.setCssStyles({ position: "relative", margin: "6px 8px", flex: "0 0 auto" });
 		const search = searchWrap.createEl("input", { attr: { type: "text", placeholder: "Search: word, #tag, key:value" } });
-		Object.assign(search.style, { display: "block", width: "100%", boxSizing: "border-box", padding: "4px 6px", background: "#0f1116", border: "1px solid #2a3447", borderRadius: "4px", color: "#e6edf3" } as Partial<CSSStyleDeclaration>);
+		search.setCssStyles({ display: "block", width: "100%", boxSizing: "border-box", padding: "4px 6px", background: "#0f1116", border: "1px solid #2a3447", borderRadius: "4px", color: "#e6edf3" });
 		// Restore the search query that was active before this rebuild (if any).
 		// This preserves the user's typed text across vault-change-triggered rebuilds.
 		if (this.noteMenuSearchQuery) search.value = this.noteMenuSearchQuery;
 		// Suggestion (autocomplete) dropdown — absolutely positioned under the input,
 		// same panel styling, zIndex above the body. Hidden until there are matches.
 		const suggBox = searchWrap.createDiv();
-		Object.assign(suggBox.style, {
+		suggBox.setCssStyles({
 			position: "absolute", left: "0", right: "0", top: "100%", marginTop: "2px",
 			background: "rgba(20,24,33,0.98)", border: "1px solid #3a4760", borderRadius: "4px",
 			boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "70", overflow: "auto", maxHeight: "240px",
 			display: "none",
-		} as Partial<CSSStyleDeclaration>);
+		});
 		const body = notesTab.createDiv({ cls: "gim-notemenu-body" });
 		// flex:1 1 auto + minHeight:0 → the tree scroll area grows/shrinks with the
 		// panel height (set above / on resize) instead of a fixed maxHeight.
-		Object.assign(body.style, { overflow: "auto", padding: "4px 6px 8px", flex: "1 1 auto", minHeight: "0" } as Partial<CSSStyleDeclaration>);
+		body.setCssStyles({ overflow: "auto", padding: "4px 6px 8px", flex: "1 1 auto", minHeight: "0" });
 		// FLOATING: header-drag MOVE + bottom-right RESIZE + double-click MINIMIZE.
 		// PINNED: none of those (it's docked) — a left-edge handle resizes width.
 		if (!pinned) {
@@ -3531,18 +3532,18 @@ export class MiniGraphView extends ItemView {
 		const applyMinimizedState = (): void => {
 			if (this.noteMenuMinimized) {
 				// Collapse to the header bar (title + tabs): hide the whole tab body.
-				bodyWrap.style.display = "none";
+				bodyWrap.setCssStyles({ display: "none" });
 				// Resize is meaningless while collapsed — hide the grip.
-				grip.style.display = "none";
+				grip.setCssStyles({ display: "none" });
 				const collapsed = noteMenuHeight(true, headerOnlyHeight(), rect.height, this.noteMenuRestoreHeight);
-				panel.style.height = `${collapsed}px`;
+				panel.setCssStyles({ height: `${collapsed}px` });
 			} else {
-				bodyWrap.style.display = "flex";
-				grip.style.display = "";
+				bodyWrap.setCssStyles({ display: "flex" });
+				grip.setCssStyles({ display: "" });
 				// Restore the remembered body height (fall back to the live rect).
 				const current = this.noteMenuRect?.height ?? rect.height;
 				const h = noteMenuHeight(false, headerOnlyHeight(), current, this.noteMenuRestoreHeight);
-				panel.style.height = `${h}px`;
+				panel.setCssStyles({ height: `${h}px` });
 				if (this.noteMenuRect) this.noteMenuRect = { ...this.noteMenuRect, height: h };
 			}
 		};
@@ -3566,10 +3567,10 @@ export class MiniGraphView extends ItemView {
 			// PINNED: a thin left-edge handle resizes the docked column width.
 			// Dragging LEFT widens; the canvas reservation + pan update live.
 			const lgrip = panel.createDiv();
-			Object.assign(lgrip.style, {
+			lgrip.setCssStyles({
 				position: "absolute", left: "0", top: "0", bottom: "0", width: "6px",
 				cursor: "ew-resize", zIndex: "61", background: "transparent",
-			} as Partial<CSSStyleDeclaration>);
+			});
 			lgrip.addEventListener("mousedown", (ev: MouseEvent) => {
 				if (ev.button !== 0) return;
 				ev.preventDefault();
@@ -3583,17 +3584,17 @@ export class MiniGraphView extends ItemView {
 						Math.max(NOTE_MENU_MIN.width, raw),
 						Math.max(NOTE_MENU_MIN.width, Math.floor((cw || 320) * 0.8)),
 					);
-					panel.style.width = `${w}px`;
+					panel.setCssStyles({ width: `${w}px` });
 					this.settings.noteMenuPinnedWidth = w;
 					this.requestDraw(); // re-reserve canvas width + re-pan the figure
 				};
 				const onUp = (): void => {
-					window.removeEventListener("mousemove", onMove, true);
-					window.removeEventListener("mouseup", onUp, true);
+					activeWindow.removeEventListener("mousemove", onMove, true);
+					activeWindow.removeEventListener("mouseup", onUp, true);
 					void this.save();
 				};
-				window.addEventListener("mousemove", onMove, true);
-				window.addEventListener("mouseup", onUp, true);
+				activeWindow.addEventListener("mousemove", onMove, true);
+				activeWindow.addEventListener("mouseup", onUp, true);
 			});
 		}
 		// A row checkbox that must NOT trigger the row's click (focus/locate/open)
@@ -3650,7 +3651,7 @@ export class MiniGraphView extends ItemView {
 			const baseBg = id === highlightId ? "#2d6cdf55" : "";
 			// padding must come BEFORE paddingLeft — Object.assign applies properties
 			// left-to-right; putting padding last would overwrite the depth indent.
-			Object.assign(row.style, { display: "flex", alignItems: "center", padding: "2px 4px", paddingLeft: `${6 + depth * 12}px`, cursor: "pointer", borderRadius: "3px", whiteSpace: "nowrap", overflow: "hidden", background: baseBg } as Partial<CSSStyleDeclaration>);
+			row.setCssStyles({ display: "flex", alignItems: "center", padding: "2px 4px", paddingLeft: `${6 + depth * 12}px`, cursor: "pointer", borderRadius: "3px", whiteSpace: "nowrap", overflow: "hidden", background: baseBg });
 			// Per-note visibility checkbox. CHECKED ⇔ the note is NOT hidden. The
 			// state is GLOBAL per note (driven by hiddenNodes, keyed by PATH) so a
 			// note appearing in multiple tag groups shows the same state everywhere.
@@ -3678,10 +3679,10 @@ export class MiniGraphView extends ItemView {
 			checkboxRefreshers.push(() => { setCbState(cb, hiddenSetNow().has(noteKey) ? "unchecked" : "checked"); });
 			// The label carries the row-click behaviour (focus/locate/open) + ellipsis.
 			const lbl = row.createSpan({ text: label });
-			Object.assign(lbl.style, { flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as Partial<CSSStyleDeclaration>);
-			if (id === highlightId) lbl.style.color = "#ffd35c";
-			row.addEventListener("mouseenter", () => (row.style.background = "#2a3447"));
-			row.addEventListener("mouseleave", () => (row.style.background = baseBg));
+			lbl.setCssStyles({ flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
+			if (id === highlightId) lbl.setCssStyles({ color: "#ffd35c" });
+			row.addEventListener("mouseenter", () => { row.setCssStyles({ background: "#2a3447" }); });
+			row.addEventListener("mouseleave", () => { row.setCssStyles({ background: baseBg }); });
 			lbl.addEventListener("click", () => this.focusNoteFromMenu(id));
 			return row;
 		};
@@ -3698,22 +3699,22 @@ export class MiniGraphView extends ItemView {
 			const allPath = buildFolderPathKey(parentPath, "(all)");
 			const row = container.createDiv();
 			row.dataset.menupath = allPath;
-			Object.assign(row.style, {
+			row.setCssStyles({
 				display: "flex", alignItems: "center",
 				padding: "2px 4px", paddingLeft: `${26 + depth * 12}px`,
 				color: "#7a8aa0", fontWeight: "600", fontStyle: "italic",
-			} as Partial<CSSStyleDeclaration>);
+			});
 			// (all) has NO checkbox — only a collapsible label
 			const lbl = row.createSpan({ text: `\u25b8 (all)` });
-			Object.assign(lbl.style, {
+			lbl.setCssStyles({
 				flex: "1 1 auto", cursor: "pointer",
 				overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-			} as Partial<CSSStyleDeclaration>);
+			});
 			const kids = container.createDiv();
-			kids.style.display = "none";
+			kids.setCssStyles({ display: "none" });
 			let built = false;
 			const openAll = (): void => {
-				kids.style.display = "block";
+				kids.setCssStyles({ display: "block" });
 				lbl.textContent = `\u25be (all)`;
 				if (!built) {
 					for (const lf of leaves) leafRow(kids, lf.id, lf.label, depth + 1);
@@ -3721,7 +3722,7 @@ export class MiniGraphView extends ItemView {
 				}
 			};
 			const closeAll = (): void => {
-				kids.style.display = "none";
+				kids.setCssStyles({ display: "none" });
 				lbl.textContent = `\u25b8 (all)`;
 			};
 			lbl.addEventListener("click", () => {
@@ -3747,7 +3748,7 @@ export class MiniGraphView extends ItemView {
 				// folders were open and ensureNoteMenu() can re-open them.
 				row.dataset.menupath = folderPath;
 				// padding before paddingLeft — same order as leafRow (see comment there).
-				Object.assign(row.style, { display: "flex", alignItems: "center", padding: "2px 4px", paddingLeft: `${6 + depth * 12}px`, color: "#9db4d6", fontWeight: "600" } as Partial<CSSStyleDeclaration>);
+				row.setCssStyles({ display: "flex", alignItems: "center", padding: "2px 4px", paddingLeft: `${6 + depth * 12}px`, color: "#9db4d6", fontWeight: "600" });
 				// Folder/group/combo checkbox — TRI-STATE over its descendant notes:
 				// checked = all visible, unchecked = all hidden, indeterminate = mixed.
 				// Toggling cascades to EVERY descendant note (check-all / uncheck-all).
@@ -3777,13 +3778,13 @@ export class MiniGraphView extends ItemView {
 				// Live-refresh this group's tri-state after any toggle elsewhere.
 				checkboxRefreshers.push(applyFolderState);
 				const lbl = row.createSpan({ text: `▸ ${display}` });
-				Object.assign(lbl.style, { flex: "1 1 auto", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as Partial<CSSStyleDeclaration>);
+				lbl.setCssStyles({ flex: "1 1 auto", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
 				const kids = container.createDiv();
-				kids.style.display = "none";
+				kids.setCssStyles({ display: "none" });
 				let built = false;
 				// Open this folder (build children lazily if not yet built).
 				const openFolder = (): void => {
-					kids.style.display = "block";
+					kids.setCssStyles({ display: "block" });
 					lbl.textContent = `▾ ${display}`;
 					if (!built) {
 						// (all) subtree: in tag-tree mode, folders with sub-folders get a
@@ -3800,7 +3801,7 @@ export class MiniGraphView extends ItemView {
 				};
 				// Close this folder.
 				const closeFolder = (): void => {
-					kids.style.display = "none";
+					kids.setCssStyles({ display: "none" });
 					lbl.textContent = `▸ ${display}`;
 				};
 				lbl.addEventListener("click", () => {
@@ -3861,10 +3862,10 @@ export class MiniGraphView extends ItemView {
 		};
 		const renderSelection = (): void => {
 			const rows = Array.from(suggBox.children) as HTMLElement[];
-			rows.forEach((r, i) => { r.style.background = i === selIdx ? "#2a3447" : ""; });
+			rows.forEach((r, i) => { r.setCssStyles({ background: i === selIdx ? "#2a3447" : "" }); });
 		};
 		const closeSuggest = (): void => {
-			suggBox.style.display = "none";
+			suggBox.setCssStyles({ display: "none" });
 			suggBox.empty();
 			suggestions = [];
 			selIdx = -1;
@@ -3873,12 +3874,12 @@ export class MiniGraphView extends ItemView {
 			suggestions = suggestQuery(nodes, search.value);
 			suggBox.empty();
 			selIdx = -1;
-			if (suggestions.length === 0) { suggBox.style.display = "none"; return; }
+			if (suggestions.length === 0) { suggBox.setCssStyles({ display: "none" }); return; }
 			suggestions.forEach((s, i) => {
 				const row = suggBox.createDiv();
-				Object.assign(row.style, { padding: "3px 8px", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", gap: "6px", alignItems: "center" } as Partial<CSSStyleDeclaration>);
+				row.setCssStyles({ padding: "3px 8px", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", gap: "6px", alignItems: "center" });
 				const glyph = row.createSpan({ text: kindGlyph[s.kind] });
-				Object.assign(glyph.style, { color: kindColor[s.kind], width: "10px", flex: "0 0 auto", textAlign: "center" } as Partial<CSSStyleDeclaration>);
+				glyph.setCssStyles({ color: kindColor[s.kind], width: "10px", flex: "0 0 auto", textAlign: "center" });
 				row.createSpan({ text: s.text });
 				row.addEventListener("mouseenter", () => { selIdx = i; renderSelection(); });
 				// mousedown (not click) so it fires before the input's blur closes the box.
@@ -3887,7 +3888,7 @@ export class MiniGraphView extends ItemView {
 					acceptSuggestion(s.text, s.kind);
 				});
 			});
-			suggBox.style.display = "block";
+			suggBox.setCssStyles({ display: "block" });
 		};
 		// Re-suggest as the user types; close when the current token is empty.
 		const onInput = (): void => {
@@ -3924,7 +3925,7 @@ export class MiniGraphView extends ItemView {
 			}
 		});
 		// Close on blur — small delay so a suggestion mousedown/click lands first.
-		search.addEventListener("blur", () => { window.setTimeout(closeSuggest, 150); });
+		search.addEventListener("blur", () => { activeWindow.setTimeout(closeSuggest, 150); });
 		// Open the dropdown again when the field regains focus with a live token.
 		search.addEventListener("focus", () => { if (currentToken(search.value).length > 0) openSuggest(); });
 		draw();
@@ -3971,10 +3972,10 @@ export class MiniGraphView extends ItemView {
 			const c = containerSize();
 			const r = c.width > 0 && c.height > 0 ? clampRect(raw, c, NOTE_MENU_MIN) : raw;
 			this.noteMenuRect = r;
-			panel.style.left = `${r.left}px`;
-			panel.style.top = `${r.top}px`;
-			panel.style.width = `${r.width}px`;
-			panel.style.height = `${r.height}px`;
+			panel.setCssStyles({ left: `${r.left}px` });
+			panel.setCssStyles({ top: `${r.top}px` });
+			panel.setCssStyles({ width: `${r.width}px` });
+			panel.setCssStyles({ height: `${r.height}px` });
 		};
 		const persist = (): void => {
 			if (this.noteMenuRect) this.settings.noteMenuRect = { ...this.noteMenuRect };
@@ -3996,22 +3997,22 @@ export class MiniGraphView extends ItemView {
 				applyRect({ left: baseLeft + (e.clientX - ox), top: baseTop + (e.clientY - oy), width: start.width, height: start.height });
 			};
 			const onUp = (): void => {
-				window.removeEventListener("mousemove", onMove, true);
-				window.removeEventListener("mouseup", onUp, true);
+				activeWindow.removeEventListener("mousemove", onMove, true);
+				activeWindow.removeEventListener("mouseup", onUp, true);
 				persist();
 			};
-			window.addEventListener("mousemove", onMove, true);
-			window.addEventListener("mouseup", onUp, true);
+			activeWindow.addEventListener("mousemove", onMove, true);
+			activeWindow.addEventListener("mouseup", onUp, true);
 		});
 
 		// ── RESIZE: drag the invisible bottom-right corner ──────────────────────
 		const grip = panel.createDiv();
-		Object.assign(grip.style, {
+		grip.setCssStyles({
 			position: "absolute", right: "0", bottom: "0", width: "16px", height: "16px",
 			cursor: "nwse-resize", zIndex: "61",
 			// Invisible (no icon): just a transparent hit target in the corner.
 			background: "transparent",
-		} as Partial<CSSStyleDeclaration>);
+		});
 		grip.addEventListener("mousedown", (ev: MouseEvent) => {
 			if (ev.button !== 0) return;
 			const start = this.noteMenuRect ?? { left: 0, top: 0, width: panel.offsetWidth, height: panel.offsetHeight };
@@ -4023,19 +4024,19 @@ export class MiniGraphView extends ItemView {
 				applyRect({ left: start.left, top: start.top, width: baseW + (e.clientX - ox), height: baseH + (e.clientY - oy) });
 			};
 			const onUp = (): void => {
-				window.removeEventListener("mousemove", onMove, true);
-				window.removeEventListener("mouseup", onUp, true);
+				activeWindow.removeEventListener("mousemove", onMove, true);
+				activeWindow.removeEventListener("mouseup", onUp, true);
 				persist();
 			};
-			window.addEventListener("mousemove", onMove, true);
-			window.addEventListener("mouseup", onUp, true);
+			activeWindow.addEventListener("mousemove", onMove, true);
+			activeWindow.addEventListener("mouseup", onUp, true);
 		});
 		return grip;
 	}
 
 	private drosteHitTest(sx: number, sy: number): string | null {
 		if (!this.laid.drosteGallery) return null;
-		const dpr = window.devicePixelRatio || 1;
+		const dpr = activeWindow.devicePixelRatio || 1;
 		const dx = sx * dpr, dy = sy * dpr;
 		for (let i = this.drosteHit.length - 1; i >= 0; i--) {
 			const r = this.drosteHit[i];
@@ -4102,7 +4103,7 @@ export class MiniGraphView extends ItemView {
 	): void {
 		this.closeDetail();
 		const panel = this.root.createDiv({ cls: "gim-detail-panel" });
-		Object.assign(panel.style, {
+		panel.setCssStyles({
 			position: "absolute",
 			width: "248px",
 			maxHeight: "320px",
@@ -4115,26 +4116,26 @@ export class MiniGraphView extends ItemView {
 			zIndex: "50",
 			font: "13px sans-serif",
 			color: "#e6edf3",
-		} as Partial<CSSStyleDeclaration>);
+		});
 
 		const head = panel.createDiv({ cls: "gim-detail-head" });
-		Object.assign(head.style, {
+		head.setCssStyles({
 			display: "flex",
 			alignItems: "center",
 			justifyContent: "space-between",
 			padding: "6px 8px",
 			borderBottom: "1px solid #2a3447",
 			fontWeight: "700",
-		} as Partial<CSSStyleDeclaration>);
+		});
 		head.createSpan({ text: title });
 		const close = head.createEl("button", { text: "×" });
-		Object.assign(close.style, {
+		close.setCssStyles({
 			background: "transparent",
 			border: "none",
 			color: "#9eb0c4",
 			cursor: "pointer",
 			fontSize: "16px",
-		} as Partial<CSSStyleDeclaration>);
+		});
 		close.addEventListener("click", () => {
 			if (onCloseSelection) onCloseSelection();
 			this.closeDetail();
@@ -4142,10 +4143,10 @@ export class MiniGraphView extends ItemView {
 		});
 
 		const list = panel.createDiv({ cls: "gim-detail-list" });
-		Object.assign(list.style, { overflowY: "auto", padding: "4px 0" } as Partial<CSSStyleDeclaration>);
+		list.setCssStyles({ overflowY: "auto", padding: "4px 0" });
 		if (ids.length === 0) {
 			const empty = list.createDiv({ text: "(no shared notes)" });
-			Object.assign(empty.style, { padding: "6px 10px", color: "#7a8aa0" } as Partial<CSSStyleDeclaration>);
+			empty.setCssStyles({ padding: "6px 10px", color: "#7a8aa0" });
 		}
 		for (const id of ids) {
 			const sep = id.indexOf("\t");
@@ -4153,15 +4154,15 @@ export class MiniGraphView extends ItemView {
 			const f = this.app.vault.getAbstractFileByPath(path);
 			const name = f instanceof TFile ? f.basename : path;
 			const row = list.createDiv({ cls: "gim-detail-row", text: name });
-			Object.assign(row.style, {
+			row.setCssStyles({
 				padding: "4px 10px",
 				cursor: "pointer",
 				whiteSpace: "nowrap",
 				overflow: "hidden",
 				textOverflow: "ellipsis",
-			} as Partial<CSSStyleDeclaration>);
-			row.addEventListener("mouseenter", () => (row.style.background = "rgba(160,190,230,0.14)"));
-			row.addEventListener("mouseleave", () => (row.style.background = "transparent"));
+			});
+			row.addEventListener("mouseenter", () => { row.setCssStyles({ background: "rgba(160,190,230,0.14)" }); });
+			row.addEventListener("mouseleave", () => { row.setCssStyles({ background: "transparent" }); });
 			row.addEventListener("click", () => {
 				this.openFile(id);
 			});
@@ -4185,8 +4186,8 @@ export class MiniGraphView extends ItemView {
 		x = Math.max(8, x);
 		let y = Math.min(sy + 8, rect.height - h - 8);
 		y = Math.max(8, y);
-		el.style.left = `${x}px`;
-		el.style.top = `${y}px`;
+		el.setCssStyles({ left: `${x}px` });
+		el.setCssStyles({ top: `${y}px` });
 	}
 
 	// Build the visible display lines: rows bundled into signature blocks, and
@@ -4435,7 +4436,7 @@ export class MiniGraphView extends ItemView {
 
 	private scheduleHover(target: NonNullable<HoverTarget>, sx: number, sy: number): void {
 		const gen = ++this.hoverGen;
-		this.hoverTimer = window.setTimeout(() => {
+		this.hoverTimer = activeWindow.setTimeout(() => {
 			if (gen !== this.hoverGen) return;
 			void this.showHover(target, sx, sy);
 		}, HOVER_DELAY_MS);
@@ -4444,7 +4445,7 @@ export class MiniGraphView extends ItemView {
 	private cancelHover(): void {
 		this.hoverGen++;
 		if (this.hoverTimer) {
-			window.clearTimeout(this.hoverTimer);
+			activeWindow.clearTimeout(this.hoverTimer);
 			this.hoverTimer = 0;
 		}
 		if (this.tipEl) {
@@ -4471,7 +4472,7 @@ export class MiniGraphView extends ItemView {
 
 	private async showHover(target: NonNullable<HoverTarget>, sx: number, sy: number): Promise<void> {
 		const gen = this.hoverGen;
-		const tip = document.createElement("div");
+		const tip = activeDocument.createElement("div");
 		tip.className = "gim-hover-tip gim-tip-" + target.kind;
 		tip.setAttr("data-kind", target.kind);
 
@@ -4555,8 +4556,8 @@ export class MiniGraphView extends ItemView {
 			rect.width,
 			rect.height,
 		);
-		tip.style.left = x + "px";
-		tip.style.top = y + "px";
+		tip.setCssStyles({ left: x + "px" });
+		tip.setCssStyles({ top: y + "px" });
 	}
 
 	private attachInputs(): void {
@@ -4581,10 +4582,10 @@ export class MiniGraphView extends ItemView {
 			this.downX = e.clientX;
 			this.downY = e.clientY;
 			this.pointerMoved = false;
-			c.style.cursor = "grabbing";
+			c.setCssStyles({ cursor: "grabbing" });
 			this.cancelHover();
 		});
-		window.addEventListener("mousemove", (e) => {
+		activeWindow.addEventListener("mousemove", (e) => {
 			if (this.marquee.isActive()) {
 				this.marquee.update(e.clientX, e.clientY);
 				return;
@@ -4600,15 +4601,15 @@ export class MiniGraphView extends ItemView {
 			this.lastY = e.clientY;
 			this.requestDraw();
 		});
-		window.addEventListener("mouseup", (e) => {
+		activeWindow.addEventListener("mouseup", (e) => {
 			if (this.marquee.isActive()) {
 				this.marquee.finish(e.clientX, e.clientY);
 				return;
 			}
 			this.dragging = false;
-			c.style.cursor = "grab";
+			c.setCssStyles({ cursor: "grab" });
 		});
-		window.addEventListener("keydown", (e) => {
+		activeWindow.addEventListener("keydown", (e) => {
 			if (e.key === "Escape" && this.marquee.isActive()) this.marquee.cancel();
 		});
 		c.addEventListener("contextmenu", (e) => {

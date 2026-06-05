@@ -595,7 +595,6 @@ function bridgeComponents(
 			}
 
 			// L-path fallback for the must-keep component only.
-			let bestCompIdx = mustKeepIdx;
 			let bestD = Infinity;
 			let bestAvoid = Infinity;
 			let bestPath: string[] = [];
@@ -711,6 +710,7 @@ function minForeignPath(
 //
 // This eliminates V1 violations from interior foreign-filler cells
 // while preserving essential foreign bridges for V2 = 0 and V3 = 0.
+/*
 function pruneUnnecessaryForeignCells(
 	cells: Set<string>,
 	foreignCells: Set<string>,
@@ -807,6 +807,7 @@ function pruneUnnecessaryForeignCells(
 
 	return result;
 }
+*/
 
 // Close a cell set into a single simply-connected rectilinear region:
 // fill interior holes + bridge disconnected components. The resulting
@@ -980,7 +981,7 @@ export function computeClusterBBoxes(
 	// All cells that hold at least one card (= occupied). Used by the
 	// empty-cell carving rule: empty cells inside the cluster's AABB that
 	// also fall inside another cluster's AABB become carve candidates.
-	const allOccupied = computeAllOccupiedCells(positionedNodes, slotW, slotH);
+	// const allOccupied = computeAllOccupiedCells(positionedNodes, slotW, slotH);
 
 	// Main-group assignment per node. Each node's "main" is the cluster
 	// (among its memberships) with the largest total member count;

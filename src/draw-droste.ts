@@ -112,7 +112,7 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 	const tags = icon.tKeys;
 	const tIdx = new Map(tags.map((t, i) => [t, i]));
 	const tagHue = (t: string): number => TAG_HUES[(tIdx.get(t) ?? 0) % TAG_HUES.length];
-	const tagLabel = (t: string): string => o.gallery.labels.get(t) ?? t;
+
 
 	type Item = { id?: string; label: string; hue: number; agg?: boolean; placeholder?: boolean; spacer?: boolean };
 	const buildItems = (lvl: IconDiagram["levels"][number]): Item[] => {

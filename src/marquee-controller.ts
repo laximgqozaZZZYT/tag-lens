@@ -45,7 +45,7 @@ export class MarqueeController {
 	// will marquee-select.
 	arm(): void {
 		this.armed = true;
-		this.deps.canvas.style.cursor = "crosshair";
+		this.deps.canvas.setCssStyles({ cursor: "crosshair" });
 		this.deps.onActivate();
 	}
 
@@ -54,12 +54,9 @@ export class MarqueeController {
 	begin(sx: number, sy: number): void {
 		this.deps.onActivate();
 		this.startPt = { sx, sy };
-		const el = document.createElement("div");
+		const el = this.deps.root.ownerDocument.createElement("div");
 		el.className = "gim-marquee";
-		el.style.left = sx + "px";
-		el.style.top = sy + "px";
-		el.style.width = "0px";
-		el.style.height = "0px";
+		el.setCssStyles({ left: sx + "px", top: sy + "px", width: "0px", height: "0px" });
 		this.deps.root.appendChild(el);
 		this.el = el;
 	}
@@ -75,10 +72,7 @@ export class MarqueeController {
 		const y = Math.min(this.startPt.sy, sy);
 		const w = Math.abs(sx - this.startPt.sx);
 		const h = Math.abs(sy - this.startPt.sy);
-		this.el.style.left = x + "px";
-		this.el.style.top = y + "px";
-		this.el.style.width = w + "px";
-		this.el.style.height = h + "px";
+		this.el.setCssStyles({ left: x + "px", top: y + "px", width: w + "px", height: h + "px" });
 	}
 
 	// End the drag. Computes the world-space rect and calls fitToRect
@@ -106,7 +100,7 @@ export class MarqueeController {
 	cancel(): void {
 		this.startPt = null;
 		this.armed = false;
-		this.deps.canvas.style.cursor = "grab";
+		this.deps.canvas.setCssStyles({ cursor: "grab" });
 		if (this.el) {
 			this.el.remove();
 			this.el = null;

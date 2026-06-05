@@ -242,15 +242,15 @@ export function renderOrderBySection(
 	});
 	customInput.value = isCustom ? deps.settings.orderField : "";
 	customInput.placeholder = "frontmatter field";
-	customInput.style.display = isCustom ? "" : "none";
+	customInput.setCssStyles({ display: isCustom ? "" : "none" });
 
 	fieldSel.addEventListener("change", () => {
 		if (fieldSel.value === "__custom__") {
-			customInput.style.display = "";
+			customInput.setCssStyles({ display: "" });
 			customInput.focus();
 			deps.settings.orderField = customInput.value.trim() || "name";
 		} else {
-			customInput.style.display = "none";
+			customInput.setCssStyles({ display: "none" });
 			deps.settings.orderField = fieldSel.value;
 		}
 		void deps.save();
