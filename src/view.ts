@@ -1492,6 +1492,11 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private lastLayoutSig = "";
+	// Signature of the last completed rebuild's INPUTS (graph topology +
+	// cluster labels + view-affecting settings). Lets rebuild() skip the
+	// expensive relayout/redraw when nothing relevant changed — e.g. editing a
+	// note's body text that touches no tags/memberships. "" = no build yet.
+	private lastRebuildSig = "";
 
 	private async rebuild(): Promise<void> {
 		const gen = ++this.rebuildGen;
@@ -1504,6 +1509,23 @@ export class MiniGraphView extends ItemView {
 		this.whereError = errors.where ?? "";
 		this.groupByError = errors.groupBy ?? "";
 		let { data, clusterLabels } = result;
+
+		// ── Early-out: skip the (expensive) relayout/redraw/menu-rebuild when the
+		// graph INPUTS are byte-for-byte identical to the last build. buildGraph
+		// (cheap, reads metadata) still ran, but its result is unchanged — typical
+		// for editing a note's BODY that touches no tags/memberships. Settings
+		// changes are caught via layoutSignature; create/delete/rename and real
+		// tag edits change the graph signature and fall through to a full rebuild.
+		// (The navigator's frontmatter SEARCH metadata can lag a frontmatter-only
+		// edit until the next graph-affecting change — acceptable for the win.)
+		const rebuildSig = JSON.stringify({
+			n: result.data.nodes.map((n) => [n.id, n.label, n.memberships ?? []]),
+			e: result.data.edges.map((e) => [e.source, e.target]),
+			c: [...clusterLabels.entries()],
+			s: this.layoutSignature(this.settings),
+		});
+		if (rebuildSig === this.lastRebuildSig) return;
+		this.lastRebuildSig = rebuildSig;
 		// Pristine post-buildGraph graph (post WHERE/GROUP_BY, pre any HAVING/LIMIT
 		// mutation). The navigator's mode-invariant (non-droste) note set is derived
 		// from THIS via menuLimitedNodes() below, so switching between non-droste
