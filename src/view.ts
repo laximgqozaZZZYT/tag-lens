@@ -320,7 +320,7 @@ export class MiniGraphView extends ItemView {
 	// Which Settings sub-tab is shown: View / Filter / Sort / Display / Layers.
 	// In-memory, preserved across graph rebuilds. Default View.
 	private settingsSubTab: "view" | "filter" | "sort" | "display" | "layers" = "view";
-	private insightSubTab: "overview" | "alerts" = "overview";
+	private insightSubTab: "overview" | "alerts" | "suggest" = "overview";
 	// UpSet mode: signature key (= `signature.join("|")`) of the column
 	// currently selected by the user (highlighted in the matrix; drives
 	// the detail panel listing in Phase C). null = nothing selected.
@@ -815,10 +815,11 @@ export class MiniGraphView extends ItemView {
 		subBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", marginBottom: "6px", borderBottom: "1px solid var(--background-modifier-border)" });
 		const content = host.createDiv({ cls: "gim-panel-content" });
 
-		type SubKey = "overview" | "alerts";
+		type SubKey = "overview" | "alerts" | "suggest";
 		const SUBS: { key: SubKey; label: string }[] = [
 			{ key: "overview", label: "Overview" },
 			{ key: "alerts", label: "Alerts" },
+			{ key: "suggest", label: "Suggest" },
 		];
 		const subBtns = new Map<string, HTMLElement>();
 		const styleSubs = (): void => {
@@ -840,6 +841,7 @@ export class MiniGraphView extends ItemView {
 			switch (this.insightSubTab) {
 				case "overview": this.renderInsightOverview(content, computed); break;
 				case "alerts": this.renderInsightAlerts(content, computed); break;
+				case "suggest": this.renderInsightSuggest(content); break;
 			}
 		};
 		for (const { key, label } of SUBS) {
@@ -990,6 +992,235 @@ export class MiniGraphView extends ItemView {
 
 		// Initial render
 		renderBatch();
+	}
+
+	private computeTagSuggestions(): { tag: string; count: number; ratio: number; golderType: string; coOccurrence: Map<string, number> }[] {
+		const files = this.app.vault.getMarkdownFiles();
+		const totalNotes = Math.max(1, files.length);
+
+		interface TagStat {
+			tag: string;
+			count: number;
+			coOccurrence: Map<string, number>;
+		}
+
+		const stats = new Map<string, TagStat>();
+		const stripHash = (t: string): string => (t.startsWith("#") ? t.slice(1) : t);
+
+		for (const f of files) {
+			const cache = this.app.metadataCache.getFileCache(f);
+			const tags = new Set<string>();
+			if (cache?.tags) for (const t of cache.tags) tags.add(stripHash(t.tag));
+			const fmTags = (cache?.frontmatter as Record<string, unknown> | undefined)?.tags;
+			if (Array.isArray(fmTags)) {
+				for (const t of fmTags) if (t) tags.add(stripHash(String(t)));
+			} else if (typeof fmTags === "string") {
+				if (fmTags) tags.add(stripHash(fmTags));
+			}
+
+			const tagArray = Array.from(tags);
+			for (const t of tagArray) {
+				let stat = stats.get(t);
+				if (!stat) {
+					stat = { tag: t, count: 0, coOccurrence: new Map() };
+					stats.set(t, stat);
+				}
+				stat.count++;
+				for (const co of tagArray) {
+					if (co !== t) {
+						stat.coOccurrence.set(co, (stat.coOccurrence.get(co) ?? 0) + 1);
+					}
+				}
+			}
+		}
+
+		const getGolderSuggestion = (stat: TagStat, totalNotes: number): string => {
+			const ratio = stat.count / totalNotes;
+			
+			if (ratio >= 0.08) return "task_org";
+			
+			const vendorPattern = /(^|\/)(amazon|aws|google|microsoft|apple|meta|github|vercel|linux|ubuntu|debian|ansible|terraform)$/i;
+			if (ratio < 0.005 && vendorPattern.test(stat.tag)) return "who_owns_it";
+			
+			if (stat.tag.includes('/')) return "refined_category";
+			
+			// Prevent extreme low frequency tags (count < 3) from being automatically classified as refined categories.
+			// Also ensure the co-occurring tag is more frequent (acts as a parent topic).
+			if (stat.count >= 3) {
+				for (const [coTag, coCount] of stat.coOccurrence) {
+					const parentStat = stats.get(coTag);
+					if (parentStat && parentStat.count > stat.count && (coCount / stat.count) >= 0.9) {
+						return "refined_category";
+					}
+				}
+			}
+			
+			if (ratio >= 0.02 && ratio < 0.08) {
+				return stat.coOccurrence.size > 10 ? "qualities" : "what_it_is";
+			}
+			
+			if (ratio >= 0.005 && ratio < 0.02) return "what_it_contains";
+			
+			return "self_ref";
+		};
+
+		const results = [];
+		for (const stat of stats.values()) {
+			results.push({
+				tag: stat.tag,
+				count: stat.count,
+				ratio: stat.count / totalNotes,
+				golderType: getGolderSuggestion(stat, totalNotes),
+				coOccurrence: stat.coOccurrence
+			});
+		}
+
+		return results.sort((a, b) => b.count - a.count);
+	}
+
+	private renderInsightSuggest(host: HTMLElement): void {
+		host.empty();
+		
+		const suggestions = this.computeTagSuggestions();
+		
+		const container = host.createDiv();
+		container.setCssStyles({ display: "flex", flexDirection: "column", gap: "10px" });
+
+		const titleRow = container.createDiv();
+		titleRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center" });
+		titleRow.createEl("h4", { text: "Tag Classification Suggestions" }).setCssStyles({ margin: "0" });
+
+		// Since there can be many tags, let's make it scrollable
+		const tableContainer = container.createDiv();
+		tableContainer.setCssStyles({ overflowY: "auto", maxHeight: "400px", border: "1px solid var(--background-modifier-border)", borderRadius: "4px" });
+
+		const table = tableContainer.createEl("table");
+		table.setCssStyles({ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" });
+		
+		const thead = table.createEl("thead");
+		thead.setCssStyles({ position: "sticky", top: "0", background: "var(--background-secondary)", zIndex: "1" });
+		const headerRow = thead.createEl("tr");
+		["Tag", "Stats", "Suggested Classification", "Actions"].forEach(text => {
+			const th = headerRow.createEl("th", { text });
+			th.setCssStyles({ padding: "6px", borderBottom: "1px solid var(--background-modifier-border)", color: "var(--text-muted)" });
+		});
+
+		const tbody = table.createEl("tbody");
+
+		const TYPE_LABELS: Record<string, string> = {
+			"what_it_is": "What it is (Objective Topic)",
+			"what_it_contains": "What it contains (Content Elements)",
+			"who_owns_it": "Who owns it (Owner/Creator)",
+			"refined_category": "Refining categories (Category Refiner)",
+			"qualities": "Qualities (Subjective Traits)",
+			"task_org": "Task organization (Status/Process)",
+			"self_ref": "Self reference (Personal/Contextual)"
+		};
+
+		for (const s of suggestions) {
+			const tr = tbody.createEl("tr");
+			tr.setCssStyles({ borderBottom: "1px solid var(--background-modifier-border-hover)" });
+
+			// Tag
+			const tdTag = tr.createEl("td");
+			tdTag.setCssStyles({ padding: "8px 6px" });
+			const tagLink = tdTag.createEl("a", { text: `#${s.tag}` });
+			tagLink.setCssStyles({ color: "var(--text-accent)", cursor: "pointer", textDecoration: "none" });
+			tagLink.addEventListener("click", () => {
+				const dest = this.app.metadataCache.getFirstLinkpathDest(s.tag, "");
+				if (dest) {
+					this.app.workspace.getLeaf(false).openFile(dest);
+				} else {
+					new Notice(`Tag page for #${s.tag} does not exist yet.`);
+				}
+			});
+
+			// Stats
+			const tdStats = tr.createEl("td", { text: `${s.count} notes (${(s.ratio * 100).toFixed(1)}%)` });
+			tdStats.setCssStyles({ padding: "8px 6px", color: "var(--text-muted)", whiteSpace: "nowrap" });
+
+			// Suggested Classification
+			const tdClass = tr.createEl("td", { text: TYPE_LABELS[s.golderType] || s.golderType });
+			tdClass.setCssStyles({ padding: "8px 6px" });
+
+			// Actions
+			const tdActions = tr.createEl("td");
+			tdActions.setCssStyles({ padding: "8px 6px", display: "flex", gap: "6px", flexWrap: "wrap" });
+
+			const btnApply = tdActions.createEl("button", { text: "Apply Classification" });
+			btnApply.setCssStyles({ fontSize: "10px", padding: "2px 6px", cursor: "pointer" });
+			btnApply.addEventListener("click", async () => {
+				await this.applyGolderClassification(s.tag, s.golderType);
+				this.renderInsightSuggest(host); // refresh
+			});
+
+			const btnConvert = tdActions.createEl("button", { text: "Convert to Nested Tag" });
+			btnConvert.setCssStyles({ fontSize: "10px", padding: "2px 6px", cursor: "pointer" });
+			btnConvert.addEventListener("click", async () => {
+				const parent = window.prompt(`Convert #${s.tag} to a nested tag. Enter parent path (e.g. "Programming"):`);
+				if (parent) {
+					await this.convertToNestedTag(s.tag, parent.trim());
+					this.renderInsightSuggest(host); // refresh
+				}
+			});
+		}
+	}
+
+	private async applyGolderClassification(tag: string, golderType: string): Promise<void> {
+		let file = this.app.metadataCache.getFirstLinkpathDest(tag, "");
+		if (!file) {
+			const tagsFolder = "tags";
+			let folder = this.app.vault.getAbstractFileByPath(tagsFolder);
+			if (!folder) {
+				await this.app.vault.createFolder(tagsFolder);
+			}
+			const safeFileName = tag.replace(/\//g, '-');
+			file = await this.app.vault.create(`${tagsFolder}/${safeFileName}.md`, "");
+			new Notice(`Created tag page: ${tagsFolder}/${safeFileName}.md`);
+		}
+		
+		await this.app.fileManager.processFrontMatter(file, (fm) => {
+			fm.golder_type = golderType;
+		});
+		new Notice(`Applied classification '${golderType}' to #${tag}`);
+	}
+
+	private async convertToNestedTag(tag: string, parentPath: string): Promise<void> {
+		const files = this.app.vault.getMarkdownFiles();
+		let updatedCount = 0;
+		// Handle both #tag and tags in frontmatter. For body replacement, ensure word boundaries
+		const searchRegex = new RegExp(`(^|\\s)#${tag.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}(\\s|$)`, "gm");
+		const replacement = `$1#${parentPath}/${tag}$2`;
+
+		for (const f of files) {
+			const cache = this.app.metadataCache.getFileCache(f);
+			if (!cache) continue;
+			
+			const hasTag = cache.tags?.some(t => t.tag === `#${tag}`) || 
+						   ((cache.frontmatter?.tags) && (
+							   (Array.isArray(cache.frontmatter.tags) && cache.frontmatter.tags.includes(tag)) ||
+							   cache.frontmatter.tags === tag
+						   ));
+			
+			if (hasTag) {
+				await this.app.vault.process(f, (content) => {
+					return content.replace(searchRegex, replacement);
+				});
+				
+				await this.app.fileManager.processFrontMatter(f, (fm) => {
+					if (fm.tags) {
+						if (Array.isArray(fm.tags)) {
+							fm.tags = fm.tags.map((t: string) => t === tag ? `${parentPath}/${tag}` : t);
+						} else if (fm.tags === tag) {
+							fm.tags = `${parentPath}/${tag}`;
+						}
+					}
+				});
+				
+				updatedCount++;
+			}
+		}
+		new Notice(`Converted #${tag} to #${parentPath}/${tag} in ${updatedCount} files.`);
 	}
 
 	private renderTabButton(
