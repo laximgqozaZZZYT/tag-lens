@@ -1015,7 +1015,12 @@ export class MiniGraphView extends ItemView {
 			if (Array.isArray(fmTags)) {
 				for (const t of fmTags) if (t) tags.add(stripHash(String(t)));
 			} else if (typeof fmTags === "string") {
-				if (fmTags) tags.add(stripHash(fmTags));
+				if (fmTags) {
+					fmTags.split(",").forEach(t => {
+						const trimmed = t.trim();
+						if (trimmed) tags.add(stripHash(trimmed));
+					});
+				}
 			}
 
 			const tagArray = Array.from(tags);
@@ -1034,17 +1039,26 @@ export class MiniGraphView extends ItemView {
 			}
 		}
 
-		const getGolderSuggestion = (stat: TagStat, totalNotes: number): string => {
-			const ratio = stat.count / totalNotes;
+		// Calculate percentiles across all tags
+		const allCounts = Array.from(stats.values()).map(s => s.count).sort((a, b) => a - b);
+		const totalTagsCount = allCounts.length;
+		const medianCount = totalTagsCount > 0 ? allCounts[Math.floor(totalTagsCount * 0.5)] : 0;
+		const p90Count = totalTagsCount > 0 ? allCounts[Math.floor(totalTagsCount * 0.9)] : 0;
+		const p75Count = totalTagsCount > 0 ? allCounts[Math.floor(totalTagsCount * 0.75)] : 0;
+		const p25Count = totalTagsCount > 0 ? allCounts[Math.floor(totalTagsCount * 0.25)] : 0;
+
+		const getGolderSuggestion = (stat: TagStat): string => {
+			// 1. Task Organization (Top 10% frequency, at least 5 notes)
+			if (stat.count >= p90Count && stat.count >= 5) return "task_org";
 			
-			if (ratio >= 0.08) return "task_org";
-			
+			// 6. Who owns it (Vendors, must be below median frequency)
 			const vendorPattern = /(^|\/)(amazon|aws|google|microsoft|apple|meta|github|vercel|linux|ubuntu|debian|ansible|terraform)$/i;
-			if (ratio < 0.005 && vendorPattern.test(stat.tag)) return "who_owns_it";
+			if (stat.count <= medianCount && vendorPattern.test(stat.tag)) return "who_owns_it";
 			
+			// 2. Refining Categories (Explicit hierarchy)
 			if (stat.tag.includes('/')) return "refined_category";
 			
-			// Prevent extreme low frequency tags (count < 3) from being automatically classified as refined categories.
+			// Prevent extreme low frequency tags from being automatically classified as refined categories.
 			// Also ensure the co-occurring tag is more frequent (acts as a parent topic).
 			if (stat.count >= 3) {
 				for (const [coTag, coCount] of stat.coOccurrence) {
@@ -1055,11 +1069,16 @@ export class MiniGraphView extends ItemView {
 				}
 			}
 			
-			if (ratio >= 0.02 && ratio < 0.08) {
-				return stat.coOccurrence.size > 10 ? "qualities" : "what_it_is";
+			// 3. Qualities vs 4. What it is
+			// Medium to high frequency (between 25th and 90th percentile)
+			if (stat.count > p25Count && stat.count < p90Count) {
+				// Use entropy (diversity of co-occurrence) instead of absolute size
+				const entropy = stat.coOccurrence.size / stat.count;
+				return entropy >= 0.5 ? "qualities" : "what_it_is";
 			}
 			
-			if (ratio >= 0.005 && ratio < 0.02) return "what_it_contains";
+			// 5. What it contains (Bottom 25% frequency)
+			if (stat.count <= p25Count && stat.count >= 2) return "what_it_contains";
 			
 			return "self_ref";
 		};
@@ -1070,7 +1089,7 @@ export class MiniGraphView extends ItemView {
 				tag: stat.tag,
 				count: stat.count,
 				ratio: stat.count / totalNotes,
-				golderType: getGolderSuggestion(stat, totalNotes),
+				golderType: getGolderSuggestion(stat),
 				coOccurrence: stat.coOccurrence
 			});
 		}
