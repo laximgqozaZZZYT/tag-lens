@@ -45,6 +45,23 @@ export function buildGraph(
 	}
 
 	const files = app.vault.getMarkdownFiles();
+	const allTags = new Set<string>();
+	for (const f of files) {
+		const cache = app.metadataCache.getFileCache(f);
+		for (const t of collectTags(cache)) allTags.add(t);
+	}
+
+	const tagProperties: Record<string, Record<string, unknown>> = {};
+	for (const t of allTags) {
+		const dest = app.metadataCache.getFirstLinkpathDest(t, "");
+		if (dest) {
+			const c = app.metadataCache.getFileCache(dest);
+			if (c && c.frontmatter) {
+				tagProperties[t] = c.frontmatter as Record<string, unknown>;
+			}
+		}
+	}
+
 	const nodes: GraphNode[] = [];
 	const edges: GraphEdge[] = [];
 	const idSet = new Set<string>();
@@ -52,7 +69,7 @@ export function buildGraph(
 
 	for (const f of files) {
 		const cache = app.metadataCache.getFileCache(f);
-		const facts = makeFacts(f, cache);
+		const facts = makeFacts(f, cache, tagProperties);
 
 		if (whereAst && !isMatched(evalQuery(whereAst, facts))) continue;
 
@@ -111,11 +128,16 @@ function instanceCluster(
 	return { key, label };
 }
 
-function makeFacts(file: TFile, cache: CachedMetadata | null): FileFacts {
+function makeFacts(
+	file: TFile,
+	cache: CachedMetadata | null,
+	tagProperties: Record<string, Record<string, unknown>>,
+): FileFacts {
 	return {
 		path: file.path,
 		tags: collectTags(cache),
 		frontmatter: (cache?.frontmatter as Record<string, unknown>) ?? {},
+		tagProperties,
 	};
 }
 

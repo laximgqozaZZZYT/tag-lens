@@ -242,6 +242,7 @@ export class MiniGraphView extends ItemView {
 	// The live container the settings tab renders into (replaces the old docking
 	// panel's `panelEl` as the host that `applyTabFilter`/`renderTabButton` query).
 	private settingsHostEl: HTMLElement | null = null;
+	private insightHostEl: HTMLElement | null = null;
 	// The last note "located" on canvas via the navigator (non-droste modes),
 	// used to highlight its row in the menu.
 	private locatedNoteId: string | null = null;
@@ -319,6 +320,7 @@ export class MiniGraphView extends ItemView {
 	// Which Settings sub-tab is shown: View / Filter / Sort / Display / Layers.
 	// In-memory, preserved across graph rebuilds. Default View.
 	private settingsSubTab: "view" | "filter" | "sort" | "display" | "layers" = "view";
+	private insightSubTab: "overview" | "alerts" = "overview";
 	// UpSet mode: signature key (= `signature.join("|")`) of the column
 	// currently selected by the user (highlighted in the matrix; drives
 	// the detail panel listing in Phase C). null = nothing selected.
@@ -808,7 +810,51 @@ export class MiniGraphView extends ItemView {
 				.setAttr("style", "font-size:11px;color:var(--color-red);padding:8px");
 			return;
 		}
-		const { score, globalStats, triggered } = computed;
+
+		const subBar = host.createDiv();
+		subBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", marginBottom: "6px", borderBottom: "1px solid var(--background-modifier-border)" });
+		const content = host.createDiv({ cls: "gim-panel-content" });
+
+		type SubKey = "overview" | "alerts";
+		const SUBS: { key: SubKey; label: string }[] = [
+			{ key: "overview", label: "Overview" },
+			{ key: "alerts", label: "Alerts" },
+		];
+		const subBtns = new Map<string, HTMLElement>();
+		const styleSubs = (): void => {
+			for (const { key } of SUBS) {
+				const b = subBtns.get(key);
+				if (!b) continue;
+				const on = this.insightSubTab === key;
+				b.setCssStyles({
+					background: "transparent", border: "none",
+					borderBottom: on ? "2px solid var(--interactive-accent)" : "2px solid transparent",
+					borderRadius: "0", padding: "4px 8px", marginBottom: "-1px",
+					color: on ? "var(--text-normal)" : "var(--text-muted)", fontWeight: on ? "600" : "400",
+					cursor: "pointer", fontSize: "10.5px", lineHeight: "1.3",
+				});
+			}
+		};
+		const renderSub = (): void => {
+			content.empty();
+			switch (this.insightSubTab) {
+				case "overview": this.renderInsightOverview(content, computed); break;
+				case "alerts": this.renderInsightAlerts(content, computed); break;
+			}
+		};
+		for (const { key, label } of SUBS) {
+			const b = subBar.createEl("button", { text: label });
+			subBtns.set(key, b);
+			b.addEventListener("click", () => { this.insightSubTab = key; styleSubs(); renderSub(); });
+			b.addEventListener("mouseenter", () => { if (this.insightSubTab !== key) { b.setCssStyles({ color: "var(--text-muted)" }); b.setCssStyles({ borderBottomColor: "var(--background-modifier-border)" }); } });
+			b.addEventListener("mouseleave", () => styleSubs());
+		}
+		styleSubs();
+		renderSub();
+	}
+
+	private renderInsightOverview(host: HTMLElement, computed: ReturnType<MiniGraphView["computeCognitiveLoad"]>): void {
+		const { score, globalStats } = computed;
 		const band = score < 40 ? { c: "var(--color-green)", b: "var(--color-green)", t: "Low" }
 			: score < 80 ? { c: "var(--color-yellow)", b: "var(--color-yellow)", t: "Moderate" }
 				: { c: "var(--color-red)", b: "var(--color-red)", t: "High / Critical" };
@@ -835,18 +881,21 @@ export class MiniGraphView extends ItemView {
 		const ctrl = host.createDiv();
 		ctrl.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", fontSize: "11px", color: "var(--text-muted)" });
 		ctrl.createSpan({ text: "Sensitivity (K)" });
-		const kIn = ctrl.createEl("input", { attr: { type: "range", min: "1", max: "5", step: "0.1", value: String(k) } });
+		const kIn = ctrl.createEl("input", { attr: { type: "range", min: "1", max: "5", step: "0.1", value: String(this.clInsightK) } });
 		kIn.setCssStyles({ flex: "1 1 auto", accentColor: "var(--interactive-accent)", cursor: "pointer" });
-		const kVal = ctrl.createSpan({ text: k.toFixed(1) });
+		const kVal = ctrl.createSpan({ text: this.clInsightK.toFixed(1) });
 		kVal.setCssStyles({ fontFamily: "monospace", color: "var(--text-accent)", width: "26px", textAlign: "right" });
 		// Update K + label live while dragging (cheap), but only RE-SCAN the vault
 		// on release (`change`) so a large vault doesn't recompute per pixel.
 		kIn.addEventListener("input", () => { this.clInsightK = Number(kIn.value); kVal.setText(this.clInsightK.toFixed(1)); });
-		kIn.addEventListener("change", () => this.renderInsightBody(host));
+		kIn.addEventListener("change", () => { if (this.insightHostEl) this.renderInsightBody(this.insightHostEl); });
 		const refresh = ctrl.createEl("button", { text: "Refresh" });
 		refresh.setCssStyles({ fontSize: "10px", padding: "2px 8px", background: "var(--background-secondary)", border: "1px solid var(--background-modifier-border)", borderRadius: "4px", color: "var(--text-muted)", cursor: "pointer" });
-		refresh.addEventListener("click", () => this.renderInsightBody(host));
+		refresh.addEventListener("click", () => { if (this.insightHostEl) this.renderInsightBody(this.insightHostEl); });
+	}
 
+	private renderInsightAlerts(host: HTMLElement, computed: ReturnType<MiniGraphView["computeCognitiveLoad"]>): void {
+		const { triggered } = computed;
 		// ── Alerts (active only) ──
 		if (triggered.length === 0) {
 			const ok = host.createDiv();
@@ -3403,7 +3452,12 @@ export class MiniGraphView extends ItemView {
 			insightTab.setCssStyles({ display: key === "insight" ? "block" : "none" });
 			if (key === "settings") this.renderSettingsBody(settingsTab);
 			else this.settingsHostEl = null;
-			if (key === "insight") this.renderInsightBody(insightTab);
+			if (key === "insight") {
+				this.insightHostEl = insightTab;
+				this.renderInsightBody(insightTab);
+			} else {
+				this.insightHostEl = null;
+			}
 			styleTabs();
 		};
 		const mkTab = (key: MenuTab, label: string): void => {

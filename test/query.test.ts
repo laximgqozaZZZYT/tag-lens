@@ -2,10 +2,15 @@
 // once Patch B lands, the tag-page frontmatter join (tag.<key>:). The base
 // AND/OR/NOT/wildcard behaviour is exercised indirectly here too.
 import { ok } from "./assert";
-import { parseQuery, evalQuery, isMatched, type FileFacts } from "../src/query";
+import {
+	parseQuery,
+	evalQuery,
+	isMatched,
+	type FileFacts,
+} from "../src/query";
 
-function facts(tags: string[], frontmatter: Record<string, unknown> = {}): FileFacts {
-	return { path: "n.md", tags, frontmatter };
+function facts(tags: string[], frontmatter: Record<string, unknown> = {}, tagProperties?: Record<string, Record<string, unknown>>): FileFacts {
+	return { path: "n.md", tags, frontmatter, tagProperties };
 }
 
 // distinct bound values for a single-binding GROUP_BY key, sorted for stable compare
@@ -67,5 +72,55 @@ function boundValues(ast: ReturnType<typeof parseQuery>, f: FileFacts, key: stri
 	ok(
 		!isMatched(evalQuery(parseQuery("tag1:Programming AND -tag1:todo"), f)),
 		"tagN composes with AND/NOT",
+	);
+}
+
+// === Patch B: tag-page frontmatter join (tag.<key>:) ===
+
+const tagProperties: Record<string, Record<string, unknown>> = {
+	"nginx": { category: "Infrastructure", type: "tool" },
+	"postgres": { category: "Infrastructure", type: "tool" },
+	"essay": { category: "Writing" }
+};
+
+// tag.category:? partitions by the tag-page category of each of the note's
+// tags, de-duplicated (two Infrastructure tags → one cluster).
+{
+	const f = facts(["nginx", "postgres", "essay"], {}, tagProperties);
+	const vals = evalQuery(parseQuery("tag.category:?"), f).instances
+		.map((m) => m.get("tag.category") ?? "")
+		.sort();
+	ok(
+		JSON.stringify(vals) === JSON.stringify(["Infrastructure", "Writing"]),
+		"tag.category:? groups by tag-page category, deduped",
+	);
+}
+
+// tag.category:Infrastructure matches a note that has at least one such tag.
+{
+	ok(
+		isMatched(evalQuery(parseQuery("tag.category:Infrastructure"), facts(["nginx"], {}, tagProperties))),
+		"tag.category:literal matches via tag page",
+	);
+	ok(
+		!isMatched(evalQuery(parseQuery("tag.category:Frontend"), facts(["nginx"], {}, tagProperties))),
+		"tag.category:literal no false positive",
+	);
+}
+
+// Composes with WHERE negation and AND.
+{
+	const f = facts(["nginx", "essay"], {}, tagProperties);
+	ok(
+		isMatched(evalQuery(parseQuery("tag.type:tool AND -tag.category:Frontend AND tag.category:Infrastructure"), f)),
+		"tag.<key> composes with AND/NOT (note still has an Infrastructure tool tag)",
+	);
+}
+
+// Missing context (no tag pages) yields no match rather than throwing.
+{
+	ok(
+		!isMatched(evalQuery(parseQuery("tag.category:Infrastructure"), facts(["nginx"]))),
+		"tag.<key> with no tagProperties → no match, no throw",
 	);
 }

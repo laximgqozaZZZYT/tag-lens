@@ -7,7 +7,8 @@
 
 export type Atom =
 	| { kind: "tag"; value: string; depth?: number } // tag name (no #) or "?"; depth = nested level (tagN:)
-	| { kind: "fm"; field: string; value: string }; // literal or "?"
+	| { kind: "fm"; field: string; value: string } // literal or "?"
+	| { kind: "tag_fm"; field: string; value: string }; // e.g. tag.category:Infrastructure
 
 export type QueryAst =
 	| { kind: "atom"; atom: Atom }
@@ -19,6 +20,7 @@ export interface FileFacts {
 	path: string;
 	tags: string[];
 	frontmatter: Record<string, unknown>;
+	tagProperties?: Record<string, Record<string, unknown>>;
 }
 
 // Empty `instances` array = no match. A single empty-bindings entry = match
@@ -90,6 +92,10 @@ function parseAtomText(text: string): Atom {
 	// level), so `tag1:*` clusters by top-level tag and `tag1:Programming`
 	// subtree-matches Programming/anything.
 	const tagLevel = field.match(/^tag([1-9]\d*)$/);
+	const tagFmMatch = field.match(/^tag\.([A-Za-z_][A-Za-z0-9_-]*)$/);
+	if (tagFmMatch) {
+		return { kind: "tag_fm", field: tagFmMatch[1], value };
+	}
 	if (field === "tag" || tagLevel) {
 		if (value !== "?" && value.startsWith("#")) value = value.slice(1);
 		return { kind: "tag", value, depth: tagLevel ? Number(tagLevel[1]) : undefined };
@@ -203,6 +209,53 @@ function evalAtom(atom: Atom, f: FileFacts): EvalResult {
 			: f.tags.includes(atom.value);
 		return { instances: hit ? [EMPTY_INSTANCE()] : [] };
 	}
+	if (atom.kind === "tag_fm") {
+		const targetField = atom.field;
+		const props = f.tagProperties || {};
+		const seen = new Set<string>();
+		const instances: Map<string, string>[] = [];
+
+		if (atom.value === "?") {
+			for (const t of f.tags) {
+				const val = props[t]?.[targetField];
+				if (val != null && val !== "") {
+					if (Array.isArray(val)) {
+						for (const v of val) {
+							const s = String(v);
+							if (s && !seen.has(s)) {
+								seen.add(s);
+								instances.push(new Map([[`tag.${targetField}`, s]]));
+							}
+						}
+					} else {
+						const s = String(val);
+						if (s && !seen.has(s)) {
+							seen.add(s);
+							instances.push(new Map([[`tag.${targetField}`, s]]));
+						}
+					}
+				}
+			}
+			return { instances };
+		}
+
+		let hit = false;
+		for (const t of f.tags) {
+			const val = props[t]?.[targetField];
+			if (val != null) {
+				if (Array.isArray(val)) {
+					if (val.some((x) => String(x) === atom.value)) {
+						hit = true;
+						break;
+					}
+				} else if (String(val) === atom.value) {
+					hit = true;
+					break;
+				}
+			}
+		}
+		return { instances: hit ? [EMPTY_INSTANCE()] : [] };
+	}
 	// frontmatter
 	const fmValue = f.frontmatter[atom.field];
 	if (atom.value === "?") {
@@ -263,10 +316,10 @@ export function isMatched(r: EvalResult): boolean {
 	return r.instances.length > 0;
 }
 
-// Substitute `$<field>` placeholders in a label string with bound values.
+// Substitute `$<field>` or `$tag.<field>` placeholders in a label string with bound values.
 // Unknown placeholders are left as-is.
 export function substituteLabel(template: string, bindings: Map<string, string>): string {
-	return template.replace(/\$([A-Za-z_][A-Za-z0-9_-]*)/g, (m: string, name: string) => {
+	return template.replace(/\$([A-Za-z_][A-Za-z0-9_.-]*)/g, (m: string, name: string) => {
 		return bindings.get(name) ?? m;
 	});
 }
