@@ -5201,15 +5201,20 @@ class ClassificationInfoModal extends Modal {
 		contentEl.empty();
 		contentEl.createEl("h2", { text: "Tag Classifications" });
 		
-		const list = contentEl.createEl("ul");
-		list.setCssStyles({ paddingLeft: "20px" });
+		const table = contentEl.createEl("table");
+		table.setCssStyles({ width: "100%", borderCollapse: "collapse", fontSize: "14px", marginTop: "10px" });
+
 		for (const [key, label] of Object.entries(this.labels)) {
-			const li = list.createEl("li");
-			li.setCssStyles({ marginBottom: "12px", lineHeight: "1.4" });
-			li.createEl("strong", { text: label });
-			li.createEl("br");
-			const descSpan = li.createSpan({ text: this.descriptions[key] || "" });
-			descSpan.setCssStyles({ color: "var(--text-muted)", fontSize: "0.9em" });
+			const tr = table.createEl("tr");
+			tr.setCssStyles({ borderBottom: "1px solid var(--background-modifier-border-hover)" });
+			
+			const tdLabel = tr.createEl("td");
+			tdLabel.setCssStyles({ padding: "10px 8px", fontWeight: "600", whiteSpace: "nowrap", verticalAlign: "top" });
+			tdLabel.createSpan({ text: label });
+
+			const tdDesc = tr.createEl("td");
+			tdDesc.setCssStyles({ padding: "10px 8px", color: "var(--text-muted)", verticalAlign: "top" });
+			tdDesc.createSpan({ text: this.descriptions[key] || "" });
 		}
 	}
 
