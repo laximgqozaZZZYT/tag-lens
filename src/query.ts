@@ -6,7 +6,7 @@
 // membership downstream, enabling Euler-diagram-style overlap rendering.
 
 export type Atom =
-	| { kind: "tag"; value: string } // tag name (no leading #) or "?"
+	| { kind: "tag"; value: string; depth?: number } // tag name (no #) or "?"; depth = nested level (tagN:)
 	| { kind: "fm"; field: string; value: string }; // literal or "?"
 
 export type QueryAst =
@@ -86,9 +86,13 @@ function parseAtomText(text: string): Atom {
 	// `*` is accepted as an alias for the `?` partition wildcard so the
 	// notation matches glob-style conventions some users expect.
 	if (value === "*") value = "?";
-	if (field === "tag") {
+	// `tag:` = whole nested path; `tagN:` = first N path segments (hierarchy
+	// level), so `tag1:*` clusters by top-level tag and `tag1:Programming`
+	// subtree-matches Programming/anything.
+	const tagLevel = field.match(/^tag([1-9]\d*)$/);
+	if (field === "tag" || tagLevel) {
 		if (value !== "?" && value.startsWith("#")) value = value.slice(1);
-		return { kind: "tag", value };
+		return { kind: "tag", value, depth: tagLevel ? Number(tagLevel[1]) : undefined };
 	}
 	if (field === "folder" || field === "path") {
 		throw new Error(`"${field}:" is not supported; use tag:/<frontmatter-field>: only`);
@@ -171,21 +175,33 @@ export function parseQuery(s: string): QueryAst {
 
 const EMPTY_INSTANCE = (): Map<string, string> => new Map();
 
+// Collapse a nested tag (`A/B/C`) to its first `depth` segments (`A/B`).
+// depth undefined → whole tag unchanged.
+function tagAtDepth(tag: string, depth?: number): string {
+	return depth ? tag.split("/").slice(0, depth).join("/") : tag;
+}
+
 function evalAtom(atom: Atom, f: FileFacts): EvalResult {
 	if (atom.kind === "tag") {
+		const depth = atom.depth;
 		if (atom.value === "?") {
 			if (f.tags.length === 0) return { instances: [] };
-			// Dedupe in case a file has the same tag listed twice (e.g. inline + fm).
+			// Dedupe in case a file has the same tag listed twice (e.g. inline +
+			// fm), or two tags share a prefix at this depth.
 			const seen = new Set<string>();
 			const instances: Map<string, string>[] = [];
 			for (const t of f.tags) {
-				if (seen.has(t)) continue;
-				seen.add(t);
-				instances.push(new Map([["tag", t]]));
+				const key = tagAtDepth(t, depth);
+				if (seen.has(key)) continue;
+				seen.add(key);
+				instances.push(new Map([["tag", key]]));
 			}
 			return { instances };
 		}
-		return { instances: f.tags.includes(atom.value) ? [EMPTY_INSTANCE()] : [] };
+		const hit = depth != null
+			? f.tags.some((t) => tagAtDepth(t, depth) === atom.value)
+			: f.tags.includes(atom.value);
+		return { instances: hit ? [EMPTY_INSTANCE()] : [] };
 	}
 	// frontmatter
 	const fmValue = f.frontmatter[atom.field];

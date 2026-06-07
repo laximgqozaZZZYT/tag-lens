@@ -7,5 +7,6 @@ import "./droste-layout.test";
 import "./note-menu.test";
 import "./hidden-nodes.test";
 import "./theme.test";
+import "./query.test";
 
 summary();
