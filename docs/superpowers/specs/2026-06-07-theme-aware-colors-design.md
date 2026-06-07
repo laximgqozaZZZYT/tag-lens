@@ -22,10 +22,13 @@ Canvas 2D は CSS 変数を解釈しないため、`ctx.fillStyle = "var(--text-
 ## 2. Goals / Non-Goals
 
 ### Goals
+- **システムのベースカラー（`--background-primary`）を全色のアンカーにする。** 解決した
+  ベース背景色の相対輝度 `L_bg` を唯一の基準入力とし、クローム・識別色とも「ベースカラーから
+  どれだけ離すか」で導出する。ライト／ダーク／グレー／セピア等あらゆるベースに連続追従する。
 - **クローム色（背景・文字・枠・パネル・アクセント）を Obsidian テーマに完全追従**させる。
-  ライト／ダーク／カスタムテーマすべてで自動的に馴染む。
-- **識別色（タグ／クラスタのカテゴリ色）はライトテーマでも十分なコントラストで見える**よう、
-  色相（hue）を保ったまま明度・彩度ランプをテーマで切り替える。
+  対応する CSS 変数があればそれを使い、無ければベースカラーから輝度オフセットで導出。
+- **識別色（タグ／クラスタのカテゴリ色）はどのベースカラーでも十分なコントラストで見える**よう、
+  色相（hue）を保ったまま明度を `L_bg` から一定差を確保して算出する。
 - **テーマ切替に即座に追従**する（`css-change` イベント → 再解決 → 再描画）。
 - 設定トグルなしで「とにかく自動」で動く（YAGNI: 手動オーバーライド設定は作らない）。
 
@@ -57,14 +60,16 @@ Obsidian CSS変数 ──getComputedStyle(viewRoot)──▶ resolveTheme(el): T
    danger     ← --color-red
    warn       ← --color-yellow / --color-orange
    success    ← --color-green
-   isDark     ← luminance(--background-primary) < 0.5
+   baseLum    ← relativeLuminance(--background-primary)   ★ 全導出のアンカー
+   isDark     ← baseLum < 0.5
 ```
 
 ### 3.1 `ThemeTokens` インターフェース
 
 ```ts
 export interface ThemeTokens {
-  isDark: boolean;
+  isDark: boolean;     // L_bg < 0.5 の便宜フラグ（境界処理用）
+  baseLum: number;     // ★ アンカー: --background-primary の相対輝度 0..1
   // chrome（解決済みの実色文字列: "rgb(...)" / "#..."）
   canvasBg: string;
   canvasBgAlt: string;
@@ -96,25 +101,49 @@ export type SwatchRole =
 ### 3.2 `resolveTheme(el)`
 
 - `getComputedStyle(el)` でビューのルート要素から Obsidian 変数を読む。
-- 各変数 → 意味トークンへマップ。空文字の場合はダーク既定値にフォールバック
-  （現行のハードコード値を既定値として温存し、変数取得失敗時も破綻しない）。
-- `--background-primary` を相対輝度に変換して `isDark` を判定。
+- **まず `--background-primary` を相対輝度 `baseLum` に変換**（全導出のアンカー）。
+- クローム各トークン → 対応 CSS 変数を解決。変数が空／無い場合は `baseLum` から
+  輝度オフセットで導出（最終フォールバックとして現行ハードコード値）。
+- `swatch` は `baseLum` を取り込んだクロージャとして生成。
 - 解決結果はビュー側でキャッシュし、`css-change` 時のみ再解決。
 
-### 3.3 `swatch(hue, role, alpha)` の明度ランプ
+### 3.3 `swatch(hue, role, alpha)` — ベースカラーから連続導出
 
-役割ごとに `{ s, l }` を `isDark` で切替（数値は実装時に視認性検証して微調整）:
+二値の固定テーブルではなく、**ベース背景の輝度 `L_bg`（= `baseLum`）を基準にした
+相対オフセット**で各役割の明度を決める。これにより、純黒・純白だけでなく
+グレー／セピア等の中間的なベースカラーにも連続的に追従する。
 
-| role        | dark (s%,l%) | light (s%,l%) | 意図 |
-|-------------|--------------|---------------|------|
-| fill        | 60, 55       | 65, 42        | ライトは暗めにして白背景で沈ませない |
-| fillStrong  | 75, 65       | 70, 38        | 選択時の強調 |
-| stroke      | 70, 65       | 65, 40        | 輪郭はライトで濃く |
-| dim         | 25, 35       | 30, 62        | 非アクティブ。ライトは明るめで背景に近づける |
-| label       | 60, 72       | 55, 30        | 図形上文字。背景と逆方向の明度 |
-| tint        | 18, 22       | 40, 90        | 領域背景。ライトは極淡 |
+役割ごとに「ベースからの明度方向（コントラスト方向）」と「目標コントラスト差」を定義:
 
-→ `return alpha == null ? \`hsl(${hue}, ${s}%, ${l}%)\` : \`hsla(${hue}, ${s}%, ${l}%, ${alpha})\``
+| role        | 明度方向            | 目標 L（概念式） | 意図 |
+|-------------|---------------------|------------------|------|
+| fill        | ベースと反対方向     | `L_bg + dir*0.42` | ベースから十分離し図形を浮かせる |
+| fillStrong  | ベースと反対・最大   | `L_bg + dir*0.55` | 選択／ホバー強調 |
+| stroke      | ベースと反対方向     | `L_bg + dir*0.48` | 輪郭をベースに対し明瞭に |
+| dim         | ベース寄り           | `L_bg + dir*0.18` | 非アクティブ。ベースに近づけ後退 |
+| label       | ベースと反対・高     | `L_bg + dir*0.55` | 図形上文字。ベースの逆へ |
+| tint        | ベース寄り・極小     | `L_bg + dir*0.06` | 領域背景。ベースとほぼ同調 |
+
+- `dir = L_bg < 0.5 ? +1 : -1`（暗いベース→明るく、明るいベース→暗く離す）。
+- 目標 L は `clamp(0.04..0.96)`。彩度 `s` は役割ごとの基準値（fill/stroke≈0.6、dim/tint≈0.25）を
+  そのまま使用（色相識別性のため彩度はベースに依存させない）。
+- HSL の L は %（`L*100`）で出力。係数（0.42 等）は実装時に両端＋中間ベースで視認性検証して微調整。
+
+→ 概念実装:
+```ts
+swatch(hue, role, alpha) {
+  const dir = baseLum < 0.5 ? 1 : -1;
+  const { off, s } = ROLE[role];               // 役割の係数
+  const L = clamp(baseLum + dir * off, 0.04, 0.96) * 100;
+  return alpha == null
+    ? `hsl(${hue}, ${s*100}%, ${L}%)`
+    : `hsla(${hue}, ${s*100}%, ${L}%, ${alpha})`;
+}
+```
+
+クローム色も同方針: 対応 CSS 変数があれば優先。`border`/`borderStrong`/`canvasBgAlt` など
+変数が無い／薄い場合は `--background-primary` の輝度に固定オフセットを足し引きして導出し、
+ベースカラーを基調に統一する。
 
 ## 4. 修正対象と手法（2 系統）
 
@@ -159,10 +188,13 @@ draw()
 
 ## 7. Testing
 
-- `src/theme.ts` の純関数部分（輝度判定 `isDark`、`swatch` の HSL 生成、フォールバック）に
-  ユニットテストを追加（`test/theme.test.ts`）。既存の `test/note-menu.test.ts` と同形式。
-- 視覚確認: ライト／ダーク両テーマでビューを開き、背景・文字・タグ識別色が
-  それぞれ馴染む／十分見えることを目視（デプロイ先 vault でリロード）。
+- `src/theme.ts` の純関数部分に `test/theme.test.ts` を追加（既存 `test/note-menu.test.ts` と同形式）:
+  - `relativeLuminance` が代表色で妥当な値を返す。
+  - `swatch` が暗ベース／明ベース／中間ベース（グレー）で、ベースと十分なコントラスト差を持つ
+    L を生成する（`|L - baseLum*100| >= 役割の最小差`）。色相が入力 hue と一致する。
+  - 変数欠落時のフォールバックが破綻しない。
+- 視覚確認: ライト／ダーク／カスタム（グレー系）テーマでビューを開き、背景・文字・タグ識別色が
+  ベースカラーに馴染む／十分見えることを目視（デプロイ先 vault でリロード）。
 - `npm run build`（esbuild）と既存 lint がパスすること。
 
 ## 8. Build / Deploy 注意
