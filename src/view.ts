@@ -1117,6 +1117,16 @@ export class MiniGraphView extends ItemView {
 			"self_ref": "Self reference (Personal/Contextual)"
 		};
 
+		const TYPE_DESCRIPTIONS: Record<string, string> = {
+			"what_it_is": "Describes the objective topic or subject matter of the note.",
+			"what_it_contains": "Describes specific content elements (e.g., code, images, formulas).",
+			"who_owns_it": "Identifies the owner, creator, brand, or vendor related to the note.",
+			"refined_category": "A sub-category that refines a broader topic, typically used in a nested hierarchy.",
+			"qualities": "Describes subjective traits, opinions, or characteristics of the note.",
+			"task_org": "Used for organizing workflow, statuses, or processes (e.g., #todo, #wip).",
+			"self_ref": "Highly localized, personal, or temporary contextual tags."
+		};
+
 		for (const s of suggestions) {
 			const tr = tbody.createEl("tr");
 			tr.setCssStyles({ borderBottom: "1px solid var(--background-modifier-border-hover)" });
@@ -1140,8 +1150,15 @@ export class MiniGraphView extends ItemView {
 			tdStats.setCssStyles({ padding: "8px 6px", color: "var(--text-muted)", whiteSpace: "nowrap" });
 
 			// Suggested Classification
-			const tdClass = tr.createEl("td", { text: TYPE_LABELS[s.golderType] || s.golderType });
-			tdClass.setCssStyles({ padding: "8px 6px" });
+			const tdClass = tr.createEl("td");
+			tdClass.setCssStyles({ padding: "8px 6px", display: "flex", alignItems: "center", gap: "4px" });
+			tdClass.createSpan({ text: TYPE_LABELS[s.golderType] || s.golderType });
+			
+			const infoIcon = tdClass.createSpan();
+			infoIcon.setCssStyles({ cursor: "help", color: "var(--text-muted)", display: "inline-flex" });
+			setIcon(infoIcon, "info");
+			infoIcon.setAttribute("aria-label", TYPE_DESCRIPTIONS[s.golderType] || "No description available.");
+			infoIcon.setAttribute("aria-label-position", "top");
 
 			// Actions
 			const tdActions = tr.createEl("td");
