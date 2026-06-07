@@ -1,14 +1,18 @@
 import type { LaidOut } from "./layout";
+import { theme, colorAlpha } from "./theme";
 
 // Colour palette for hover / accent rendering. Centralised here so the
 // "warm = outgoing, cool = incoming" convention is enforced by the
-// renderer instead of being duplicated as magic strings.
-export const EDGE_DIM = "rgba(180,200,220,0.10)";
-export const EDGE_LINE = "rgba(180,200,220,0.55)";
-export const EDGE_ACCENT_OUT = "#ff9d3f";
-export const EDGE_GLOW_OUT = "rgba(255,157,63,0.35)";
-export const EDGE_ACCENT_IN = "#3fbfff";
-export const EDGE_GLOW_IN = "rgba(63,191,255,0.35)";
+// renderer instead of being duplicated as magic strings. Functions (not
+// consts) so each call re-reads the current theme — the warm/cool accents
+// follow Obsidian's accent/warning colours, and the faint base lines flip
+// with the base colour via overlay/colorAlpha.
+const edgeDim = () => theme().overlay(0.1);
+const edgeLine = () => colorAlpha(theme().textMuted, 0.55);
+const edgeAccentOut = () => theme().warn;
+const edgeGlowOut = () => colorAlpha(theme().warn, 0.35);
+const edgeAccentIn = () => theme().accent;
+const edgeGlowIn = () => colorAlpha(theme().accent, 0.35);
 
 // Predicate that decides whether a node is currently invisible (= hidden
 // via layer panel checkbox, or fully aggregated into a stack). Edges
@@ -37,7 +41,7 @@ export function drawBaseEdges(
 		if (skipNode(e.source) || skipNode(e.target)) return;
 		const path = e.path;
 		if (!path || path.length < 2) return;
-		ctx.strokeStyle = hasHighlight ? EDGE_DIM : EDGE_LINE;
+		ctx.strokeStyle = hasHighlight ? edgeDim() : edgeLine();
 		ctx.beginPath();
 		ctx.moveTo(path[0].x, path[0].y);
 		for (let i2 = 1; i2 < path.length; i2++) {
@@ -71,8 +75,8 @@ export function drawAccentEdges(
 		if (!path || path.length < 2) return;
 		const isOutgoing =
 			hoveredNodeId !== null ? e.source === hoveredNodeId : true;
-		const accent = isOutgoing ? EDGE_ACCENT_OUT : EDGE_ACCENT_IN;
-		const glow = isOutgoing ? EDGE_GLOW_OUT : EDGE_GLOW_IN;
+		const accent = isOutgoing ? edgeAccentOut() : edgeAccentIn();
+		const glow = isOutgoing ? edgeGlowOut() : edgeGlowIn();
 		// Glow first (wide, translucent), accent second (narrow, opaque)
 		// so the inner solid line sits centred inside its halo.
 		ctx.strokeStyle = glow;

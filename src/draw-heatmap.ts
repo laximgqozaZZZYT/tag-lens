@@ -4,6 +4,7 @@
 // only visible rows/cols drawn (virtualization). Cell shade = |Ti ∩ Tj|
 // (raw, log+p95-clamped) or Jaccard. The diagonal (|Ti|) is drawn in a
 // distinct amber so it reads apart from the blue intersection cells.
+import { theme, colorAlpha } from "./theme";
 import type { HeatmapMeta } from "./layout";
 import { truncateToWidth } from "./canvas-utils";
 
@@ -48,7 +49,7 @@ export function drawHeatmap(
 	const visW = o.canvas.width / dpr;
 	const visH = o.canvas.height / dpr;
 	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-	ctx.fillStyle = "#0f1116";
+	ctx.fillStyle = theme().canvasBg;
 	ctx.fillRect(0, 0, visW, visH);
 
 	const n = h.n;
@@ -72,14 +73,14 @@ export function drawHeatmap(
 	if (o.hoverCol >= 0) {
 		const x = cellX(o.hoverCol);
 		if (x + cellPx > labelBand && x < visW) {
-			ctx.fillStyle = "rgba(160, 190, 230, 0.14)";
+			ctx.fillStyle = colorAlpha(theme().accent, 0.14);
 			ctx.fillRect(Math.max(labelBand, x), headerH, cellPx, visH - headerH);
 		}
 	}
 	if (o.hoverRow >= 0) {
 		const y = cellY(o.hoverRow);
 		if (y + cellPx > headerH && y < visH) {
-			ctx.fillStyle = "rgba(160, 190, 230, 0.14)";
+			ctx.fillStyle = colorAlpha(theme().accent, 0.14);
 			ctx.fillRect(labelBand, Math.max(headerH, y), visW - labelBand, cellPx);
 		}
 	}
@@ -138,7 +139,7 @@ export function drawHeatmap(
 	}
 	// Selected cell outline (both the cell and its symmetric twin).
 	if (o.selected) {
-		ctx.strokeStyle = "#ff9d3f";
+		ctx.strokeStyle = theme().warn;
 		ctx.lineWidth = 2;
 		for (const [rr, cc] of [
 			[o.selected.i, o.selected.j],
@@ -152,7 +153,7 @@ export function drawHeatmap(
 
 	// LEFT band — row (tag) labels, frozen x, scroll y. LOD: skip rows when the
 	// pitch is too small for legible text.
-	ctx.fillStyle = "rgba(20, 24, 33, 0.97)";
+	ctx.fillStyle = colorAlpha(theme().canvasBgAlt, 0.97);
 	ctx.fillRect(0, headerH, labelBand, visH - headerH);
 	ctx.save();
 	ctx.beginPath();
@@ -167,7 +168,7 @@ export function drawHeatmap(
 		const cy = cellY(r) + cellPx / 2;
 		const sel = r === o.hoverRow || r === o.selected?.i || r === o.selected?.j;
 		ctx.font = `${sel ? 700 : 400} ${font}px sans-serif`;
-		ctx.fillStyle = sel ? "#ffd49d" : "#dbe4ee";
+		ctx.fillStyle = sel ? theme().warn : theme().textNormal;
 		ctx.fillText(
 			truncateToWidth(ctx, `${h.tags[r].label} (${h.tags[r].size})`, labelBand - 12),
 			8,
@@ -177,7 +178,7 @@ export function drawHeatmap(
 	ctx.restore();
 
 	// TOP band — column (tag) labels, rotated, same LOD stride.
-	ctx.fillStyle = "rgba(20, 24, 33, 0.97)";
+	ctx.fillStyle = colorAlpha(theme().canvasBgAlt, 0.97);
 	ctx.fillRect(0, 0, visW, headerH);
 	ctx.save();
 	ctx.beginPath();
@@ -194,16 +195,16 @@ export function drawHeatmap(
 		ctx.font = `${sel ? 700 : 400} ${font}px sans-serif`;
 		ctx.textAlign = "start";
 		ctx.textBaseline = "middle";
-		ctx.fillStyle = sel ? "#ffd49d" : "#cdd8e4";
+		ctx.fillStyle = sel ? theme().warn : theme().textMuted;
 		ctx.fillText(truncateToWidth(ctx, `${h.tags[c].label}`, headerH - 12), 0, 0);
 		ctx.restore();
 	}
 	ctx.restore();
 
 	// Corner + frozen-pane separators.
-	ctx.fillStyle = "rgba(14, 17, 22, 1)";
+	ctx.fillStyle = theme().canvasBg;
 	ctx.fillRect(0, 0, labelBand, headerH);
-	ctx.strokeStyle = "rgba(180, 200, 230, 0.55)";
+	ctx.strokeStyle = colorAlpha(theme().accent, 0.55);
 	ctx.lineWidth = 1;
 	ctx.beginPath();
 	ctx.moveTo(labelBand + 0.5, 0);

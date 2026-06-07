@@ -1,3 +1,4 @@
+import { theme } from "./theme";
 import type { PositionedNode } from "./layout";
 import {
 	CARD_RADIUS_PX,
@@ -73,22 +74,22 @@ export function drawCard(
 	ctx.beginPath();
 	roundedRectPath(ctx, x, y, w, h, r);
 	ctx.fillStyle = highlighted
-		? "#ffe7a8"
+		? theme().warn
 		: isSet
-			? `hsl(${fillHue}, 55%, 40%)`
+			? theme().swatch(fillHue, "fill")
 			: isTint
-				? `hsl(${tintHue}, 38%, 30%)`
-				: "#1d2230";
+				? theme().swatch(tintHue, "tint")
+				: theme().canvasBgAlt;
 	ctx.fill();
 
 	ctx.lineWidth = (highlighted ? 1.8 : isSet ? 1.6 : 1) / zoom;
 	ctx.strokeStyle = highlighted
-		? "#ff9d3f"
+		? theme().warn
 		: isSet
-			? `hsl(${fillHue}, 75%, 72%)`
+			? theme().swatch(fillHue, "fillStrong")
 			: isTint
-				? `hsl(${tintHue}, 45%, 52%)`
-				: "#5a7ba8";
+				? theme().swatch(tintHue, "fill")
+				: theme().accent;
 	ctx.beginPath();
 	roundedRectPath(ctx, x, y, w, h, r);
 	ctx.stroke();
@@ -143,7 +144,7 @@ export function drawCard(
 	const showTitle = opts.titleLodPx == null || w * zoom >= opts.titleLodPx;
 	if (showTitle) {
 		ctx.font = `600 ${titleFontPx}px sans-serif`;
-		ctx.fillStyle = highlighted ? "#1d1100" : isSet ? "#f2f6ff" : "#e6edf3";
+		ctx.fillStyle = highlighted ? "#1d1100" : theme().textNormal;
 		const titleFitted = truncateToWidth(ctx, n.label, innerW);
 		// Title-only cards: centre the title vertically so the enlarged glyphs
 		// sit flush in the node. (Body preview was retired.)
@@ -154,7 +155,7 @@ export function drawCard(
 	ctx.textBaseline = "top";
 	if (bodyLines.length > 0 && showBody) {
 		ctx.font = `${bodyFontPx}px sans-serif`;
-		ctx.fillStyle = highlighted ? "#3a2400" : "#9eb0c4";
+		ctx.fillStyle = highlighted ? "#3a2400" : theme().textMuted;
 		// Offset below the ACTUAL title height (the capped font may exceed
 		// the nominal line height at low zoom) so the body never overlaps
 		// the title; the clip drops any line that runs past the card.

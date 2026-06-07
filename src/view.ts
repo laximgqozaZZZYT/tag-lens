@@ -22,6 +22,7 @@ import {
 	computeDroppedClusters as computeDroppedClustersFn,
 } from "./query-pipeline";
 import { clusterHue } from "./canvas-utils";
+import { resolveTheme, setTheme, theme, colorAlpha } from "./theme";
 import { expandClustersByInheritance } from "./cluster-bbox";
 import { runAggregateSnap } from "./aggregate-snap";
 import {
@@ -393,6 +394,10 @@ export class MiniGraphView extends ItemView {
 		root.setCssStyles({ position: "relative" });
 		this.root = root;
 
+		// Resolve Obsidian's theme colours into concrete strings for the canvas
+		// (Canvas 2D cannot read CSS variables). Re-resolved on `css-change`.
+		setTheme(resolveTheme(root));
+
 		this.canvas = root.createEl("canvas");
 		this.canvas.setCssStyles({ width: "100%" });
 		this.canvas.setCssStyles({ height: "100%" });
@@ -419,6 +424,16 @@ export class MiniGraphView extends ItemView {
 		this.attachInputs();
 		this.resizeObs = new ResizeObserver(() => this.resize());
 		this.resizeObs.observe(root);
+
+		// Follow live theme / appearance changes: re-resolve base colour and
+		// repaint so the canvas tracks Obsidian's base colour immediately.
+		this.registerEvent(
+			this.app.workspace.on("css-change", () => {
+				if (!this.root) return;
+				setTheme(resolveTheme(this.root));
+				this.requestDraw();
+			}),
+		);
 
 		this.registerEvent(this.app.metadataCache.on("resolved", () => this.scheduleRebuild()));
 		this.registerEvent(
@@ -512,7 +527,7 @@ export class MiniGraphView extends ItemView {
 		// Sub-tab bar: View / Filter / Sort / Display / Layers. Underline style,
 		// matching the top-level Notes/Settings tabs but more compact.
 		const subBar = host.createDiv();
-		subBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", marginBottom: "6px", borderBottom: "1px solid #2a3447" });
+		subBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", marginBottom: "6px", borderBottom: "1px solid var(--background-modifier-border)" });
 		const content = host.createDiv({ cls: "gim-panel-content" });
 		type SubKey = "view" | "filter" | "sort" | "display" | "layers";
 		const SUBS: { key: SubKey; label: string }[] = [
@@ -530,9 +545,9 @@ export class MiniGraphView extends ItemView {
 				const on = this.settingsSubTab === key;
 				b.setCssStyles({
 					background: "transparent", border: "none",
-					borderBottom: on ? "2px solid #2d6cdf" : "2px solid transparent",
+					borderBottom: on ? "2px solid var(--interactive-accent)" : "2px solid transparent",
 					borderRadius: "0", padding: "4px 8px", marginBottom: "-1px",
-					color: on ? "#e6edf3" : "#9db4d6", fontWeight: on ? "600" : "400",
+					color: on ? "var(--text-normal)" : "var(--text-muted)", fontWeight: on ? "600" : "400",
 					cursor: "pointer", fontSize: "10.5px", lineHeight: "1.3",
 				});
 			}
@@ -551,7 +566,7 @@ export class MiniGraphView extends ItemView {
 			const b = subBar.createEl("button", { text: label });
 			subBtns.set(key, b);
 			b.addEventListener("click", () => { this.settingsSubTab = key; styleSubs(); renderSub(); });
-			b.addEventListener("mouseenter", () => { if (this.settingsSubTab !== key) { b.setCssStyles({ color: "#cdd9ec" }); b.setCssStyles({ borderBottomColor: "#3a4760" }); } });
+			b.addEventListener("mouseenter", () => { if (this.settingsSubTab !== key) { b.setCssStyles({ color: "var(--text-muted)" }); b.setCssStyles({ borderBottomColor: "var(--background-modifier-border)" }); } });
 			b.addEventListener("mouseleave", () => styleSubs());
 		}
 		styleSubs();
@@ -790,54 +805,54 @@ export class MiniGraphView extends ItemView {
 			computed = this.computeCognitiveLoad(k);
 		} catch (e) {
 			host.createDiv({ text: `Could not compute cognitive load: ${e instanceof Error ? e.message : String(e)}` })
-				.setAttr("style", "font-size:11px;color:#f87171;padding:8px");
+				.setAttr("style", "font-size:11px;color:var(--color-red);padding:8px");
 			return;
 		}
 		const { score, globalStats, triggered } = computed;
-		const band = score < 40 ? { c: "#34d399", b: "#10b981", t: "Low" }
-			: score < 80 ? { c: "#fbbf24", b: "#f59e0b", t: "Moderate" }
-				: { c: "#f87171", b: "#ef4444", t: "High / Critical" };
+		const band = score < 40 ? { c: "var(--color-green)", b: "var(--color-green)", t: "Low" }
+			: score < 80 ? { c: "var(--color-yellow)", b: "var(--color-yellow)", t: "Moderate" }
+				: { c: "var(--color-red)", b: "var(--color-red)", t: "High / Critical" };
 
 		// ── Score gauge ──
 		const gauge = host.createDiv();
-		gauge.setCssStyles({ border: "1px solid #3a4760", borderRadius: "8px", background: "#161c2a", padding: "10px", marginBottom: "8px" });
+		gauge.setCssStyles({ border: "1px solid var(--background-modifier-border)", borderRadius: "8px", background: "var(--background-secondary)", padding: "10px", marginBottom: "8px" });
 		const gTop = gauge.createDiv();
 		gTop.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "6px" });
 		const gLeft = gTop.createDiv();
-		gLeft.createDiv({ text: "Total Cognitive Load Score" }).setAttr("style", "font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:#7e8aa0");
+		gLeft.createDiv({ text: "Total Cognitive Load Score" }).setAttr("style", "font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)");
 		const sc = gLeft.createDiv({ text: `${score} ` });
 		sc.setCssStyles({ fontSize: "22px", fontWeight: "700", color: band.c });
-		sc.createSpan({ text: "/ 100" }).setAttr("style", "font-size:11px;font-weight:400;color:#5b6678");
+		sc.createSpan({ text: "/ 100" }).setAttr("style", "font-size:11px;font-weight:400;color:var(--text-faint)");
 		gTop.createDiv({ text: band.t }).setAttr("style", `font-size:12px;font-weight:600;color:${band.c}`);
 		const track = gauge.createDiv();
-		track.setCssStyles({ height: "8px", width: "100%", borderRadius: "999px", background: "#2a3447", overflow: "hidden" });
+		track.setCssStyles({ height: "8px", width: "100%", borderRadius: "999px", background: "var(--background-modifier-border)", overflow: "hidden" });
 		const fill = track.createDiv();
 		fill.setCssStyles({ height: "100%", width: `${score}%`, background: band.b, borderRadius: "999px", transition: "width .15s" });
 		gauge.createDiv({ text: `Vault: ${globalStats.totalNotes} notes · ${globalStats.totalFolders} folders · ${globalStats.totalLinks} links · ${globalStats.distinctTags} tags` })
-			.setAttr("style", "font-size:9px;color:#5b6678;margin-top:6px;font-family:monospace");
+			.setAttr("style", "font-size:9px;color:var(--text-faint);margin-top:6px;font-family:monospace");
 
 		// ── K sensitivity slider + refresh ──
 		const ctrl = host.createDiv();
-		ctrl.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", fontSize: "11px", color: "#9db4d6" });
+		ctrl.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", fontSize: "11px", color: "var(--text-muted)" });
 		ctrl.createSpan({ text: "Sensitivity (K)" });
 		const kIn = ctrl.createEl("input", { attr: { type: "range", min: "1", max: "5", step: "0.1", value: String(k) } });
-		kIn.setCssStyles({ flex: "1 1 auto", accentColor: "#2d6cdf", cursor: "pointer" });
+		kIn.setCssStyles({ flex: "1 1 auto", accentColor: "var(--interactive-accent)", cursor: "pointer" });
 		const kVal = ctrl.createSpan({ text: k.toFixed(1) });
-		kVal.setCssStyles({ fontFamily: "monospace", color: "#7fb4ff", width: "26px", textAlign: "right" });
+		kVal.setCssStyles({ fontFamily: "monospace", color: "var(--text-accent)", width: "26px", textAlign: "right" });
 		// Update K + label live while dragging (cheap), but only RE-SCAN the vault
 		// on release (`change`) so a large vault doesn't recompute per pixel.
 		kIn.addEventListener("input", () => { this.clInsightK = Number(kIn.value); kVal.setText(this.clInsightK.toFixed(1)); });
 		kIn.addEventListener("change", () => this.renderInsightBody(host));
 		const refresh = ctrl.createEl("button", { text: "Refresh" });
-		refresh.setCssStyles({ fontSize: "10px", padding: "2px 8px", background: "#1a2236", border: "1px solid #3a4760", borderRadius: "4px", color: "#9db4d6", cursor: "pointer" });
+		refresh.setCssStyles({ fontSize: "10px", padding: "2px 8px", background: "var(--background-secondary)", border: "1px solid var(--background-modifier-border)", borderRadius: "4px", color: "var(--text-muted)", cursor: "pointer" });
 		refresh.addEventListener("click", () => this.renderInsightBody(host));
 
 		// ── Alerts (active only) ──
 		if (triggered.length === 0) {
 			const ok = host.createDiv();
-			ok.setCssStyles({ display: "flex", gap: "8px", alignItems: "flex-start", border: "1px solid #1f6b4f", background: "rgba(16,185,129,0.12)", borderRadius: "6px", padding: "10px" });
-			ok.createSpan().setAttr("style", "width:10px;height:10px;border-radius:2px;background:#34d399;flex:0 0 auto;margin-top:2px;display:inline-block");
-			ok.createSpan({ text: "[OK] System status: Normal. Cognitive load is optimal." }).setAttr("style", "font-size:12px;line-height:1.5;color:#a7f3d0");
+			ok.setCssStyles({ display: "flex", gap: "8px", alignItems: "flex-start", border: "1px solid var(--color-green)", background: "rgba(16,185,129,0.12)", borderRadius: "6px", padding: "10px" });
+			ok.createSpan().setAttr("style", "width:10px;height:10px;border-radius:2px;background:var(--color-green);flex:0 0 auto;margin-top:2px;display:inline-block");
+			ok.createSpan({ text: "[OK] System status: Normal. Cognitive load is optimal." }).setAttr("style", "font-size:12px;line-height:1.5;color:var(--color-green)");
 			return;
 		}
 
@@ -860,21 +875,21 @@ export class MiniGraphView extends ItemView {
 				const card = listContainer.createDiv();
 				card.setCssStyles({
 					display: "flex", gap: "8px", alignItems: "flex-start", marginBottom: "8px", borderRadius: "6px", padding: "10px",
-					border: `1px solid ${critical ? "#7f2a2a" : "#7a5a1f"}`, background: critical ? "rgba(239,68,68,0.10)" : "rgba(245,158,11,0.10)",
+					border: `1px solid ${critical ? "var(--color-red)" : "var(--color-yellow)"}`, background: critical ? "rgba(239,68,68,0.10)" : "rgba(245,158,11,0.10)",
 				});
-				card.createSpan().setAttr("style", `width:10px;height:10px;border-radius:2px;flex:0 0 auto;margin-top:3px;display:inline-block;background:${critical ? "#ef4444" : "#fbbf24"}`);
+				card.createSpan().setAttr("style", `width:10px;height:10px;border-radius:2px;flex:0 0 auto;margin-top:3px;display:inline-block;background:${critical ? "var(--color-red)" : "var(--color-yellow)"}`);
 				const body = card.createDiv();
 				body.setCssStyles({ flex: "1 1 auto" });
 
 				const titleRow = body.createDiv();
 				titleRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" });
-				titleRow.createDiv({ text: item.label }).setAttr("style", `font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${critical ? "#fca5a5" : "#fcd34d"}`);
+				titleRow.createDiv({ text: item.label }).setAttr("style", `font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${critical ? "var(--color-red)" : "var(--color-yellow)"}`);
 				const btnGroup = titleRow.createDiv();
 				btnGroup.setCssStyles({ display: "flex", gap: "8px", alignItems: "center" });
 
 				const dismissBtn = btnGroup.createEl("button", { cls: "clickable-icon", title: "Dismiss" });
 				setIcon(dismissBtn, "x");
-				dismissBtn.setCssStyles({ background: "none", border: "none", padding: "0", cursor: "pointer", color: critical ? "#fca5a5" : "#fcd34d", display: "flex", alignItems: "center" });
+				dismissBtn.setCssStyles({ background: "none", border: "none", padding: "0", cursor: "pointer", color: critical ? "var(--color-red)" : "var(--color-yellow)", display: "flex", alignItems: "center" });
 
 				dismissBtn.addEventListener("click", () => {
 					card.remove();
@@ -884,23 +899,23 @@ export class MiniGraphView extends ItemView {
 				summaryDiv.setCssStyles({ 
 					fontSize: "12px", 
 					lineHeight: "1.5", 
-					color: critical ? "#fecaca" : "#fde68a",
+					color: critical ? "var(--color-red)" : "var(--color-yellow)",
 					cursor: "pointer",
 					textDecoration: "underline dashed",
 					textUnderlineOffset: "2px"
 				});
 				
 				const offenderDiv = body.createDiv({ text: `• Target: ${item.offender}` });
-				offenderDiv.setCssStyles({ marginTop: "5px", fontSize: "10px", color: "#9db4d6", fontFamily: "monospace", lineHeight: "1.5" });
+				offenderDiv.setCssStyles({ marginTop: "5px", fontSize: "10px", color: "var(--text-muted)", fontFamily: "monospace", lineHeight: "1.5" });
 
 				const detailsDiv = body.createDiv();
 				detailsDiv.setCssStyles({ display: "none", marginTop: "8px", padding: "6px", background: "rgba(0,0,0,0.15)", borderRadius: "4px" });
 				
 				const detailText = detailsDiv.createDiv({ text: item.detail });
-				detailText.setCssStyles({ fontSize: "11px", color: critical ? "#fca5a5" : "#fcd34d", marginBottom: "4px" });
+				detailText.setCssStyles({ fontSize: "11px", color: critical ? "var(--color-red)" : "var(--color-yellow)", marginBottom: "4px" });
 				
 				const adviceText = detailsDiv.createDiv();
-				adviceText.setCssStyles({ fontSize: "11px", color: critical ? "#fca5a5" : "#fcd34d" });
+				adviceText.setCssStyles({ fontSize: "11px", color: critical ? "var(--color-red)" : "var(--color-yellow)" });
 				adviceText.createSpan({ text: "Recommendation: " }).setAttr("style", "font-weight:bold");
 				adviceText.createSpan({ text: item.advice });
 
@@ -939,7 +954,7 @@ export class MiniGraphView extends ItemView {
 		if (this.activeTab === key) btn.addClass("active");
 		if (hue !== null) {
 			const sw = btn.createSpan({ cls: "gim-panel-tab-swatch" });
-			sw.setCssStyles({ background: `hsl(${hue}, 70%, 62%)` });
+			sw.setCssStyles({ background: theme().swatch(hue, "fill") });
 		}
 		btn.createSpan({ text: label });
 		// filterText = null ⇒ pinned (never filtered, e.g. the 全体 tab).
@@ -1014,7 +1029,7 @@ export class MiniGraphView extends ItemView {
 		const meta = head.createDiv({ cls: "gim-layer-meta" });
 		const swatch = meta.createSpan({ cls: "gim-layer-swatch" });
 		const hue = clusterHue(cluster.groupKey);
-		swatch.setCssStyles({ background: `hsl(${hue}, 70%, 62%)` });
+		swatch.setCssStyles({ background: theme().swatch(hue, "fill") });
 		meta.createSpan({ text: cluster.label });
 		meta.createSpan({
 			cls: "gim-layer-count",
@@ -1582,7 +1597,7 @@ export class MiniGraphView extends ItemView {
 			userSelect: "none",
 			margin: "8px 0 4px",
 			fontSize: "12px",
-			color: "#9eb0c4",
+			color: "var(--text-muted)",
 		});
 		const caret = header.createSpan({ text: expSelected ? "▾ " : "▸ " });
 		header.createSpan({ text: "Experimental (beta)" });
@@ -2522,7 +2537,7 @@ export class MiniGraphView extends ItemView {
 		const cw = this.canvas.width;
 		const ch = this.canvas.height;
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
-		ctx.fillStyle = "#0f1116";
+		ctx.fillStyle = theme().canvasBg;
 		ctx.fillRect(0, 0, cw, ch);
 		// Mode-agnostic note navigator (folder tree + search). Built once per
 		// rebuild; shown in EVERY view mode. It self-suppresses when there are
@@ -2644,7 +2659,7 @@ export class MiniGraphView extends ItemView {
 			!heatmapHasCells &&
 			!latticeHasNodes
 		) {
-			ctx.fillStyle = "#7a8aa0";
+			ctx.fillStyle = theme().textFaint;
 			ctx.font = `${14 * dpr}px sans-serif`;
 			ctx.textAlign = "center";
 			ctx.textBaseline = "middle";
@@ -2797,9 +2812,9 @@ export class MiniGraphView extends ItemView {
 			const padX = 8, padY = 5, cw = this.canvas.clientWidth || 0;
 			const text = msg.length > 140 ? `${msg.slice(0, 139)}…` : msg;
 			const tw = Math.min(ctx.measureText(text).width, Math.max(0, cw - 16));
-			ctx.fillStyle = "rgba(120,30,30,0.92)";
+			ctx.fillStyle = colorAlpha(theme().danger, 0.92);
 			ctx.fillRect(8, 8, tw + padX * 2, 22);
-			ctx.fillStyle = "#ffd7d7";
+			ctx.fillStyle = theme().textNormal;
 			ctx.fillText(text, 8 + padX, 8 + padY, Math.max(0, cw - 24));
 		}
 	}
@@ -3302,9 +3317,9 @@ export class MiniGraphView extends ItemView {
 				position: "absolute",
 				left: "", right: "0", top: "0", bottom: "0", height: "", width: `${pinnedW}px`,
 				display: "flex", flexDirection: "column", overflow: "hidden",
-				background: "rgba(20,24,33,0.98)",
-				border: "none", borderLeft: "1px solid #3a4760", borderRadius: "0",
-				boxShadow: "-4px 0 16px rgba(0,0,0,0.5)", zIndex: "60", font: "12px sans-serif", color: "#e6edf3",
+				background: "var(--background-secondary)",
+				border: "none", borderLeft: "1px solid var(--background-modifier-border)", borderRadius: "0",
+				boxShadow: "-4px 0 16px rgba(0,0,0,0.5)", zIndex: "60", font: "12px sans-serif", color: "var(--text-normal)",
 			});
 		} else {
 			panel.setCssStyles({
@@ -3312,15 +3327,15 @@ export class MiniGraphView extends ItemView {
 				left: `${rect.left}px`, top: `${rect.top}px`, right: "", bottom: "",
 				width: `${rect.width}px`, height: `${rect.height}px`,
 				display: "flex", flexDirection: "column", overflow: "hidden",
-				background: "rgba(20,24,33,0.96)", border: "1px solid #3a4760", borderRadius: "6px",
-				boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "60", font: "12px sans-serif", color: "#e6edf3",
+				background: "var(--background-secondary)", border: "1px solid var(--background-modifier-border)", borderRadius: "6px",
+				boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "60", font: "12px sans-serif", color: "var(--text-normal)",
 			});
 		}
 		const head = panel.createDiv();
 		// When floating, the header IS the drag handle (cursor:move); when pinned
 		// the panel is docked so it can't be moved (cursor:default).
 		head.setCssStyles({
-			padding: "6px 8px", borderBottom: "1px solid #2a3447", fontWeight: "600",
+			padding: "6px 8px", borderBottom: "1px solid var(--background-modifier-border)", fontWeight: "600",
 			cursor: pinned ? "default" : "move", userSelect: "none", flex: "0 0 auto",
 		});
 		// Header verb is mode-appropriate: droste focuses, other modes either
@@ -3334,14 +3349,14 @@ export class MiniGraphView extends ItemView {
 		headBtns.setCssStyles({ display: "flex", alignItems: "center", gap: "2px", flex: "0 0 auto" });
 		// Pin/unpin: dock the menu to the right edge (standard pin affordance).
 		const pinBtn = headBtns.createSpan();
-		pinBtn.setCssStyles({ cursor: "pointer", color: pinned ? "#2d6cdf" : "#9db4d6", display: "inline-flex", alignItems: "center", padding: "0 2px" });
+		pinBtn.setCssStyles({ cursor: "pointer", color: pinned ? "var(--interactive-accent)" : "var(--text-muted)", display: "inline-flex", alignItems: "center", padding: "0 2px" });
 		setIcon(pinBtn, pinned ? "pin-off" : "pin");
 		pinBtn.setAttr("aria-label", pinned ? "Unpin (float)" : "Pin to right");
 		pinBtn.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		pinBtn.addEventListener("dblclick", (ev) => ev.stopPropagation());
 		pinBtn.addEventListener("click", (ev) => { ev.stopPropagation(); this.togglePin(); });
 		const closeBtn = headBtns.createSpan({ text: "×" });
-		closeBtn.setCssStyles({ cursor: "pointer", fontWeight: "700", fontSize: "16px", lineHeight: "1", padding: "0 4px", color: "#9db4d6", flex: "0 0 auto" });
+		closeBtn.setCssStyles({ cursor: "pointer", fontWeight: "700", fontSize: "16px", lineHeight: "1", padding: "0 4px", color: "var(--text-muted)", flex: "0 0 auto" });
 		closeBtn.setAttr("aria-label", "Close menu");
 		closeBtn.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		closeBtn.addEventListener("dblclick", (ev) => ev.stopPropagation());
@@ -3351,7 +3366,7 @@ export class MiniGraphView extends ItemView {
 		// Underline-style tabs: the bar carries the divider line that the active
 		// tab's accent underline sits on (marginBottom:-1px lines them up), so the
 		// active tab reads as connected to the body below.
-		tabBar.setCssStyles({ display: "flex", gap: "2px", marginTop: "8px", fontWeight: "400", fontSize: "11px", borderBottom: "1px solid #2a3447" });
+		tabBar.setCssStyles({ display: "flex", gap: "2px", marginTop: "8px", fontWeight: "400", fontSize: "11px", borderBottom: "1px solid var(--background-modifier-border)" });
 		tabBar.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		// Don't let a double-click on the tab bar toggle the header's minimize.
 		tabBar.addEventListener("dblclick", (ev) => ev.stopPropagation());
@@ -3374,9 +3389,9 @@ export class MiniGraphView extends ItemView {
 				const on = this.activeMenuTab === key;
 				b.setCssStyles({
 					background: "transparent", border: "none",
-					borderBottom: on ? "2px solid #2d6cdf" : "2px solid transparent",
+					borderBottom: on ? "2px solid var(--interactive-accent)" : "2px solid transparent",
 					borderRadius: "0", padding: "6px 14px", marginBottom: "-1px",
-					color: on ? "#e6edf3" : "#9db4d6", fontWeight: on ? "600" : "400",
+					color: on ? "var(--text-normal)" : "var(--text-muted)", fontWeight: on ? "600" : "400",
 					cursor: "pointer", fontSize: "11px", lineHeight: "1.3",
 				});
 			}
@@ -3398,7 +3413,7 @@ export class MiniGraphView extends ItemView {
 			b.addEventListener("click", (ev) => { ev.stopPropagation(); showTab(key); });
 			// Hover affordance for the inactive tab (active styling wins via styleTabs).
 			b.addEventListener("mouseenter", () => {
-				if (this.activeMenuTab !== key) { b.setCssStyles({ color: "#cdd9ec" }); b.setCssStyles({ borderBottomColor: "#3a4760" }); }
+				if (this.activeMenuTab !== key) { b.setCssStyles({ color: "var(--text-muted)" }); b.setCssStyles({ borderBottomColor: "var(--background-modifier-border)" }); }
 			});
 			b.addEventListener("mouseleave", () => styleTabs());
 		};
@@ -3407,7 +3422,7 @@ export class MiniGraphView extends ItemView {
 		mkTab("insight", "Insight");
 		// Note-count + click hint, shown at the top of the Notes pane.
 		const notesHint = notesTab.createDiv({ text: `${nodes.length} notes — click to ${verb}` });
-		notesHint.setCssStyles({ fontSize: "10px", color: "#7e8aa0", padding: "4px 8px 0" });
+		notesHint.setCssStyles({ fontSize: "10px", color: "var(--text-faint)", padding: "4px 8px 0" });
 		// ── Grouping selector (Folder / Tag) ────────────────────────────────────
 		// A small radio group in the header switches the tree between the FOLDER
 		// tree (by note path, default) and the TAG tree (by GROUP_BY membership
@@ -3416,7 +3431,7 @@ export class MiniGraphView extends ItemView {
 		const groupBar = notesTab.createDiv();
 		groupBar.setCssStyles({
 			display: "flex", gap: "10px", marginTop: "4px", fontWeight: "400",
-			fontSize: "11px", color: "#9db4d6", cursor: "default",
+			fontSize: "11px", color: "var(--text-muted)", cursor: "default",
 		});
 		const groupName = "gim-notemenu-group";
 		const mkGroupRadio = (value: "folder" | "tag", labelText: string): void => {
@@ -3453,8 +3468,8 @@ export class MiniGraphView extends ItemView {
 			btn.textContent = label;
 			btn.setCssStyles({
 				fontSize: "10px", padding: "2px 6px", cursor: "pointer",
-				background: "#1a2236", border: "1px solid #3a4760",
-				borderRadius: "3px", color: "#9db4d6", lineHeight: "1.4",
+				background: "var(--background-secondary)", border: "1px solid var(--background-modifier-border)",
+				borderRadius: "3px", color: "var(--text-muted)", lineHeight: "1.4",
 			});
 			// Prevent the button click from starting a header move-drag.
 			btn.addEventListener("mousedown", (ev) => ev.stopPropagation());
@@ -3493,7 +3508,7 @@ export class MiniGraphView extends ItemView {
 		const searchWrap = notesTab.createDiv();
 		searchWrap.setCssStyles({ position: "relative", margin: "6px 8px", flex: "0 0 auto" });
 		const search = searchWrap.createEl("input", { attr: { type: "text", placeholder: "Search: word, #tag, key:value" } });
-		search.setCssStyles({ display: "block", width: "100%", boxSizing: "border-box", padding: "4px 6px", background: "#0f1116", border: "1px solid #2a3447", borderRadius: "4px", color: "#e6edf3" });
+		search.setCssStyles({ display: "block", width: "100%", boxSizing: "border-box", padding: "4px 6px", background: "var(--background-primary)", border: "1px solid var(--background-modifier-border)", borderRadius: "4px", color: "var(--text-normal)" });
 		// Restore the search query that was active before this rebuild (if any).
 		// This preserves the user's typed text across vault-change-triggered rebuilds.
 		if (this.noteMenuSearchQuery) search.value = this.noteMenuSearchQuery;
@@ -3502,7 +3517,7 @@ export class MiniGraphView extends ItemView {
 		const suggBox = searchWrap.createDiv();
 		suggBox.setCssStyles({
 			position: "absolute", left: "0", right: "0", top: "100%", marginTop: "2px",
-			background: "rgba(20,24,33,0.98)", border: "1px solid #3a4760", borderRadius: "4px",
+			background: "var(--background-secondary)", border: "1px solid var(--background-modifier-border)", borderRadius: "4px",
 			boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "70", overflow: "auto", maxHeight: "240px",
 			display: "none",
 		});
@@ -3678,8 +3693,8 @@ export class MiniGraphView extends ItemView {
 			// The label carries the row-click behaviour (focus/locate/open) + ellipsis.
 			const lbl = row.createSpan({ text: label });
 			lbl.setCssStyles({ flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
-			if (id === highlightId) lbl.setCssStyles({ color: "#ffd35c" });
-			row.addEventListener("mouseenter", () => { row.setCssStyles({ background: "#2a3447" }); });
+			if (id === highlightId) lbl.setCssStyles({ color: "var(--color-yellow)" });
+			row.addEventListener("mouseenter", () => { row.setCssStyles({ background: "var(--background-modifier-border)" }); });
 			row.addEventListener("mouseleave", () => { row.setCssStyles({ background: baseBg }); });
 			lbl.addEventListener("click", () => this.focusNoteFromMenu(id));
 			return row;
@@ -3700,7 +3715,7 @@ export class MiniGraphView extends ItemView {
 			row.setCssStyles({
 				display: "flex", alignItems: "center",
 				padding: "2px 4px", paddingLeft: `${26 + depth * 12}px`,
-				color: "#7a8aa0", fontWeight: "600", fontStyle: "italic",
+				color: "var(--text-faint)", fontWeight: "600", fontStyle: "italic",
 			});
 			// (all) has NO checkbox — only a collapsible label
 			const lbl = row.createSpan({ text: `\u25b8 (all)` });
@@ -3746,7 +3761,7 @@ export class MiniGraphView extends ItemView {
 				// folders were open and ensureNoteMenu() can re-open them.
 				row.dataset.menupath = folderPath;
 				// padding before paddingLeft — same order as leafRow (see comment there).
-				row.setCssStyles({ display: "flex", alignItems: "center", padding: "2px 4px", paddingLeft: `${6 + depth * 12}px`, color: "#9db4d6", fontWeight: "600" });
+				row.setCssStyles({ display: "flex", alignItems: "center", padding: "2px 4px", paddingLeft: `${6 + depth * 12}px`, color: "var(--text-muted)", fontWeight: "600" });
 				// Folder/group/combo checkbox — TRI-STATE over its descendant notes:
 				// checked = all visible, unchecked = all hidden, indeterminate = mixed.
 				// Toggling cascades to EVERY descendant note (check-all / uncheck-all).
@@ -3844,7 +3859,7 @@ export class MiniGraphView extends ItemView {
 		let suggestions: Suggestion[] = [];
 		let selIdx = -1;
 		const kindGlyph: Record<Suggestion["kind"], string> = { tag: "#", field: "⊳", note: "·" };
-		const kindColor: Record<Suggestion["kind"], string> = { tag: "#7fc8ff", field: "#c8a6ff", note: "#9db4d6" };
+		const kindColor: Record<Suggestion["kind"], string> = { tag: "var(--text-accent)", field: "var(--color-purple)", note: "var(--text-muted)" };
 		// Replace the current token in the input with `text`. Tags/notes get a
 		// trailing space (term complete); "key:" stays open (no space) so the user
 		// can keep typing the value.
@@ -3860,7 +3875,7 @@ export class MiniGraphView extends ItemView {
 		};
 		const renderSelection = (): void => {
 			const rows = Array.from(suggBox.children) as HTMLElement[];
-			rows.forEach((r, i) => { r.setCssStyles({ background: i === selIdx ? "#2a3447" : "" }); });
+			rows.forEach((r, i) => { r.setCssStyles({ background: i === selIdx ? "var(--background-modifier-border)" : "" }); });
 		};
 		const closeSuggest = (): void => {
 			suggBox.setCssStyles({ display: "none" });
@@ -4107,13 +4122,13 @@ export class MiniGraphView extends ItemView {
 			maxHeight: "320px",
 			display: "flex",
 			flexDirection: "column",
-			background: "rgba(20, 24, 33, 0.98)",
-			border: "1px solid #3a4760",
+			background: "var(--background-secondary)",
+			border: "1px solid var(--background-modifier-border)",
 			borderRadius: "6px",
 			boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
 			zIndex: "50",
 			font: "13px sans-serif",
-			color: "#e6edf3",
+			color: "var(--text-normal)",
 		});
 
 		const head = panel.createDiv({ cls: "gim-detail-head" });
@@ -4122,7 +4137,7 @@ export class MiniGraphView extends ItemView {
 			alignItems: "center",
 			justifyContent: "space-between",
 			padding: "6px 8px",
-			borderBottom: "1px solid #2a3447",
+			borderBottom: "1px solid var(--background-modifier-border)",
 			fontWeight: "700",
 		});
 		head.createSpan({ text: title });
@@ -4130,7 +4145,7 @@ export class MiniGraphView extends ItemView {
 		close.setCssStyles({
 			background: "transparent",
 			border: "none",
-			color: "#9eb0c4",
+			color: "var(--text-muted)",
 			cursor: "pointer",
 			fontSize: "16px",
 		});
@@ -4144,7 +4159,7 @@ export class MiniGraphView extends ItemView {
 		list.setCssStyles({ overflowY: "auto", padding: "4px 0" });
 		if (ids.length === 0) {
 			const empty = list.createDiv({ text: "(no shared notes)" });
-			empty.setCssStyles({ padding: "6px 10px", color: "#7a8aa0" });
+			empty.setCssStyles({ padding: "6px 10px", color: "var(--text-faint)" });
 		}
 		for (const id of ids) {
 			const sep = id.indexOf("\t");
@@ -4159,7 +4174,7 @@ export class MiniGraphView extends ItemView {
 				overflow: "hidden",
 				textOverflow: "ellipsis",
 			});
-			row.addEventListener("mouseenter", () => { row.setCssStyles({ background: "rgba(160,190,230,0.14)" }); });
+			row.addEventListener("mouseenter", () => { row.setCssStyles({ background: "var(--background-modifier-hover)" }); });
 			row.addEventListener("mouseleave", () => { row.setCssStyles({ background: "transparent" }); });
 			row.addEventListener("click", () => {
 				this.openFile(id);

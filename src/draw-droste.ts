@@ -1,4 +1,5 @@
 import { buildIcon, type DrosteGallery, type IconDiagram } from "./droste-layout";
+import { theme, colorAlpha } from "./theme";
 import { truncateToWidth } from "./canvas-utils";
 
 // Containment lens = Icon Gallery (spec 2026-06-01). Every node gets an "icon diagram"
@@ -79,8 +80,8 @@ function drawWrapped(ctx: CanvasRenderingContext2D, text: string, cx: number, cy
 	lines.forEach((ln, i) => ctx.fillText(ln, cx, y0 + i * lh));
 }
 
-const FOCUS_RING = "#ffd35c";
-const ICON_BG = "rgba(255,255,255,0.02)";
+const focusRing = () => theme().warn;
+const iconBg = () => theme().overlay(0.02);
 const TWO_HUE = 45; // ② = amber
 // Distinct hue per single tag of T (for ③ node colour-coding + the ③ frame label).
 const TAG_HUES = [130, 265, 200, 25, 175, 310, 95, 330];
@@ -97,7 +98,7 @@ function drawTagLabel(ctx: CanvasRenderingContext2D, labels: string[], hues: num
 	let x = cx - total / 2;
 	ctx.textAlign = "left";
 	segs.forEach((s, i) => {
-		ctx.fillStyle = s.h == null ? "rgba(200,210,225,0.65)" : `hsl(${s.h}, 70%, 74%)`;
+		ctx.fillStyle = s.h == null ? colorAlpha(theme().textMuted, 0.65) : theme().swatch(s.h, "fill");
 		ctx.fillText(s.t, x, topY);
 		x += w[i];
 	});
@@ -162,7 +163,7 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 	// cells) centred on integer cells have their EDGES exactly on grid lines.
 	ctx.save();
 	ctx.beginPath(); ctx.rect(scx - half, scy - half, 2 * half, 2 * half); ctx.clip();
-	ctx.strokeStyle = "rgba(150,165,190,0.10)"; ctx.lineWidth = 1;
+	ctx.strokeStyle = theme().overlay(0.10); ctx.lineWidth = 1;
 	const g0 = (c: number): number => c - (Math.ceil(half / u) + 0.5) * u;
 	for (let gx = g0(scx); gx <= scx + half; gx += u) { ctx.beginPath(); ctx.moveTo(gx, scy - half); ctx.lineTo(gx, scy + half); ctx.stroke(); }
 	for (let gy = g0(scy); gy <= scy + half; gy += u) { ctx.beginPath(); ctx.moveTo(scx - half, gy); ctx.lineTo(scx + half, gy); ctx.stroke(); }
@@ -172,9 +173,9 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 	for (let f = rings.length - 1; f >= 0; f--) {
 		const R = rings[f];
 		const Ro = R.frameC * u, mh = R.memHalfC * u;
-		ctx.fillStyle = ICON_BG; ctx.fillRect(scx - Ro, scy - Ro, 2 * Ro, 2 * Ro);
+		ctx.fillStyle = iconBg(); ctx.fillRect(scx - Ro, scy - Ro, 2 * Ro, 2 * Ro);
 		ctx.lineWidth = 1.4 * dpr;
-		ctx.strokeStyle = R.isLink ? "hsl(190,35%,58%)" : R.isTwo ? "hsl(45,70%,62%)" : "hsl(150,28%,55%)";
+		ctx.strokeStyle = R.isLink ? theme().accent : R.isTwo ? theme().warn : theme().success;
 		ctx.strokeRect(scx - Ro, scy - Ro, 2 * Ro, 2 * Ro);
 		// grid-aligned border ring: rows/columns line up, edges on the grid.
 		const pts = gridBorderRing(scx, scy, R.nSteps, R.stepC, u, R.items.length);
@@ -182,22 +183,22 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 			if (it.spacer) return;
 			const p = pts[i];
 			if (it.agg) {
-				ctx.fillStyle = "rgba(120,140,165,0.5)"; ctx.fillRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
-				ctx.strokeStyle = "rgba(190,205,225,0.7)"; ctx.lineWidth = 1 * dpr; ctx.strokeRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
-				if (labelOK) { ctx.fillStyle = "#cfe"; ctx.font = `${Math.min(mh * 0.9, 10 * dpr)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(it.label, p.x, p.y); }
+				ctx.fillStyle = theme().overlay(0.3); ctx.fillRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
+				ctx.strokeStyle = theme().overlay(0.7); ctx.lineWidth = 1 * dpr; ctx.strokeRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
+				if (labelOK) { ctx.fillStyle = theme().textNormal; ctx.font = `${Math.min(mh * 0.9, 10 * dpr)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(it.label, p.x, p.y); }
 			} else if (it.placeholder) {
-				ctx.setLineDash([3 * dpr, 2 * dpr]); ctx.strokeStyle = `hsl(${it.hue}, 60%, 70%)`; ctx.lineWidth = 1.2 * dpr;
+				ctx.setLineDash([3 * dpr, 2 * dpr]); ctx.strokeStyle = theme().swatch(it.hue, "stroke"); ctx.lineWidth = 1.2 * dpr;
 				ctx.strokeRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh); ctx.setLineDash([]);
-				if (labelOK) { ctx.fillStyle = `hsl(${it.hue}, 60%, 82%)`; ctx.font = `${Math.min(mh * 0.8, 10 * dpr)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(truncateToWidth(ctx, it.label, 1.8 * mh), p.x, p.y); }
+				if (labelOK) { ctx.fillStyle = theme().swatch(it.hue, "label"); ctx.font = `${Math.min(mh * 0.8, 10 * dpr)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(truncateToWidth(ctx, it.label, 1.8 * mh), p.x, p.y); }
 			} else {
 				const hover = it.id != null && it.id === o.hoverId;
-				ctx.fillStyle = `hsla(${it.hue}, 75%, 55%, 0.45)`; ctx.fillRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
-				ctx.lineWidth = (hover ? 2.5 : 1.2) * dpr; ctx.strokeStyle = `hsl(${it.hue}, 85%, ${hover ? 80 : 70}%)`; ctx.strokeRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
+				ctx.fillStyle = theme().swatch(it.hue, "fill", 0.45); ctx.fillRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
+				ctx.lineWidth = (hover ? 2.5 : 1.2) * dpr; ctx.strokeStyle = theme().swatch(it.hue, hover ? "fillStrong" : "fill"); ctx.strokeRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
 				if (it.id) push(it.id, p.x, p.y, mh);
 				if (labelOK && mh > 6 * dpr) {
 					// ②⑤ (3×3) wrap long labels to multiple lines; ③ (1×1) is too small → truncate.
-					if (R.isTwo || R.isLink) drawWrapped(ctx, it.label, p.x, p.y, mh, Math.min(mh * 0.42, 11 * dpr), "#eef");
-					else { ctx.fillStyle = "#eef"; ctx.font = `${Math.min(mh * 0.7, 10 * dpr)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(truncateToWidth(ctx, it.label, 1.8 * mh), p.x, p.y); }
+					if (R.isTwo || R.isLink) drawWrapped(ctx, it.label, p.x, p.y, mh, Math.min(mh * 0.42, 11 * dpr), theme().textNormal);
+					else { ctx.fillStyle = theme().textNormal; ctx.font = `${Math.min(mh * 0.7, 10 * dpr)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(truncateToWidth(ctx, it.label, 1.8 * mh), p.x, p.y); }
 				}
 			}
 		});
@@ -205,7 +206,7 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 		if (labelOK) {
 			const labelY = scy - Ro - 2 * dpr; // outside the frame (above top edge)
 			if (R.isTwo) {
-				ctx.fillStyle = "hsl(45,60%,82%)"; ctx.font = `${10 * dpr}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+				ctx.fillStyle = theme().warn; ctx.font = `${10 * dpr}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
 				ctx.fillText(truncateToWidth(ctx, icon.levels[f].sets.map((s) => s.label).join(" * "), 1.95 * Ro), scx, labelY);
 			} else if (R.isLink) {
 				// ⑤: "link | backlink" (only the categories present), each in its colour.
@@ -220,22 +221,22 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 		}
 	}
 	// ① focus node at the centre (on top), 4×4 — note title drawn LARGE inside it.
-	ctx.fillStyle = "hsla(205, 90%, 60%, 0.5)";
+	ctx.fillStyle = colorAlpha(theme().accent, 0.5);
 	ctx.fillRect(scx - s1, scy - s1, 2 * s1, 2 * s1);
 	ctx.lineWidth = (icon.focusId === o.focusId ? 3 : 1.6) * dpr;
-	ctx.strokeStyle = icon.focusId === o.focusId ? FOCUS_RING : "hsl(205, 90%, 72%)";
+	ctx.strokeStyle = icon.focusId === o.focusId ? focusRing() : theme().accent;
 	ctx.strokeRect(scx - s1, scy - s1, 2 * s1, 2 * s1);
 	push(icon.focusId, scx, scy, s1);
 	if (labelOK) {
 		// ① title wraps to multiple lines instead of truncating.
-		drawWrapped(ctx, icon.focusLabel, scx, scy, s1, Math.min(s1 * 0.34, 20 * dpr), icon.focusId === o.focusId ? FOCUS_RING : "#ffffff", true);
+		drawWrapped(ctx, icon.focusLabel, scx, scy, s1, Math.min(s1 * 0.34, 20 * dpr), icon.focusId === o.focusId ? focusRing() : theme().textNormal, true);
 	}
 }
 
 export function drawDroste(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): void {
 	const { canvas, dpr, gallery, cellSize, zoom, panX, panY } = o;
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
-	ctx.fillStyle = "#0f1116";
+	ctx.fillStyle = theme().canvasBg;
 	ctx.fillRect(0, 0, canvas.width, canvas.height);
 	if (!gallery || gallery.cells.length === 0) return;
 	// world→device-screen
@@ -271,7 +272,7 @@ export function drawDroste(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): vo
 			const scx = sx((col + 0.5) * cellSize), scy = sy((row + 0.5) * cellSize);
 			if (half < 3 * dpr) {
 				// LOD floor: a single marker for the node.
-				ctx.fillStyle = id === o.focusId ? FOCUS_RING : "hsl(205, 80%, 62%)";
+				ctx.fillStyle = id === o.focusId ? focusRing() : theme().accent;
 				const m = Math.max(1 * dpr, half);
 				ctx.fillRect(scx - m, scy - m, 2 * m, 2 * m);
 				if (o.hitRegions) o.hitRegions.push({ id, x0: scx - m, y0: scy - m, x1: scx + m, y1: scy + m });

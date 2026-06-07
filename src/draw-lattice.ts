@@ -31,6 +31,7 @@ import {
 	NAME_FONT_PX,
 	NAMED_BODY_PAD_X,
 } from "./lattice-layout";
+import { theme } from "./theme";
 
 interface DrawLatticeOpts {
 	zoom: number;
@@ -86,7 +87,7 @@ const TIER_GUTTER_PAD_X = 10;
 const TIER_GUTTER_LINE_GAP = 2;
 
 // Subset-link styling.
-const LINK_DIM_RGBA = "rgba(160, 175, 205, 0.18)";
+const linkDimRgba = () => theme().overlay(0.18);
 const LINK_DIM_LINE_W = 1;
 const LINK_HOVER_LINE_W = 2;
 
@@ -101,7 +102,7 @@ export function drawLattice(
 
 	// 1. Background (screen-space).
 	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-	ctx.fillStyle = "#0f1116";
+	ctx.fillStyle = theme().canvasBg;
 	ctx.fillRect(0, 0, visW, visH);
 	if (meta.nodes.length === 0) {
 		drawEmptyState(ctx, visW, visH);
@@ -173,11 +174,11 @@ function drawTierBands(
 		// Subtle band background spanning the whole world width so the tier
 		// reads as one horizontal strip.
 		ctx.fillStyle = band.degree % 2 === 0
-			? "rgba(255,255,255,0.025)"
-			: "rgba(255,255,255,0.04)";
+			? theme().overlay(0.025)
+			: theme().overlay(0.04);
 		ctx.fillRect(0, band.y, meta.worldWidth, band.h);
 		// Hairlines top + bottom (1 screen px regardless of zoom).
-		ctx.strokeStyle = "rgba(255,255,255,0.10)";
+		ctx.strokeStyle = theme().overlay(0.10);
 		ctx.lineWidth = 1 / z;
 		ctx.beginPath();
 		ctx.moveTo(wLeft, band.y);
@@ -207,10 +208,10 @@ function drawTierLabels(
 ): void {
 	// 1. Opaque gutter background — covers the full canvas height so the
 	//    labels never sit on a transparent strip showing nodes underneath.
-	ctx.fillStyle = "#0f1116";
+	ctx.fillStyle = theme().canvasBg;
 	ctx.fillRect(0, 0, TIER_GUTTER, visH);
 	// Subtle right-edge hairline so the gutter reads as a separate column.
-	ctx.fillStyle = "rgba(255,255,255,0.06)";
+	ctx.fillStyle = theme().overlay(0.06);
 	ctx.fillRect(TIER_GUTTER - 1, 0, 1, visH);
 	if (meta.tiers.length === 0) return;
 
@@ -228,7 +229,7 @@ function drawTierLabels(
 
 		// Line 1 — "Degree N". Always fits (very short).
 		ctx.font = `700 ${l1Font}px sans-serif`;
-		ctx.fillStyle = "#e6edf3";
+		ctx.fillStyle = theme().textNormal;
 		const l1Y = yMid - (l1Font + l2Font + TIER_GUTTER_LINE_GAP) / 2 + l1Font / 2;
 		ctx.fillText(`Degree ${band.degree}`, TIER_GUTTER_PAD_X, l1Y);
 
@@ -236,7 +237,7 @@ function drawTierLabels(
 		// the unit words before letting truncateToWidth introduce a "…" —
 		// the digits matter more than the suffix.
 		ctx.font = `${l2Font}px sans-serif`;
-		ctx.fillStyle = "#9eb0c4";
+		ctx.fillStyle = theme().textMuted;
 		const full = `${band.intersectionCount} intersections / ${band.noteSum} notes`;
 		const numeric = `${band.intersectionCount} / ${band.noteSum}`;
 		let l2 = full;
@@ -307,7 +308,7 @@ function drawSubsetLinks(
 	meta.nodes.forEach((n, i) => indexByKey.set(n.key, i));
 
 	// 1. Dim back layer — every link, low alpha, thin.
-	ctx.strokeStyle = LINK_DIM_RGBA;
+	ctx.strokeStyle = linkDimRgba();
 	ctx.lineWidth = LINK_DIM_LINE_W / z;
 	ctx.beginPath();
 	for (const lk of meta.links) {
@@ -335,7 +336,7 @@ function drawSubsetLinks(
 			const hoverNode = meta.nodes[hoverIdx];
 			const seed = nodeSeed(hoverNode);
 			const hue = clusterHue(seed);
-			ctx.strokeStyle = `hsla(${hue}, 70%, 65%, 0.95)`;
+			ctx.strokeStyle = theme().swatch(hue, "stroke", 0.95);
 			ctx.lineWidth = LINK_HOVER_LINE_W / z;
 			ctx.beginPath();
 			for (const lk of meta.links) {
@@ -398,12 +399,12 @@ function drawNode(
 	// 1. Body fill — calm dark base; hover/selection gets a tinted underlay.
 	ctx.beginPath();
 	roundedRectPath(ctx, node.x, node.y, node.w, node.h, NODE_RADIUS / z);
-	ctx.fillStyle = "#171b24";
+	ctx.fillStyle = theme().canvasBgAlt;
 	ctx.fill();
 	if (isSelected || isHover) {
 		ctx.fillStyle = isSelected
-			? `hsla(${hue}, 55%, 35%, 0.30)`
-			: `hsla(${hue}, 45%, 30%, 0.18)`;
+			? theme().swatch(hue, "tint", 0.30)
+			: theme().swatch(hue, "tint", 0.18);
 		ctx.beginPath();
 		roundedRectPath(ctx, node.x, node.y, node.w, node.h, NODE_RADIUS / z);
 		ctx.fill();
@@ -412,10 +413,10 @@ function drawNode(
 	// 2. Border — hue-tinted; selection/hover emphasised.
 	ctx.lineWidth = (isSelected ? 2 : isHover ? 1.5 : 1) / z;
 	ctx.strokeStyle = isSelected
-		? `hsl(${hue}, 75%, 65%)`
+		? theme().swatch(hue, "fillStrong")
 		: isHover
-			? `hsl(${hue}, 65%, 55%)`
-			: `hsla(${hue}, 50%, 50%, 0.6)`;
+			? theme().swatch(hue, "fill")
+			: theme().swatch(hue, "fill", 0.6);
 	ctx.beginPath();
 	roundedRectPath(ctx, node.x, node.y, node.w, node.h, NODE_RADIUS / z);
 	ctx.stroke();
@@ -538,7 +539,7 @@ function drawHeader(
 	ctx.beginPath();
 	ctx.rect(node.x, node.y, node.w, headerH);
 	ctx.clip();
-	ctx.fillStyle = `hsla(${hue}, 55%, 32%, 0.85)`;
+	ctx.fillStyle = theme().swatch(hue, "fill", 0.85);
 	ctx.fillRect(node.x, node.y, node.w, headerH);
 
 	// Title font intent → world units after the min-font floor. We use the
@@ -562,7 +563,7 @@ function drawHeader(
 	const countX = node.x + node.w - padX - countW;
 	// Line-1 centre y matches the layout: TITLE_PAD + TITLE_LINE_H/2.
 	const line1Y = node.y + TITLE_PAD + TITLE_LINE_H / 2;
-	ctx.fillStyle = "#fff3d6";
+	ctx.fillStyle = theme().warn;
 	ctx.textAlign = "start";
 	ctx.textBaseline = "middle";
 	ctx.fillText(countText, countX, line1Y);
@@ -578,14 +579,14 @@ function drawHeader(
 	const cbY = line1Y - cbSize / 2;
 	ctx.beginPath();
 	roundedRectPath(ctx, cbX, cbY, cbSize, cbSize, 2);
-	ctx.fillStyle = named ? "rgba(122,162,255,0.50)" : "rgba(0,0,0,0.45)";
+	ctx.fillStyle = named ? theme().overlay(0.22) : "rgba(0,0,0,0.45)";
 	ctx.fill();
 	ctx.lineWidth = 1 / z;
-	ctx.strokeStyle = named ? "#cfe0ff" : "rgba(230,237,243,0.85)";
+	ctx.strokeStyle = named ? theme().accent : theme().overlay(0.85);
 	ctx.stroke();
 	if (named) {
 		// ✓ check mark.
-		ctx.strokeStyle = "#ffffff";
+		ctx.strokeStyle = theme().textNormal;
 		ctx.lineWidth = 1.8 / z;
 		ctx.beginPath();
 		ctx.moveTo(cbX + cbSize * 0.18, cbY + cbSize * 0.55);
@@ -605,7 +606,7 @@ function drawHeader(
 	// Layout sized the node to fit each line PLUS the checkbox column, so
 	// `truncateToWidth` here is a safety net for the rare overflow case.
 	ctx.font = `600 ${titleFontWorld}px sans-serif`;
-	ctx.fillStyle = "#e6edf3";
+	ctx.fillStyle = theme().textNormal;
 	const titleX = cbX + cbSize + HEADER_CB_GAP;
 	for (let i = 0; i < node.displayLines.length; i++) {
 		const lineY = node.y + TITLE_PAD + (i + 0.5) * TITLE_LINE_H;
@@ -645,16 +646,16 @@ function drawOverview(
 	const barH = Math.min(OVERVIEW_BAR_H, bodyMaxH);
 	const barY = bodyTop + Math.floor((bodyMaxH - barH) / 2);
 	// Background track.
-	ctx.fillStyle = "rgba(255,255,255,0.06)";
+	ctx.fillStyle = theme().overlay(0.06);
 	ctx.fillRect(bodyLeft, barY, bodyW, barH);
 	// Filled portion.
-	ctx.fillStyle = `hsla(${hue}, 60%, 55%, 0.95)`;
+	ctx.fillStyle = theme().swatch(hue, "fill", 0.95);
 	ctx.fillRect(bodyLeft, barY, Math.max(2, bodyW * frac), barH);
 	// Right-anchored "N 件" badge for redundancy with the header count — kept
 	// small (FOOTER font) so it disappears gracefully when font floors hit it.
 	const labelFont = floorWorldFontPx(FOOTER_FONT_PX, minFont, z);
 	ctx.font = `${labelFont}px sans-serif`;
-	ctx.fillStyle = "#c8d4e4";
+	ctx.fillStyle = theme().textMuted;
 	ctx.textAlign = "end";
 	ctx.textBaseline = "middle";
 	ctx.fillText(`${node.count} notes`, bodyLeft + bodyW, barY + barH / 2);
@@ -691,8 +692,8 @@ function drawDensity(
 	const xOffset = Math.max(0, Math.floor((bodyW - m.bodyW) / 2));
 	const yOffset = 0;
 	const { perCell, filled } = densityBins(node.count, densityCells);
-	const lit = `hsla(${hue}, 60%, 55%, 0.92)`;
-	const dim = `hsla(${hue}, 25%, 35%, 0.32)`;
+	const lit = theme().swatch(hue, "fill", 0.92);
+	const dim = theme().swatch(hue, "dim", 0.32);
 	for (let r = 0, drawn = 0; r < m.rows && drawn < densityCells; r++) {
 		for (let c = 0; c < m.cols && drawn < densityCells; c++, drawn++) {
 			const cx = bodyLeft + xOffset + c * (cellSize + cellGap);
@@ -707,7 +708,7 @@ function drawDensity(
 		const footY = bodyTop + yOffset + m.bodyH + 3;
 		if (footY + footFont <= bodyTop + bodyMaxH) {
 			ctx.font = `${footFont}px sans-serif`;
-			ctx.fillStyle = "#9eb0c4";
+			ctx.fillStyle = theme().textMuted;
 			ctx.textBaseline = "top";
 			ctx.fillText(`1 cell ≈ ${perCell} notes`, bodyLeft, footY);
 		}
@@ -746,7 +747,7 @@ function drawIndividual(
 	const fits = m.rows * m.cols;
 	const drawnMax = Math.min(node.count, fits);
 	const xOffset = Math.max(0, Math.floor((bodyW - m.bodyW) / 2));
-	ctx.fillStyle = `hsla(${hue}, 60%, 55%, 0.90)`;
+	ctx.fillStyle = theme().swatch(hue, "fill", 0.90);
 	for (let r = 0, drawn = 0; r < m.rows && drawn < drawnMax; r++) {
 		for (let c = 0; c < m.cols && drawn < drawnMax; c++, drawn++) {
 			const cx = bodyLeft + xOffset + c * (cellSize + cellGap);
@@ -771,7 +772,7 @@ function drawIndividual(
 		const chipY = bodyTop + bodyMaxH - chipFont - chipPad;
 		ctx.fillStyle = "rgba(0,0,0,0.65)";
 		ctx.fillRect(chipX - chipPad, chipY - chipPad, chipW + chipPad * 2, chipFont + chipPad * 2);
-		ctx.fillStyle = "#ffd49d";
+		ctx.fillStyle = theme().warn;
 		ctx.textBaseline = "top";
 		ctx.textAlign = "start";
 		ctx.fillText(chipText, chipX, chipY);
@@ -789,7 +790,7 @@ function drawEmptyState(
 	visW: number,
 	visH: number,
 ): void {
-	ctx.fillStyle = "#9eb0c4";
+	ctx.fillStyle = theme().textMuted;
 	ctx.font = "14px sans-serif";
 	ctx.textAlign = "center";
 	ctx.textBaseline = "middle";
@@ -877,8 +878,8 @@ function drawNamedList(
 	// would shrink the usable width at zoom-in and force unnecessary
 	// truncation of labels the layout already sized to fit.
 	const padX = NAMED_BODY_PAD_X;
-	const baseFill = `hsla(${hue}, 18%, 22%, 0.5)`;
-	const altFill = `hsla(${hue}, 18%, 16%, 0.35)`;
+	const baseFill = theme().swatch(hue, "tint", 0.5);
+	const altFill = theme().swatch(hue, "tint", 0.35);
 	for (let i = 0; i < drawn; i++) {
 		const rowY = bodyTop + i * rowH;
 		// Faint zebra stripe so rows read as discrete entries.
@@ -893,7 +894,7 @@ function drawNamedList(
 		const text = ctx.measureText(label).width <= maxW
 			? label
 			: truncateToWidth(ctx, label, maxW);
-		ctx.fillStyle = "#e6edf3";
+		ctx.fillStyle = theme().textNormal;
 		ctx.fillText(text, bodyLeft + padX, rowY + rowH / 2);
 	}
 	// "+N" residual row when more names exist than fit/are allowed.
@@ -901,7 +902,7 @@ function drawNamedList(
 		const rowY = bodyTop + drawn * rowH;
 		ctx.fillStyle = "rgba(0,0,0,0.55)";
 		ctx.fillRect(bodyLeft, rowY, bodyW, rowH);
-		ctx.fillStyle = "#ffd49d";
+		ctx.fillStyle = theme().warn;
 		ctx.fillText(
 			`+${node.count - drawn}`,
 			bodyLeft + padX,

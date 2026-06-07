@@ -1,3 +1,4 @@
+import { theme, colorAlpha } from "./theme";
 import type { ClusterRect } from "./layout";
 import { clusterHue } from "./canvas-utils";
 
@@ -51,8 +52,8 @@ export function drawEnclosures(
 		const hue = clusterHue(c.groupKey);
 		const isHigh = highlightedClusters.has(c.groupKey);
 		ctx.fillStyle = isHigh
-			? "rgba(255, 157, 63, 0.40)"
-			: `hsla(${hue}, 60%, 50%, 0.32)`;
+			? colorAlpha(theme().warn, 0.40)
+			: theme().swatch(hue, "tint", 0.32);
 		if (c.pieces && c.pieces.length > 0) {
 			// Contour rings are lines only (no fill) — fill the solid mains.
 			const mains = c.pieces.filter((p) => p.kind === "main" && !p.contour);
@@ -67,7 +68,7 @@ export function drawEnclosures(
 			for (const p of c.pieces) {
 				if (p.kind !== "sub") continue;
 				const sh = clusterHue(p.hueKey ?? c.groupKey);
-				ctx.fillStyle = `hsla(${sh}, 72%, 55%, 0.42)`;
+				ctx.fillStyle = theme().swatch(sh, "fill", 0.42);
 				ctx.beginPath();
 				ctx.rect(p.x, p.y, p.w, p.h);
 				ctx.fill();
@@ -88,8 +89,8 @@ export function drawEnclosures(
 		const hue = clusterHue(c.groupKey);
 		const isHigh = highlightedClusters.has(c.groupKey);
 		ctx.strokeStyle = isHigh
-			? "#ff9d3f"
-			: `hsla(${hue}, 70%, 62%, 0.9)`;
+			? theme().warn
+			: theme().swatch(hue, "fill", 0.9);
 		ctx.lineWidth = isHigh ? accentStrokeW : strokeW;
 		if (c.pieces && c.pieces.length > 0) {
 			for (const p of c.pieces) {
@@ -97,11 +98,11 @@ export function drawEnclosures(
 					// Glowing iso-contour: wide translucent halo + bright core.
 					ctx.setLineDash([]);
 					ctx.strokeStyle = isHigh
-						? "rgba(255, 157, 63, 0.35)"
-						: `hsla(${hue}, 85%, 60%, 0.30)`;
+						? colorAlpha(theme().warn, 0.35)
+						: theme().swatch(hue, "fill", 0.30);
 					ctx.lineWidth = 8 / zoom;
 					ctx.strokeRect(p.x, p.y, p.w, p.h);
-					ctx.strokeStyle = isHigh ? "#ffd49d" : `hsla(${hue}, 95%, 80%, 1)`;
+					ctx.strokeStyle = isHigh ? theme().warn : theme().swatch(hue, "fillStrong", 1);
 					ctx.lineWidth = 2.2 / zoom;
 					ctx.strokeRect(p.x, p.y, p.w, p.h);
 					continue;
@@ -119,11 +120,11 @@ export function drawEnclosures(
 								hoverPos.y >= p.y &&
 								hoverPos.y <= p.y + p.h));
 					const sh = clusterHue(p.hueKey ?? c.groupKey);
-					ctx.strokeStyle = pHigh ? "#ff9d3f" : `hsla(${sh}, 78%, 66%, 0.95)`;
+					ctx.strokeStyle = pHigh ? theme().warn : theme().swatch(sh, "stroke", 0.95);
 				} else {
 					ctx.setLineDash([]);
 					pHigh = isHigh;
-					ctx.strokeStyle = pHigh ? "#ff9d3f" : `hsla(${hue}, 70%, 62%, 0.9)`;
+					ctx.strokeStyle = pHigh ? theme().warn : theme().swatch(hue, "fill", 0.9);
 				}
 				ctx.lineWidth = pHigh ? accentStrokeW : strokeW;
 				ctx.strokeRect(p.x, p.y, p.w, p.h);

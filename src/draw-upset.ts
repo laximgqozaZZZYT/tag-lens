@@ -14,6 +14,7 @@
 // Row filter (unchanged): only sets whose member cards are currently
 // visible in the canvas keep a row. Falls back to full set list when
 // nothing is visible.
+import { theme, colorAlpha } from "./theme";
 import type { LaidOut } from "./layout";
 import { clusterHue } from "./canvas-utils";
 
@@ -28,7 +29,7 @@ const COUNT_FONT_MAX = 16;
 const SET_LABEL_BAND_PX = 100;
 const SIZE_BAR_BAND_PX = 56;
 export const LEFT_BAND_PX = SET_LABEL_BAND_PX + SIZE_BAR_BAND_PX + 16; // = 172
-const HIGHLIGHT = "rgba(255, 157, 63, 0.9)";
+const HIGHLIGHT = colorAlpha(theme().warn, 0.9);
 const ROW_LABEL_PAD = 6;
 
 // Footer height calculation — clamped between a sane min (so labels
@@ -125,9 +126,9 @@ export function drawUpsetFooter(
 	if (!L) return;
 	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 	// Opaque footer background.
-	ctx.fillStyle = "#0f1116";
+	ctx.fillStyle = theme().canvasBg;
 	ctx.fillRect(0, footerTopY, canvasW, footerH);
-	ctx.strokeStyle = "rgba(120, 130, 150, 0.35)";
+	ctx.strokeStyle = theme().overlay(0.35);
 	ctx.lineWidth = 1;
 	ctx.beginPath();
 	ctx.moveTo(0, footerTopY + 0.5);
@@ -148,7 +149,7 @@ export function drawUpsetFooter(
 		y: rowsTop + (idx + 0.5) * ROW_H,
 	}));
 	// Row tracks (start below the count row).
-	ctx.fillStyle = "rgba(120, 130, 150, 0.06)";
+	ctx.fillStyle = theme().overlay(0.06);
 	for (const set of setRows) {
 		ctx.fillRect(0, set.y - ROW_H * 0.45, canvasW, ROW_H * 0.9);
 	}
@@ -202,7 +203,7 @@ function drawColumnCounts(
 			sqrtScale(col.size, maxColSize, COUNT_FONT_MIN, COUNT_FONT_MAX),
 		);
 		ctx.font = `${fontPx}px sans-serif`;
-		ctx.fillStyle = "rgba(220, 225, 235, 0.92)";
+		ctx.fillStyle = colorAlpha(theme().textNormal, 0.92);
 		ctx.fillText(String(col.size), x, y);
 	}
 }
@@ -236,7 +237,7 @@ function drawSetLabelsAndBars(
 		ctx.font = `${labelFontPx}px sans-serif`;
 		ctx.textAlign = "end";
 		ctx.textBaseline = "middle";
-		ctx.fillStyle = `hsla(${clusterHue(set.key)}, 65%, 80%, 1)`;
+		ctx.fillStyle = theme().swatch(clusterHue(set.key), "fillStrong", 1);
 		ctx.fillText(
 			ellipsise(ctx, set.label, SET_LABEL_BAND_PX - ROW_LABEL_PAD),
 			labelRightX - ROW_LABEL_PAD,
@@ -245,10 +246,10 @@ function drawSetLabelsAndBars(
 		// Size bar.
 		const w = (set.size / maxSize) * (SIZE_BAR_BAND_PX - 8);
 		const x = sizeBarRightX - w;
-		ctx.fillStyle = `hsla(${clusterHue(set.key)}, 65%, 55%, 0.65)`;
+		ctx.fillStyle = theme().swatch(clusterHue(set.key), "fill", 0.65);
 		ctx.fillRect(x, set.y - barH / 2, w, barH);
 		ctx.font = `${smallFontPx}px sans-serif`;
-		ctx.fillStyle = "rgba(220, 225, 235, 0.85)";
+		ctx.fillStyle = colorAlpha(theme().textNormal, 0.85);
 		ctx.fillText(String(set.size), x - 2, set.y);
 	}
 }
@@ -291,7 +292,7 @@ function drawMatrixDots(
 		if (isFinite(topY) && botY > topY) {
 			ctx.strokeStyle = highlighted
 				? HIGHLIGHT
-				: "rgba(180, 195, 220, 0.85)";
+				: colorAlpha(theme().textMuted, 0.85);
 			ctx.lineWidth = highlighted ? 2.4 : 1.8;
 			ctx.beginPath();
 			ctx.moveTo(x, topY);
@@ -302,12 +303,12 @@ function drawMatrixDots(
 			if (inCol.has(set.key)) {
 				ctx.fillStyle = highlighted
 					? HIGHLIGHT
-					: `hsla(${clusterHue(set.key)}, 65%, 65%, 1)`;
+					: theme().swatch(clusterHue(set.key), "fill", 1);
 				ctx.beginPath();
 				ctx.arc(x, set.y, dotR, 0, Math.PI * 2);
 				ctx.fill();
 			} else {
-				ctx.fillStyle = "rgba(70, 80, 95, 0.55)";
+				ctx.fillStyle = theme().hover;
 				ctx.beginPath();
 				ctx.arc(x, set.y, Math.max(1.5, dotR * 0.45), 0, Math.PI * 2);
 				ctx.fill();

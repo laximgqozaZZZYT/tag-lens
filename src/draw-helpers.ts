@@ -1,3 +1,4 @@
+import { theme, colorAlpha } from "./theme";
 import type { LaidOut, ClusterRect } from "./layout";
 import { clusterHue, roundedRectPath, truncateToWidth } from "./canvas-utils";
 import {
@@ -60,7 +61,7 @@ export function drawCardGrid(
 	const cellCount = (maxCol - minCol + 1) * (maxRow - minRow + 1);
 	if (cellCount > maxCells) return;
 
-	ctx.strokeStyle = "rgba(120, 140, 160, 0.22)";
+	ctx.strokeStyle = theme().overlay(0.22);
 	ctx.lineWidth = 1 / zoom;
 	ctx.beginPath();
 	for (let r = minRow; r <= maxRow; r++) {
@@ -122,12 +123,12 @@ export function drawGridHeaders(
 	const headerCellCount = (maxCol - minCol) + (maxRow - minRow);
 	const skipTicks = headerCellCount > 4000;
 
-	ctx.fillStyle = "rgba(58, 78, 108, 0.98)";
+	ctx.fillStyle = colorAlpha(theme().panelBg, 0.98);
 	ctx.fillRect(0, 0, visW, headerH);
 	ctx.fillRect(0, 0, headerW, visH);
 
 	if (!skipTicks) {
-		ctx.strokeStyle = "rgba(120, 140, 160, 0.45)";
+		ctx.strokeStyle = theme().overlay(0.45);
 		ctx.lineWidth = 1;
 		ctx.beginPath();
 		for (let c = minCol; c <= maxCol + 1; c++) {
@@ -145,7 +146,7 @@ export function drawGridHeaders(
 		ctx.stroke();
 	}
 
-	ctx.strokeStyle = "rgba(180, 200, 230, 0.9)";
+	ctx.strokeStyle = colorAlpha(theme().accent, 0.9);
 	ctx.lineWidth = 1.6;
 	ctx.beginPath();
 	ctx.moveTo(0, headerH);
@@ -164,7 +165,7 @@ export function drawGridHeaders(
 		Math.min(headerH * 0.62, headerW * 0.4, 14),
 	);
 	ctx.font = `700 ${fontPx}px sans-serif`;
-	ctx.fillStyle = "rgba(245, 250, 255, 1)";
+	ctx.fillStyle = theme().textNormal;
 	ctx.textAlign = "center";
 	ctx.textBaseline = "middle";
 	if (!skipTicks) {
@@ -183,9 +184,9 @@ export function drawGridHeaders(
 	ctx.textBaseline = "alphabetic";
 
 	// Corner block — slightly darker to anchor the header origin.
-	ctx.fillStyle = "rgba(40, 55, 80, 1)";
+	ctx.fillStyle = theme().panelBg;
 	ctx.fillRect(0, 0, headerW, headerH);
-	ctx.strokeStyle = "rgba(180, 200, 230, 0.9)";
+	ctx.strokeStyle = colorAlpha(theme().accent, 0.9);
 	ctx.lineWidth = 1.6;
 	ctx.beginPath();
 	ctx.moveTo(0, headerH);
@@ -337,9 +338,9 @@ export function drawOverviewLabels(
 		const hue = clusterHue(c.groupKey);
 		ctx.lineJoin = "round";
 		ctx.lineWidth = Math.max(chosen.font * 0.08, 2 / zoom);
-		ctx.strokeStyle = "rgba(8, 10, 14, 0.9)";
+		ctx.strokeStyle = colorAlpha(theme().canvasBg, 0.9);
 		ctx.strokeText(text, cx, chosen.cy);
-		ctx.fillStyle = `hsla(${hue}, 75%, 82%, 0.96)`;
+		ctx.fillStyle = theme().swatch(hue, "fill", 0.96);
 		ctx.fillText(text, cx, chosen.cy);
 	}
 	ctx.textAlign = "start";
@@ -363,7 +364,7 @@ export function drawClusterLabels(
 	for (const c of laid.clusters) byKey.set(c.groupKey, c);
 
 	const screenPx = Math.max(12, minFontPx);
-	const labelBg = "rgba(13, 15, 20, 0.9)";
+	const labelBg = colorAlpha(theme().canvasBg, 0.9);
 	const boxes: PlacedLabelBox[] = [];
 	for (const cell of cells) {
 		const c = byKey.get(cell.key);
@@ -410,7 +411,7 @@ export function drawClusterLabels(
 		ctx.fillStyle = labelBg;
 		ctx.fillRect(x1, cy - fontPx * 0.62, cw, fontPx * 1.24);
 		// Centred coloured label.
-		ctx.fillStyle = `hsla(${clusterHue(cell.key)}, 65%, 74%, 1)`;
+		ctx.fillStyle = theme().swatch(clusterHue(cell.key), "fill", 1);
 		ctx.textAlign = "center";
 		ctx.fillText(fitted, cx, cy);
 		boxes.push({ key: cell.key, x1, x2, top, bot, text, anchorX: cx, anchorY: cy });
@@ -454,20 +455,20 @@ export function drawAggregateStack(
 		roundedRectPath(ctx, x, y, subW, subH, r);
 		ctx.fillStyle = highlighted
 			? isFront
-				? "#ffe7a8"
-				: "#f0d188"
+				? theme().warn
+				: theme().warn
 			: isFront
-				? "#1d2230"
-				: "#1a1f2a";
+				? theme().canvasBgAlt
+				: theme().canvasBgAlt;
 		ctx.fill();
 		ctx.lineWidth = (isFront ? (highlighted ? 1.8 : 1.2) : 0.8) / zoom;
 		ctx.strokeStyle = highlighted
 			? isFront
-				? "#ff9d3f"
-				: "#c97e2c"
+				? theme().warn
+				: theme().warn
 			: isFront
-				? "#5a7ba8"
-				: "#3e567a";
+				? theme().accent
+				: theme().accent;
 		ctx.beginPath();
 		roundedRectPath(ctx, x, y, subW, subH, r);
 		ctx.stroke();
@@ -477,7 +478,7 @@ export function drawAggregateStack(
 			const titleFontPx = Math.max(CARD_TITLE_FONT_PX, minFontPx / Math.max(0.01, zoom));
 			const bodyFontPx = Math.max(CARD_BODY_FONT_PX, minFontPx / Math.max(0.01, zoom));
 			ctx.font = `600 ${titleFontPx}px sans-serif`;
-			ctx.fillStyle = highlighted ? "#1d1100" : "#e6edf3";
+			ctx.fillStyle = highlighted ? "#1d1100" : theme().textNormal;
 			const title = truncateToWidth(
 				ctx,
 				cluster.label,
@@ -485,7 +486,7 @@ export function drawAggregateStack(
 			);
 			ctx.fillText(title, x + CARD_PAD_X, y + CARD_PAD_Y);
 			ctx.font = `${bodyFontPx}px sans-serif`;
-			ctx.fillStyle = highlighted ? "#3a2400" : "#9eb0c4";
+			ctx.fillStyle = highlighted ? "#3a2400" : theme().textMuted;
 			ctx.fillText(
 				`${count} cards`,
 				x + CARD_PAD_X,
