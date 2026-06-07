@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon, Notice } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon, Notice, Modal, App } from "obsidian";
 import { buildGraph } from "./parser";
 import {
 	layout,
@@ -1100,13 +1100,6 @@ export class MiniGraphView extends ItemView {
 		const thead = table.createEl("thead");
 		thead.setCssStyles({ position: "sticky", top: "0", background: "var(--background-secondary)", zIndex: "1" });
 		const headerRow = thead.createEl("tr");
-		["Tag", "Stats", "Suggested Classification", "Actions"].forEach(text => {
-			const th = headerRow.createEl("th", { text });
-			th.setCssStyles({ padding: "6px", borderBottom: "1px solid var(--background-modifier-border)", color: "var(--text-muted)" });
-		});
-
-		const tbody = table.createEl("tbody");
-
 		const TYPE_LABELS: Record<string, string> = {
 			"what_it_is": "What it is (Objective Topic)",
 			"what_it_contains": "What it contains (Content Elements)",
@@ -1126,6 +1119,27 @@ export class MiniGraphView extends ItemView {
 			"task_org": "Used for organizing workflow, statuses, or processes (e.g., #todo, #wip).",
 			"self_ref": "Highly localized, personal, or temporary contextual tags."
 		};
+
+		["Tag", "Stats", "Suggested Classification", "Actions"].forEach(text => {
+			const th = headerRow.createEl("th");
+			th.setCssStyles({ padding: "6px", borderBottom: "1px solid var(--background-modifier-border)", color: "var(--text-muted)" });
+			
+			const wrapper = th.createDiv();
+			wrapper.setCssStyles({ display: "flex", alignItems: "center", gap: "4px" });
+			wrapper.createSpan({ text });
+			
+			if (text === "Suggested Classification") {
+				const infoIcon = wrapper.createSpan();
+				infoIcon.setCssStyles({ cursor: "pointer", color: "var(--text-muted)", display: "inline-flex" });
+				setIcon(infoIcon, "info");
+				infoIcon.addEventListener("click", () => {
+					new ClassificationInfoModal(this.app, TYPE_LABELS, TYPE_DESCRIPTIONS).open();
+				});
+			}
+		});
+
+		const tbody = table.createEl("tbody");
+
 
 		for (const s of suggestions) {
 			const tr = tbody.createEl("tr");
@@ -1149,19 +1163,16 @@ export class MiniGraphView extends ItemView {
 			const tdStats = tr.createEl("td", { text: `${s.count} notes (${(s.ratio * 100).toFixed(1)}%)` });
 			tdStats.setCssStyles({ padding: "8px 6px", color: "var(--text-muted)", whiteSpace: "nowrap" });
 
-			// Suggested Classification
+			// Suggested Classification Dropdown
 			const tdClass = tr.createEl("td");
-			tdClass.setCssStyles({ padding: "8px 6px", display: "flex", alignItems: "center", gap: "4px" });
-			tdClass.createSpan({ text: TYPE_LABELS[s.golderType] || s.golderType });
+			tdClass.setCssStyles({ padding: "8px 6px" });
 			
-			const infoIcon = tdClass.createSpan();
-			infoIcon.setCssStyles({ cursor: "pointer", color: "var(--text-muted)", display: "inline-flex" });
-			setIcon(infoIcon, "info");
-			infoIcon.setAttribute("aria-label", TYPE_DESCRIPTIONS[s.golderType] || "No description available.");
-			infoIcon.setAttribute("aria-label-position", "top");
-			infoIcon.addEventListener("click", () => {
-				new Notice(TYPE_DESCRIPTIONS[s.golderType] || "No description available.", 5000);
-			});
+			const selectEl = tdClass.createEl("select");
+			selectEl.setCssStyles({ width: "100%", maxWidth: "180px", padding: "2px", fontSize: "12px", background: "var(--background-modifier-form-field)" });
+			for (const [key, label] of Object.entries(TYPE_LABELS)) {
+				const option = selectEl.createEl("option", { text: label, value: key });
+				if (key === s.golderType) option.selected = true;
+			}
 
 			// Actions
 			const tdActions = tr.createEl("td");
@@ -1172,7 +1183,8 @@ export class MiniGraphView extends ItemView {
 			const btnApply = actionsDiv.createEl("button", { text: "Apply Classification" });
 			btnApply.setCssStyles({ fontSize: "10px", padding: "2px 6px", cursor: "pointer" });
 			btnApply.addEventListener("click", async () => {
-				await this.applyGolderClassification(s.tag, s.golderType);
+				const selectedType = selectEl.value;
+				await this.applyGolderClassification(s.tag, selectedType);
 				this.renderInsightSuggest(host); // refresh
 			});
 
@@ -5173,3 +5185,36 @@ export class MiniGraphView extends ItemView {
 	}
 }
 
+
+class ClassificationInfoModal extends Modal {
+	labels: Record<string, string>;
+	descriptions: Record<string, string>;
+
+	constructor(app: App, labels: Record<string, string>, descriptions: Record<string, string>) {
+		super(app);
+		this.labels = labels;
+		this.descriptions = descriptions;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.createEl("h2", { text: "Tag Classifications" });
+		
+		const list = contentEl.createEl("ul");
+		list.setCssStyles({ paddingLeft: "20px" });
+		for (const [key, label] of Object.entries(this.labels)) {
+			const li = list.createEl("li");
+			li.setCssStyles({ marginBottom: "12px", lineHeight: "1.4" });
+			li.createEl("strong", { text: label });
+			li.createEl("br");
+			const descSpan = li.createSpan({ text: this.descriptions[key] || "" });
+			descSpan.setCssStyles({ color: "var(--text-muted)", fontSize: "0.9em" });
+		}
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
