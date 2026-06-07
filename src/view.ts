@@ -1155,23 +1155,28 @@ export class MiniGraphView extends ItemView {
 			tdClass.createSpan({ text: TYPE_LABELS[s.golderType] || s.golderType });
 			
 			const infoIcon = tdClass.createSpan();
-			infoIcon.setCssStyles({ cursor: "help", color: "var(--text-muted)", display: "inline-flex" });
+			infoIcon.setCssStyles({ cursor: "pointer", color: "var(--text-muted)", display: "inline-flex" });
 			setIcon(infoIcon, "info");
 			infoIcon.setAttribute("aria-label", TYPE_DESCRIPTIONS[s.golderType] || "No description available.");
 			infoIcon.setAttribute("aria-label-position", "top");
+			infoIcon.addEventListener("click", () => {
+				new Notice(TYPE_DESCRIPTIONS[s.golderType] || "No description available.", 5000);
+			});
 
 			// Actions
 			const tdActions = tr.createEl("td");
-			tdActions.setCssStyles({ padding: "8px 6px", display: "flex", gap: "6px", flexWrap: "wrap" });
+			tdActions.setCssStyles({ padding: "8px 6px", minWidth: "150px" });
+			const actionsDiv = tdActions.createDiv();
+			actionsDiv.setCssStyles({ display: "flex", gap: "6px", flexWrap: "wrap" });
 
-			const btnApply = tdActions.createEl("button", { text: "Apply Classification" });
+			const btnApply = actionsDiv.createEl("button", { text: "Apply Classification" });
 			btnApply.setCssStyles({ fontSize: "10px", padding: "2px 6px", cursor: "pointer" });
 			btnApply.addEventListener("click", async () => {
 				await this.applyGolderClassification(s.tag, s.golderType);
 				this.renderInsightSuggest(host); // refresh
 			});
 
-			const btnConvert = tdActions.createEl("button", { text: "Convert to Nested Tag" });
+			const btnConvert = actionsDiv.createEl("button", { text: "Convert to Nested Tag" });
 			btnConvert.setCssStyles({ fontSize: "10px", padding: "2px 6px", cursor: "pointer" });
 			btnConvert.addEventListener("click", async () => {
 				const parent = window.prompt(`Convert #${s.tag} to a nested tag. Enter parent path (e.g. "Programming"):`);
