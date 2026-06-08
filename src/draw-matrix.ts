@@ -48,6 +48,7 @@ interface DrawOpts {
 	panX: number;
 	panY: number;
 	canvas: HTMLCanvasElement;
+	dpr?: number; // injected effective DPR (supersample on PNG export); falls back to the window value
 	selectedCol: string | null;
 	minFontPx: number;
 	lines: MatrixLine[];
@@ -71,7 +72,7 @@ export function drawMatrix(
 	matrix: MatrixMeta,
 	o: DrawOpts,
 ): void {
-	const dpr = window.devicePixelRatio || 1;
+	const dpr = o.dpr ?? (window.devicePixelRatio || 1);
 	const visW = o.canvas.width / dpr;
 	const visH = o.canvas.height / dpr;
 	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

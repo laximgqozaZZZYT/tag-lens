@@ -1,4 +1,5 @@
-import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon, Notice, Modal, App } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon, Notice, Modal, Menu, App, MarkdownView } from "obsidian";
+import { exportFileName, exportCanvasDims } from "./image-export";
 import { buildGraph } from "./parser";
 import {
 	layout,
@@ -126,6 +127,12 @@ export class MiniGraphView extends ItemView {
 	private panX = 0;
 	private panY = 0;
 	private zoom = 1;
+	// PNG export: when true, draw() renders into a detached offscreen canvas and
+	// must NOT touch the live DOM (note-navigator panel). `exportDprMul`
+	// supersamples by inflating the effective device-pixel-ratio only — zoom is
+	// untouched, so LOD decisions match the on-screen figure exactly.
+	private exporting = false;
+	private exportDprMul = 1;
 	private dragging = false;
 	private lastX = 0;
 	private lastY = 0;
@@ -170,6 +177,8 @@ export class MiniGraphView extends ItemView {
 	// Containment lens: the full pre-LIMIT graph, so the lens + focus picker cover the
 	// whole vault (not just the LIMIT-trimmed subset).
 	private drosteData: GraphData | null = null;
+	private activeFileDebounceTimer: number | null = null;
+	public isInternalClick = false;
 	// Always-on mode-agnostic note navigator (folder tree + search). Built once
 	// per rebuild and shown in EVERY view mode. `noteMenu` is the DOM panel,
 	// `noteMenuRedraw` re-renders its rows (to refresh the highlighted row).
@@ -422,6 +431,14 @@ export class MiniGraphView extends ItemView {
 		this.addAction("zoom-in", "Zoom in", () => this.zoomBy(1.4));
 		this.addAction("zoom-out", "Zoom out", () => this.zoomBy(1 / 1.4));
 		this.addAction("maximize", "Fit to view", () => this.fitToView());
+		this.addAction("image-down", "Export image (PNG)", (e) => this.openExportMenu(e));
+
+		// 2. Obsidianのfile-openイベントをフック
+		this.registerEvent(
+			this.app.workspace.on('file-open', (file: TFile | null) => {
+				this.handleActiveFileChange(file);
+			})
+		);
 
 		this.attachInputs();
 		this.resizeObs = new ResizeObserver(() => this.resize());
@@ -475,6 +492,121 @@ export class MiniGraphView extends ItemView {
 
 		void this.rebuild();
 		this.resize();
+	}
+
+	private handleActiveFileChange(file: TFile | null) {
+		// ガード1: 設定が無効な場合は処理をスキップ
+		if (!this.settings?.autoFollowActiveNote) return;
+		
+		// ガード2: Tag Lens内のノードクリックに起因するfile-openイベントは1回スキップ（探索文脈の保護）
+		if (this.isInternalClick) { 
+			this.isInternalClick = false; 
+			return; 
+		}
+		
+		// ガード3: マークダウンファイル以外は処理対象外
+		if (!file || file.extension !== 'md') return; 
+
+		// ガード4: パフォーマンス最適化。Tag LensのView自体が現在非表示（裏のタブ、または折りたたまれている）なら計算をスキップ
+		if (!this.containerEl.getClientRects().length) return;
+
+		// ガード5: メインエディタからの発火であることを確認（サイドバー等でのファイル開きを検知対象外にする）
+		const activeLeaf = this.app.workspace.getActiveViewOfType(MarkdownView)?.leaf;
+		if (!activeLeaf || activeLeaf.getRoot() !== this.app.workspace.rootSplit) return;
+
+		// 1200msのデバウンス制御（連続タイピングや高速ファイル切り替えによるメインスレッドのブロックを完全防止）
+		if (this.activeFileDebounceTimer) {
+			window.clearTimeout(this.activeFileDebounceTimer);
+		}
+		
+		this.activeFileDebounceTimer = window.setTimeout(async () => {
+			await this.updateViewContextToElement(file.path);
+		}, 1200);
+	}
+
+	private async updateViewContextToElement(activePath: string) {
+		// メモリ上のグラフデータ（キャッシュ）の存在チェック。存在しない場合は処理をスキップ
+		const currentGraphData: GraphData = this.drosteData as any; 
+		if (!currentGraphData || !currentGraphData.nodes) return;
+
+		const activeFile = this.app.vault.getAbstractFileByPath(activePath);
+		if (!(activeFile instanceof TFile)) return;
+
+		// 1. アクティブノートのメタデータ（タグ）を取得
+		const activeCache = this.app.metadataCache.getFileCache(activeFile);
+		const activeTags = activeCache?.tags?.map(t => t.tag.toLowerCase()) || [];
+		const activeTagSet = new Set(activeTags);
+
+		// 2. 既存の解決済みリンク（双方向リンク判定用）のマップを取得
+		const resolvedLinks = this.app.metadataCache.resolvedLinks;
+		
+		const settings = this.settings;
+		const w_link = settings?.W_link ?? 3.0;
+		const w_tag = settings?.W_tag ?? 2.0;
+		const maxNeighborhoodSize = settings?.maxNeighborhoodSize ?? 50;
+
+		const scoredNodes: { node: GraphNode; score: number }[] = [];
+
+		// 3. 全ノードに対する関連度スコア計算（O(N)の軽量ループ、buildGraphは呼ばない）
+		for (const node of currentGraphData.nodes) {
+			// 自分自身（中心ノード）はスコアを無限大にして最優先、かつ一律表示
+			if (node.id === activePath) {
+				node.score = Infinity;
+				node.filtered = false;
+				continue;
+			}
+
+			// HasLink の判定 (双方向リンクチェック)
+			const hasLinkFromActive = (resolvedLinks[activePath] && resolvedLinks[activePath][node.id]) ? 1 : 0;
+			const hasLinkToActive = (resolvedLinks[node.id] && resolvedLinks[node.id][activePath]) ? 1 : 0;
+			const hasLink = (hasLinkFromActive || hasLinkToActive) ? 1 : 0;
+
+			// Jaccard 係数の計算
+			const nodeFile = this.app.vault.getAbstractFileByPath(node.id);
+			let jaccard = 0;
+
+			if (nodeFile instanceof TFile) {
+				const nodeCache = this.app.metadataCache.getFileCache(nodeFile);
+				const nodeTags = nodeCache?.tags?.map(t => t.tag.toLowerCase()) || [];
+				const nodeTagSet = new Set(nodeTags);
+
+				if (activeTagSet.size > 0 || nodeTagSet.size > 0) {
+					const intersection = new Set([...activeTagSet].filter(x => nodeTagSet.has(x)));
+					const union = new Set([...activeTagSet, ...nodeTagSet]);
+					jaccard = intersection.size / union.size;
+				}
+			}
+
+			// 総合スコア算出
+			const score = (w_link * hasLink) + (w_tag * jaccard);
+			node.score = score;
+
+			if (score > 0) {
+				scoredNodes.push({ node, score });
+			} else {
+				// スコア0（関連なし）のノードはフィルタリングフラグを立てる
+				node.filtered = true;
+			}
+		}
+
+		// 4. スコア降順にソートして上位を絞り込み（トポロジーを維持するため配列からは間引かない）
+		scoredNodes.sort((a, b) => b.score - a.score);
+
+		for (let i = 0; i < scoredNodes.length; i++) {
+			if (i < maxNeighborhoodSize) {
+				// 上位50件は描画対象
+				scoredNodes[i].node.filtered = false;
+			} else {
+				// 50件から漏れた近傍ノードはフィルタリング（非表示/薄色）対象
+				scoredNodes[i].node.filtered = true;
+			}
+		}
+
+		// 5. 既存のレイアウトエンジン・Viewに対して安全に再描画を要求
+		// this.drosteFocus は中心にしたいノート
+		this.settings.drosteFocus = activePath;
+		void this.save();
+		this.requestDraw();
 	}
 
 	// Open/close the unified menu. Opening always lands on the Notes tab; the
@@ -606,6 +738,18 @@ export class MiniGraphView extends ItemView {
 		const isMatrix = this.settings.viewMode === "matrix";
 		const isHeatmap = this.settings.viewMode === "heatmap";
 		const isLattice = this.settings.viewMode === "lattice";
+
+		const autoFollowSection = el.createDiv({ cls: "gim-panel-section" });
+		autoFollowSection.createEl("h4", { text: "Active Note View" });
+		const autoFollowRow = autoFollowSection.createEl("label", { cls: "gim-toggle-row" });
+		const autoFollowCb = autoFollowRow.createEl("input", { type: "checkbox" });
+		autoFollowCb.checked = this.settings.autoFollowActiveNote;
+		autoFollowCb.addEventListener("change", () => {
+			this.settings.autoFollowActiveNote = autoFollowCb.checked;
+			void this.save();
+		});
+		autoFollowRow.createSpan({ text: "Auto-follow active note" });
+
 		// Matrix dots / heatmap cells / lattice nodes size by intrinsic metrics,
 		// so NODE DISPLAY (size by / m×n) is hidden for those modes.
 		if (!isMatrix && !isHeatmap && !isLattice) this.renderNodeDisplaySection(el);
@@ -2573,6 +2717,158 @@ export class MiniGraphView extends ItemView {
 		this.requestDraw();
 	}
 
+	// ── PNG export ──────────────────────────────────────────────────────────
+	// A native menu off the toolbar "image-down" action. Kept flat (no submenus)
+	// so it works on minAppVersion 1.5.0.
+	private openExportMenu(evt: MouseEvent): void {
+		const menu = new Menu();
+		menu.addItem((i) =>
+			i
+				.setTitle("Copy view to clipboard")
+				.setIcon("copy")
+				.onClick(() => void this.exportImage({ scale: 2, fit: false, target: "clipboard" })),
+		);
+		menu.addItem((i) =>
+			i
+				.setTitle("Save view as PNG (2×)")
+				.setIcon("image-down")
+				.onClick(() => void this.exportImage({ scale: 2, fit: false, target: "vault" })),
+		);
+		menu.addItem((i) =>
+			i
+				.setTitle("Save view as PNG (4×)")
+				.setIcon("image-down")
+				.onClick(() => void this.exportImage({ scale: 4, fit: false, target: "vault" })),
+		);
+		menu.addSeparator();
+		menu.addItem((i) =>
+			i
+				.setTitle("Save whole figure as PNG (2×)")
+				.setIcon("maximize")
+				.onClick(() => void this.exportImage({ scale: 2, fit: true, target: "vault" })),
+		);
+		menu.showAtMouseEvent(evt);
+	}
+
+	// Render the current figure into a detached, supersampled offscreen canvas
+	// and either copy it to the clipboard or save it into the vault. The on-DOM
+	// canvas, zoom and pan are never mutated except for an optional fit-to-figure
+	// reframe (restored afterwards).
+	private async exportImage(opts: {
+		scale: number;
+		fit: boolean;
+		target: "vault" | "clipboard";
+	}): Promise<void> {
+		if (this.exporting) return;
+
+		const savedZoom = this.zoom;
+		const savedPanX = this.panX;
+		const savedPanY = this.panY;
+		// "Whole figure" reframes the LIVE canvas first (fitToView reads its real
+		// clientWidth/Height), then we restore the user's view at the end.
+		if (opts.fit) this.fitToView();
+
+		const srcW = this.canvas.width;
+		const srcH = this.canvas.height;
+		const dims = exportCanvasDims(srcW, srcH, opts.scale);
+		if (dims.scale < opts.scale - 1e-6) {
+			new Notice(
+				`Tag Lens: export limited to ${dims.scale.toFixed(1)}× (canvas size cap).`,
+			);
+		}
+
+		const off = this.canvas.ownerDocument.createElement("canvas");
+		off.width = dims.width;
+		off.height = dims.height;
+		const offCtx = off.getContext("2d");
+		if (!offCtx) {
+			new Notice("Tag Lens: image export failed (no 2D context).");
+			this.zoom = savedZoom;
+			this.panX = savedPanX;
+			this.panY = savedPanY;
+			this.requestDraw();
+			return;
+		}
+
+		const savedCanvas = this.canvas;
+		const savedCtx = this.ctx;
+		this.exporting = true;
+		this.exportDprMul = dims.scale;
+		this.canvas = off;
+		this.ctx = offCtx;
+		try {
+			this.draw();
+		} catch (e) {
+			console.error("[tag-lens] export render failed:", e);
+		} finally {
+			this.canvas = savedCanvas;
+			this.ctx = savedCtx;
+			this.exporting = false;
+			this.exportDprMul = 1;
+			this.zoom = savedZoom;
+			this.panX = savedPanX;
+			this.panY = savedPanY;
+		}
+
+		const blob = await new Promise<Blob | null>((res) =>
+			off.toBlob((b) => res(b), "image/png"),
+		);
+		this.requestDraw();
+		if (!blob) {
+			new Notice("Tag Lens: image export failed (encode).");
+			return;
+		}
+
+		if (opts.target === "clipboard") {
+			await this.copyBlobToClipboard(blob);
+		} else {
+			await this.saveBlobToVault(blob);
+		}
+	}
+
+	private async copyBlobToClipboard(blob: Blob): Promise<void> {
+		const w = activeWindow as unknown as {
+			ClipboardItem?: new (items: Record<string, Blob>) => unknown;
+			navigator?: { clipboard?: { write?: (data: unknown[]) => Promise<void> } };
+		};
+		const Ctor = w.ClipboardItem;
+		const write = w.navigator?.clipboard?.write;
+		if (!Ctor || !write) {
+			new Notice("Tag Lens: clipboard image copy unavailable — saving to vault instead.");
+			await this.saveBlobToVault(blob);
+			return;
+		}
+		try {
+			await write.call(w.navigator!.clipboard, [new Ctor({ "image/png": blob })]);
+			new Notice("Tag Lens: view copied to clipboard.");
+		} catch (e) {
+			new Notice("Tag Lens: clipboard copy failed — saving to vault instead.");
+			console.error("[tag-lens] clipboard copy failed:", e);
+			await this.saveBlobToVault(blob);
+		}
+	}
+
+	private async saveBlobToVault(blob: Blob): Promise<void> {
+		const name = exportFileName(this.settings.viewMode, new Date());
+		const fm = this.app.fileManager as unknown as {
+			getAvailablePathForAttachment?: (n: string, src?: string) => Promise<string> | string;
+		};
+		let path = name;
+		try {
+			if (typeof fm.getAvailablePathForAttachment === "function") {
+				path = await fm.getAvailablePathForAttachment(name, "");
+			}
+			const buf = await blob.arrayBuffer();
+			const file = await this.app.vault.createBinary(path, buf);
+			new Notice(`Tag Lens: image saved to ${file.path}`);
+		} catch (e) {
+			new Notice(
+				`Tag Lens: failed to save image — ${e instanceof Error ? e.message : String(e)}`,
+			);
+			console.error("[tag-lens] save image failed:", e);
+		}
+	}
+
 	private zoomBy(factor: number): void {
 		const rect = this.canvas.getBoundingClientRect();
 		const sx = rect.width / 2;
@@ -2866,7 +3162,10 @@ export class MiniGraphView extends ItemView {
 
 	private draw(): void {
 		const ctx = this.ctx;
-		const dpr = activeWindow.devicePixelRatio || 1;
+		// `exportDprMul` is 1 during normal painting; >1 only while exportImage()
+		// renders into the offscreen canvas, so every sub-draw supersamples
+		// uniformly without any per-mode special-casing.
+		const dpr = (activeWindow.devicePixelRatio || 1) * this.exportDprMul;
 		const cw = this.canvas.width;
 		const ch = this.canvas.height;
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2879,16 +3178,20 @@ export class MiniGraphView extends ItemView {
 		// throw here (seen on mobile) used to abort the whole draw, leaving the
 		// canvas blank. Catch it, keep drawing, and surface the cause in a banner.
 		this.noteMenuError = null;
-		try {
-			this.ensureNoteMenu();
-		} catch (e) {
-			this.noteMenuError = e instanceof Error ? `${e.message}` : String(e);
-			if (!this.noteMenuErrorLogged) {
-				console.error("[tag-lens] note navigator failed to render (figure still drawn):", e);
-				this.noteMenuErrorLogged = true;
+		// The note navigator is live-view DOM, not part of the export bitmap, and
+		// rebuilding it against a detached canvas would throw — skip it on export.
+		if (!this.exporting) {
+			try {
+				this.ensureNoteMenu();
+			} catch (e) {
+				this.noteMenuError = e instanceof Error ? `${e.message}` : String(e);
+				if (!this.noteMenuErrorLogged) {
+					console.error("[tag-lens] note navigator failed to render (figure still drawn):", e);
+					this.noteMenuErrorLogged = true;
+				}
+				// A half-built panel would overlay the canvas — remove it so the figure is clean.
+				try { this.removeNoteMenu(); } catch { /* ignore */ }
 			}
-			// A half-built panel would overlay the canvas — remove it so the figure is clean.
-			try { this.removeNoteMenu(); } catch { /* ignore */ }
 		}
 		// If the filter pipeline (WHERE / HAVING / LIMIT) eliminated every
 		// node, draw a hint instead of an empty canvas. This makes the cause
@@ -2904,6 +3207,7 @@ export class MiniGraphView extends ItemView {
 				panX: this.panX,
 				panY: this.panY,
 				canvas: this.canvas,
+				dpr,
 				selectedCol: this.matrixSelectedCol,
 				minFontPx: this.settings.minFontPx,
 				lines: this.matrixLines,
@@ -2973,6 +3277,7 @@ export class MiniGraphView extends ItemView {
 				panX: this.panX,
 				panY: this.panY,
 				canvas: this.canvas,
+				dpr,
 				minFontPx: this.settings.minFontPx,
 				jaccard: this.settings.heatmapJaccard,
 				selected: this.heatmapSelected,
@@ -3356,6 +3661,7 @@ export class MiniGraphView extends ItemView {
 		// ORIGINAL file path, not the prefixed copy id.
 		const sepIdx = id.indexOf("\t");
 		const path = sepIdx >= 0 ? id.slice(sepIdx + 1) : id;
+		this.isInternalClick = true;
 		void this.app.workspace.openLinkText(path, "", false);
 	}
 

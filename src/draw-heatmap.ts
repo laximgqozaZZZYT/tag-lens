@@ -33,6 +33,7 @@ interface DrawOpts {
 	panX: number;
 	panY: number;
 	canvas: HTMLCanvasElement;
+	dpr?: number; // injected effective DPR (supersample on PNG export); falls back to the window value
 	minFontPx: number;
 	jaccard: boolean;
 	selected: { i: number; j: number } | null;
@@ -45,7 +46,7 @@ export function drawHeatmap(
 	h: HeatmapMeta,
 	o: DrawOpts,
 ): void {
-	const dpr = window.devicePixelRatio || 1;
+	const dpr = o.dpr ?? (window.devicePixelRatio || 1);
 	const visW = o.canvas.width / dpr;
 	const visH = o.canvas.height / dpr;
 	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

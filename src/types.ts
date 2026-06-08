@@ -4,6 +4,8 @@ export interface GraphNode {
 	// Cluster keys this node belongs to. Single-cluster files have one entry;
 	// multi-tag files (when GROUP_BY uses `tag:?`) have one entry per tag.
 	memberships: string[];
+	score?: number;
+	filtered?: boolean;
 }
 
 export interface GraphEdge {
@@ -22,6 +24,10 @@ export interface Offset {
 }
 
 export interface MiniSettings {
+	autoFollowActiveNote: boolean;
+	maxNeighborhoodSize: number;
+	W_link: number;
+	W_tag: number;
 	clusterSpacing: number;
 	nodeSpacing: number;
 	cardMaxChars: number;
@@ -346,6 +352,10 @@ export const VIEW_MODES: ViewModeOption[] = [
 ];
 
 export const DEFAULT_SETTINGS: MiniSettings = {
+	autoFollowActiveNote: false,
+	maxNeighborhoodSize: 50,
+	W_link: 3.0,
+	W_tag: 2.0,
 	clusterSpacing: 80,
 	nodeSpacing: 16,
 	cardMaxChars: 160,

@@ -8,5 +8,6 @@ import "./note-menu.test";
 import "./hidden-nodes.test";
 import "./theme.test";
 import "./query.test";
+import "./image-export.test";
 
 summary();
