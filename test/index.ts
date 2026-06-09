@@ -9,5 +9,6 @@ import "./hidden-nodes.test";
 import "./theme.test";
 import "./query.test";
 import "./image-export.test";
+import "./tag-classification.test";
 
 summary();
