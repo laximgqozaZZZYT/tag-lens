@@ -239,10 +239,9 @@ export class MiniGraphView extends ItemView {
 	// non-essential) and a small banner surfaces the cause on-canvas. Logged once.
 	private noteMenuError: string | null = null;
 	private noteMenuErrorLogged = false;
-	// Which top-level tab the unified menu shows: the note navigator ("notes") or
-	// the graph settings ("settings"). In-memory only — opening via the toolbar
+	// Which top-level tab the unified menu shows. In-memory only — opening via the toolbar
 	// gear always resets to "notes"; a manual switch survives graph rebuilds.
-	private activeMenuTab: "notes" | "settings" | "insight" = "notes";
+	private activeMenuTab: "filter" | "notes" | "settings" | "insight" = "filter";
 	// Sensitivity coefficient K for the Insight tab's cognitive-load thresholds
 	// (1.0–5.0). In-memory; survives rebuilds, adjustable via the tab's slider.
 	private clInsightK = 2.0;
@@ -251,6 +250,7 @@ export class MiniGraphView extends ItemView {
 	// The live container the settings tab renders into (replaces the old docking
 	// panel's `panelEl` as the host that `applyTabFilter`/`renderTabButton` query).
 	private settingsHostEl: HTMLElement | null = null;
+	private filterHostEl: HTMLElement | null = null;
 	private insightHostEl: HTMLElement | null = null;
 	// The last note "located" on canvas via the navigator (non-droste modes),
 	// used to highlight its row in the menu.
@@ -328,7 +328,7 @@ export class MiniGraphView extends ItemView {
 	private activeTab: string = "__all__";
 	// Which Settings sub-tab is shown: View / Filter / Sort / Display / Layers.
 	// In-memory, preserved across graph rebuilds. Default View.
-	private settingsSubTab: "view" | "filter" | "sort" | "display" | "layers" = "view";
+	private settingsSubTab: "view" | "display" | "layers" = "view";
 	private insightSubTab: "overview" | "alerts" | "suggest" = "overview";
 	// UpSet mode: signature key (= `signature.join("|")`) of the column
 	// currently selected by the user (highlighted in the matrix; drives
@@ -663,11 +663,9 @@ export class MiniGraphView extends ItemView {
 		const subBar = host.createDiv();
 		subBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", marginBottom: "6px", borderBottom: "1px solid var(--background-modifier-border)" });
 		const content = host.createDiv({ cls: "gim-panel-content" });
-		type SubKey = "view" | "filter" | "sort" | "display" | "layers";
+		type SubKey = "view" | "display" | "layers";
 		const SUBS: { key: SubKey; label: string }[] = [
 			{ key: "view", label: "View" },
-			{ key: "filter", label: "Filter" },
-			{ key: "sort", label: "Sort" },
 			{ key: "display", label: "Display" },
 			{ key: "layers", label: "Layers" },
 		];
@@ -690,8 +688,6 @@ export class MiniGraphView extends ItemView {
 			content.empty();
 			switch (this.settingsSubTab) {
 				case "view": this.renderSettingsView(content); break;
-				case "filter": this.renderSettingsFilter(content); break;
-				case "sort": this.renderSettingsSort(content); break;
 				case "display": this.renderSettingsDisplay(content); break;
 				case "layers": this.renderSettingsLayers(content); break;
 			}
@@ -809,6 +805,25 @@ export class MiniGraphView extends ItemView {
 	private refreshSettingsTab(): void {
 		if (this.noteMenu && this.activeMenuTab === "settings" && this.settingsHostEl) {
 			this.renderSettingsBody(this.settingsHostEl);
+		}
+	}
+
+	private renderFilterBody(host: HTMLElement): void {
+		this.filterHostEl = host;
+		host.empty();
+		
+		const filterSection = host.createDiv({ cls: "gim-panel-section" });
+		filterSection.createEl("h4", { text: "Filter" });
+		this.renderSettingsFilter(filterSection);
+		
+		const sortSection = host.createDiv({ cls: "gim-panel-section" });
+		sortSection.createEl("h4", { text: "Sort" });
+		this.renderSettingsSort(sortSection);
+	}
+
+	private refreshFilterTab(): void {
+		if (this.noteMenu && this.activeMenuTab === "filter" && this.filterHostEl) {
+			this.renderFilterBody(this.filterHostEl);
 		}
 	}
 
@@ -2206,7 +2221,10 @@ export class MiniGraphView extends ItemView {
 			{
 				settings: this.settings,
 				save: () => void this.save(),
-				rerender: () => this.refreshSettingsTab(),
+				rerender: () => {
+					this.refreshSettingsTab();
+					this.refreshFilterTab();
+				},
 				// WHERE / GROUP_BY / HAVING / LIMIT are pipeline settings — any
 				// expression change must trigger a full rebuild so the graph,
 				// note menu, and mode-specific layout all reflect the new query.
@@ -4012,14 +4030,16 @@ export class MiniGraphView extends ItemView {
 		// Two tab panes under a flex wrapper that fills the rest of the panel.
 		const bodyWrap = panel.createDiv();
 		bodyWrap.setCssStyles({ display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: "0", overflow: "hidden" });
+		const filterTab = bodyWrap.createDiv({ cls: "gim-menu-filter" });
+		filterTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
 		const notesTab = bodyWrap.createDiv();
 		notesTab.setCssStyles({ display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: "0" });
 		const settingsTab = bodyWrap.createDiv({ cls: "gim-menu-settings" });
 		settingsTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
 		const insightTab = bodyWrap.createDiv();
 		insightTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
-		type MenuTab = "notes" | "settings" | "insight";
-		const TABS: MenuTab[] = ["notes", "settings", "insight"];
+		type MenuTab = "filter" | "notes" | "settings" | "insight";
+		const TABS: MenuTab[] = ["filter", "notes", "settings", "insight"];
 		const tabBtns: Partial<Record<MenuTab, HTMLElement>> = {};
 		const styleTabs = (): void => {
 			for (const key of TABS) {
@@ -4037,11 +4057,17 @@ export class MiniGraphView extends ItemView {
 		};
 		const showTab = (key: MenuTab): void => {
 			this.activeMenuTab = key;
+			filterTab.setCssStyles({ display: key === "filter" ? "block" : "none" });
 			notesTab.setCssStyles({ display: key === "notes" ? "flex" : "none" });
 			settingsTab.setCssStyles({ display: key === "settings" ? "block" : "none" });
 			insightTab.setCssStyles({ display: key === "insight" ? "block" : "none" });
+			
+			if (key === "filter") this.renderFilterBody(filterTab);
+			else this.filterHostEl = null;
+
 			if (key === "settings") this.renderSettingsBody(settingsTab);
 			else this.settingsHostEl = null;
+			
 			if (key === "insight") {
 				this.insightHostEl = insightTab;
 				this.renderInsightBody(insightTab);
@@ -4061,6 +4087,7 @@ export class MiniGraphView extends ItemView {
 			});
 			b.addEventListener("mouseleave", () => styleTabs());
 		};
+		mkTab("filter", "Filter");
 		mkTab("notes", "Notes");
 		mkTab("settings", "Settings");
 		mkTab("insight", "Insight");
