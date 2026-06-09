@@ -18,6 +18,8 @@ import { nodeIsHidden } from "./note-menu";
 export interface EffectiveQuery {
 	effGroupBy: string[];
 	effWhere: string[];
+	filterMode?: "sql" | "dvjs";
+	dvjsFilter?: string;
 }
 
 export function resolveEffectiveQuery(settings: MiniSettings): EffectiveQuery {
@@ -25,6 +27,9 @@ export function resolveEffectiveQuery(settings: MiniSettings): EffectiveQuery {
 	if (settings.groupByAuto && !effGroupBy.some((r) => r.trim().length > 0)) {
 		// Empty GROUP_BY with auto on → cluster every tag.
 		effGroupBy = ["tag:*"];
+	}
+	if (settings.filterMode === "dvjs") {
+		return { effGroupBy, effWhere: [], filterMode: "dvjs", dvjsFilter: settings.dvjsFilter };
 	}
 	let effWhere = [...settings.where];
 	if (settings.whereAuto) {
@@ -35,7 +40,7 @@ export function resolveEffectiveQuery(settings: MiniSettings): EffectiveQuery {
 			if (r.trim().length > 0) effWhere.push(r);
 		}
 	}
-	return { effGroupBy, effWhere };
+	return { effGroupBy, effWhere, filterMode: "sql" };
 }
 
 // AUTO HAVING runs AFTER WHERE/GROUP_BY because its thresholds scale

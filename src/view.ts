@@ -1,5 +1,6 @@
 import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon, Notice, Modal, Menu, App, MarkdownView } from "obsidian";
 import { exportFileName, exportCanvasDims } from "./image-export";
+import { effectiveClassification } from "./tag-classification";
 import { buildGraph } from "./parser";
 import {
 	layout,
@@ -713,7 +714,29 @@ export class MiniGraphView extends ItemView {
 	private renderSettingsFilter(el: HTMLElement): void {
 		const isMatrix = this.settings.viewMode === "matrix";
 		const isHeatmap = this.settings.viewMode === "heatmap";
-		this.renderExprSection(el, "WHERE", this.settings.where, this.whereError, { autoKey: "whereAuto" });
+		if (this.settings.filterMode === "dvjs") {
+			const info = el.createDiv({ text: "Return an array of paths or Dataview pages. Example:\nreturn dv.pages('\"\"').map(p => p.file.path).array();" });
+			info.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", whiteSpace: "pre-wrap" });
+			
+			const textarea = el.createEl("textarea", { cls: "gim-expr-input" });
+			textarea.value = this.settings.dvjsFilter;
+			textarea.setCssStyles({ width: "100%", minHeight: "120px", fontFamily: "var(--font-monospace)", fontSize: "11px", resize: "vertical" });
+			
+			let debounce: number | null = null;
+			textarea.addEventListener("input", () => {
+				this.settings.dvjsFilter = textarea.value;
+				void this.save();
+				if (debounce !== null) window.clearTimeout(debounce);
+				debounce = window.setTimeout(() => void this.rebuild(), 600);
+			});
+			
+			if (this.whereError) {
+				const errorDiv = el.createDiv({ text: this.whereError });
+				errorDiv.setCssStyles({ color: "var(--text-error)", fontSize: "11px", marginTop: "4px" });
+			}
+		} else {
+			this.renderExprSection(el, "WHERE", this.settings.where, this.whereError, { autoKey: "whereAuto" });
+		}
 		this.renderExprSection(el, "GROUP_BY", this.settings.groupBy, this.groupByError, { autoKey: "groupByAuto" });
 		const havingSection = this.renderExprSection(el, "HAVING", this.settings.having, this.havingError, {
 			placeholder: "e.g. count >= 3", autoKey: "havingAuto",
@@ -812,8 +835,24 @@ export class MiniGraphView extends ItemView {
 		this.filterHostEl = host;
 		host.empty();
 		
+		const header = host.createDiv({ cls: "gim-panel-section" });
+		header.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", borderBottom: "none" });
+		
+		const title = header.createEl("h4", { text: "Filter", cls: "gim-panel-title" });
+		title.setCssStyles({ margin: "0" });
+
+		const modeToggle = header.createEl("a", { cls: "view-action clickable-icon" });
+		modeToggle.setAttribute("aria-label", this.settings.filterMode === "dvjs" ? "Switch to SQL Mode" : "Switch to DataviewJS Mode");
+		setIcon(modeToggle, this.settings.filterMode === "dvjs" ? "database" : "code");
+		
+		modeToggle.addEventListener("click", () => {
+			this.settings.filterMode = this.settings.filterMode === "dvjs" ? "sql" : "dvjs";
+			void this.save();
+			this.refreshFilterTab();
+			void this.rebuild();
+		});
+
 		const filterSection = host.createDiv({ cls: "gim-panel-section" });
-		filterSection.createEl("h4", { text: "Filter" });
 		this.renderSettingsFilter(filterSection);
 		
 		const sortSection = host.createDiv({ cls: "gim-panel-section" });
@@ -1244,11 +1283,20 @@ export class MiniGraphView extends ItemView {
 
 		const results = [];
 		for (const stat of stats.values()) {
+			// A user's applied classification (tag-page frontmatter `golder_type`,
+			// written by applyGolderClassification) is the source of truth for the
+			// dropdown's initial value; the heuristic only fills in when nothing
+			// has been applied yet. Read the SAME file the writer targets so the
+			// applied choice round-trips instead of reverting to the suggestion.
+			const tagPage = this.app.metadataCache.getFirstLinkpathDest(stat.tag, "");
+			const persisted = tagPage
+				? (this.app.metadataCache.getFileCache(tagPage)?.frontmatter as Record<string, unknown> | undefined)?.golder_type
+				: undefined;
 			results.push({
 				tag: stat.tag,
 				count: stat.count,
 				ratio: stat.count / totalNotes,
-				golderType: getGolderSuggestion(stat),
+				golderType: effectiveClassification(persisted, getGolderSuggestion(stat)),
 				coOccurrence: stat.coOccurrence
 			});
 		}
@@ -2295,8 +2343,8 @@ export class MiniGraphView extends ItemView {
 		// Stage 1: AUTO-augment GROUP_BY / WHERE, then run the vault → graph
 		// builder. Errors from the query parsers are surfaced into panel
 		// state so the user sees them inline.
-		const { effGroupBy, effWhere } = resolveEffectiveQuery(this.settings);
-		const { result, errors } = buildGraph(this.app, effWhere, effGroupBy);
+		const { effGroupBy, effWhere, filterMode, dvjsFilter } = resolveEffectiveQuery(this.settings);
+		const { result, errors } = buildGraph(this.app, effWhere, effGroupBy, filterMode, dvjsFilter);
 		this.whereError = errors.where ?? "";
 		this.groupByError = errors.groupBy ?? "";
 		let { data, clusterLabels } = result;
@@ -3919,8 +3967,7 @@ export class MiniGraphView extends ItemView {
 
 	// Always-on, mode-agnostic note navigator (folder tree + search). Built once
 	// per rebuild and shown in EVERY view mode. Selecting a note routes through
-	// `focusNoteFromMenu` (droste focus / canvas locate / openFile). Self-
-	// suppresses when there are zero notes.
+	// `focusNoteFromMenu` (droste focus / canvas locate / openFile).
 	private ensureNoteMenu(): void {
 		// Respect the graph-settings show/hide toggle: when off, the menu must
 		// never appear in ANY mode — tear down any existing panel and bail.
@@ -3930,7 +3977,6 @@ export class MiniGraphView extends ItemView {
 		}
 		if (this.noteMenu) return;
 		const nodes = this.currentMenuNotes();
-		if (nodes.length === 0) return;
 		const isDroste = !!this.laid.drosteGallery;
 		const panel = this.root.createDiv();
 		this.noteMenu = panel;

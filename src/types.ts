@@ -31,6 +31,8 @@ export interface MiniSettings {
 	clusterSpacing: number;
 	nodeSpacing: number;
 	cardMaxChars: number;
+	filterMode: "sql" | "dvjs";
+	dvjsFilter: string;
 	// Each entry is one query row in the panel. Empty rows are ignored; all
 	// non-empty rows are AND-combined for evaluation.
 	where: string[];
@@ -359,6 +361,8 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	clusterSpacing: 80,
 	nodeSpacing: 16,
 	cardMaxChars: 160,
+	filterMode: "sql",
+	dvjsFilter: "return dv.pages('\"\"').map(p => p.file.path).array();",
 	where: [],
 	groupBy: ["tag:*"],
 	having: [],
