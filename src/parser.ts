@@ -132,7 +132,7 @@ export function buildGraph(
 			if (!clusterLabels.has("all")) clusterLabels.set("all", "all");
 		}
 
-		nodes.push({ id: f.path, label: f.basename, memberships });
+		nodes.push({ id: f.path, label: f.basename, memberships, mtime: f.stat.mtime });
 		idSet.add(f.path);
 	}
 

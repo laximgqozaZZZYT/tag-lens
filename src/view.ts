@@ -99,6 +99,7 @@ import {
 	removePreset,
 	captureLens,
 } from "./lens-presets";
+import { staleClusters } from "./freshness";
 import {
 	HOVER_DELAY_MS,
 	sameTarget,
@@ -165,6 +166,8 @@ export class MiniGraphView extends ItemView {
 	private hoverTarget: HoverTarget = null;
 	private tipEl: HTMLDivElement | null = null;
 	private hoverGen = 0;
+	private hoveredEdge: [string, string] | null = null;
+	private currentFrameMs = 0;
 	// Marquee state machine lives in its own controller — the view
 	// just queries it (isArmed / isActive) and pumps pointer events.
 	private marquee!: MarqueeController;
@@ -481,6 +484,7 @@ export class MiniGraphView extends ItemView {
 			this.app.vault.on("rename", (f, oldPath) => {
 				if (!(f instanceof TFile)) return;
 				this.bodyCache.delete(oldPath);
+				this.cardCache.delete(f.path);
 				this.cardCache.delete(oldPath);
 				this.scheduleRebuild();
 			}),
@@ -788,6 +792,34 @@ export class MiniGraphView extends ItemView {
 		]);
 		if (isMatrix) this.renderMatrixDisplayToggles(gdSection);
 		if (isHeatmap) this.renderHeatmapDisplayToggles(gdSection);
+
+		const freshnessSection = el.createDiv({ cls: "gim-panel-section" });
+		freshnessSection.createEl("h4", { text: "Freshness overlay" });
+		
+		const freshnessRow = freshnessSection.createEl("label", { cls: "gim-toggle-row" });
+		const freshnessCb = freshnessRow.createEl("input", { type: "checkbox" });
+		freshnessCb.checked = this.settings.freshnessOverlay;
+		freshnessCb.addEventListener("change", () => {
+			this.settings.freshnessOverlay = freshnessCb.checked;
+			void this.save();
+		});
+		freshnessRow.createSpan({ text: "Enable freshness overlay" });
+		
+		const staleRow = freshnessSection.createDiv({ cls: "gim-setting-row" });
+		staleRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", paddingLeft: "24px" });
+		staleRow.createSpan({ text: "Stale after N days:" });
+		const staleInput = staleRow.createEl("input", { type: "number", cls: "gim-number-input" });
+		staleInput.setCssStyles({ width: "60px" });
+		staleInput.value = this.settings.staleDays.toString();
+		staleInput.addEventListener("change", () => {
+			const v = parseInt(staleInput.value, 10);
+			if (!isNaN(v) && v > 0) {
+				this.settings.staleDays = v;
+				void this.save();
+			} else {
+				staleInput.value = this.settings.staleDays.toString();
+			}
+		});
 	}
 
 	// Layers sub-tab: a cluster picker (chips) + the selected cluster's
@@ -1151,6 +1183,38 @@ export class MiniGraphView extends ItemView {
 		for (const cond of triggered) {
 			for (const o of cond.offenders) {
 				allCards.push({ label: cond.label, severity: cond.severity, summary: cond.summary, detail: cond.detail, advice: cond.advice, offender: o });
+			}
+		}
+
+		// Freshness Overlay: Stalled Cluster check
+		if (this.settings.freshnessOverlay) {
+			// Extract cluster timestamps from graph nodes
+			const clusterMap = new Map<string, { newest: number; size: number }>();
+			for (const node of this.graphData.nodes) {
+				if (node.mtime == null) continue;
+				for (const m of node.memberships) {
+					if (m === "all") continue;
+					const c = clusterMap.get(m);
+					if (c) {
+						c.newest = Math.max(c.newest, node.mtime);
+						c.size++;
+					} else {
+						clusterMap.set(m, { newest: node.mtime, size: 1 });
+					}
+				}
+			}
+			const clusterStats = Array.from(clusterMap.entries()).map(([k, v]) => ({ key: k, newestMtime: v.newest, size: v.size }));
+			const now = Date.now();
+			const stalled = staleClusters(clusterStats, now, this.settings.staleDays);
+			for (const s of stalled) {
+				allCards.push({
+					label: "Stalled cluster",
+					severity: "WARNING",
+					summary: `No activity for ${s.daysStale} days.`,
+					detail: `The cluster has not had any notes updated or created in ${s.daysStale} days, exceeding the configured threshold of ${this.settings.staleDays} days.`,
+					advice: "Consider reviewing these notes to see if they are still relevant, or if they need to be archived.",
+					offender: s.key
+				});
 			}
 		}
 
@@ -3268,7 +3332,9 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private draw(): void {
+		this.currentFrameMs = Date.now();
 		const ctx = this.ctx;
+		if (!ctx) return;
 		// `exportDprMul` is 1 during normal painting; >1 only while exportImage()
 		// renders into the offscreen canvas, so every sub-draw supersamples
 		// uniformly without any per-mode special-casing.

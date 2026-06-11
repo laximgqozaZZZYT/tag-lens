@@ -6,6 +6,7 @@ export interface GraphNode {
 	memberships: string[];
 	score?: number;
 	filtered?: boolean;
+	mtime?: number;
 }
 
 export interface GraphEdge {
@@ -43,6 +44,8 @@ export interface MiniSettings {
 	cardMaxChars: number;
 	filterMode: "sql" | "dvjs";
 	dvjsFilter: string;
+	freshnessOverlay: boolean;
+	staleDays: number;
 	// Each entry is one query row in the panel. Empty rows are ignored; all
 	// non-empty rows are AND-combined for evaluation.
 	where: string[];
@@ -375,6 +378,8 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	cardMaxChars: 160,
 	filterMode: "sql",
 	dvjsFilter: "return dv.pages('\"\"').map(p => p.file.path).array();",
+	freshnessOverlay: false,
+	staleDays: 14,
 	where: [],
 	groupBy: ["tag:*"],
 	having: [],

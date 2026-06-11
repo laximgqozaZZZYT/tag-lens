@@ -14,6 +14,7 @@ import {
 	truncateToWidth,
 	floorWorldFontPx,
 } from "./canvas-utils";
+import { freshnessAlpha } from "./freshness";
 
 // Wrapped + truncated body lines for a card. Computed once by
 // `cardFor()` / measureCard, then cached under the (id, mode, scale)
@@ -43,6 +44,12 @@ export interface DrawCardOptions {
 	// on-screen width (width × zoom) is at least this. Below it the card is a
 	// bare coloured marker — no title, no lone "…". Used by clustered bipartite.
 	titleLodPx?: number;
+	
+	// Freshness Overlay
+	freshnessOverlay?: boolean;
+	staleDays?: number;
+	nowMs?: number;
+	mtime?: number;
 }
 
 // Pure card renderer. Receives the already-resolved scale + body lines
@@ -69,6 +76,11 @@ export function drawCard(
 	const w = n.width;
 	const h = n.height;
 	const r = Math.min(CARD_RADIUS_PX, w / 2, h / 2);
+
+	ctx.save();
+	if (opts.freshnessOverlay && opts.mtime != null && opts.nowMs != null && opts.staleDays != null) {
+		ctx.globalAlpha = freshnessAlpha(opts.mtime, opts.nowMs, opts.staleDays);
+	}
 
 	// Fill first so the stroke below sits cleanly on top.
 	ctx.beginPath();
@@ -165,5 +177,5 @@ export function drawCard(
 			ly += bodyLineH;
 		}
 	}
-	ctx.restore();
+	ctx.restore(); // Restores both the text clip and the globalAlpha if changed
 }
