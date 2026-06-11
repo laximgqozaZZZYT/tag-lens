@@ -97,3 +97,33 @@ export function drawAccentEdges(
 		ctx.stroke();
 	});
 }
+
+// Layer 0: ghost edges (Link candidates). Drawn behind base edges.
+// Dashed lines indicating strong Jaccard similarity without a real link.
+export function drawGhostEdges(
+	ctx: CanvasRenderingContext2D,
+	laid: LaidOut,
+	zoom: number,
+	skipNode: SkipNodeFn,
+): void {
+	if (!laid.ghostEdges) return;
+	
+	ctx.lineWidth = 1.0 / zoom;
+	ctx.strokeStyle = colorAlpha(theme().warn, 0.4);
+	ctx.setLineDash([6 / zoom, 6 / zoom]);
+	
+	laid.ghostEdges.forEach((e) => {
+		if (skipNode(e.source) || skipNode(e.target)) return;
+		const path = e.path;
+		if (!path || path.length < 2) return;
+		
+		ctx.beginPath();
+		ctx.moveTo(path[0].x, path[0].y);
+		for (let i2 = 1; i2 < path.length; i2++) {
+			ctx.lineTo(path[i2].x, path[i2].y);
+		}
+		ctx.stroke();
+	});
+	
+	ctx.setLineDash([]);
+}

@@ -16,6 +16,7 @@ question.
 | **Intersection lattice** | Degree-tiered Hasse-style layout of exact tag intersections with subset links; each node auto-switches between overview / density / individual rendering by count and zoom. |
 | **Tag co-occurrence heatmap** | Symmetric tag × tag grid; cell shade = how many notes share two tags (Jaccard by default; raw count on a log/p95 scale). Diagonal = tag size. Click a cell to list the notes shared by that tag pair. |
 | **Gap Finder** | Statistical analysis overlay that identifies missing connections. Highlights "empty" intersections between tags that should theoretically have content, ideal for uncovering unexplored character pairings or research blind spots. |
+| **Bridge Finder** | Discovers and draws "ghost edges" between notes that have a high Jaccard similarity in their tags but no actual links. Provides a "Link candidates" alert in the Insight panel to help you connect isolated knowledge. |
 | **UpSet plot** | Stack of cards per intersection signature + dot matrix at the bottom — handles ≥ 4-way intersections that diagrams can't draw. |
 | **BubbleSets** | Containment layout drawn as rectangular iso-contour bubbles. |
 | Experimental (beta) | **Connection matrix** (notes × tags dot grid, seriated), **Tag graph** (bipartite notes + tag nodes), and the region/containment family — **Nested set diagram / Containment map / Euler diagram** — kept selectable but with known scaling caveats on giant-tag, hierarchy-less vaults. |
@@ -51,6 +52,7 @@ Global graph display configurations and behavior.
 Analyzes your current graph state to help you manage complexity.
 - **Cognitive Load Metric**: Computes a real-time score based on visible nodes, edges, and clusters. Provides actionable advice when the graph becomes too complex.
 - **Suggest**: Provides categorization suggestions and structural insights based on your frontmatter tag properties.
+- **Unexplored Intersections & Link Candidates**: Automatically alerts you to statistical gaps in co-occurrences and suggests highly similar note pairs (Bridge Finder) to connect.
 
 ## Install
 

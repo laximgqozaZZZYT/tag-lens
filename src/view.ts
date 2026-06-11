@@ -46,7 +46,7 @@ import {
 	type NodeDisplayDeps,
 } from "./node-display";
 import { drawEnclosures } from "./draw-enclosures";
-import { drawBaseEdges, drawAccentEdges } from "./draw-edges";
+import { drawBaseEdges, drawAccentEdges, drawGhostEdges } from "./draw-edges";
 import {
 	drawUpsetFooter,
 	upsetFooterHeight,
@@ -101,6 +101,7 @@ import {
 } from "./lens-presets";
 import { staleClusters } from "./freshness";
 import { findGaps, type TagGap } from "./gap-finder";
+import { findBridges, type BridgeCandidate } from "./bridge-finder";
 import {
 	HOVER_DELAY_MS,
 	sameTarget,
@@ -170,6 +171,8 @@ export class MiniGraphView extends ItemView {
 	private hoveredEdge: [string, string] | null = null;
 	private currentFrameMs = 0;
 	private currentGaps: TagGap[] = [];
+	private currentBridges: BridgeCandidate[] = [];
+	private hoveredGhostEdge: BridgeCandidate | null = null;
 	// Marquee state machine lives in its own controller — the view
 	// just queries it (isArmed / isActive) and pumps pointer events.
 	private marquee!: MarqueeController;
@@ -822,6 +825,36 @@ export class MiniGraphView extends ItemView {
 				staleInput.value = this.settings.staleDays.toString();
 			}
 		});
+
+		const bridgeSection = el.createDiv({ cls: "gim-panel-section" });
+		bridgeSection.createEl("h4", { text: "Bridge finder" });
+		
+		const ghostRow = bridgeSection.createEl("label", { cls: "gim-toggle-row" });
+		const ghostCb = ghostRow.createEl("input", { type: "checkbox" });
+		ghostCb.checked = this.settings.showGhostEdges;
+		ghostCb.addEventListener("change", () => {
+			this.settings.showGhostEdges = ghostCb.checked;
+			void this.save();
+			void this.rebuild();
+		});
+		ghostRow.createSpan({ text: "Show ghost edges" });
+		
+		const jaccardRow = bridgeSection.createDiv({ cls: "gim-setting-row" });
+		jaccardRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", paddingLeft: "24px" });
+		jaccardRow.createSpan({ text: "Min Jaccard similarity:" });
+		const jaccardIn = jaccardRow.createEl("input", { type: "number", cls: "gim-number-input", step: "0.05", min: "0", max: "1" });
+		jaccardIn.setCssStyles({ width: "60px" });
+		jaccardIn.value = String(this.settings.ghostEdgeMinJaccard);
+		jaccardIn.addEventListener("change", () => {
+			const v = parseFloat(jaccardIn.value);
+			if (!isNaN(v) && v >= 0 && v <= 1) {
+				this.settings.ghostEdgeMinJaccard = v;
+				void this.save();
+				void this.rebuild();
+			} else {
+				jaccardIn.value = String(this.settings.ghostEdgeMinJaccard);
+			}
+		});
 	}
 
 	// Layers sub-tab: a cluster picker (chips) + the selected cluster's
@@ -1230,6 +1263,19 @@ export class MiniGraphView extends ItemView {
 				detail: `These tags have high individual frequencies but rarely or never co-occur. Top gaps:\n${details}`,
 				advice: "Consider creating notes that bridge these topics.",
 				offender: "Heatmap Gaps"
+			});
+		}
+
+		if (this.settings.showGhostEdges && this.currentBridges.length > 0) {
+			const top10 = this.currentBridges.slice(0, 10);
+			const details = top10.map(b => `${b.a} ↔ ${b.b} (${b.sharedTags.length} shared tags)`).join("\n");
+			allCards.push({
+				label: "Link candidates",
+				severity: "INFO",
+				summary: `Found ${this.currentBridges.length} ghost edges.`,
+				detail: `These notes have strong tag overlap (Jaccard >= ${this.settings.ghostEdgeMinJaccard}) but are not linked. Top candidates:\n${details}`,
+				advice: "Consider explicitly linking these notes.",
+				offender: "Ghost Edges"
 			});
 		}
 
@@ -2640,9 +2686,27 @@ export class MiniGraphView extends ItemView {
 		// Seed the bipartite force layout from the previous frame's positions
 		// (only when the outgoing layout WAS bipartite) so a tag-count change
 		// nudges nodes instead of teleporting them.
-		const bipartitePrev = this.laid.setNodeIds
+		const bipartitePrev = this.laid?.setNodeIds
 			? new Map(this.laid.nodes.map((n) => [n.id, { x: n.x, y: n.y }]))
 			: undefined;
+
+		this.currentBridges = [];
+		if (this.settings.showGhostEdges) {
+			const linkedPairs = new Set<string>();
+			for (const e of layoutData.edges) {
+				const a = e.source < e.target ? e.source : e.target;
+				const b = e.source < e.target ? e.target : e.source;
+				linkedPairs.add(`${a}|${b}`);
+			}
+			const bridgeNodes = layoutData.nodes.map(n => ({ id: n.id, tags: n.memberships }));
+			this.currentBridges = findBridges(
+				bridgeNodes,
+				linkedPairs,
+				this.settings.ghostEdgeMinJaccard,
+				50
+			);
+		}
+
 		this.laid = layout(layoutData, sized, {
 			clusterSpacing: this.settings.clusterSpacing,
 			nodeSpacing: this.settings.nodeSpacing,
@@ -2694,6 +2758,7 @@ export class MiniGraphView extends ItemView {
 			bipartitePrev,
 			heatmapCriterion: this.settings.heatmapCriterion,
 			heatmapSortDir: this.settings.heatmapSortDir,
+			ghostBridges: this.settings.showGhostEdges ? this.currentBridges : undefined,
 		});
 
 		this.currentGaps = [];
@@ -3703,6 +3768,15 @@ export class MiniGraphView extends ItemView {
 		}
 
 		if (this.settings.showEdges) {
+			if (this.settings.showGhostEdges) {
+				drawGhostEdges(
+					ctx,
+					this.laid,
+					this.zoom,
+					skipNode
+				);
+			}
+
 			drawBaseEdges(
 				ctx,
 				this.laid,
@@ -3872,7 +3946,14 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private hitTest(wx: number, wy: number): HoverTarget {
-		return hitTestFn(wx, wy, this.laid.nodes, this.laid.clusters, this.zoom);
+		return hitTestFn(
+			wx, 
+			wy, 
+			this.laid.nodes, 
+			this.laid.clusters, 
+			this.zoom,
+			this.settings.showGhostEdges ? this.laid.ghostEdges : undefined
+		);
 	}
 
 	private openFile(id: string): void {
@@ -5394,6 +5475,17 @@ export class MiniGraphView extends ItemView {
 			this.positionTip(sx, sy, tip);
 			return;
 		}
+		if (target.kind === "ghostEdge") {
+			const b = target.bridge;
+			const tagsStr = b.sharedTags.slice(0, 3).map(t => `#${t}`).join(" ");
+			const moreTags = b.sharedTags.length > 3 ? ` (+${b.sharedTags.length - 3})` : "";
+			tip.createSpan({ cls: "gim-tip-title", text: "Suggested link" });
+			tip.createSpan({ cls: "gim-tip-sub", text: `shared tags: ${tagsStr}${moreTags} (Jaccard ${b.jaccard.toFixed(2)})` });
+			this.root.appendChild(tip);
+			this.tipEl = tip;
+			this.positionTip(sx, sy, tip);
+			return;
+		}
 		if (target.kind === "node") {
 			// Bipartite SET node: no backing file — show the tag label + size.
 			if (this.laid.setNodeIds?.has(target.nodeId)) {
@@ -5679,6 +5771,12 @@ export class MiniGraphView extends ItemView {
 				} else {
 					this.openFile(hit.nodeId);
 				}
+			} else if (hit?.kind === "ghostEdge") {
+				// Open one of the notes in a new leaf (the one that is not currently focused)
+				const b = hit.bridge;
+				const currentFile = this.app.workspace.getActiveFile();
+				const targetId = (currentFile && currentFile.path === b.a) ? b.b : b.a;
+				this.openFile(targetId);
 			} else if (this.pinnedSet) {
 				// Click on empty space clears the pinned set selection.
 				this.pinnedSet = null;

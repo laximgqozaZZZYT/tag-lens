@@ -9,8 +9,9 @@ export type HoverTarget =
 	// Connection-matrix column header (tag) under the cursor — reuses the same
 	// tooltip lifecycle as node/cluster hover, applied to the column band.
 	| { kind: "matrixCol"; col: number }
-	// Heatmap cell (tag i × tag j) under the cursor — same tooltip lifecycle.
 	| { kind: "heatmapCell"; i: number; j: number }
+	// Bridge finder ghost edge under the cursor
+	| { kind: "ghostEdge"; bridge: import("./bridge-finder").BridgeCandidate }
 	| null;
 
 // Screen-space coordinates → world coordinates. Inverse of the
@@ -37,6 +38,7 @@ export function hitTest(
 	nodes: PositionedNode[],
 	clusters: ClusterRect[],
 	zoom: number,
+	ghostEdges?: Array<import("./layout").PositionedEdge & { bridge?: import("./bridge-finder").BridgeCandidate }>
 ): HoverTarget {
 	let bestId: string | null = null;
 	let bestDist2 = Infinity;
@@ -61,5 +63,28 @@ export function hitTest(
 			return { kind: "cluster", group: c.groupKey };
 		}
 	}
+	
+	if (ghostEdges) {
+		const edgeSlack = 5 / zoom;
+		for (const edge of ghostEdges) {
+			if (!edge.bridge) continue;
+			const p = edge.path;
+			if (!p || p.length < 2) continue;
+			for (let i = 0; i < p.length - 1; i++) {
+				const x1 = p[i].x, y1 = p[i].y, x2 = p[i + 1].x, y2 = p[i + 1].y;
+				// Distance from point to line segment
+				const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+				if (l2 === 0) continue;
+				let t = ((wx - x1) * (x2 - x1) + (wy - y1) * (y2 - y1)) / l2;
+				t = Math.max(0, Math.min(1, t));
+				const projX = x1 + t * (x2 - x1);
+				const projY = y1 + t * (y2 - y1);
+				if ((wx - projX) ** 2 + (wy - projY) ** 2 < edgeSlack * edgeSlack) {
+					return { kind: "ghostEdge", bridge: edge.bridge };
+				}
+			}
+		}
+	}
+	
 	return null;
 }

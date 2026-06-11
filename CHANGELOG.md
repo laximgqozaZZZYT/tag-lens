@@ -2,6 +2,15 @@
 
 All notable changes to Tag Lens are documented here.
 
+## [Unreleased]
+
+### Added — Bridge Finder (Ghost Edges)
+
+- Added **Bridge Finder**, an analysis tool that discovers "ghost edges" between notes that have a high Jaccard similarity in their tags but lack a physical link.
+- Drawn as dashed lines on the canvas to suggest potential missing links.
+- Displays a new "Link candidates" alert in the Insight panel, listing the top unlinked note pairs based on shared tags.
+- Includes a setting to adjust the minimum Jaccard similarity threshold for displaying these ghost edges.
+
 ## 0.3.1
 
 ### Added — Note navigator (mini-menu)
