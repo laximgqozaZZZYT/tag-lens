@@ -100,6 +100,7 @@ import {
 	captureLens,
 } from "./lens-presets";
 import { staleClusters } from "./freshness";
+import { findGaps, type TagGap } from "./gap-finder";
 import {
 	HOVER_DELAY_MS,
 	sameTarget,
@@ -168,6 +169,7 @@ export class MiniGraphView extends ItemView {
 	private hoverGen = 0;
 	private hoveredEdge: [string, string] | null = null;
 	private currentFrameMs = 0;
+	private currentGaps: TagGap[] = [];
 	// Marquee state machine lives in its own controller — the view
 	// just queries it (isArmed / isActive) and pumps pointer events.
 	private marquee!: MarqueeController;
@@ -1218,6 +1220,19 @@ export class MiniGraphView extends ItemView {
 			}
 		}
 
+		if (this.settings.gapFinder && this.settings.viewMode === "heatmap" && this.currentGaps.length > 0) {
+			const top10 = this.currentGaps.slice(0, 10);
+			const details = top10.map(g => `#${g.a} × #${g.b} — expected ~${Math.round(g.expected)}, actual ${g.actual}`).join("\n");
+			allCards.push({
+				label: "Unexplored intersections",
+				severity: "WARNING", // Using WARNING to ensure it stands out, but could be INFO
+				summary: `Found ${this.currentGaps.length} gaps in tag co-occurrences.`,
+				detail: `These tags have high individual frequencies but rarely or never co-occur. Top gaps:\n${details}`,
+				advice: "Consider creating notes that bridge these topics.",
+				offender: "Heatmap Gaps"
+			});
+		}
+
 		const listContainer = host.createDiv();
 		const BATCH_SIZE = 20;
 		let loadedCount = 0;
@@ -2051,6 +2066,24 @@ export class MiniGraphView extends ItemView {
 			void this.save();
 			void this.rebuild();
 		});
+
+		const jaccardRow = section.createEl("label", { cls: "gim-toggle-row" });
+		const jaccardCb = jaccardRow.createEl("input", { type: "checkbox" });
+		jaccardCb.checked = this.settings.heatmapJaccard;
+		jaccardCb.addEventListener("change", () => {
+			this.settings.heatmapJaccard = jaccardCb.checked;
+			void this.save();
+		});
+		jaccardRow.createSpan({ text: "Jaccard similarity color scale" });
+
+		const gapRow = section.createEl("label", { cls: "gim-toggle-row" });
+		const gapCb = gapRow.createEl("input", { type: "checkbox" });
+		gapCb.checked = this.settings.gapFinder;
+		gapCb.addEventListener("change", () => {
+			this.settings.gapFinder = gapCb.checked;
+			void this.save();
+		});
+		gapRow.createSpan({ text: "Highlight gaps" });
 	}
 
 	// Heatmap "min tag size" — a tag (axis) filter, rendered inside HAVING.
@@ -2659,7 +2692,20 @@ export class MiniGraphView extends ItemView {
 			// font family the renderer will eventually use.
 			latticeMeasureText: this.measureLatticeText,
 			bipartitePrev,
+			heatmapCriterion: this.settings.heatmapCriterion,
+			heatmapSortDir: this.settings.heatmapSortDir,
 		});
+
+		this.currentGaps = [];
+		if (this.settings.gapFinder && this.settings.viewMode === "heatmap" && this.laid.heatmap) {
+			this.currentGaps = findGaps(
+				this.laid.heatmap.tags,
+				this.laid.heatmap.counts,
+				this.laid.heatmap.n,
+				this.laid.heatmap.totalNotes,
+				50
+			);
+		}
 		// Stage 5: id → incident-edge-index adjacency for hover lookups.
 		this.adjacency = buildAdjacency(this.laid.edges);
 		// Aggregate-snap + inheritance operate on the Euler cluster/edge model

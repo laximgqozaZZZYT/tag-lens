@@ -12,5 +12,6 @@ import "./image-export.test";
 import "./tag-classification.test";
 import "./lens-presets.test";
 import "./freshness.test";
+import "./gap-finder.test";
 
 summary();

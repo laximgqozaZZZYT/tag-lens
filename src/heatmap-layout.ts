@@ -99,6 +99,6 @@ export function layoutHeatmap(data: GraphData, opts: LayoutOptions): LaidOut {
 		? offVals[Math.min(offVals.length - 1, Math.floor(offVals.length * 0.95))]
 		: 1;
 
-	const heatmap: HeatmapMeta = { tags, counts, n, nodeIds, maxOff, p95, cell: CELL };
+	const heatmap: HeatmapMeta = { tags, counts, n, nodeIds, maxOff, p95, cell: CELL, totalNotes: data.nodes.length };
 	return { nodes: [], edges: [], clusters: [], trunks: [], slotW, slotH, channelW, channelH, heatmap };
 }

@@ -7,6 +7,7 @@
 import { theme, colorAlpha } from "./theme";
 import type { HeatmapMeta } from "./layout";
 import { truncateToWidth } from "./canvas-utils";
+import type { TagGap } from "./gap-finder";
 
 export interface HeatmapGeom {
 	labelBand: number;
@@ -36,6 +37,8 @@ interface DrawOpts {
 	dpr?: number; // injected effective DPR (supersample on PNG export); falls back to the window value
 	minFontPx: number;
 	jaccard: boolean;
+	gapFinder: boolean;
+	gaps: TagGap[];
 	selected: { i: number; j: number } | null;
 	hoverRow: number;
 	hoverCol: number;
@@ -138,6 +141,26 @@ export function drawHeatmap(
 			if (showNums) num(cnt, x + cellPx / 2, y + cellPx / 2, light);
 		}
 	}
+	
+	// Draw gaps (highlight missing intersections)
+	if (o.gapFinder && o.gaps.length > 0) {
+		ctx.strokeStyle = colorAlpha(theme().warn, 0.8);
+		ctx.lineWidth = Math.max(1, cellPx * 0.1);
+		ctx.setLineDash([Math.max(2, cellPx * 0.15), Math.max(2, cellPx * 0.15)]);
+		for (const gap of o.gaps) {
+			for (const [rr, cc] of [
+				[gap.i, gap.j],
+				[gap.j, gap.i],
+			]) {
+				if (rr < r0 || rr > r1 || cc < c0 || cc > c1) continue;
+				const x = cellX(cc);
+				const y = cellY(rr);
+				ctx.strokeRect(x + inset + 1, y + inset + 1, cellPx - 2 * inset - 2, cellPx - 2 * inset - 2);
+			}
+		}
+		ctx.setLineDash([]); // Restore
+	}
+
 	// Selected cell outline (both the cell and its symmetric twin).
 	if (o.selected) {
 		ctx.strokeStyle = theme().warn;

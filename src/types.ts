@@ -160,6 +160,7 @@ export interface MiniSettings {
 	heatmapCriterion: "co-occurrence" | "size";
 	heatmapSortDir: "asc" | "desc";
 	heatmapJaccard: boolean;
+	gapFinder: boolean;
 	// Bipartite tag graph: maximum number of tag (set) nodes shown. The layout
 	// first drops singleton + giant (>40% of notes) tags, then keeps the
 	// top-N by size. Caps hub fan-out so a sparse vault stays operable.
@@ -427,6 +428,7 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	heatmapCriterion: "co-occurrence",
 	heatmapSortDir: "desc",
 	heatmapJaccard: true,
+	gapFinder: false,
 	bipartiteMaxTags: 80,
 	bipartiteLayout: "force",
 	latticeNodeLOD: "auto",
