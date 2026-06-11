@@ -23,6 +23,16 @@ export interface Offset {
 	dy: number;
 }
 
+export type LensQuerySettings = Pick<MiniSettings,
+	"filterMode" | "dvjsFilter" | "where" | "groupBy" | "having" |
+	"limit" | "orderField" | "orderDir" | "viewMode" |
+	"whereAuto" | "groupByAuto" | "havingAuto" | "limitAuto">;
+
+export interface LensPreset {
+	name: string;
+	query: LensQuerySettings;
+}
+
 export interface MiniSettings {
 	autoFollowActiveNote: boolean;
 	maxNeighborhoodSize: number;
@@ -138,6 +148,8 @@ export interface MiniSettings {
 	// order is kept; the same-signature grouping is preserved either way.
 	// Default true — restores the "count overview" lost when singletons scatter.
 	matrixBlockPriority: boolean;
+	// Names saved presets (Lenses).
+	lensPresets: LensPreset[];
 	// Heatmap: minimum tag size to appear on an axis (default 2 = drop
 	// singletons), the seriation criterion + direction, and whether cell shade
 	// uses Jaccard (default) vs raw (log/clamped) co-occurrence count.
@@ -405,6 +417,7 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	matrixGroupBySignature: true,
 	matrixCollapseGroups: false,
 	matrixBlockPriority: true,
+	lensPresets: [],
 	heatmapMinTagSize: 2,
 	heatmapCriterion: "co-occurrence",
 	heatmapSortDir: "desc",

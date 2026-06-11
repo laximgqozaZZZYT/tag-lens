@@ -91,7 +91,14 @@ import {
 	renderToggleSection as renderToggleSectionFn,
 	renderOrderBySection as renderOrderBySectionFn,
 	toggleArrayMember as toggleArrayMemberFn,
+	renderPresetSection as renderPresetSectionFn,
 } from "./panel-sections";
+import {
+	applyLens,
+	upsertPreset,
+	removePreset,
+	captureLens,
+} from "./lens-presets";
 import {
 	HOVER_DELAY_MS,
 	sameTarget,
@@ -835,6 +842,40 @@ export class MiniGraphView extends ItemView {
 		this.filterHostEl = host;
 		host.empty();
 		
+		renderPresetSectionFn(host, {
+			settings: this.settings,
+			save: () => void this.save(),
+			rerender: () => this.refreshFilterTab(),
+			rebuild: () => void this.rebuild(),
+			applyPreset: (name) => {
+				const preset = this.settings.lensPresets.find(p => p.name === name);
+				if (preset) {
+					applyLens(this.settings, preset);
+					void this.save();
+					this.refreshFilterTab();
+					void this.rebuild();
+				}
+			},
+			savePreset: (name) => {
+				this.settings.lensPresets = upsertPreset(this.settings.lensPresets, name, captureLens(this.settings));
+				void this.save();
+				this.refreshFilterTab();
+				// Also trigger command palette sync if needed
+				if (this.app) {
+					const plugin = (this.app as any).plugins.plugins["tag-lens"];
+					if (plugin && plugin.syncLensCommands) {
+						plugin.syncLensCommands(this.settings.lensPresets);
+					}
+				}
+			},
+			removePreset: (name) => {
+				this.settings.lensPresets = removePreset(this.settings.lensPresets, name);
+				void this.save();
+				this.refreshFilterTab();
+				new Notice(`Lens '${name}' deleted. Note: its command palette entry will disappear on next reload.`);
+			}
+		});
+
 		const header = host.createDiv({ cls: "gim-panel-section" });
 		header.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", borderBottom: "none" });
 		

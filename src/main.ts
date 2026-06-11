@@ -1,5 +1,6 @@
 import { Plugin, PluginSettingTab, Setting, WorkspaceLeaf } from "obsidian";
-import { DEFAULT_SETTINGS, MiniSettings } from "./types";
+import { DEFAULT_SETTINGS, MiniSettings, LensPreset } from "./types";
+import { applyLens } from "./lens-presets";
 import { MiniGraphView, VIEW_TYPE_MINI } from "./view";
 
 export default class GraphIslandMiniPlugin extends Plugin {
@@ -26,7 +27,37 @@ export default class GraphIslandMiniPlugin extends Plugin {
 			callback: () => void this.activateView(),
 		});
 
+		this.syncLensCommands(this.settings.lensPresets);
+
 		this.addSettingTab(new MiniSettingTab(this));
+	}
+
+	syncLensCommands(presets: LensPreset[]): void {
+		// Note: Orphaned commands from deleted presets will disappear on the next plugin reload.
+		for (const preset of presets) {
+			const safeId = preset.name.replace(/[^a-z0-9]/gi, "-").toLowerCase();
+			this.addCommand({
+				id: `lens-apply-${safeId}`,
+				name: `Apply lens: ${preset.name}`,
+				callback: () => {
+					let v = this.firstView();
+					if (!v) {
+						this.activateView().then(() => {
+							v = this.firstView();
+							if (v) {
+								applyLens(this.settings, preset);
+								v.updateSettings(this.settings);
+								this.saveSettings();
+							}
+						});
+					} else {
+						applyLens(this.settings, preset);
+						v.updateSettings(this.settings);
+						this.saveSettings();
+					}
+				},
+			});
+		}
 	}
 
 	onunload(): void {
