@@ -102,6 +102,10 @@ import {
 	renderPresetSection as renderPresetSectionFn,
 } from "./panel-sections";
 import {
+	renderMinFontSection as renderMinFontSectionFn,
+	renderNodeDisplaySection as renderNodeDisplaySectionFn,
+} from "./panel/settings-sections";
+import {
 	applyLens,
 	upsertPreset,
 	removePreset,
@@ -1948,29 +1952,10 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private renderMinFontSection(parent: HTMLElement): void {
-		const section = parent.createDiv({ cls: "gim-panel-section" });
-		section.createEl("h4", { text: "Min font size (px)" });
-		const wrap = section.createDiv({ cls: "gim-min-font-row" });
-		const input = wrap.createEl("input", {
-			type: "number",
-			attr: { min: "0", max: "48", step: "1" },
-		});
-		input.value = String(this.settings.minFontPx);
-		input.setCssStyles({ width: "60px" });
-		const hint = wrap.createSpan({
-			cls: "gim-min-font-hint",
-			text: "Floor for every label / card font",
-		});
-		hint.setCssStyles({ marginLeft: "8px" });
-		hint.setCssStyles({ color: "var(--text-muted, #7a8aa0)" });
-		hint.setCssStyles({ fontSize: "11px" });
-		input.addEventListener("change", () => {
-			const v = Math.max(0, Math.min(48, Math.floor(Number(input.value) || 0)));
-			input.value = String(v);
-			if (this.settings.minFontPx === v) return;
-			this.settings.minFontPx = v;
-			void this.save();
-			this.requestDraw();
+		renderMinFontSectionFn(parent, {
+			settings: this.settings,
+			save: () => void this.save(),
+			requestDraw: () => this.requestDraw(),
 		});
 	}
 
@@ -2129,119 +2114,17 @@ export class MiniGraphView extends ItemView {
 		parent: HTMLElement,
 		scope?: { groupKey: string },
 	): void {
-		const section = parent.createDiv({ cls: "gim-panel-section" });
-		section.createEl("h4", { text: "Node display" });
-
-		const overrideFor = (): {
-			nodeRows?: number;
-			nodeCols?: number;
-			nodeSizeMode?: "fixed" | "indegree" | "outdegree";
-		} => {
-			if (!scope) return {};
-			let ov = this.settings.nodeDisplayOverrides[scope.groupKey];
-			if (!ov) {
-				ov = {};
-				this.settings.nodeDisplayOverrides[scope.groupKey] = ov;
-			}
-			return ov;
-		};
-		// In layer scope, look up resolved value (= what the renderer uses)
-		// to display as placeholder so the user can see what they'll override.
-		const resolvedFor = scope
-			? this.resolveFromCluster(scope.groupKey)
-			: {
-					nodeRows: this.settings.nodeRows,
-					nodeCols: this.settings.nodeCols,
-					nodeSizeMode: this.settings.nodeSizeMode,
-				};
-
-		// "Size (m × n)". For layer scope, empty value means "use inherited".
-		const sizeRow = section.createDiv({ cls: "gim-order-row" });
-		sizeRow.createSpan({ text: "Size (m × n)", cls: "gim-order-field" });
-		const mIn = sizeRow.createEl("input", { type: "number" });
-		const nIn = (() => {
-			sizeRow.createSpan({ text: "×" });
-			return sizeRow.createEl("input", { type: "number" });
-		})();
-		mIn.min = nIn.min = "1";
-		mIn.max = nIn.max = "8";
-		mIn.step = nIn.step = "1";
-		mIn.setCssStyles({ width: "50px" });
-		nIn.setCssStyles({ width: "50px" });
-		if (scope) {
-			const ov = this.settings.nodeDisplayOverrides[scope.groupKey];
-			mIn.value = ov?.nodeRows !== undefined ? String(ov.nodeRows) : "";
-			nIn.value = ov?.nodeCols !== undefined ? String(ov.nodeCols) : "";
-			mIn.placeholder = String(resolvedFor.nodeRows);
-			nIn.placeholder = String(resolvedFor.nodeCols);
-		} else {
-			mIn.value = String(this.settings.nodeRows);
-			nIn.value = String(this.settings.nodeCols);
-		}
-		const applySize = (): void => {
-			const m = parseInt(mIn.value, 10);
-			const n = parseInt(nIn.value, 10);
-			if (scope) {
-				const ov = overrideFor();
-				if (Number.isFinite(m) && m >= 1 && m <= 8) ov.nodeRows = m;
-				else delete ov.nodeRows;
-				if (Number.isFinite(n) && n >= 1 && n <= 8) ov.nodeCols = n;
-				else delete ov.nodeCols;
-				if (
-					ov.nodeRows === undefined &&
-					ov.nodeCols === undefined &&
-					ov.nodeSizeMode === undefined
-				) {
-					delete this.settings.nodeDisplayOverrides[scope.groupKey];
-				}
-			} else {
-				if (Number.isFinite(m) && m >= 1 && m <= 12) this.settings.nodeRows = m;
-				if (Number.isFinite(n) && n >= 1 && n <= 12) this.settings.nodeCols = n;
-			}
-			this.cardCache.clear();
-			void this.save();
-			void this.rebuild();
-		};
-		mIn.addEventListener("change", applySize);
-		nIn.addEventListener("change", applySize);
-
-		if (scope) {
-			const modeRow = section.createDiv({ cls: "gim-order-row" });
-			modeRow.createSpan({ text: "Size by", cls: "gim-order-field" });
-			const sel = modeRow.createEl("select", { cls: "gim-order-dir" });
-			sel.createEl("option", {
-				value: "",
-				text: `Inherited (${this.formatSizeMode(resolvedFor.nodeSizeMode)})`,
-			});
-			for (const opt of [
-				{ v: "fixed", t: "Fixed" },
-				{ v: "indegree", t: "Incoming links" },
-				{ v: "outdegree", t: "Outgoing links" },
-			]) {
-				sel.createEl("option", { value: opt.v, text: opt.t });
-			}
-			const ov = this.settings.nodeDisplayOverrides[scope.groupKey];
-			sel.value = ov?.nodeSizeMode ?? "";
-			sel.addEventListener("change", () => {
-				const ov = overrideFor();
-				if (sel.value === "") delete ov.nodeSizeMode;
-				else
-					ov.nodeSizeMode = sel.value as
-						| "fixed"
-						| "indegree"
-						| "outdegree";
-				if (
-					ov.nodeRows === undefined &&
-					ov.nodeCols === undefined &&
-					ov.nodeSizeMode === undefined
-				) {
-					delete this.settings.nodeDisplayOverrides[scope.groupKey];
-				}
-				this.cardCache.clear();
-				void this.save();
-				void this.rebuild();
-			});
-		}
+		renderNodeDisplaySectionFn(
+			parent,
+			{
+				settings: this.settings,
+				save: () => void this.save(),
+				rebuild: () => void this.rebuild(),
+				clearCardCache: () => this.cardCache.clear(),
+				resolveFromCluster: (groupKey) => this.resolveFromCluster(groupKey),
+			},
+			scope,
+		);
 	}
 
 	private formatSizeMode(m: "fixed" | "indegree" | "outdegree"): string {
