@@ -86,3 +86,10 @@ hive-*.png
 
 # Playwright MCP browser snapshot artifacts
 .playwright-mcp/
+
+# Scratch / debug artifacts left by E2E + UI tooling (Kaizen cleanup)
+ui-tester-log.txt
+test/ui-tester.mjs
+test/gallery.html
+capture-toggles.js
+update_dev_vault.py
