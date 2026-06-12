@@ -1,5 +1,5 @@
 import type { MiniSettings } from "../types";
-import { MATRIX_ORDER_CRITERIA, HEATMAP_ORDER_CRITERIA } from "../types";
+import { MATRIX_ORDER_CRITERIA, HEATMAP_ORDER_CRITERIA, VIEW_MODES } from "../types";
 import type { NodeDisplay } from "../node-display";
 
 export interface MinFontSectionDeps {
@@ -164,6 +164,256 @@ export function renderNodeDisplaySection(
 			deps.rebuild();
 		});
 	}
+}
+
+export interface StreamSectionDeps {
+	settings: MiniSettings;
+	save: () => void;
+	scheduleRebuild: () => void;
+}
+
+export function renderStreamDisplayToggles(section: HTMLElement, deps: StreamSectionDeps): void {
+	section.createEl("h4", { text: "Sequence Stream", cls: "gim-panel-heading" });
+
+	const axisRow = section.createDiv({ cls: "gim-setting-row" });
+	axisRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" });
+	axisRow.createSpan({ text: "Axis field:" });
+	const axisInput = axisRow.createEl("input", { type: "text", cls: "gim-text-input" });
+	axisInput.setCssStyles({ width: "100px" });
+	axisInput.value = deps.settings.streamAxisField;
+	axisInput.addEventListener("change", () => {
+		deps.settings.streamAxisField = axisInput.value.trim() || "mtime";
+		deps.save();
+		deps.scheduleRebuild();
+	});
+
+	const binRow = section.createDiv({ cls: "gim-setting-row" });
+	binRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" });
+	binRow.createSpan({ text: "Binning:" });
+	const binSel = binRow.createEl("select");
+	binSel.add(new Option("Value", "value"));
+	binSel.add(new Option("Month", "month"));
+	binSel.add(new Option("Week", "week"));
+	binSel.value = deps.settings.streamBinning;
+	binSel.addEventListener("change", () => {
+		deps.settings.streamBinning = binSel.value as MiniSettings["streamBinning"];
+		deps.save();
+		deps.scheduleRebuild();
+	});
+
+	const rowSortRow = section.createDiv({ cls: "gim-setting-row" });
+	rowSortRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" });
+	rowSortRow.createSpan({ text: "Row sort:" });
+	const rsSel = rowSortRow.createEl("select");
+	rsSel.add(new Option("Size", "size"));
+	rsSel.add(new Option("First appearance", "first-appearance"));
+	rsSel.value = deps.settings.streamRowSort;
+	rsSel.addEventListener("change", () => {
+		deps.settings.streamRowSort = rsSel.value as MiniSettings["streamRowSort"];
+		deps.save();
+		deps.scheduleRebuild();
+	});
+}
+
+export function renderLatticeSection(parent: HTMLElement, deps: GenericSectionDeps): void {
+	const section = parent.createDiv({ cls: "gim-panel-section" });
+	section.createEl("h4", { text: "Lattice" });
+
+	const lodRow = section.createDiv({ cls: "gim-row" });
+	lodRow.createSpan({ text: "Node LOD" });
+	const lodSel = lodRow.createEl("select");
+	const lodOpts: Array<[string, string]> = [
+		["auto", "Auto (zoom-based)"],
+		["overview", "Overview"],
+		["density", "Density"],
+		["individual", "Individual"],
+	];
+	for (const [v, label] of lodOpts) {
+		const o = lodSel.createEl("option", { text: label });
+		o.value = v;
+		if (deps.settings.latticeNodeLOD === v) o.selected = true;
+	}
+	lodSel.addEventListener("change", () => {
+		deps.settings.latticeNodeLOD = lodSel.value as MiniSettings["latticeNodeLOD"];
+		deps.save();
+		deps.rebuild();
+	});
+
+	const minRow = section.createDiv({ cls: "gim-row" });
+	minRow.createSpan({ text: "Min intersection size" });
+	const minIn = minRow.createEl("input", {
+		type: "number",
+		attr: { min: "1", step: "1" },
+	});
+	minIn.value = String(deps.settings.latticeMinNodeSize);
+	minIn.setCssStyles({ width: "60px" });
+	minIn.addEventListener("change", () => {
+		const v = Math.max(1, Math.floor(Number(minIn.value) || 1));
+		deps.settings.latticeMinNodeSize = v;
+		minIn.value = String(v);
+		deps.save();
+		deps.rebuild();
+	});
+
+	const capRow = section.createDiv({ cls: "gim-row" });
+	capRow.createSpan({ text: "Max nodes per tier" });
+	const capIn = capRow.createEl("input", {
+		type: "number",
+		attr: { min: "1", step: "1" },
+	});
+	capIn.value = String(deps.settings.latticeMaxNodesPerTier);
+	capIn.setCssStyles({ width: "60px" });
+	capIn.addEventListener("change", () => {
+		const v = Math.max(1, Math.floor(Number(capIn.value) || 1));
+		deps.settings.latticeMaxNodesPerTier = v;
+		capIn.value = String(v);
+		deps.save();
+		deps.rebuild();
+	});
+
+	const namedRow = section.createDiv({ cls: "gim-row" });
+	namedRow.createSpan({ text: "Max names per node" });
+	const namedIn = namedRow.createEl("input", {
+		type: "number",
+		attr: { min: "1", step: "1" },
+	});
+	namedIn.value = String(deps.settings.latticeNamedMax);
+	namedIn.setCssStyles({ width: "60px" });
+	namedIn.addEventListener("change", () => {
+		const v = Math.max(1, Math.floor(Number(namedIn.value) || 1));
+		deps.settings.latticeNamedMax = v;
+		namedIn.value = String(v);
+		deps.save();
+		deps.rebuild();
+	});
+
+	const linkRow = section.createEl("label", { cls: "gim-toggle-row" });
+	const linkCb = linkRow.createEl("input", { type: "checkbox" });
+	linkCb.checked = deps.settings.latticeShowSubsetLinks;
+	linkCb.addEventListener("change", () => {
+		deps.settings.latticeShowSubsetLinks = linkCb.checked;
+		deps.save();
+		deps.requestDraw?.();
+	});
+	linkRow.createSpan({ text: "Show subset links" });
+
+	const topRow = section.createEl("label", { cls: "gim-toggle-row" });
+	const topCb = topRow.createEl("input", { type: "checkbox" });
+	topCb.checked = deps.settings.latticeSpecificTop;
+	topCb.addEventListener("change", () => {
+		deps.settings.latticeSpecificTop = topCb.checked;
+		deps.save();
+		deps.rebuild();
+	});
+	topRow.createSpan({ text: "Most-specific tier on top" });
+}
+
+export function renderViewModeOption(
+	container: HTMLElement,
+	opt: (typeof VIEW_MODES)[number],
+	deps: GenericSectionDeps
+): void {
+	const item = container.createEl("label", { cls: "gim-viewmode-option" });
+	const input = item.createEl("input", {
+		type: "radio",
+		attr: { name: "gim-viewmode" },
+	});
+	input.value = opt.id;
+	input.checked = deps.settings.viewMode === opt.id;
+	input.addEventListener("change", () => {
+		if (!input.checked) return;
+		const next = input.value as MiniSettings["viewMode"];
+		if (deps.settings.viewMode === next) return;
+		deps.settings.viewMode = next;
+		deps.save();
+		deps.rebuild();
+		deps.refreshSettingsTab?.();
+	});
+	const text = item.createDiv({ cls: "gim-viewmode-text" });
+	text.createEl("strong", {
+		text: opt.experimental ? `${opt.label} (beta)` : opt.label,
+	});
+	if (opt.description) {
+		text.createEl("span", { cls: "gim-viewmode-desc", text: opt.description });
+	}
+}
+
+export function renderViewModeSection(parent: HTMLElement, deps: GenericSectionDeps): void {
+	const section = parent.createDiv({ cls: "gim-panel-section" });
+	section.createEl("h4", { text: "View mode" });
+
+	const stableGroup = section.createDiv({ cls: "gim-viewmode-options" });
+	for (const opt of VIEW_MODES.filter((o) => !o.experimental)) {
+		renderViewModeOption(stableGroup, opt, deps);
+	}
+
+	const experimental = VIEW_MODES.filter((o) => o.experimental);
+	if (experimental.length === 0) return;
+	const expSelected = experimental.some((o) => o.id === deps.settings.viewMode);
+
+	const header = section.createDiv({ cls: "gim-viewmode-exp-header" });
+	header.setCssStyles({
+		cursor: "pointer",
+		userSelect: "none",
+		margin: "8px 0 4px",
+		fontSize: "12px",
+		color: "var(--text-muted)",
+	});
+	const caret = header.createSpan({ text: expSelected ? "▾ " : "▸ " });
+	header.createSpan({ text: "Experimental (beta)" });
+
+	const expGroup = section.createDiv({ cls: "gim-viewmode-options" });
+	expGroup.setCssStyles({ display: expSelected ? "" : "none" });
+	for (const opt of experimental) renderViewModeOption(expGroup, opt, deps);
+
+	header.addEventListener("click", () => {
+		const open = expGroup.style.display === "none";
+		expGroup.setCssStyles({ display: open ? "" : "none" });
+		caret.setText(open ? "▾ " : "▸ ");
+	});
+}
+
+export function renderBipartiteSection(parent: HTMLElement, deps: GenericSectionDeps): void {
+	const section = parent.createDiv({ cls: "gim-panel-section" });
+	section.createEl("h4", { text: "Tag graph" });
+
+	const layRow = section.createDiv({ cls: "gim-order-row" });
+	layRow.createSpan({ text: "Layout", cls: "gim-order-field" });
+	const laySel = layRow.createEl("select");
+	for (const [val, label] of [
+		["force", "Force"],
+		["concentric", "Concentric"],
+		["clustered", "Clustered"],
+	] as const) {
+		const o = laySel.createEl("option", { value: val, text: label });
+		if (val === deps.settings.bipartiteLayout) o.selected = true;
+	}
+	laySel.addEventListener("change", () => {
+		deps.settings.bipartiteLayout = laySel.value as
+			| "force"
+			| "concentric"
+			| "clustered";
+		deps.save();
+		deps.rebuild();
+	});
+
+	const row = section.createDiv({ cls: "gim-order-row" });
+	row.createSpan({ text: "Max tags", cls: "gim-order-field" });
+	const inp = row.createEl("input", { type: "number" });
+	inp.min = "1";
+	inp.setCssStyles({ width: "56px" });
+	inp.value = String(deps.settings.bipartiteMaxTags);
+	inp.addEventListener("change", () => {
+		const v = Math.max(1, Math.floor(Number(inp.value) || 1));
+		deps.settings.bipartiteMaxTags = v;
+		inp.value = String(v);
+		deps.save();
+		deps.rebuild();
+	});
+	section.createEl("p", {
+		cls: "gim-panel-hint",
+		text: "Singleton + giant (>40% of notes) tags are dropped first; then the top-N by size are kept. Click a tag node to highlight its notes; click a note to open it.",
+	});
 }
 
 export interface GenericSectionDeps {

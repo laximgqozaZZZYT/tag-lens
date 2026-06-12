@@ -110,6 +110,10 @@ import {
 	renderHeatmapMinTagControl as renderHeatmapMinTagControlFn,
 	renderHeatmapDisplayToggles as renderHeatmapDisplayTogglesFn,
 	renderMatrixDisplayToggles as renderMatrixDisplayTogglesFn,
+	renderStreamDisplayToggles as renderStreamDisplayTogglesFn,
+	renderLatticeSection as renderLatticeSectionFn,
+	renderBipartiteSection as renderBipartiteSectionFn,
+	renderViewModeSection as renderViewModeSectionFn,
 } from "./panel/settings-sections";
 import {
 	applyLens,
@@ -2220,220 +2224,28 @@ export class MiniGraphView extends ItemView {
 	// LOD, per-tier cap, and the subset-link back layer. Mirrors the
 	// renderBipartiteSection shape (own panel section).
 	private renderLatticeSection(parent: HTMLElement): void {
-		const section = parent.createDiv({ cls: "gim-panel-section" });
-		section.createEl("h4", { text: "Lattice" });
-
-		// LOD mode (auto / overview / density / individual).
-		const lodRow = section.createDiv({ cls: "gim-row" });
-		lodRow.createSpan({ text: "Node LOD" });
-		const lodSel = lodRow.createEl("select");
-		const lodOpts: Array<[string, string]> = [
-			["auto", "Auto (zoom-based)"],
-			["overview", "Overview"],
-			["density", "Density"],
-			["individual", "Individual"],
-		];
-		for (const [v, label] of lodOpts) {
-			const o = lodSel.createEl("option", { text: label });
-			o.value = v;
-			if (this.settings.latticeNodeLOD === v) o.selected = true;
-		}
-		lodSel.addEventListener("change", () => {
-			this.settings.latticeNodeLOD = lodSel.value as MiniSettings["latticeNodeLOD"];
-			void this.save();
-			void this.rebuild();
+		renderLatticeSectionFn(parent, {
+			settings: this.settings,
+			save: () => void this.save(),
+			rebuild: () => void this.rebuild(),
+			requestDraw: () => this.requestDraw(),
 		});
-
-		// Min size cull — drop intersections below this count entirely.
-		const minRow = section.createDiv({ cls: "gim-row" });
-		minRow.createSpan({ text: "Min intersection size" });
-		const minIn = minRow.createEl("input", {
-			type: "number",
-			attr: { min: "1", step: "1" },
-		});
-		minIn.value = String(this.settings.latticeMinNodeSize);
-		minIn.setCssStyles({ width: "60px" });
-		minIn.addEventListener("change", () => {
-			const v = Math.max(1, Math.floor(Number(minIn.value) || 1));
-			this.settings.latticeMinNodeSize = v;
-			minIn.value = String(v);
-			void this.save();
-			void this.rebuild();
-		});
-
-		// Per-tier cap — beyond this, the rest collapse into "Other (×M)".
-		const capRow = section.createDiv({ cls: "gim-row" });
-		capRow.createSpan({ text: "Max nodes per tier" });
-		const capIn = capRow.createEl("input", {
-			type: "number",
-			attr: { min: "1", step: "1" },
-		});
-		capIn.value = String(this.settings.latticeMaxNodesPerTier);
-		capIn.setCssStyles({ width: "60px" });
-		capIn.addEventListener("change", () => {
-			const v = Math.max(1, Math.floor(Number(capIn.value) || 1));
-			this.settings.latticeMaxNodesPerTier = v;
-			capIn.value = String(v);
-			void this.save();
-			void this.rebuild();
-		});
-
-		// Max names per node — drives the per-node "show names" checkbox.
-		// Higher = more rows visible inside each expanded card before "+N".
-		const namedRow = section.createDiv({ cls: "gim-row" });
-		namedRow.createSpan({ text: "Max names per node" });
-		const namedIn = namedRow.createEl("input", {
-			type: "number",
-			attr: { min: "1", step: "1" },
-		});
-		namedIn.value = String(this.settings.latticeNamedMax);
-		namedIn.setCssStyles({ width: "60px" });
-		namedIn.addEventListener("change", () => {
-			const v = Math.max(1, Math.floor(Number(namedIn.value) || 1));
-			this.settings.latticeNamedMax = v;
-			namedIn.value = String(v);
-			void this.save();
-			void this.rebuild();
-		});
-
-		// Subset links (display-only — DISPLAY_ONLY_KEYS skips relayout).
-		const linkRow = section.createEl("label", { cls: "gim-toggle-row" });
-		const linkCb = linkRow.createEl("input", { type: "checkbox" });
-		linkCb.checked = this.settings.latticeShowSubsetLinks;
-		linkCb.addEventListener("change", () => {
-			this.settings.latticeShowSubsetLinks = linkCb.checked;
-			void this.save();
-			this.requestDraw();
-		});
-		linkRow.createSpan({ text: "Show subset links" });
-
-		// Tier orientation — most specific on top vs bottom.
-		const topRow = section.createEl("label", { cls: "gim-toggle-row" });
-		const topCb = topRow.createEl("input", { type: "checkbox" });
-		topCb.checked = this.settings.latticeSpecificTop;
-		topCb.addEventListener("change", () => {
-			this.settings.latticeSpecificTop = topCb.checked;
-			void this.save();
-			void this.rebuild();
-		});
-		topRow.createSpan({ text: "Most-specific tier on top" });
-	}
-
-	// One radio row for a view mode. Shared by the stable list and the
-	// collapsible Experimental list — the only difference is a "(beta)" tag.
-	private renderViewModeOption(
-		container: HTMLElement,
-		opt: (typeof VIEW_MODES)[number],
-	): void {
-		const item = container.createEl("label", { cls: "gim-viewmode-option" });
-		const input = item.createEl("input", {
-			type: "radio",
-			attr: { name: "gim-viewmode" },
-		});
-		input.value = opt.id;
-		input.checked = this.settings.viewMode === opt.id;
-		input.addEventListener("change", () => {
-			if (!input.checked) return;
-			const next = input.value as ViewMode;
-			if (this.settings.viewMode === next) return;
-			this.settings.viewMode = next;
-			void this.save();
-			void this.rebuild();
-			this.refreshSettingsTab();
-		});
-		const text = item.createDiv({ cls: "gim-viewmode-text" });
-		text.createEl("strong", {
-			text: opt.experimental ? `${opt.label} (beta)` : opt.label,
-		});
-		if (opt.description) {
-			text.createEl("span", { cls: "gim-viewmode-desc", text: opt.description });
-		}
 	}
 
 	private renderViewModeSection(parent: HTMLElement): void {
-		const section = parent.createDiv({ cls: "gim-panel-section" });
-		section.createEl("h4", { text: "View mode" });
-
-		// (The note-navigator show/hide control was removed: the toolbar gear and
-		// the menu's × button now open/close the unified menu directly.)
-
-		// Stable modes first.
-		const stableGroup = section.createDiv({ cls: "gim-viewmode-options" });
-		for (const opt of VIEW_MODES.filter((o) => !o.experimental)) {
-			this.renderViewModeOption(stableGroup, opt);
-		}
-
-		// Experimental (beta) modes in a collapsible sub-section — these break
-		// on sparse / hierarchy-less vaults, so they're segregated below the
-		// stable list. Expanded by default ONLY when one is currently selected.
-		const experimental = VIEW_MODES.filter((o) => o.experimental);
-		if (experimental.length === 0) return;
-		const expSelected = experimental.some((o) => o.id === this.settings.viewMode);
-
-		const header = section.createDiv({ cls: "gim-viewmode-exp-header" });
-		header.setCssStyles({
-			cursor: "pointer",
-			userSelect: "none",
-			margin: "8px 0 4px",
-			fontSize: "12px",
-			color: "var(--text-muted)",
-		});
-		const caret = header.createSpan({ text: expSelected ? "▾ " : "▸ " });
-		header.createSpan({ text: "Experimental (beta)" });
-
-		const expGroup = section.createDiv({ cls: "gim-viewmode-options" });
-		expGroup.setCssStyles({ display: expSelected ? "" : "none" });
-		for (const opt of experimental) this.renderViewModeOption(expGroup, opt);
-
-		header.addEventListener("click", () => {
-			const open = expGroup.style.display === "none";
-			expGroup.setCssStyles({ display: open ? "" : "none" });
-			caret.setText(open ? "▾ " : "▸ ");
+		renderViewModeSectionFn(parent, {
+			settings: this.settings,
+			save: () => void this.save(),
+			rebuild: () => void this.rebuild(),
+			refreshSettingsTab: () => this.refreshSettingsTab(),
 		});
 	}
 
-	// Bipartite-only controls: max number of tag (set) nodes shown.
 	private renderBipartiteSection(parent: HTMLElement): void {
-		const section = parent.createDiv({ cls: "gim-panel-section" });
-		section.createEl("h4", { text: "Tag graph" });
-
-		// Layout method (placement only; the edge set is identical either way).
-		const layRow = section.createDiv({ cls: "gim-order-row" });
-		layRow.createSpan({ text: "Layout", cls: "gim-order-field" });
-		const laySel = layRow.createEl("select");
-		for (const [val, label] of [
-			["force", "Force"],
-			["concentric", "Concentric"],
-			["clustered", "Clustered"],
-		] as const) {
-			const o = laySel.createEl("option", { value: val, text: label });
-			if (val === this.settings.bipartiteLayout) o.selected = true;
-		}
-		laySel.addEventListener("change", () => {
-			this.settings.bipartiteLayout = laySel.value as
-				| "force"
-				| "concentric"
-				| "clustered";
-			void this.save();
-			void this.rebuild();
-		});
-
-		const row = section.createDiv({ cls: "gim-order-row" });
-		row.createSpan({ text: "Max tags", cls: "gim-order-field" });
-		const inp = row.createEl("input", { type: "number" });
-		inp.min = "1";
-		inp.setCssStyles({ width: "56px" });
-		inp.value = String(this.settings.bipartiteMaxTags);
-		inp.addEventListener("change", () => {
-			const v = Math.max(1, Math.floor(Number(inp.value) || 1));
-			this.settings.bipartiteMaxTags = v;
-			inp.value = String(v);
-			void this.save();
-			void this.rebuild();
-		});
-		section.createEl("p", {
-			cls: "gim-panel-hint",
-			text: "Singleton + giant (>40% of notes) tags are dropped first; then the top-N by size are kept. Click a tag node to highlight its notes; click a note to open it.",
+		renderBipartiteSectionFn(parent, {
+			settings: this.settings,
+			save: () => void this.save(),
+			rebuild: () => void this.rebuild(),
 		});
 	}
 
@@ -2469,45 +2281,10 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private renderStreamDisplayToggles(section: HTMLElement): void {
-		section.createEl("h4", { text: "Sequence Stream", cls: "gim-panel-heading" });
-
-		const axisRow = section.createDiv({ cls: "gim-setting-row" });
-		axisRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" });
-		axisRow.createSpan({ text: "Axis field:" });
-		const axisInput = axisRow.createEl("input", { type: "text", cls: "gim-text-input" });
-		axisInput.setCssStyles({ width: "100px" });
-		axisInput.value = this.settings.streamAxisField;
-		axisInput.addEventListener("change", () => {
-			this.settings.streamAxisField = axisInput.value.trim() || "mtime";
-			void this.save();
-			this.scheduleRebuild();
-		});
-
-		const binRow = section.createDiv({ cls: "gim-setting-row" });
-		binRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" });
-		binRow.createSpan({ text: "Binning:" });
-		const binSel = binRow.createEl("select");
-		binSel.add(new Option("Value", "value"));
-		binSel.add(new Option("Month", "month"));
-		binSel.add(new Option("Week", "week"));
-		binSel.value = this.settings.streamBinning;
-		binSel.addEventListener("change", () => {
-			this.settings.streamBinning = binSel.value as MiniSettings["streamBinning"];
-			void this.save();
-			this.scheduleRebuild();
-		});
-
-		const rowSortRow = section.createDiv({ cls: "gim-setting-row" });
-		rowSortRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" });
-		rowSortRow.createSpan({ text: "Row sort:" });
-		const rsSel = rowSortRow.createEl("select");
-		rsSel.add(new Option("Size", "size"));
-		rsSel.add(new Option("First appearance", "first-appearance"));
-		rsSel.value = this.settings.streamRowSort;
-		rsSel.addEventListener("change", () => {
-			this.settings.streamRowSort = rsSel.value as MiniSettings["streamRowSort"];
-			void this.save();
-			this.scheduleRebuild();
+		renderStreamDisplayTogglesFn(section, {
+			settings: this.settings,
+			save: () => void this.save(),
+			scheduleRebuild: () => this.scheduleRebuild(),
 		});
 	}
 
