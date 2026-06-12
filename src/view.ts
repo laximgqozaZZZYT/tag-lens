@@ -104,6 +104,12 @@ import {
 import {
 	renderMinFontSection as renderMinFontSectionFn,
 	renderNodeDisplaySection as renderNodeDisplaySectionFn,
+	renderMatrixOrderBySection as renderMatrixOrderBySectionFn,
+	renderMatrixMinColumnControl as renderMatrixMinColumnControlFn,
+	renderHeatmapOrderBySection as renderHeatmapOrderBySectionFn,
+	renderHeatmapMinTagControl as renderHeatmapMinTagControlFn,
+	renderHeatmapDisplayToggles as renderHeatmapDisplayTogglesFn,
+	renderMatrixDisplayToggles as renderMatrixDisplayTogglesFn,
 } from "./panel/settings-sections";
 import {
 	applyLens,
@@ -2162,53 +2168,20 @@ export class MiniGraphView extends ItemView {
 	// (co-occurrence / block-priority) and map to matrixBlockPriority; the
 	// direction maps to matrixSortDir. No matrix-only checkboxes live here.
 	private renderMatrixOrderBySection(parent: HTMLElement): void {
-		const section = parent.createDiv({ cls: "gim-panel-section" });
-		const header = section.createDiv({ cls: "gim-panel-section-header" });
-		header.createEl("h4", { text: "ORDER_BY" });
-
-		const row = section.createDiv({ cls: "gim-order-row" });
-		const fieldSel = row.createEl("select", { cls: "gim-order-field" });
-		const current = this.settings.matrixBlockPriority
-			? "block-priority"
-			: "co-occurrence";
-		for (const o of MATRIX_ORDER_CRITERIA) {
-			const opt = fieldSel.createEl("option", { value: o.value, text: o.text });
-			if (o.value === current) opt.selected = true;
-		}
-		fieldSel.addEventListener("change", () => {
-			this.settings.matrixSort = "cooccurrence";
-			this.settings.matrixBlockPriority = fieldSel.value === "block-priority";
-			void this.save();
-			void this.rebuild();
-		});
-
-		const dirSel = row.createEl("select", { cls: "gim-order-dir" });
-		for (const d of ["asc", "desc"] as const) {
-			const opt = dirSel.createEl("option", { value: d, text: d });
-			if (this.settings.matrixSortDir === d) opt.selected = true;
-		}
-		dirSel.addEventListener("change", () => {
-			this.settings.matrixSortDir = dirSel.value as "asc" | "desc";
-			void this.save();
-			void this.rebuild();
+		renderMatrixOrderBySectionFn(parent, {
+			settings: this.settings,
+			save: () => void this.save(),
+			rebuild: () => void this.rebuild(),
 		});
 	}
 
 	// Matrix "min column size" — a column (tag) filter, rendered inside the
 	// HAVING filter section (no standalone Matrix section).
 	private renderMatrixMinColumnControl(section: HTMLElement): void {
-		const row = section.createDiv({ cls: "gim-order-row" });
-		row.createSpan({ text: "Min column size", cls: "gim-order-field" });
-		const inp = row.createEl("input", { type: "number" });
-		inp.min = "1";
-		inp.setCssStyles({ width: "56px" });
-		inp.value = String(this.settings.matrixMinColumnSize);
-		inp.addEventListener("change", () => {
-			const v = Math.max(1, Math.floor(Number(inp.value) || 1));
-			this.settings.matrixMinColumnSize = v;
-			inp.value = String(v);
-			void this.save();
-			void this.rebuild();
+		renderMatrixMinColumnControlFn(section, {
+			settings: this.settings,
+			save: () => void this.save(),
+			rebuild: () => void this.rebuild(),
 		});
 	}
 
@@ -2216,80 +2189,31 @@ export class MiniGraphView extends ItemView {
 	// Criterion = co-occurrence (Jaccard seriation) / size; direction reverses
 	// the tag order. No heatmap-only controls live in ORDER_BY.
 	private renderHeatmapOrderBySection(parent: HTMLElement): void {
-		const section = parent.createDiv({ cls: "gim-panel-section" });
-		const header = section.createDiv({ cls: "gim-panel-section-header" });
-		header.createEl("h4", { text: "ORDER_BY" });
-		const row = section.createDiv({ cls: "gim-order-row" });
-		const fieldSel = row.createEl("select", { cls: "gim-order-field" });
-		for (const o of HEATMAP_ORDER_CRITERIA) {
-			const opt = fieldSel.createEl("option", { value: o.value, text: o.text });
-			if (o.value === this.settings.heatmapCriterion) opt.selected = true;
-		}
-		fieldSel.addEventListener("change", () => {
-			this.settings.heatmapCriterion = fieldSel.value as "co-occurrence" | "size";
-			void this.save();
-			void this.rebuild();
+		renderHeatmapOrderBySectionFn(parent, {
+			settings: this.settings,
+			save: () => void this.save(),
+			rebuild: () => void this.rebuild(),
+			requestDraw: () => this.requestDraw(),
 		});
-		const dirSel = row.createEl("select", { cls: "gim-order-dir" });
-		for (const d of ["asc", "desc"] as const) {
-			const opt = dirSel.createEl("option", { value: d, text: d });
-			if (this.settings.heatmapSortDir === d) opt.selected = true;
-		}
-		dirSel.addEventListener("change", () => {
-			this.settings.heatmapSortDir = dirSel.value as "asc" | "desc";
-			void this.save();
-			void this.rebuild();
-		});
-
-		const jaccardRow = section.createEl("label", { cls: "gim-toggle-row" });
-		const jaccardCb = jaccardRow.createEl("input", { type: "checkbox" });
-		jaccardCb.checked = this.settings.heatmapJaccard;
-		jaccardCb.addEventListener("change", () => {
-			this.settings.heatmapJaccard = jaccardCb.checked;
-			void this.save();
-			this.requestDraw();
-		});
-		jaccardRow.createSpan({ text: "Jaccard similarity color scale" });
-
-		const gapRow = section.createEl("label", { cls: "gim-toggle-row" });
-		const gapCb = gapRow.createEl("input", { type: "checkbox" });
-		gapCb.checked = this.settings.gapFinder;
-		gapCb.addEventListener("change", () => {
-			this.settings.gapFinder = gapCb.checked;
-			void this.save();
-			void this.rebuild();
-		});
-		gapRow.createSpan({ text: "Highlight gaps" });
 	}
 
 	// Heatmap "min tag size" — a tag (axis) filter, rendered inside HAVING.
 	private renderHeatmapMinTagControl(section: HTMLElement): void {
-		const row = section.createDiv({ cls: "gim-order-row" });
-		row.createSpan({ text: "Min tag size", cls: "gim-order-field" });
-		const inp = row.createEl("input", { type: "number" });
-		inp.min = "1";
-		inp.setCssStyles({ width: "56px" });
-		inp.value = String(this.settings.heatmapMinTagSize);
-		inp.addEventListener("change", () => {
-			const v = Math.max(1, Math.floor(Number(inp.value) || 1));
-			this.settings.heatmapMinTagSize = v;
-			inp.value = String(v);
-			void this.save();
-			void this.rebuild();
+		renderHeatmapMinTagControlFn(section, {
+			settings: this.settings,
+			save: () => void this.save(),
+			rebuild: () => void this.rebuild(),
 		});
 	}
 
 	// Heatmap colour-scale toggle in GRAPH DISPLAY (display-only repaint).
 	private renderHeatmapDisplayToggles(section: HTMLElement): void {
-		const row = section.createEl("label", { cls: "gim-toggle-row" });
-		const cb = row.createEl("input", { type: "checkbox" });
-		cb.checked = this.settings.heatmapJaccard;
-		cb.addEventListener("change", () => {
-			this.settings.heatmapJaccard = cb.checked;
-			void this.save();
-			this.requestDraw();
+		renderHeatmapDisplayTogglesFn(section, {
+			settings: this.settings,
+			save: () => void this.save(),
+			rebuild: () => void this.rebuild(),
+			requestDraw: () => this.requestDraw(),
 		});
-		row.createSpan({ text: "Jaccard color scale" });
 	}
 
 	// Lattice (intersection lattice) mode settings — degree-tier layout,
@@ -2534,40 +2458,14 @@ export class MiniGraphView extends ItemView {
 	// are display operations (no relayout): the projection rebuilds on the
 	// display-only repaint path. Collapse depends on Group.
 	private renderMatrixDisplayToggles(section: HTMLElement): void {
-		const add = (
-			label: string,
-			get: () => boolean,
-			set: (v: boolean) => void,
-			enabled: boolean,
-		): void => {
-			const row = section.createEl("label", { cls: "gim-toggle-row" });
-			if (!enabled) row.setCssStyles({ opacity: "0.45" });
-			const cb = row.createEl("input", { type: "checkbox" });
-			cb.checked = get();
-			cb.disabled = !enabled;
-			cb.addEventListener("change", () => {
-				set(cb.checked);
-				void this.save();
-				this.refreshSettingsTab(); // refresh Collapse enabled state
-				// Group / Collapse are display-only (no relayout): rebuild the
-				// row-line projection and repaint so the change is visible now.
-				this.rebuildMatrixDisplay();
-				this.requestDraw();
-			});
-			row.createSpan({ text: label });
-		};
-		add(
-			"Group identical rows",
-			() => this.settings.matrixGroupBySignature,
-			(v) => (this.settings.matrixGroupBySignature = v),
-			true,
-		);
-		add(
-			"Collapse groups",
-			() => this.settings.matrixCollapseGroups,
-			(v) => (this.settings.matrixCollapseGroups = v),
-			this.settings.matrixGroupBySignature,
-		);
+		renderMatrixDisplayTogglesFn(section, {
+			settings: this.settings,
+			save: () => void this.save(),
+			rebuild: () => void this.rebuild(),
+			refreshSettingsTab: () => this.refreshSettingsTab(),
+			rebuildMatrixDisplay: () => this.rebuildMatrixDisplay(),
+			requestDraw: () => this.requestDraw(),
+		});
 	}
 
 	private renderStreamDisplayToggles(section: HTMLElement): void {

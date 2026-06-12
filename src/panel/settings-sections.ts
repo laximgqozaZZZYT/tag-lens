@@ -1,4 +1,5 @@
 import type { MiniSettings } from "../types";
+import { MATRIX_ORDER_CRITERIA, HEATMAP_ORDER_CRITERIA } from "../types";
 import type { NodeDisplay } from "../node-display";
 
 export interface MinFontSectionDeps {
@@ -163,4 +164,172 @@ export function renderNodeDisplaySection(
 			deps.rebuild();
 		});
 	}
+}
+
+export interface GenericSectionDeps {
+	settings: MiniSettings;
+	save: () => void;
+	rebuild: () => void;
+	requestDraw?: () => void;
+	refreshSettingsTab?: () => void;
+	rebuildMatrixDisplay?: () => void;
+}
+
+export function renderMatrixOrderBySection(parent: HTMLElement, deps: GenericSectionDeps): void {
+	const section = parent.createDiv({ cls: "gim-panel-section" });
+	const header = section.createDiv({ cls: "gim-panel-section-header" });
+	header.createEl("h4", { text: "ORDER_BY" });
+
+	const row = section.createDiv({ cls: "gim-order-row" });
+	const fieldSel = row.createEl("select", { cls: "gim-order-field" });
+	const current = deps.settings.matrixBlockPriority
+		? "block-priority"
+		: "co-occurrence";
+	for (const o of MATRIX_ORDER_CRITERIA) {
+		const opt = fieldSel.createEl("option", { value: o.value, text: o.text });
+		if (o.value === current) opt.selected = true;
+	}
+	fieldSel.addEventListener("change", () => {
+		deps.settings.matrixSort = "cooccurrence";
+		deps.settings.matrixBlockPriority = fieldSel.value === "block-priority";
+		deps.save();
+		deps.rebuild();
+	});
+
+	const dirSel = row.createEl("select", { cls: "gim-order-dir" });
+	for (const d of ["asc", "desc"] as const) {
+		const opt = dirSel.createEl("option", { value: d, text: d });
+		if (deps.settings.matrixSortDir === d) opt.selected = true;
+	}
+	dirSel.addEventListener("change", () => {
+		deps.settings.matrixSortDir = dirSel.value as "asc" | "desc";
+		deps.save();
+		deps.rebuild();
+	});
+}
+
+export function renderMatrixMinColumnControl(section: HTMLElement, deps: GenericSectionDeps): void {
+	const row = section.createDiv({ cls: "gim-order-row" });
+	row.createSpan({ text: "Min column size", cls: "gim-order-field" });
+	const inp = row.createEl("input", { type: "number" });
+	inp.min = "1";
+	inp.setCssStyles({ width: "56px" });
+	inp.value = String(deps.settings.matrixMinColumnSize);
+	inp.addEventListener("change", () => {
+		const v = Math.max(1, Math.floor(Number(inp.value) || 1));
+		deps.settings.matrixMinColumnSize = v;
+		inp.value = String(v);
+		deps.save();
+		deps.rebuild();
+	});
+}
+
+export function renderHeatmapOrderBySection(parent: HTMLElement, deps: GenericSectionDeps): void {
+	const section = parent.createDiv({ cls: "gim-panel-section" });
+	const header = section.createDiv({ cls: "gim-panel-section-header" });
+	header.createEl("h4", { text: "ORDER_BY" });
+	const row = section.createDiv({ cls: "gim-order-row" });
+	const fieldSel = row.createEl("select", { cls: "gim-order-field" });
+	for (const o of HEATMAP_ORDER_CRITERIA) {
+		const opt = fieldSel.createEl("option", { value: o.value, text: o.text });
+		if (o.value === deps.settings.heatmapCriterion) opt.selected = true;
+	}
+	fieldSel.addEventListener("change", () => {
+		deps.settings.heatmapCriterion = fieldSel.value as "co-occurrence" | "size";
+		deps.save();
+		deps.rebuild();
+	});
+	const dirSel = row.createEl("select", { cls: "gim-order-dir" });
+	for (const d of ["asc", "desc"] as const) {
+		const opt = dirSel.createEl("option", { value: d, text: d });
+		if (deps.settings.heatmapSortDir === d) opt.selected = true;
+	}
+	dirSel.addEventListener("change", () => {
+		deps.settings.heatmapSortDir = dirSel.value as "asc" | "desc";
+		deps.save();
+		deps.rebuild();
+	});
+
+	const jaccardRow = section.createEl("label", { cls: "gim-toggle-row" });
+	const jaccardCb = jaccardRow.createEl("input", { type: "checkbox" });
+	jaccardCb.checked = deps.settings.heatmapJaccard;
+	jaccardCb.addEventListener("change", () => {
+		deps.settings.heatmapJaccard = jaccardCb.checked;
+		deps.save();
+		deps.requestDraw?.();
+	});
+	jaccardRow.createSpan({ text: "Jaccard similarity color scale" });
+
+	const gapRow = section.createEl("label", { cls: "gim-toggle-row" });
+	const gapCb = gapRow.createEl("input", { type: "checkbox" });
+	gapCb.checked = deps.settings.gapFinder;
+	gapCb.addEventListener("change", () => {
+		deps.settings.gapFinder = gapCb.checked;
+		deps.save();
+		deps.rebuild();
+	});
+	gapRow.createSpan({ text: "Highlight gaps" });
+}
+
+export function renderHeatmapMinTagControl(section: HTMLElement, deps: GenericSectionDeps): void {
+	const row = section.createDiv({ cls: "gim-order-row" });
+	row.createSpan({ text: "Min tag size", cls: "gim-order-field" });
+	const inp = row.createEl("input", { type: "number" });
+	inp.min = "1";
+	inp.setCssStyles({ width: "56px" });
+	inp.value = String(deps.settings.heatmapMinTagSize);
+	inp.addEventListener("change", () => {
+		const v = Math.max(1, Math.floor(Number(inp.value) || 1));
+		deps.settings.heatmapMinTagSize = v;
+		inp.value = String(v);
+		deps.save();
+		deps.rebuild();
+	});
+}
+
+export function renderHeatmapDisplayToggles(section: HTMLElement, deps: GenericSectionDeps): void {
+	const row = section.createEl("label", { cls: "gim-toggle-row" });
+	const cb = row.createEl("input", { type: "checkbox" });
+	cb.checked = deps.settings.heatmapJaccard;
+	cb.addEventListener("change", () => {
+		deps.settings.heatmapJaccard = cb.checked;
+		deps.save();
+		deps.requestDraw?.();
+	});
+	row.createSpan({ text: "Jaccard color scale" });
+}
+
+export function renderMatrixDisplayToggles(section: HTMLElement, deps: GenericSectionDeps): void {
+	const add = (
+		label: string,
+		get: () => boolean,
+		set: (v: boolean) => void,
+		enabled: boolean,
+	): void => {
+		const row = section.createEl("label", { cls: "gim-toggle-row" });
+		if (!enabled) row.setCssStyles({ opacity: "0.45" });
+		const cb = row.createEl("input", { type: "checkbox" });
+		cb.checked = get();
+		cb.disabled = !enabled;
+		cb.addEventListener("change", () => {
+			set(cb.checked);
+			deps.save();
+			deps.refreshSettingsTab?.();
+			deps.rebuildMatrixDisplay?.();
+			deps.requestDraw?.();
+		});
+		row.createSpan({ text: label });
+	};
+	add(
+		"Group identical rows",
+		() => deps.settings.matrixGroupBySignature,
+		(v) => (deps.settings.matrixGroupBySignature = v),
+		true,
+	);
+	add(
+		"Collapse groups",
+		() => deps.settings.matrixCollapseGroups,
+		(v) => (deps.settings.matrixCollapseGroups = v),
+		deps.settings.matrixGroupBySignature,
+	);
 }
