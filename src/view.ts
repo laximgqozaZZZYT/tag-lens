@@ -2,6 +2,10 @@ import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon, Notice, Modal, Menu,
 import { exportFileName, exportCanvasDims } from "./image-export";
 import { effectiveClassification } from "./tag-classification";
 import { displayToggleApplies } from "./display-applicability";
+import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
+import { effectiveEncoding } from "./encoding/migrate";
+import { fieldSourceRegistry } from "./encoding/field-sources";
+import type { EncContext, NodeDrawParams, EncodingBinding, ScaleType } from "./encoding/types";
 import { buildGraph } from "./parser";
 import {
 	layout,
@@ -322,6 +326,9 @@ export class MiniGraphView extends ItemView {
 	private limitError = "";
 	private displayMode: Map<string, "full" | "brief"> = new Map();
 	private degreeMap: Map<string, number> = new Map();
+	// Visual Encoding output (computed per rebuild): per-node draw params + legends.
+	private encParams: Map<string, NodeDrawParams> = new Map();
+	private encLegends: BindingLegend[] = [];
 	// Per-direction degree counters used by nodeSizeMode = indegree / outdegree.
 	// Refreshed every rebuild from data.edges.
 	private inDegreeMap: Map<string, number> = new Map();
@@ -349,7 +356,7 @@ export class MiniGraphView extends ItemView {
 	private activeTab: string = "__all__";
 	// Which Settings sub-tab is shown: View / Filter / Sort / Display / Layers.
 	// In-memory, preserved across graph rebuilds. Default View.
-	private settingsSubTab: "view" | "display" | "layers" = "view";
+	private settingsSubTab: "view" | "display" | "encode" | "layers" = "view";
 	private insightSubTab: "overview" | "alerts" | "suggest" = "overview";
 	// UpSet mode: signature key (= `signature.join("|")`) of the column
 	// currently selected by the user (highlighted in the matrix; drives
@@ -685,10 +692,11 @@ export class MiniGraphView extends ItemView {
 		const subBar = host.createDiv();
 		subBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", marginBottom: "6px", borderBottom: "1px solid var(--background-modifier-border)" });
 		const content = host.createDiv({ cls: "gim-panel-content" });
-		type SubKey = "view" | "display" | "layers";
+		type SubKey = "view" | "display" | "encode" | "layers";
 		const SUBS: { key: SubKey; label: string }[] = [
 			{ key: "view", label: "View" },
 			{ key: "display", label: "Display" },
+			{ key: "encode", label: "Encode" },
 			{ key: "layers", label: "Layers" },
 		];
 		const subBtns = new Map<string, HTMLElement>();
@@ -711,6 +719,7 @@ export class MiniGraphView extends ItemView {
 			switch (this.settingsSubTab) {
 				case "view": this.renderSettingsView(content); break;
 				case "display": this.renderSettingsDisplay(content); break;
+				case "encode": this.renderSettingsEncode(content); break;
 				case "layers": this.renderSettingsLayers(content); break;
 			}
 		};
@@ -814,7 +823,6 @@ export class MiniGraphView extends ItemView {
 			{ key: "showEnclosures" as const, label: "Show enclosures" },
 			{ key: "showEdges" as const, label: "Show edges" },
 			{ key: "showGrid" as const, label: "Show grid" },
-			{ key: "showMaturity" as const, label: "Note maturity badge" },
 		].filter((t) => displayToggleApplies(this.settings.viewMode, t.key));
 		const hasModeToggles = isMatrix || isHeatmap || this.settings.viewMode === "stream";
 		if (gdToggles.length > 0 || hasModeToggles) {
@@ -824,73 +832,7 @@ export class MiniGraphView extends ItemView {
 			if (this.settings.viewMode === "stream") this.renderStreamDisplayToggles(gdSection);
 		}
 
-		if (displayToggleApplies(this.settings.viewMode, "freshnessOverlay")) {
-		const freshnessSection = el.createDiv({ cls: "gim-panel-section" });
-		freshnessSection.createEl("h4", { text: "Freshness overlay" });
-		
-		const freshnessRow = freshnessSection.createEl("label", { cls: "gim-toggle-row" });
-		const freshnessCb = freshnessRow.createEl("input", { type: "checkbox" });
-		freshnessCb.checked = this.settings.freshnessOverlay;
-		freshnessCb.addEventListener("change", () => {
-			this.settings.freshnessOverlay = freshnessCb.checked;
-			void this.save();
-			this.requestDraw();
-		});
-		freshnessRow.createSpan({ text: "Enable freshness overlay" });
-		
-		const staleRow = freshnessSection.createDiv({ cls: "gim-setting-row" });
-		staleRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", paddingLeft: "24px" });
-		staleRow.createSpan({ text: "Stale after N days:" });
-		const staleInput = staleRow.createEl("input", { type: "number", cls: "gim-number-input" });
-		staleInput.setCssStyles({ width: "60px" });
-		staleInput.value = this.settings.staleDays.toString();
-		staleInput.addEventListener("change", () => {
-			const v = parseInt(staleInput.value, 10);
-			if (!isNaN(v) && v > 0) {
-				this.settings.staleDays = v;
-				void this.save();
-				this.requestDraw();
-			} else {
-				staleInput.value = this.settings.staleDays.toString();
-			}
-		});
-		}
 
-		if (displayToggleApplies(this.settings.viewMode, "statusField")) {
-		const statusSection = el.createDiv({ cls: "gim-panel-section" });
-		statusSection.createEl("h4", { text: "Status overlay" });
-		
-		const statusFieldRow = statusSection.createDiv({ cls: "gim-setting-row" });
-		statusFieldRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" });
-		statusFieldRow.createSpan({ text: "Field name (e.g. status):" });
-		const statusFieldInput = statusFieldRow.createEl("input", { type: "text", cls: "gim-text-input" });
-		statusFieldInput.setCssStyles({ width: "100px" });
-		statusFieldInput.value = this.settings.statusField;
-		statusFieldInput.addEventListener("change", () => {
-			this.settings.statusField = statusFieldInput.value.trim();
-			void this.save();
-			void this.rebuild();
-		});
-
-		if (this.settings.statusField && Object.keys(this.activeStatusColors).length > 0) {
-			const colorsContainer = statusSection.createDiv();
-			colorsContainer.setCssStyles({ marginTop: "8px", paddingLeft: "8px", display: "flex", flexDirection: "column", gap: "4px" });
-			
-			for (const key of Object.keys(this.activeStatusColors).sort()) {
-				const colorRow = colorsContainer.createDiv({ cls: "gim-setting-row" });
-				colorRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center" });
-				colorRow.createSpan({ text: key });
-				
-				const colorInput = colorRow.createEl("input", { type: "color" });
-				colorInput.value = this.settings.statusColors[key] || this.activeStatusColors[key] || "#ffffff";
-				colorInput.addEventListener("change", () => {
-					this.settings.statusColors[key] = colorInput.value;
-					void this.save();
-					this.requestDraw();
-				});
-			}
-		}
-		}
 
 		if (displayToggleApplies(this.settings.viewMode, "showEdges")) {
 		const bridgeSection = el.createDiv({ cls: "gim-panel-section" });
@@ -923,6 +865,196 @@ export class MiniGraphView extends ItemView {
 			}
 		});
 		}
+	}
+
+	// Encode sub-tab: bind a node attribute to a visual channel. First scope =
+	// Color only. This is the Visual Encoding layer — distinct from the SQL/dvjs
+	// Filter tab: it only changes how nodes LOOK, never which nodes appear.
+	private renderSettingsEncode(el: HTMLElement): void {
+		const section = el.createDiv({ cls: "gim-panel-section" });
+		section.createEl("h4", { text: "Encode — Color" });
+		section.createEl("div", {
+			text: "Colour each note card by an attribute. Does not filter — only changes appearance.",
+		}).setCssStyles({ fontSize: "10px", color: "var(--text-faint)", marginBottom: "6px" });
+
+		const cur = (this.settings.encoding ?? []).find((b) => b.channelId === "color");
+		const curIsFm = !!cur && cur.fieldId.startsWith("frontmatter:");
+
+		const fieldRow = section.createDiv({ cls: "gim-setting-row" });
+		fieldRow.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" });
+		fieldRow.createSpan({ text: "Color ←" });
+		const sel = fieldRow.createEl("select");
+		sel.add(new Option("(none)", ""));
+		for (const f of fieldSourceRegistry) sel.add(new Option(f.label, f.id));
+		sel.value = cur && !curIsFm ? cur.fieldId : "";
+
+		const fmRow = section.createDiv({ cls: "gim-setting-row" });
+		fmRow.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" });
+		fmRow.createSpan({ text: "or frontmatter key:" });
+		const fmIn = fmRow.createEl("input", { type: "text", cls: "gim-text-input" });
+		fmIn.setCssStyles({ width: "120px" });
+		fmIn.value = curIsFm ? cur!.fieldId.slice("frontmatter:".length) : "";
+
+		const scRow = section.createDiv({ cls: "gim-setting-row" });
+		scRow.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" });
+		scRow.createSpan({ text: "Scale:" });
+		const scSel = scRow.createEl("select");
+		for (const t of ["categorical", "linear", "log", "quantile"]) scSel.add(new Option(t, t));
+		scSel.value = cur?.scale?.type ?? "categorical";
+		const revLabel = scRow.createEl("label", { cls: "gim-toggle-row" });
+		const revCb = revLabel.createEl("input", { type: "checkbox" });
+		revCb.checked = !!cur?.scale?.reverse;
+		revLabel.createSpan({ text: "reverse" });
+
+		const apply = (): void => {
+			const fmKey = fmIn.value.trim();
+			const fieldId = fmKey ? `frontmatter:${fmKey}` : sel.value;
+			const others = (this.settings.encoding ?? []).filter((b) => b.channelId !== "color");
+			if (!fieldId) {
+				this.settings.encoding = others;
+			} else {
+				const binding: EncodingBinding = {
+					channelId: "color",
+					fieldId,
+					enabled: true,
+					scale: { type: scSel.value as ScaleType, reverse: revCb.checked },
+				};
+				this.settings.encoding = [...others, binding];
+			}
+			void this.save();
+			void this.rebuild().then(() => this.refreshSettingsTab());
+		};
+		sel.addEventListener("change", apply);
+		fmIn.addEventListener("change", apply);
+		scSel.addEventListener("change", apply);
+		revCb.addEventListener("change", apply);
+
+		// Auto-legend from the last evaluated encoding.
+		const colorLeg = this.encLegends.find((l) => l.channelId === "color");
+		if (colorLeg) {
+			const leg = section.createDiv();
+			leg.setCssStyles({ marginTop: "10px" });
+			leg.createEl("h4", { text: `Legend — ${colorLeg.fieldLabel}` });
+			if (colorLeg.legend.kind === "categorical") {
+				for (const e of colorLeg.legend.entries ?? []) {
+					const er = leg.createDiv();
+					er.setCssStyles({ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" });
+					er.createSpan().setCssStyles({
+						width: "12px", height: "12px", borderRadius: "3px", background: e.output, display: "inline-block",
+					});
+					er.createSpan({ text: e.key }).setCssStyles({ fontSize: "11px" });
+				}
+			} else if (colorLeg.legend.kind === "quantitative") {
+				leg.createDiv({
+					text: `${(colorLeg.legend.min ?? 0).toFixed(1)} … ${(colorLeg.legend.max ?? 0).toFixed(1)}${colorLeg.legend.reversed ? " (reversed)" : ""}`,
+				}).setCssStyles({ fontSize: "11px", color: "var(--text-muted)" });
+			}
+		}
+		// ---- Legacy Bindings Section ----
+		const legacySection = el.createDiv({ cls: "gim-panel-section" });
+		legacySection.setCssStyles({ marginTop: "16px", paddingTop: "8px", borderTop: "1px solid var(--background-modifier-border)" });
+		legacySection.createEl("h4", { text: "Legacy Bindings" });
+		legacySection.createEl("div", {
+			text: "These are legacy bindings mapping data to visuals. They will be fully integrated into the generic engine in the future.",
+		}).setCssStyles({ fontSize: "10px", color: "var(--text-faint)", marginBottom: "8px" });
+
+		// Freshness overlay
+		if (displayToggleApplies(this.settings.viewMode, "freshnessOverlay")) {
+			const freshnessRow = legacySection.createEl("label", { cls: "gim-toggle-row" });
+			const freshnessCb = freshnessRow.createEl("input", { type: "checkbox" });
+			freshnessCb.checked = this.settings.freshnessOverlay;
+			freshnessCb.addEventListener("change", () => {
+				this.settings.freshnessOverlay = freshnessCb.checked;
+				void this.save();
+				this.requestDraw();
+			});
+			freshnessRow.createSpan({ text: "Freshness overlay (Opacity ← ageDays)" });
+			
+			const staleRow = legacySection.createDiv({ cls: "gim-setting-row" });
+			staleRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", paddingLeft: "24px" });
+			staleRow.createSpan({ text: "Stale after N days:" });
+			const staleInput = staleRow.createEl("input", { type: "number", cls: "gim-number-input" });
+			staleInput.setCssStyles({ width: "60px" });
+			staleInput.value = this.settings.staleDays.toString();
+			staleInput.addEventListener("change", () => {
+				const v = parseInt(staleInput.value, 10);
+				if (!isNaN(v) && v > 0) {
+					this.settings.staleDays = v;
+					void this.save();
+					this.requestDraw();
+				} else {
+					staleInput.value = this.settings.staleDays.toString();
+				}
+			});
+		}
+
+		// Status overlay
+		if (displayToggleApplies(this.settings.viewMode, "statusField")) {
+			const statusFieldRow = legacySection.createDiv({ cls: "gim-setting-row" });
+			statusFieldRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px" });
+			statusFieldRow.createSpan({ text: "Status overlay (Color ← frontmatter):" });
+			const statusFieldInput = statusFieldRow.createEl("input", { type: "text", cls: "gim-text-input" });
+			statusFieldInput.setCssStyles({ width: "80px" });
+			statusFieldInput.value = this.settings.statusField;
+			statusFieldInput.addEventListener("change", () => {
+				this.settings.statusField = statusFieldInput.value.trim();
+				void this.save();
+				void this.rebuild();
+			});
+
+			if (this.settings.statusField && Object.keys(this.activeStatusColors).length > 0) {
+				const colorsContainer = legacySection.createDiv();
+				colorsContainer.setCssStyles({ marginTop: "4px", paddingLeft: "8px", display: "flex", flexDirection: "column", gap: "4px" });
+				
+				for (const key of Object.keys(this.activeStatusColors).sort()) {
+					const colorRow = colorsContainer.createDiv({ cls: "gim-setting-row" });
+					colorRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center" });
+					colorRow.createSpan({ text: key });
+					
+					const colorInput = colorRow.createEl("input", { type: "color" });
+					colorInput.value = this.settings.statusColors[key] || this.activeStatusColors[key] || "#ffffff";
+					colorInput.addEventListener("change", () => {
+						this.settings.statusColors[key] = colorInput.value;
+						void this.save();
+						this.requestDraw();
+					});
+				}
+			}
+		}
+
+		// Note maturity badge
+		if (displayToggleApplies(this.settings.viewMode, "showMaturity")) {
+			const maturityRow = legacySection.createEl("label", { cls: "gim-toggle-row" });
+			maturityRow.setCssStyles({ marginTop: "12px" });
+			const maturityCb = maturityRow.createEl("input", { type: "checkbox" });
+			maturityCb.checked = this.settings.showMaturity;
+			maturityCb.addEventListener("change", () => {
+				this.settings.showMaturity = maturityCb.checked;
+				void this.save();
+				this.requestDraw();
+			});
+			maturityRow.createSpan({ text: "Note maturity badge (Shape ← maturity)" });
+		}
+
+		// Scale card size by degree
+		const sizeRow = legacySection.createDiv({ cls: "gim-order-row" });
+		sizeRow.setCssStyles({ marginTop: "12px" });
+		sizeRow.createSpan({ text: "Scale card size by", cls: "gim-order-field" });
+		const sizeSel = sizeRow.createEl("select", { cls: "gim-order-dir" });
+		for (const opt of [
+			{ v: "fixed", t: "Fixed (None)" },
+			{ v: "indegree", t: "Incoming links" },
+			{ v: "outdegree", t: "Outgoing links" },
+		]) {
+			sizeSel.createEl("option", { value: opt.v, text: opt.t });
+		}
+		sizeSel.value = this.settings.nodeSizeMode;
+		sizeSel.addEventListener("change", () => {
+			this.settings.nodeSizeMode = sizeSel.value as "fixed" | "indegree" | "outdegree";
+			this.cardCache.clear();
+			void this.save();
+			void this.rebuild();
+		});
 	}
 
 	// Layers sub-tab: a cluster picker (chips) + the selected cluster's
@@ -2073,30 +2205,24 @@ export class MiniGraphView extends ItemView {
 		mIn.addEventListener("change", applySize);
 		nIn.addEventListener("change", applySize);
 
-		const modeRow = section.createDiv({ cls: "gim-order-row" });
-		modeRow.createSpan({ text: "Size by", cls: "gim-order-field" });
-		const sel = modeRow.createEl("select", { cls: "gim-order-dir" });
 		if (scope) {
+			const modeRow = section.createDiv({ cls: "gim-order-row" });
+			modeRow.createSpan({ text: "Size by", cls: "gim-order-field" });
+			const sel = modeRow.createEl("select", { cls: "gim-order-dir" });
 			sel.createEl("option", {
 				value: "",
 				text: `Inherited (${this.formatSizeMode(resolvedFor.nodeSizeMode)})`,
 			});
-		}
-		for (const opt of [
-			{ v: "fixed", t: "Fixed" },
-			{ v: "indegree", t: "Incoming links" },
-			{ v: "outdegree", t: "Outgoing links" },
-		]) {
-			sel.createEl("option", { value: opt.v, text: opt.t });
-		}
-		if (scope) {
+			for (const opt of [
+				{ v: "fixed", t: "Fixed" },
+				{ v: "indegree", t: "Incoming links" },
+				{ v: "outdegree", t: "Outgoing links" },
+			]) {
+				sel.createEl("option", { value: opt.v, text: opt.t });
+			}
 			const ov = this.settings.nodeDisplayOverrides[scope.groupKey];
 			sel.value = ov?.nodeSizeMode ?? "";
-		} else {
-			sel.value = this.settings.nodeSizeMode;
-		}
-		sel.addEventListener("change", () => {
-			if (scope) {
+			sel.addEventListener("change", () => {
 				const ov = overrideFor();
 				if (sel.value === "") delete ov.nodeSizeMode;
 				else
@@ -2111,13 +2237,11 @@ export class MiniGraphView extends ItemView {
 				) {
 					delete this.settings.nodeDisplayOverrides[scope.groupKey];
 				}
-			} else {
-				this.settings.nodeSizeMode = sel.value as MiniSettings["nodeSizeMode"];
-			}
-			this.cardCache.clear();
-			void this.save();
-			void this.rebuild();
-		});
+				this.cardCache.clear();
+				void this.save();
+				void this.rebuild();
+			});
+		}
 	}
 
 	private formatSizeMode(m: "fixed" | "indegree" | "outdegree"): string {
@@ -2971,6 +3095,26 @@ export class MiniGraphView extends ItemView {
 		}
 		// Stage 5: id → incident-edge-index adjacency for hover lookups.
 		this.adjacency = buildAdjacency(this.laid.edges);
+
+		// Visual Encoding: map displayed nodes' attributes -> per-node draw params.
+		// Reads only; NEVER changes which nodes are shown (see src/encoding/).
+		const encCtx: EncContext = {
+			nowMs: Date.now(),
+			degreeOf: (id) => {
+				const d = this.degreeMap.get(id);
+				return d == null ? undefined : { inDeg: 0, outDeg: 0, degree: d };
+			},
+			frontmatterOf: (id) => {
+				const f = this.app.vault.getAbstractFileByPath(id);
+				return f instanceof TFile
+					? (this.app.metadataCache.getFileCache(f)?.frontmatter as Record<string, unknown> | undefined)
+					: undefined;
+			},
+		};
+		const effEnc = effectiveEncoding(this.settings.encoding, this.settings);
+		const encRes = evaluateEncoding(this.laid.nodes, effEnc, encCtx, this.settings.viewMode);
+		this.encParams = encRes.params;
+		this.encLegends = encRes.legends;
 
 		this.activeStatusColors = {};
 		if (this.settings.statusField) {
@@ -4317,6 +4461,7 @@ export class MiniGraphView extends ItemView {
 			staleDays: this.settings.staleDays,
 			mtime: n.mtime,
 			nowMs: Date.now(),
+			encFillColor: this.encParams.get(n.id)?.fillColor,
 		});
 	}
 

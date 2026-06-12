@@ -11,6 +11,9 @@ const result = await build({
 	bundle: true,
 	format: "esm",
 	platform: "node",
+	alias: {
+		"obsidian": "./test/obsidian.mock.ts"
+	},
 	write: false,
 });
 const dir = mkdtempSync(join(tmpdir(), "tag-lens-test-"));

@@ -14,5 +14,13 @@ import "./lens-presets.test";
 import "./freshness.test";
 import "./gap-finder.test";
 import "./bridge-finder.test";
+import "./having-highlight.test";
+import "./status-overlay.test";
+import "./note-maturity.test";
+import "./stream-layout.test";
+import "./display-applicability.test";
+import "./encoding-scales.test";
+import "./encoding-evaluate.test";
+import "./encoding-migrate.test";
 
 summary();

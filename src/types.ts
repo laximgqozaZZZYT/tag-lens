@@ -1,3 +1,5 @@
+import type { EncodingBinding } from "./encoding/types";
+
 export interface GraphNode {
 	id: string;
 	label: string;
@@ -144,6 +146,9 @@ export interface MiniSettings {
 	// View mode for the [全体] tab. "euler" = the current Euler-diagram
 	// rectangle layout. Future modes will be appended here.
 	viewMode: ViewMode;
+	// Visual Encoding bindings (attribute -> visual channel). Independent of the
+	// SQL/dvjs filter layer: never changes which notes appear. See src/encoding/.
+	encoding: EncodingBinding[];
 	// UpSet plot column ordering. "size" = intersection size desc;
 	// "degree" = signature length asc (= "1-way sets first, then
 	// 2-way, then 3-way ..."), size desc within each degree.
@@ -455,6 +460,7 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	// their saved viewMode — this default only applies on first load / when
 	// no viewMode is persisted.
 	viewMode: "heatmap",
+	encoding: [],
 	upsetColumnSort: "size",
 	upsetMinColumnSize: 1,
 	matrixSort: "cooccurrence",

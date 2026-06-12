@@ -57,6 +57,10 @@ export interface DrawCardOptions {
 	// Note Maturity
 	fmMaturity?: string;
 	showMaturity?: boolean;
+
+	// Visual Encoding (Color channel): resolved fill colour for a NOTE card.
+	// Additive — when absent the card keeps its default background.
+	encFillColor?: string;
 }
 
 // Pure card renderer. Receives the already-resolved scale + body lines
@@ -98,7 +102,7 @@ export function drawCard(
 			? theme().swatch(fillHue, "fill")
 			: isTint
 				? theme().swatch(tintHue, "tint")
-				: theme().canvasBgAlt;
+				: (opts.encFillColor ?? theme().canvasBgAlt);
 	ctx.fill();
 
 	ctx.lineWidth = (highlighted ? 1.8 : isSet ? 1.6 : 1) / zoom;

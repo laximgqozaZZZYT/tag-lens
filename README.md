@@ -39,21 +39,22 @@ Control exactly what data enters the graph. Switch between modes using the toggl
 A list of all notes surviving the filter pipeline.
 - **Folder** and **Tag** trees. The tag tree groups notes by `#tag` and adds multi-tag combination sub-groups (e.g. `#a * #b`) so heavily overlapping notes are easy to find.
 - **Search** by plain text, `#tag` (hierarchical) or frontmatter `key:value`, with live suggestions.
+- **Pin to Sidebar**: Dock the navigator panel to the right edge of the canvas for persistent access alongside your visualizations.
 - **Show / hide** notes on the graph via a checkbox on each row; folder checkboxes cascade to their notes (tri-state), and **Select all / Deselect all** toggle everything at once.
 - Click a note to focus / locate / open it.
 
 ### 3. Settings
-Global graph display configurations and behavior.
-- **Active Note View (New)**: Enable auto-following of the currently active note in your Obsidian editor. Tag Lens will automatically center and contextually visualize its links, backlinks, and shared tags.
-- **NODE DISPLAY**: Card size (m × n cells, scaled by degree if chosen).
-- **MIN FONT SIZE**: Screen-pixel floor below which text is not drawn (LOD).
-- **GRAPH DISPLAY**: `Show nodes` / `Show enclosures` / `Show edges` / `Show grid`. Mode-specific toggles also appear here.
+Global graph display configurations and behavior, structured into sub-tabs:
+- **View**: Select your layout algorithms. Enable **Active Note View** to auto-follow the active note in your Obsidian editor and instantly visualize its context (links, backlinks, and shared tags).
+- **Display**: Granular control over graph elements (`Show nodes`, `Show enclosures`, `Show edges`, `Show grid`) and global minimum font size rules.
+- **Encode (New)**: The **Visual Encoding Engine**. Declaratively bind note attributes (e.g., frontmatter `status` or computed `ageDays`) to visual channels (like Color). This operates purely on aesthetics and never interferes with your data filters.
+- **Layers**: Per-cluster display overrides. Adjust card sizes (`m × n` cells) and behaviors for specific tag groups.
 
 ### 4. Insight (New)
 Analyzes your current graph state to help you manage complexity.
-- **Cognitive Load Metric**: Computes a real-time score based on visible nodes, edges, and clusters. Provides actionable advice when the graph becomes too complex.
-- **Suggest**: Provides categorization suggestions and structural insights based on your frontmatter tag properties.
-- **Unexplored Intersections & Link Candidates**: Automatically alerts you to statistical gaps in co-occurrences and suggests highly similar note pairs (Bridge Finder) to connect.
+- **Overview**: Computes a real-time **Cognitive Load Metric** based on visible nodes, edges, and clusters. Provides actionable advice when the graph becomes too complex.
+- **Alerts**: Automatically alerts you to statistical gaps in co-occurrences (**Gap Finder**) and suggests highly similar, unlinked note pairs (**Bridge Finder**) to help you connect isolated knowledge.
+- **Suggest**: Provides tag categorization suggestions based on Golder & Huberman's functional classification (e.g., identifying tags as Roles, Types, Properties, Contexts, or Statuses) for effective batch-refactoring.
 
 ## Install
 
