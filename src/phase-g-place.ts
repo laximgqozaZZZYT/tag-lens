@@ -268,5 +268,9 @@ function emitNode(
 		y: (row + rowSpan / 2) * opts.slotH,
 		width: w,
 		height: h,
+		mtime: n.mtime,
+		fmStatus: n.fmStatus,
+		fmMaturity: n.fmMaturity,
+		ageDays: n.ageDays,
 	});
 }

@@ -101,9 +101,9 @@ export function computeDroppedClusters(
 	nodes: GraphNode[],
 	rawRows: string[],
 	havingAuto: boolean,
-): { dropped: Set<string>; errors: string[] } {
+): { dropped: Map<string, number>; errors: string[] } {
 	const errors: string[] = [];
-	const dropped = new Set<string>();
+	const dropped = new Map<string, number>();
 	const counts = new Map<string, number>();
 	for (const n of nodes) {
 		for (const m of n.memberships) {
@@ -118,11 +118,11 @@ export function computeDroppedClusters(
 		const TOP_K = 20;
 		const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
 		for (let i = TOP_K; i < sorted.length; i++) {
-			dropped.add(sorted[i][0]);
+			dropped.set(sorted[i][0], sorted[i][1]);
 		}
 		// NONE_BUCKET is always suppressed when auto is on (its members
 		// would otherwise have been removed by SQL HAVING anyway).
-		dropped.add(NONE_BUCKET);
+		dropped.set(NONE_BUCKET, counts.get(NONE_BUCKET) ?? 0);
 	}
 
 	const rows = rawRows.map((s) => s.trim()).filter((s) => s.length > 0);
@@ -139,7 +139,7 @@ export function computeDroppedClusters(
 			if (dropped.has(key)) continue;
 			for (const t of tests) {
 				if (!t(count)) {
-					dropped.add(key);
+					dropped.set(key, count);
 					break;
 				}
 			}

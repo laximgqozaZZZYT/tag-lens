@@ -26,6 +26,7 @@ export function drawEnclosures(
 	ctx: CanvasRenderingContext2D,
 	clusters: ClusterRect[],
 	highlightedClusters: Set<string>,
+	warningClusters: Set<string> | undefined,
 	zoom: number,
 	// World position of the hovered NODE, if any. When set, only the
 	// intersection sub-box that CONTAINS this point is accented — the other
@@ -51,8 +52,11 @@ export function drawEnclosures(
 	for (const c of sortedClusters) {
 		const hue = clusterHue(c.groupKey);
 		const isHigh = highlightedClusters.has(c.groupKey);
+		const isWarn = warningClusters && warningClusters.has(c.groupKey);
 		ctx.fillStyle = isHigh
 			? colorAlpha(theme().warn, 0.40)
+			: isWarn
+			? colorAlpha(theme().warn, 0.20)
 			: theme().swatch(hue, "tint", 0.32);
 		if (c.pieces && c.pieces.length > 0) {
 			// Contour rings are lines only (no fill) — fill the solid mains.
@@ -88,10 +92,13 @@ export function drawEnclosures(
 	for (const c of sortedClusters) {
 		const hue = clusterHue(c.groupKey);
 		const isHigh = highlightedClusters.has(c.groupKey);
+		const isWarn = warningClusters && warningClusters.has(c.groupKey);
 		ctx.strokeStyle = isHigh
 			? theme().warn
+			: isWarn
+			? colorAlpha(theme().warn, 0.8)
 			: theme().swatch(hue, "fill", 0.9);
-		ctx.lineWidth = isHigh ? accentStrokeW : strokeW;
+		ctx.lineWidth = isHigh ? accentStrokeW : isWarn ? strokeW * 1.5 : strokeW;
 		if (c.pieces && c.pieces.length > 0) {
 			for (const p of c.pieces) {
 				if (bubble && p.kind === "main") {

@@ -308,6 +308,10 @@ function emitBipartite(
 			height: nd?.h ?? ctx.noteH,
 			// Clustered → tint the note by its island's main tag.
 			hueKey: ctx.mainTagByNote?.[i] ?? undefined,
+			mtime: n.mtime,
+			fmStatus: n.fmStatus,
+			fmMaturity: n.fmMaturity,
+			ageDays: n.ageDays,
 		};
 	});
 	// Clustered: draw NOTES first, TAG centres LAST so the big tag cards sit on

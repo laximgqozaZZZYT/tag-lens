@@ -7,6 +7,9 @@ export interface GraphNode {
 	score?: number;
 	filtered?: boolean;
 	mtime?: number;
+	fmStatus?: string;
+	fmMaturity?: string;
+	ageDays?: number;
 }
 
 export interface GraphEdge {
@@ -46,6 +49,21 @@ export interface MiniSettings {
 	dvjsFilter: string;
 	freshnessOverlay: boolean;
 	staleDays: number;
+	// Status overlay: frontmatter field whose (lowercased) value colours each
+	// card's outline. "" disables the overlay. `statusColors` maps a field value
+	// to a hex colour; values without an entry get an auto-assigned stable hue.
+	statusField: string;
+	statusColors: Record<string, string>;
+	// Note maturity badge on cards (Zettelkasten fleeting / literature /
+	// permanent), derived in the parser and optionally overridden per-note.
+	showMaturity: boolean;
+	// Sequence Stream mode: the frontmatter field used as the axis ("mtime" =
+	// file modified time), and how axis values are bucketed into columns.
+	streamAxisField: string;
+	streamBinning: "value" | "month" | "week";
+	// Sequence Stream row ordering: "size" = by tag note-count desc;
+	// "first-appearance" = by the earliest bin a tag appears in.
+	streamRowSort: "size" | "first-appearance";
 	// Each entry is one query row in the panel. Empty rows are ignored; all
 	// non-empty rows are AND-combined for evaluation.
 	where: string[];
@@ -54,6 +72,9 @@ export interface MiniSettings {
 	// are AND-combined. Failing clusters keep their nodes visible but their
 	// enclosure (outline + label) is suppressed.
 	having: string[];
+	// HAVING application mode: "filter" drops failing clusters' enclosures;
+	// "highlight" keeps everything but visually flags the failing clusters.
+	havingMode: "filter" | "highlight";
 	// Per-cluster node display tiers: `limit N` (top N shown full) and
 	// `brief N` (next batch shown title-only). Anything beyond the highest
 	// tier is hidden. The sort order used to compute "top N" comes from
@@ -251,7 +272,8 @@ export type ViewMode =
 	| "heatmap"
 	| "lattice"
 	| "upset"
-	| "droste";
+	| "droste"
+	| "stream";
 
 export interface ViewModeOption {
 	id: ViewMode;
@@ -369,6 +391,15 @@ export const VIEW_MODES: ViewModeOption[] = [
 		label: "UpSet plot",
 		description: "Stack of cards per intersection + dot matrix (handles ≥4-way intersections)",
 	},
+	{
+		// Sequence Stream: tags as rows, axis (time/value) bins as columns. Each
+		// cell aggregates the notes whose axis value falls in that bin, so a tag's
+		// row reads as when it was active and when it went dormant over the axis.
+		id: "stream",
+		label: "Sequence Stream",
+		description: "Tags as rows, time/value bins as columns; tracks when each tag is active or dormant",
+		experimental: true,
+	},
 ];
 
 export const DEFAULT_SETTINGS: MiniSettings = {
@@ -383,9 +414,16 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	dvjsFilter: "return dv.pages('\"\"').map(p => p.file.path).array();",
 	freshnessOverlay: false,
 	staleDays: 14,
+	statusField: "",
+	statusColors: {},
+	showMaturity: false,
+	streamAxisField: "mtime",
+	streamBinning: "month",
+	streamRowSort: "size",
 	where: [],
 	groupBy: ["tag:*"],
 	having: [],
+	havingMode: "filter",
 	limit: [],
 	orderField: "name",
 	orderDir: "asc",

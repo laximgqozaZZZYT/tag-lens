@@ -173,10 +173,11 @@ export function renderExprSection(
 export interface ToggleSectionDeps {
 	settings: MiniSettings;
 	save: () => void;
+	redraw?: () => void;
 }
 
 export function renderToggleSection<
-	K extends "showNodes" | "showBody" | "showEnclosures" | "showEdges" | "showGrid",
+	K extends "showNodes" | "showBody" | "showEnclosures" | "showEdges" | "showGrid" | "showMaturity",
 >(
 	parent: HTMLElement,
 	deps: ToggleSectionDeps,
@@ -192,6 +193,7 @@ export function renderToggleSection<
 		cb.addEventListener("change", () => {
 			deps.settings[t.key] = cb.checked;
 			void deps.save();
+			deps.redraw?.();
 		});
 		row.createSpan({ text: t.label });
 	}

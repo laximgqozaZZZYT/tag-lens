@@ -18,6 +18,7 @@ question.
 | **Gap Finder** | Statistical analysis overlay that identifies missing connections. Highlights "empty" intersections between tags that should theoretically have content, ideal for uncovering unexplored character pairings or research blind spots. |
 | **Bridge Finder** | Discovers and draws "ghost edges" between notes that have a high Jaccard similarity in their tags but no actual links. Provides a "Link candidates" alert in the Insight panel to help you connect isolated knowledge. |
 | **UpSet plot** | Stack of cards per intersection signature + dot matrix at the bottom — handles ≥ 4-way intersections that diagrams can't draw. |
+| **Sequence Stream** | (Beta) Time-series transposed heatmap. The X-axis represents time bins (e.g. month, week) or sequential fields (e.g. chapters), and the Y-axis represents tags. Shows tag usage over time and highlights "dropped threads" with markers where a tag suddenly stops appearing. |
 | **BubbleSets** | Containment layout drawn as rectangular iso-contour bubbles. |
 | Experimental (beta) | **Connection matrix** (notes × tags dot grid, seriated), **Tag graph** (bipartite notes + tag nodes), and the region/containment family — **Nested set diagram / Containment map / Euler diagram** — kept selectable but with known scaling caveats on giant-tag, hierarchy-less vaults. |
 

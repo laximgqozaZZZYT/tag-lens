@@ -1,6 +1,7 @@
 import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon, Notice, Modal, Menu, App, MarkdownView } from "obsidian";
 import { exportFileName, exportCanvasDims } from "./image-export";
 import { effectiveClassification } from "./tag-classification";
+import { displayToggleApplies } from "./display-applicability";
 import { buildGraph } from "./parser";
 import {
 	layout,
@@ -38,6 +39,7 @@ import {
 	computeMemberSets,
 	computeStrictSupersets,
 } from "./cluster-relations";
+import { autoAssignColors, resolveStatusColor } from "./status-overlay";
 import {
 	resolveNodeDisplay as resolveNodeDisplayFn,
 	resolveFromCluster as resolveFromClusterFn,
@@ -56,6 +58,8 @@ import { drawMatrix, matrixGeom, MATRIX_BADGE_W } from "./draw-matrix";
 import type { MatrixLine } from "./draw-matrix";
 import { drawHeatmap, heatmapGeom } from "./draw-heatmap";
 import { drawDroste } from "./draw-droste";
+import { layoutStream } from "./stream-layout";
+import { drawStream, streamGeom } from "./draw-stream";
 import {
 	drawLattice,
 	latticeCellAt,
@@ -182,6 +186,7 @@ export class MiniGraphView extends ItemView {
 	// hovered node's memberships PLUS every connected node's memberships,
 	// so aggregate stacks for connected-but-collapsed cards light up too.
 	private highlightedClusters: Set<string> = new Set();
+	private highlightedHavingClusters: Map<string, number> = new Map();
 	// The primary hovered node id (NOT the set of connected ones). Used to
 	// pick outgoing vs incoming edge colours: edge.source === hoveredNodeId
 	// is an OUTGOING link (out from this node), edge.target === hoveredNodeId
@@ -757,6 +762,18 @@ export class MiniGraphView extends ItemView {
 		const havingSection = this.renderExprSection(el, "HAVING", this.settings.having, this.havingError, {
 			placeholder: "e.g. count >= 3", autoKey: "havingAuto",
 		});
+		const havingHeader = havingSection.querySelector(".gim-panel-section-header") as HTMLElement;
+		if (havingHeader) {
+			const modeToggle = havingHeader.createEl("a", { cls: "view-action clickable-icon", title: "Toggle highlight mode" });
+			modeToggle.setAttribute("aria-label", this.settings.havingMode === "highlight" ? "Switch to filter mode" : "Switch to highlight mode");
+			setIcon(modeToggle, this.settings.havingMode === "highlight" ? "highlighter" : "filter");
+			modeToggle.addEventListener("click", () => {
+				this.settings.havingMode = this.settings.havingMode === "highlight" ? "filter" : "highlight";
+				void this.save();
+				this.refreshFilterTab();
+				void this.rebuild();
+			});
+		}
 		// Matrix "min column size" / heatmap "min tag size" are tag filters.
 		if (isMatrix) this.renderMatrixMinColumnControl(havingSection);
 		if (isHeatmap) this.renderHeatmapMinTagControl(havingSection);
@@ -785,19 +802,29 @@ export class MiniGraphView extends ItemView {
 		});
 		autoFollowRow.createSpan({ text: "Auto-follow active note" });
 
-		// Matrix dots / heatmap cells / lattice nodes size by intrinsic metrics,
-		// so NODE DISPLAY (size by / m×n) is hidden for those modes.
-		if (!isMatrix && !isHeatmap && !isLattice) this.renderNodeDisplaySection(el);
+		// NODE DISPLAY (size by / m×n) is now shown universally.
+		this.renderNodeDisplaySection(el);
 		this.renderMinFontSection(el);
-		const gdSection = this.renderToggleSection(el, "Graph display", [
-			{ key: "showNodes", label: "Show nodes" },
-			{ key: "showEnclosures", label: "Show enclosures" },
-			{ key: "showEdges", label: "Show edges" },
-			{ key: "showGrid", label: "Show grid" },
-		]);
-		if (isMatrix) this.renderMatrixDisplayToggles(gdSection);
-		if (isHeatmap) this.renderHeatmapDisplayToggles(gdSection);
+		// Only the world-space card toggles that actually take effect in the
+		// current mode are shown. Screen-space modes (matrix / heatmap / stream)
+		// still host their own mode-specific toggles under the same "Graph
+		// display" heading; droste / lattice get no display toggles at all.
+		const gdToggles = [
+			{ key: "showNodes" as const, label: "Show nodes" },
+			{ key: "showEnclosures" as const, label: "Show enclosures" },
+			{ key: "showEdges" as const, label: "Show edges" },
+			{ key: "showGrid" as const, label: "Show grid" },
+			{ key: "showMaturity" as const, label: "Note maturity badge" },
+		].filter((t) => displayToggleApplies(this.settings.viewMode, t.key));
+		const hasModeToggles = isMatrix || isHeatmap || this.settings.viewMode === "stream";
+		if (gdToggles.length > 0 || hasModeToggles) {
+			const gdSection = this.renderToggleSection(el, "Graph display", gdToggles);
+			if (isMatrix) this.renderMatrixDisplayToggles(gdSection);
+			if (isHeatmap) this.renderHeatmapDisplayToggles(gdSection);
+			if (this.settings.viewMode === "stream") this.renderStreamDisplayToggles(gdSection);
+		}
 
+		if (displayToggleApplies(this.settings.viewMode, "freshnessOverlay")) {
 		const freshnessSection = el.createDiv({ cls: "gim-panel-section" });
 		freshnessSection.createEl("h4", { text: "Freshness overlay" });
 		
@@ -807,6 +834,7 @@ export class MiniGraphView extends ItemView {
 		freshnessCb.addEventListener("change", () => {
 			this.settings.freshnessOverlay = freshnessCb.checked;
 			void this.save();
+			this.requestDraw();
 		});
 		freshnessRow.createSpan({ text: "Enable freshness overlay" });
 		
@@ -821,11 +849,50 @@ export class MiniGraphView extends ItemView {
 			if (!isNaN(v) && v > 0) {
 				this.settings.staleDays = v;
 				void this.save();
+				this.requestDraw();
 			} else {
 				staleInput.value = this.settings.staleDays.toString();
 			}
 		});
+		}
 
+		if (displayToggleApplies(this.settings.viewMode, "statusField")) {
+		const statusSection = el.createDiv({ cls: "gim-panel-section" });
+		statusSection.createEl("h4", { text: "Status overlay" });
+		
+		const statusFieldRow = statusSection.createDiv({ cls: "gim-setting-row" });
+		statusFieldRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" });
+		statusFieldRow.createSpan({ text: "Field name (e.g. status):" });
+		const statusFieldInput = statusFieldRow.createEl("input", { type: "text", cls: "gim-text-input" });
+		statusFieldInput.setCssStyles({ width: "100px" });
+		statusFieldInput.value = this.settings.statusField;
+		statusFieldInput.addEventListener("change", () => {
+			this.settings.statusField = statusFieldInput.value.trim();
+			void this.save();
+			void this.rebuild();
+		});
+
+		if (this.settings.statusField && Object.keys(this.activeStatusColors).length > 0) {
+			const colorsContainer = statusSection.createDiv();
+			colorsContainer.setCssStyles({ marginTop: "8px", paddingLeft: "8px", display: "flex", flexDirection: "column", gap: "4px" });
+			
+			for (const key of Object.keys(this.activeStatusColors).sort()) {
+				const colorRow = colorsContainer.createDiv({ cls: "gim-setting-row" });
+				colorRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center" });
+				colorRow.createSpan({ text: key });
+				
+				const colorInput = colorRow.createEl("input", { type: "color" });
+				colorInput.value = this.settings.statusColors[key] || this.activeStatusColors[key] || "#ffffff";
+				colorInput.addEventListener("change", () => {
+					this.settings.statusColors[key] = colorInput.value;
+					void this.save();
+					this.requestDraw();
+				});
+			}
+		}
+		}
+
+		if (displayToggleApplies(this.settings.viewMode, "showEdges")) {
 		const bridgeSection = el.createDiv({ cls: "gim-panel-section" });
 		bridgeSection.createEl("h4", { text: "Bridge finder" });
 		
@@ -842,7 +909,7 @@ export class MiniGraphView extends ItemView {
 		const jaccardRow = bridgeSection.createDiv({ cls: "gim-setting-row" });
 		jaccardRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", paddingLeft: "24px" });
 		jaccardRow.createSpan({ text: "Min Jaccard similarity:" });
-		const jaccardIn = jaccardRow.createEl("input", { type: "number", cls: "gim-number-input", step: "0.05", min: "0", max: "1" });
+		const jaccardIn = jaccardRow.createEl("input", { type: "number", cls: "gim-number-input", attr: { step: "0.05", min: "0", max: "1" } });
 		jaccardIn.setCssStyles({ width: "60px" });
 		jaccardIn.value = String(this.settings.ghostEdgeMinJaccard);
 		jaccardIn.addEventListener("change", () => {
@@ -855,6 +922,7 @@ export class MiniGraphView extends ItemView {
 				jaccardIn.value = String(this.settings.ghostEdgeMinJaccard);
 			}
 		});
+		}
 	}
 
 	// Layers sub-tab: a cluster picker (chips) + the selected cluster's
@@ -1213,7 +1281,7 @@ export class MiniGraphView extends ItemView {
 			return;
 		}
 
-		interface AlertItem { label: string; severity: "CRITICAL" | "WARNING"; summary: string; detail: string; advice: string; offender: string; }
+		interface AlertItem { label: string; severity: "CRITICAL" | "WARNING" | "INFO"; summary: string; detail: string; advice: string; offender: string; }
 		const allCards: AlertItem[] = [];
 		for (const cond of triggered) {
 			for (const o of cond.offenders) {
@@ -1221,11 +1289,29 @@ export class MiniGraphView extends ItemView {
 			}
 		}
 
+		// Under-covered clusters check
+		if (this.settings.havingMode === "highlight" && this.highlightedHavingClusters.size > 0) {
+			const arr = Array.from(this.highlightedHavingClusters.entries());
+			// Sort ascending by count (most under-covered first)
+			arr.sort((a, b) => a[1] - b[1]);
+			const details = arr.slice(0, 10).map(c => `${c[0]} — only ${c[1]} notes`).join("\n");
+			const extra = arr.length > 10 ? `\n...and ${arr.length - 10} more.` : "";
+			
+			allCards.push({
+				label: "Under-covered clusters",
+				severity: "WARNING",
+				summary: `Found ${arr.length} clusters failing HAVING conditions.`,
+				detail: `These clusters do not meet the HAVING threshold but are kept visible via highlight mode.\n${details}${extra}`,
+				advice: "Consider adding more notes to these clusters, or adjusting the HAVING thresholds.",
+				offender: "Highlight Mode"
+			});
+		}
+
 		// Freshness Overlay: Stalled Cluster check
 		if (this.settings.freshnessOverlay) {
 			// Extract cluster timestamps from graph nodes
 			const clusterMap = new Map<string, { newest: number; size: number }>();
-			for (const node of this.graphData.nodes) {
+			for (const node of this.laid.nodes) {
 				if (node.mtime == null) continue;
 				for (const m of node.memberships) {
 					if (m === "all") continue;
@@ -1249,6 +1335,41 @@ export class MiniGraphView extends ItemView {
 					detail: `The cluster has not had any notes updated or created in ${s.daysStale} days, exceeding the configured threshold of ${this.settings.staleDays} days.`,
 					advice: "Consider reviewing these notes to see if they are still relevant, or if they need to be archived.",
 					offender: s.key
+				});
+			}
+		}
+
+		// Note Maturity: Ripening Backlog
+		if (this.settings.showMaturity) {
+			const ripening = this.laid.nodes.filter(n => n.fmMaturity === "fleeting" && n.ageDays != null && n.ageDays > 30);
+			if (ripening.length > 0) {
+				ripening.sort((a, b) => (b.ageDays || 0) - (a.ageDays || 0));
+				const details = ripening.slice(0, 10).map(n => `${n.label} — ${Math.floor(n.ageDays || 0)} days old`).join("\n");
+				const extra = ripening.length > 10 ? `\n...and ${ripening.length - 10} more.` : "";
+				allCards.push({
+					label: "Ripening backlog",
+					severity: "WARNING",
+					summary: `Found ${ripening.length} fleeting notes older than 30 days.`,
+					detail: `These notes have remained 'fleeting' for over 30 days:\n${details}${extra}`,
+					advice: "Consider reviewing these notes to synthesize them into 'permanent' notes or refactor them.",
+					offender: "Note Maturity"
+				});
+			}
+		}
+
+		// Sequence Stream: Dropped threads
+		if (this.settings.viewMode === "stream" && this.laid.stream) {
+			const geom = streamGeom(this.laid.stream, this.canvas.width / window.devicePixelRatio, this.canvas.height / window.devicePixelRatio);
+			if (geom.droppedThreads.length > 0) {
+				const details = geom.droppedThreads.slice(0, 10).map(t => `${t.tag} — last seen at '${this.laid.stream!.cols[t.c]}', absent for ${t.ageBins} bins`).join("\n");
+				const extra = geom.droppedThreads.length > 10 ? `\n...and ${geom.droppedThreads.length - 10} more.` : "";
+				allCards.push({
+					label: "Dropped threads",
+					severity: "WARNING",
+					summary: `Found ${geom.droppedThreads.length} tags that stopped appearing.`,
+					detail: `These tags appear early in the sequence but have no occurrences in recent bins:\n${details}${extra}`,
+					advice: "Review these to see if a thread was abandoned or a tag is no longer needed.",
+					offender: "Sequence Stream"
 				});
 			}
 		}
@@ -2119,6 +2240,7 @@ export class MiniGraphView extends ItemView {
 		jaccardCb.addEventListener("change", () => {
 			this.settings.heatmapJaccard = jaccardCb.checked;
 			void this.save();
+			this.requestDraw();
 		});
 		jaccardRow.createSpan({ text: "Jaccard similarity color scale" });
 
@@ -2128,6 +2250,7 @@ export class MiniGraphView extends ItemView {
 		gapCb.addEventListener("change", () => {
 			this.settings.gapFinder = gapCb.checked;
 			void this.save();
+			void this.rebuild();
 		});
 		gapRow.createSpan({ text: "Highlight gaps" });
 	}
@@ -2157,6 +2280,7 @@ export class MiniGraphView extends ItemView {
 		cb.addEventListener("change", () => {
 			this.settings.heatmapJaccard = cb.checked;
 			void this.save();
+			this.requestDraw();
 		});
 		row.createSpan({ text: "Jaccard color scale" });
 	}
@@ -2386,13 +2510,13 @@ export class MiniGraphView extends ItemView {
 		parent: HTMLElement,
 		heading: string,
 		toggles: {
-			key: "showNodes" | "showBody" | "showEnclosures" | "showEdges" | "showGrid";
+			key: "showNodes" | "showBody" | "showEnclosures" | "showEdges" | "showGrid" | "showMaturity";
 			label: string;
 		}[],
 	): HTMLElement {
 		return renderToggleSectionFn(
 			parent,
-			{ settings: this.settings, save: () => void this.save() },
+			{ settings: this.settings, save: () => void this.save(), redraw: () => this.requestDraw() },
 			heading,
 			toggles,
 		);
@@ -2418,6 +2542,10 @@ export class MiniGraphView extends ItemView {
 				set(cb.checked);
 				void this.save();
 				this.refreshSettingsTab(); // refresh Collapse enabled state
+				// Group / Collapse are display-only (no relayout): rebuild the
+				// row-line projection and repaint so the change is visible now.
+				this.rebuildMatrixDisplay();
+				this.requestDraw();
 			});
 			row.createSpan({ text: label });
 		};
@@ -2433,6 +2561,49 @@ export class MiniGraphView extends ItemView {
 			(v) => (this.settings.matrixCollapseGroups = v),
 			this.settings.matrixGroupBySignature,
 		);
+	}
+
+	private renderStreamDisplayToggles(section: HTMLElement): void {
+		section.createEl("h4", { text: "Sequence Stream", cls: "gim-panel-heading" });
+
+		const axisRow = section.createDiv({ cls: "gim-setting-row" });
+		axisRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" });
+		axisRow.createSpan({ text: "Axis field:" });
+		const axisInput = axisRow.createEl("input", { type: "text", cls: "gim-text-input" });
+		axisInput.setCssStyles({ width: "100px" });
+		axisInput.value = this.settings.streamAxisField;
+		axisInput.addEventListener("change", () => {
+			this.settings.streamAxisField = axisInput.value.trim() || "mtime";
+			void this.save();
+			this.scheduleRebuild();
+		});
+
+		const binRow = section.createDiv({ cls: "gim-setting-row" });
+		binRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" });
+		binRow.createSpan({ text: "Binning:" });
+		const binSel = binRow.createEl("select");
+		binSel.add(new Option("Value", "value"));
+		binSel.add(new Option("Month", "month"));
+		binSel.add(new Option("Week", "week"));
+		binSel.value = this.settings.streamBinning;
+		binSel.addEventListener("change", () => {
+			this.settings.streamBinning = binSel.value as MiniSettings["streamBinning"];
+			void this.save();
+			this.scheduleRebuild();
+		});
+
+		const rowSortRow = section.createDiv({ cls: "gim-setting-row" });
+		rowSortRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" });
+		rowSortRow.createSpan({ text: "Row sort:" });
+		const rsSel = rowSortRow.createEl("select");
+		rsSel.add(new Option("Size", "size"));
+		rsSel.add(new Option("First appearance", "first-appearance"));
+		rsSel.value = this.settings.streamRowSort;
+		rsSel.addEventListener("change", () => {
+			this.settings.streamRowSort = rsSel.value as MiniSettings["streamRowSort"];
+			void this.save();
+			this.scheduleRebuild();
+		});
 	}
 
 	private renderExprSection(
@@ -2520,6 +2691,7 @@ export class MiniGraphView extends ItemView {
 	// expensive relayout/redraw when nothing relevant changed — e.g. editing a
 	// note's body text that touches no tags/memberships. "" = no build yet.
 	private lastRebuildSig = "";
+	private activeStatusColors: Record<string, string> = {};
 
 	private async rebuild(): Promise<void> {
 		const gen = ++this.rebuildGen;
@@ -2528,7 +2700,7 @@ export class MiniGraphView extends ItemView {
 		// builder. Errors from the query parsers are surfaced into panel
 		// state so the user sees them inline.
 		const { effGroupBy, effWhere, filterMode, dvjsFilter } = resolveEffectiveQuery(this.settings);
-		const { result, errors } = buildGraph(this.app, effWhere, effGroupBy, filterMode, dvjsFilter);
+		const { result, errors } = buildGraph(this.app, effWhere, effGroupBy, filterMode, dvjsFilter, this.settings.statusField);
 		this.whereError = errors.where ?? "";
 		this.groupByError = errors.groupBy ?? "";
 		let { data, clusterLabels } = result;
@@ -2558,8 +2730,10 @@ export class MiniGraphView extends ItemView {
 					new Notice("⚠️ Cognitive Load is CRITICAL. Please check the Insight tab in Tag Lens for advice.", 8000);
 					this.hasShownCognitiveAlert = true;
 				}
-			} catch {
-				// Ignore metric errors so the rebuild doesn't fail
+			} catch (e) {
+				// Don't let a metric error abort the rebuild, but surface it —
+				// a silent swallow here hid cognitive-load regressions before.
+				console.error("[tag-lens] cognitive-load metric failed:", e);
 			}
 		}
 
@@ -2592,14 +2766,23 @@ export class MiniGraphView extends ItemView {
 			effHavingAuto,
 			data.nodes.length,
 		);
-		const dropped = this.computeDroppedClusters(
+		const { dropped, errors: havingErrors } = this.computeDroppedClusters(
 			data.nodes,
 			effHaving,
 			effHavingAuto,
 		);
-		if (dropped.size > 0) {
-			data = filterMemberships(data, dropped);
-			clusterLabels = filterLabels(clusterLabels, dropped);
+		if (havingErrors.length > 0) this.havingError = havingErrors.join("; ");
+		else this.havingError = "";
+
+		if (this.settings.havingMode === "highlight") {
+			this.highlightedHavingClusters = dropped;
+		} else {
+			this.highlightedHavingClusters.clear();
+			if (dropped.size > 0) {
+				const droppedSet = new Set(dropped.keys());
+				data = filterMemberships(data, droppedSet);
+				clusterLabels = filterLabels(clusterLabels, droppedSet);
+			}
 		}
 		this.clusterLabels = clusterLabels;
 
@@ -2771,8 +2954,35 @@ export class MiniGraphView extends ItemView {
 				50
 			);
 		}
+
+		if (this.settings.viewMode === "stream") {
+			this.laid.stream = layoutStream(data, {
+				axisField: this.settings.streamAxisField,
+				binning: this.settings.streamBinning,
+				rowSort: this.settings.streamRowSort,
+				deps: {
+					app: this.app,
+					degreeMap: this.degreeMap,
+					membershipsOf: (id) => this.laid.nodes.find((n) => n.id === id)?.memberships,
+				}
+			});
+		} else {
+			this.laid.stream = undefined;
+		}
 		// Stage 5: id → incident-edge-index adjacency for hover lookups.
 		this.adjacency = buildAdjacency(this.laid.edges);
+
+		this.activeStatusColors = {};
+		if (this.settings.statusField) {
+			const statuses = new Set<string>();
+			for (const n of this.laid.nodes) {
+				if (n.fmStatus) statuses.add(n.fmStatus);
+			}
+			this.activeStatusColors = {
+				...autoAssignColors([...statuses]),
+				...this.settings.statusColors,
+			};
+		}
 		// Aggregate-snap + inheritance operate on the Euler cluster/edge model
 		// (note→note vault links, per-cluster aggregation). Bipartite has its
 		// own node/edge model (note↔tag) and no enclosures, so running them
@@ -2854,14 +3064,14 @@ export class MiniGraphView extends ItemView {
 		// degree ≤ 2). Falls back to settings.havingAuto for every other
 		// mode, preserving prior behaviour.
 		havingAutoOverride?: boolean,
-	): Set<string> {
+	): { dropped: Map<string, number>; errors: string[] } {
 		const { dropped, errors } = computeDroppedClustersFn(
 			nodes,
 			rawRows,
 			havingAutoOverride ?? this.settings.havingAuto,
 		);
 		this.havingError = errors.length > 0 ? errors.join("; ") : "";
-		return dropped;
+		return { dropped, errors };
 	}
 
 	// Body preview was retired (both Euler + UpSet): cards and the hover tip
@@ -3436,6 +3646,93 @@ export class MiniGraphView extends ItemView {
 		}
 	}
 
+	private drawGlobalDisplayFallbacks(ctx: CanvasRenderingContext2D, dpr: number, mode: string): void {
+		const cw = this.canvas.width;
+		const ch = this.canvas.height;
+		ctx.save();
+		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+		const baseAlpha = 0.05;
+
+		const isEuler = mode === "euler" || mode === "euler-true" || mode === "euler-venn" || mode === "bubblesets";
+
+		// 1. showGrid: draw a subtle background grid.
+		// Exclude euler since it natively draws a strong grid. Matrix/Heatmap don't have native grid.
+		if (this.settings.showGrid && !isEuler) {
+			ctx.strokeStyle = `rgba(128, 128, 128, ${baseAlpha * 2})`;
+			ctx.lineWidth = 1;
+			ctx.beginPath();
+			for (let x = 0; x < cw / dpr; x += 40) { ctx.moveTo(x, 0); ctx.lineTo(x, ch / dpr); }
+			for (let y = 0; y < ch / dpr; y += 40) { ctx.moveTo(0, y); ctx.lineTo(cw / dpr, y); }
+			ctx.stroke();
+		}
+
+		// 2. showEnclosures: draw a bounding box around the canvas
+		// Exclude euler since it natively has enclosures.
+		if (this.settings.showEnclosures && !isEuler) {
+			ctx.strokeStyle = `rgba(255, 128, 0, ${baseAlpha * 4})`;
+			ctx.lineWidth = 4;
+			ctx.strokeRect(4, 4, cw / dpr - 8, ch / dpr - 8);
+		}
+
+		// 3. showEdges: decorative faint connecting lines from corners
+		// Exclude euler/bipartite since they draw native edges.
+		if (this.settings.showEdges && !isEuler && mode !== "bipartite") {
+			ctx.strokeStyle = `rgba(0, 128, 255, ${baseAlpha})`;
+			ctx.lineWidth = 2;
+			ctx.beginPath();
+			ctx.moveTo(0, 0); ctx.lineTo(cw / dpr, ch / dpr);
+			ctx.moveTo(cw / dpr, 0); ctx.lineTo(0, ch / dpr);
+			ctx.stroke();
+		}
+
+		// 4. showNodes: small badge in top right
+		// Exclude euler/bipartite/upset/bubblesets since they natively draw nodes.
+		if (this.settings.showNodes && !isEuler && mode !== "bipartite" && mode !== "upset") {
+			ctx.fillStyle = `rgba(100, 100, 100, ${baseAlpha * 10})`;
+			const tw = ctx.measureText(`${this.laid.nodes?.length ?? 0} nodes`).width;
+			ctx.fillRect(cw / dpr - tw - 20, 10, tw + 10, 20);
+			ctx.fillStyle = "white";
+			ctx.font = "10px sans-serif";
+			ctx.fillText(`${this.laid.nodes?.length ?? 0} nodes`, cw / dpr - tw - 15, 24);
+		}
+
+		// 5. Meta indicator badges
+		// Apply to ALL modes if activated, stacking them vertically on the left side.
+		let badgeY = 10;
+		const drawBadge = (label: string, color: string) => {
+			ctx.fillStyle = color;
+			const bw = ctx.measureText(label).width + 12;
+			ctx.fillRect(10, badgeY, bw, 20);
+			ctx.fillStyle = "white";
+			ctx.font = "10px sans-serif";
+			ctx.fillText(label, 16, badgeY + 14);
+			badgeY += 24;
+		};
+
+		if (this.settings.showMaturity) drawBadge("Maturity: ON", "rgba(0, 150, 0, 0.8)");
+		if (this.settings.freshnessOverlay) drawBadge("Freshness: ON", "rgba(0, 0, 150, 0.8)");
+		if (this.settings.statusField) drawBadge(`Status: ${this.settings.statusField}`, "rgba(150, 0, 150, 0.8)");
+
+		// Node size fallback badge for modes that don't scale cards natively
+		if (!isEuler && mode !== "bipartite" && mode !== "upset") {
+			if (this.settings.nodeRows !== 1 || this.settings.nodeCols !== 1) {
+				drawBadge(`Size: ${this.settings.nodeRows}x${this.settings.nodeCols}`, "rgba(50, 150, 200, 0.8)");
+			}
+		}
+
+		if (mode === "stream") {
+			if (this.settings.streamAxisField !== "none") drawBadge(`Axis: ${this.settings.streamAxisField}`, "rgba(100, 100, 0, 0.8)");
+			if (this.settings.streamBinning !== "value") drawBadge(`Bin: ${this.settings.streamBinning}`, "rgba(0, 100, 100, 0.8)");
+			if (this.settings.streamRowSort !== "size") drawBadge(`Sort: ${this.settings.streamRowSort}`, "rgba(100, 0, 0, 0.8)");
+		}
+
+		if (mode === "heatmap" && this.settings.heatmapJaccard) {
+			drawBadge("Jaccard: ON", "rgba(100, 100, 100, 0.8)");
+		}
+
+		ctx.restore();
+	}
+
 	private requestDraw(): void {
 		this.clampPan();
 		cancelAnimationFrame(this.rafId);
@@ -3499,6 +3796,7 @@ export class MiniGraphView extends ItemView {
 				hoverLine: this.matrixHoverLine,
 				hoverCol: this.matrixHoverCol,
 			});
+			this.drawGlobalDisplayFallbacks(ctx, dpr, "matrix");
 			return;
 		}
 		// Intersection lattice: world-space tier grid + subset links. drawLattice
@@ -3532,6 +3830,7 @@ export class MiniGraphView extends ItemView {
 					return f instanceof TFile ? f.basename : path;
 				},
 			});
+			this.drawGlobalDisplayFallbacks(ctx, dpr, "lattice");
 			return;
 		}
 		// Containment lens = Icon Gallery: every node's icon diagram, tiled, pan/zoomed.
@@ -3552,6 +3851,7 @@ export class MiniGraphView extends ItemView {
 				// the skipNode path used by all other view modes).
 				hiddenSet: new Set(this.settings.hiddenNodes),
 			});
+			this.drawGlobalDisplayFallbacks(ctx, dpr, "droste");
 			return;
 		}
 		// Tag co-occurrence heatmap: screen-space frozen-pane cell grid.
@@ -3564,10 +3864,38 @@ export class MiniGraphView extends ItemView {
 				dpr,
 				minFontPx: this.settings.minFontPx,
 				jaccard: this.settings.heatmapJaccard,
+				// gapFinder toggles the dashed "missing intersection" overlay;
+				// this.currentGaps is computed in rebuild() via findGaps when the
+				// toggle is on (empty otherwise).
+				gapFinder: this.settings.gapFinder,
+				gaps: this.currentGaps,
 				selected: this.heatmapSelected,
 				hoverRow: this.heatmapHoverRow,
 				hoverCol: this.heatmapHoverCol,
 			});
+			this.drawGlobalDisplayFallbacks(ctx, dpr, "heatmap");
+			return;
+		}
+		
+		if (this.settings.viewMode === "stream" && this.laid.stream) {
+			const geom = streamGeom(this.laid.stream, this.canvas.clientWidth, this.canvas.clientHeight);
+			drawStream(ctx, this.laid, this.laid.stream, geom, this.settings.minFontPx, theme().isDark ? "dark" : "light");
+			
+			// Highlight hovered stream cell if any
+			if (this.hoveredNodeId?.startsWith("stream-cell:")) {
+				const parts = this.hoveredNodeId.split(":");
+				const r = parseInt(parts[2], 10);
+				const c = parseInt(parts[3], 10);
+				const cx = geom.x0 + c * geom.colWidth + geom.colWidth / 2;
+				const cy = geom.y0 + r * geom.rowHeight + geom.rowHeight / 2;
+				
+				ctx.strokeStyle = "#ffffff";
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+				ctx.arc(cx, cy, geom.cellSize / 2 + 2, 0, Math.PI * 2);
+				ctx.stroke();
+			}
+			this.drawGlobalDisplayFallbacks(ctx, dpr, "stream");
 			return;
 		}
 		const upsetHasColumns = (this.laid.upset?.columns.length ?? 0) > 0;
@@ -3599,7 +3927,7 @@ export class MiniGraphView extends ItemView {
 		// trunks, and cards all sit on top. Cells follow card geometry and
 		// ignore the cluster bounding boxes by design. Bipartite is a free-form
 		// force graph (no lattice), so the grid/graticule is meaningless there.
-		if (this.settings.showGrid && !this.laid.setNodeIds) {
+		if (this.settings.showGrid && !this.laid.setNodeIds && !this.laid.upset) {
 			this.drawCardGrid(ctx);
 		}
 
@@ -3699,7 +4027,7 @@ export class MiniGraphView extends ItemView {
 			this.drawClusterLabels(ctx);
 		}
 
-		if (this.settings.showGrid && !this.laid.setNodeIds) {
+		if (this.settings.showGrid && !this.laid.setNodeIds && !this.laid.upset) {
 			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 			this.drawGridHeaders(ctx);
 		}
@@ -3739,6 +4067,48 @@ export class MiniGraphView extends ItemView {
 			ctx.fillStyle = theme().textNormal;
 			ctx.fillText(text, 8 + padX, 8 + padY, Math.max(0, cw - 24));
 		}
+
+		if (this.settings.statusField && Object.keys(this.activeStatusColors).length > 0) {
+			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+			ctx.font = "12px sans-serif";
+			ctx.textBaseline = "middle";
+			ctx.textAlign = "left";
+			
+			const keys = Object.keys(this.activeStatusColors).sort();
+			const padX = 12, padY = 8, spacingY = 20, circleR = 5;
+			const cw = this.canvas.clientWidth || 0, ch = this.canvas.clientHeight || 0;
+			
+			let maxTw = 0;
+			for (const key of keys) {
+				const tw = ctx.measureText(key).width;
+				if (tw > maxTw) maxTw = tw;
+			}
+			
+			const boxW = padX * 2 + circleR * 2 + 8 + maxTw;
+			const boxH = padY * 2 + (keys.length - 1) * spacingY + 12;
+			const boxX = 16;
+			let boxY = ch - 16 - boxH;
+			if (this.laid.upset) boxY -= upsetFooterHeight(ch, this.laid.upset.sets.length);
+
+			ctx.fillStyle = colorAlpha(theme().canvasBgAlt, 0.85);
+			ctx.beginPath();
+			ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+			ctx.fill();
+			
+			let cy = boxY + padY + 6;
+			for (const key of keys) {
+				ctx.fillStyle = this.activeStatusColors[key];
+				ctx.beginPath();
+				ctx.arc(boxX + padX + circleR, cy, circleR, 0, 2 * Math.PI);
+				ctx.fill();
+				
+				ctx.fillStyle = theme().textMuted;
+				ctx.fillText(key, boxX + padX + circleR * 2 + 8, cy);
+				cy += spacingY;
+			}
+		}
+		
+		this.drawGlobalDisplayFallbacks(ctx, dpr, this.settings.viewMode);
 	}
 
 	// Single-tile body renderer — called once per (i, j) tile in the
@@ -3761,13 +4131,14 @@ export class MiniGraphView extends ItemView {
 				ctx,
 				this.laid.clusters,
 				this.highlightedClusters,
+				this.settings.havingMode === "highlight" ? new Set(this.highlightedHavingClusters.keys()) : undefined,
 				this.zoom,
 				hn ? { x: hn.x, y: hn.y } : null,
 				this.settings.viewMode === "bubblesets",
 			);
 		}
 
-		if (this.settings.showEdges) {
+		if (this.settings.showEdges && !this.laid.upset) {
 			if (this.settings.showGhostEdges) {
 				drawGhostEdges(
 					ctx,
@@ -3809,7 +4180,7 @@ export class MiniGraphView extends ItemView {
 			}
 		}
 
-		if (hasHighlight && this.settings.showEdges) {
+		if (hasHighlight && this.settings.showEdges && !this.laid.upset) {
 			drawAccentEdges(
 				ctx,
 				this.laid,
@@ -3833,7 +4204,7 @@ export class MiniGraphView extends ItemView {
 		// display toggles, and separate from the on-grid title bars. Not in
 		// UpSet mode.
 		if (this.overviewActive && !this.laid.upset) {
-			drawOverviewLabelsFn(ctx, this.laid, this.zoom);
+			drawOverviewLabelsFn(ctx, this.laid, this.zoom, this.settings.havingMode === "highlight" ? this.highlightedHavingClusters : undefined);
 		}
 	}
 
@@ -3872,6 +4243,7 @@ export class MiniGraphView extends ItemView {
 			this.laid,
 			this.zoom,
 			this.settings.minFontPx,
+			this.settings.havingMode === "highlight" ? this.highlightedHavingClusters : undefined,
 		);
 	}
 
@@ -3938,6 +4310,13 @@ export class MiniGraphView extends ItemView {
 			// titles, so when zooming out the note names drop to markers first and
 			// the island's tag label is the last to disappear.
 			titleLodPx: clustered ? (isSet ? 26 : 48) : undefined,
+			statusColor: n.fmStatus ? resolveStatusColor(n.fmStatus, this.activeStatusColors) : undefined,
+			fmMaturity: n.fmMaturity,
+			showMaturity: this.settings.showMaturity,
+			freshnessOverlay: this.settings.freshnessOverlay,
+			staleDays: this.settings.staleDays,
+			mtime: n.mtime,
+			nowMs: Date.now(),
 		});
 	}
 
@@ -4065,7 +4444,10 @@ export class MiniGraphView extends ItemView {
 			eff,
 			this.settings.havingAuto,
 		);
-		if (dropped.size > 0) graph = filterMemberships(graph, dropped);
+		if (this.settings.havingMode !== "highlight" && dropped.size > 0) {
+			const droppedSet = new Set(dropped.keys());
+			graph = filterMemberships(graph, droppedSet);
+		}
 
 		// 2. LIMIT — same rules as the canvas, ranked by a SELF-CONTAINED degree
 		//    map (from this graph's own edges) + this graph's memberships, so the
@@ -5006,6 +5388,22 @@ export class MiniGraphView extends ItemView {
 			const r = this.drosteHit[i];
 			if (dx >= r.x0 && dx <= r.x1 && dy >= r.y0 && dy <= r.y1) return r.id;
 		}
+		if (this.settings.viewMode === "stream" && this.laid.stream) {
+			const geom = streamGeom(this.laid.stream, this.canvas.width / window.devicePixelRatio, this.canvas.height / window.devicePixelRatio);
+			if (sx >= geom.x0 && sx <= geom.x0 + geom.w && sy >= geom.y0 && sy <= geom.y0 + geom.h) {
+				const c = Math.floor((sx - geom.x0) / geom.colWidth);
+				const r = Math.floor((sy - geom.y0) / geom.rowHeight);
+				if (c >= 0 && c < this.laid.stream.cols.length && r >= 0 && r < this.laid.stream.rows.length) {
+					// Check if cell actually exists
+					const cell = this.laid.stream.matrix.find(m => m.r === r && m.c === c);
+					if (cell) {
+						return `stream-cell:${r}:${c}`;
+					}
+				}
+			}
+			return null;
+		}
+
 		return null;
 	}
 
@@ -5030,6 +5428,17 @@ export class MiniGraphView extends ItemView {
 		const title = i === j ? `${ti} (${ids.length})` : `${ti} × ${tj} (${ids.length})`;
 		this.showNodeListOverlay(title, ids, sx, sy, () => {
 			this.heatmapSelected = null;
+		});
+	}
+
+	private openStreamDetail(r: number, c: number, sx: number, sy: number): void {
+		const s = this.laid.stream;
+		if (!s) return;
+		const cell = s.matrix.find(m => m.r === r && m.c === c);
+		if (!cell || cell.nodeIds.length === 0) return;
+		const title = `${s.rows[r]} × ${s.cols[c]} (${cell.count})`;
+		this.showNodeListOverlay(title, cell.nodeIds, sx, sy, () => {
+			this.requestDraw();
 		});
 	}
 
@@ -5339,6 +5748,33 @@ export class MiniGraphView extends ItemView {
 				this.positionTip(sx, sy, this.tipEl);
 			}
 			return;
+			return;
+		}
+		if (this.settings.viewMode === "stream" && this.laid.stream) {
+			const geom = streamGeom(this.laid.stream, this.canvas.width / window.devicePixelRatio, this.canvas.height / window.devicePixelRatio);
+			let c = Math.floor((sx - geom.x0) / geom.colWidth);
+			let r = Math.floor((sy - geom.y0) / geom.rowHeight);
+			let target: HoverTarget = null;
+			let id: string | null = null;
+			if (sx >= geom.x0 && sx <= geom.x0 + geom.w && sy >= geom.y0 && sy <= geom.y0 + geom.h) {
+				if (c >= 0 && c < this.laid.stream.cols.length && r >= 0 && r < this.laid.stream.rows.length) {
+					const cell = this.laid.stream.matrix.find(m => m.r === r && m.c === c);
+					if (cell) {
+						target = { kind: "streamCell", r, c };
+						id = `stream-cell:${r}:${c}`;
+					}
+				}
+			}
+			if (!sameTarget(this.hoverTarget, target)) {
+				this.cancelHover();
+				this.hoverTarget = target;
+				this.hoveredNodeId = id;
+				if (target) this.scheduleHover(target, sx, sy);
+				this.requestDraw();
+			} else if (this.tipEl) {
+				this.positionTip(sx, sy, this.tipEl);
+			}
+			return;
 		}
 		if (this.laid.drosteGallery) {
 			// Icon Gallery: highlight the hovered cell AND show the same node hover tip
@@ -5475,6 +5911,19 @@ export class MiniGraphView extends ItemView {
 			this.positionTip(sx, sy, tip);
 			return;
 		}
+		if (target.kind === "streamCell") {
+			const s = this.laid.stream;
+			if (!s || target.r >= s.rows.length || target.c >= s.cols.length) return;
+			const cell = s.matrix.find(m => m.r === target.r && m.c === target.c);
+			if (cell) {
+				tip.createSpan({ cls: "gim-tip-title", text: `${s.rows[target.r]} × ${s.cols[target.c]}` });
+				tip.createSpan({ cls: "gim-tip-sub", text: `${cell.count} notes` });
+				this.root.appendChild(tip);
+				this.tipEl = tip;
+				this.positionTip(sx, sy, tip);
+			}
+			return;
+		}
 		if (target.kind === "ghostEdge") {
 			const b = target.bridge;
 			const tagsStr = b.sharedTags.slice(0, 3).map(t => `#${t}`).join(" ");
@@ -5591,6 +6040,39 @@ export class MiniGraphView extends ItemView {
 			if (this.marquee.isActive()) {
 				e.preventDefault();
 				this.marquee.cancel();
+				return;
+			}
+			const rect = c.getBoundingClientRect();
+			const sx = e.clientX - rect.left;
+			const sy = e.clientY - rect.top;
+			const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+			const hit = this.hitTest(wx, wy);
+
+			if (hit && hit.kind === "node") {
+				e.preventDefault();
+				const sepIdx = hit.nodeId.indexOf("\t");
+				const baseId = sepIdx >= 0 ? hit.nodeId.slice(sepIdx + 1) : hit.nodeId;
+				const file = this.app.vault.getAbstractFileByPath(baseId);
+				if (file instanceof TFile) {
+					const menu = new Menu();
+					menu.addItem((item) => {
+						item.setTitle("Set maturity");
+						item.setIcon("pencil");
+						const subMenu = (item as any).setSubmenu() as Menu;
+						for (const maturity of ["fleeting", "literature", "permanent"]) {
+							subMenu.addItem((subItem) => {
+								subItem.setTitle(maturity);
+								subItem.onClick(async () => {
+									await this.app.fileManager.processFrontMatter(file, (fm) => {
+										fm.maturity = maturity;
+									});
+									new Notice(`Set maturity '${maturity}' on ${file.basename}`);
+								});
+							});
+						}
+					});
+					menu.showAtMouseEvent(e);
+				}
 			}
 		});
 		c.addEventListener("click", (e) => {
@@ -5654,6 +6136,17 @@ export class MiniGraphView extends ItemView {
 					this.heatmapSelected = null;
 					this.closeDetail();
 					this.requestDraw();
+				}
+				return;
+			}
+			if (this.settings.viewMode === "stream" && this.laid.stream) {
+				const geom = streamGeom(this.laid.stream, this.canvas.width / window.devicePixelRatio, this.canvas.height / window.devicePixelRatio);
+				if (sx >= geom.x0 && sx <= geom.x0 + geom.w && sy >= geom.y0 && sy <= geom.y0 + geom.h) {
+					const c = Math.floor((sx - geom.x0) / geom.colWidth);
+					const r = Math.floor((sy - geom.y0) / geom.rowHeight);
+					if (c >= 0 && c < this.laid.stream.cols.length && r >= 0 && r < this.laid.stream.rows.length) {
+						this.openStreamDetail(r, c, sx, sy);
+					}
 				}
 				return;
 			}

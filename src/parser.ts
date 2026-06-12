@@ -1,5 +1,6 @@
 import type { App, CachedMetadata, TFile } from "obsidian";
 import { GraphData, GraphEdge, GraphNode, NONE_BUCKET } from "./types";
+import { suggestMaturity, effectiveMaturity } from "./tag-classification";
 import { evalQuery, isMatched, parseQuery, type FileFacts, type QueryAst } from "./query";
 
 export interface BuildResult {
@@ -28,6 +29,7 @@ export function buildGraph(
 	groupByRows: string[],
 	filterMode: "sql" | "dvjs" = "sql",
 	dvjsFilter: string = "",
+	statusField: string = "",
 ): { result: BuildResult; errors: BuildErrors } {
 	const errors: BuildErrors = {};
 	let whereAst: QueryAst | null = null;
@@ -51,6 +53,15 @@ export function buildGraph(
 	for (const f of files) {
 		const cache = app.metadataCache.getFileCache(f);
 		for (const t of collectTags(cache)) allTags.add(t);
+	}
+
+	// Pre-compute backlinks for maturity suggestions
+	const backlinkCounts = new Map<string, number>();
+	const resolvedLinks = app.metadataCache.resolvedLinks;
+	for (const sourcePath in resolvedLinks) {
+		for (const targetPath in resolvedLinks[sourcePath]) {
+			backlinkCounts.set(targetPath, (backlinkCounts.get(targetPath) || 0) + 1);
+		}
 	}
 
 	const tagProperties: Record<string, Record<string, unknown>> = {};
@@ -132,7 +143,34 @@ export function buildGraph(
 			if (!clusterLabels.has("all")) clusterLabels.set("all", "all");
 		}
 
-		nodes.push({ id: f.path, label: f.basename, memberships, mtime: f.stat.mtime });
+		let fmStatus: string | undefined;
+		if (statusField) {
+			const raw = cache?.frontmatter?.[statusField];
+			if (raw !== undefined && raw !== null) {
+				fmStatus = String(raw).trim().toLowerCase();
+			}
+		}
+
+		// Maturity: always compute the heuristic suggestion, then let a VALID
+		// frontmatter `maturity` override win. effectiveMaturity falls back to the
+		// suggestion for an absent or unrecognised override value.
+		const ageDays = (Date.now() - f.stat.ctime) / 86400000;
+		const wordCount = Math.max(1, Math.floor(f.stat.size / 5)); // rough estimate
+		const linkCount = (cache?.links?.length ?? 0) + (cache?.frontmatterLinks?.length ?? 0);
+		const backlinkCount = backlinkCounts.get(f.path) || 0;
+		const hasSourceTag = (cache?.tags ?? []).some(t => t.tag.toLowerCase().startsWith("#source/")) ||
+			(cache?.frontmatter?.tags && (
+				(Array.isArray(cache.frontmatter.tags) && cache.frontmatter.tags.some((t: string) => t.toLowerCase().startsWith("source/"))) ||
+				(typeof cache.frontmatter.tags === "string" && cache.frontmatter.tags.toLowerCase().startsWith("source/"))
+			));
+		const maturitySuggestion = suggestMaturity({ wordCount, linkCount, backlinkCount, ageDays, hasSourceTag: !!hasSourceTag });
+		const rawMaturity = cache?.frontmatter?.["maturity"];
+		const fmMaturity = effectiveMaturity(
+			typeof rawMaturity === "string" ? rawMaturity.trim().toLowerCase() : undefined,
+			maturitySuggestion,
+		);
+
+		nodes.push({ id: f.path, label: f.basename, memberships, mtime: f.stat.mtime, fmStatus, fmMaturity, ageDays });
 		idSet.add(f.path);
 	}
 

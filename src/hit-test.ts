@@ -10,6 +10,7 @@ export type HoverTarget =
 	// tooltip lifecycle as node/cluster hover, applied to the column band.
 	| { kind: "matrixCol"; col: number }
 	| { kind: "heatmapCell"; i: number; j: number }
+	| { kind: "streamCell"; r: number; c: number }
 	// Bridge finder ghost edge under the cursor
 	| { kind: "ghostEdge"; bridge: import("./bridge-finder").BridgeCandidate }
 	| null;

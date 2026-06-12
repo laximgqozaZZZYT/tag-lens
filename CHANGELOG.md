@@ -4,6 +4,12 @@ All notable changes to Tag Lens are documented here.
 
 ## [Unreleased]
 
+### Added — Sequence Stream View
+
+- Added **Sequence Stream**, an experimental view mode that acts as a time-series transposed heatmap. It tracks tag occurrences over sequential values (like chapters) or time bins (like month or week).
+- Added visual "Dropped threads" markers to warn when a tag suddenly stops appearing along the sequence.
+- Shows dropped threads directly in the Insight panel so you can easily spot abandoned themes or projects.
+
 ### Added — Bridge Finder (Ghost Edges)
 
 - Added **Bridge Finder**, an analysis tool that discovers "ghost edges" between notes that have a high Jaccard similarity in their tags but lack a physical link.

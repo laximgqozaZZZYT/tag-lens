@@ -269,6 +269,7 @@ export function drawOverviewLabels(
 	ctx: CanvasRenderingContext2D,
 	laid: LaidOut,
 	zoom: number,
+	warningClusters?: Map<string, number>,
 ): void {
 	const cl = [...laid.clusters]
 		.filter(
@@ -292,7 +293,7 @@ export function drawOverviewLabels(
 	];
 	const placed: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
 	for (const c of cl) {
-		const text = c.label;
+		const text = warningClusters && warningClusters.has(c.groupKey) ? `⚠ ${c.label}` : c.label;
 		if (!text) continue;
 		const cx = c.x + c.width / 2;
 		ctx.font = "800 100px sans-serif";
@@ -352,6 +353,7 @@ export function drawClusterLabels(
 	laid: LaidOut,
 	zoom: number,
 	minFontPx: number = 0,
+	warningClusters?: Map<string, number>,
 ): PlacedLabelBox[] {
 	// Labels live in the grid cells the LAYOUT reserved for them
 	// (`laid.labelCells` — one empty cell per cluster, kept clear of nodes
@@ -371,7 +373,8 @@ export function drawClusterLabels(
 		// `cell.text` overrides (intersection sub-box labels "a*b*c"); otherwise
 		// fall back to the owning cluster's "name (count)". A cell with neither
 		// is skipped.
-		const text = cell.text ?? (c ? `${c.label} (${c.memberCount})` : "");
+		const baseText = cell.text ?? (c ? `${c.label} (${c.memberCount})` : "");
+		const text = warningClusters && warningClusters.has(cell.key) ? `⚠ ${baseText}` : baseText;
 		if (!text) continue;
 		// Clamp the label to the cluster's FINAL bbox (it may have been
 		// post-processed after layout, e.g. inheritance expansion). Shrink

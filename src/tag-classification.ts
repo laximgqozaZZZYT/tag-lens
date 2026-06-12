@@ -27,3 +27,39 @@ export function isGolderType(v: unknown): v is GolderType {
 export function effectiveClassification(persisted: unknown, suggestion: string): string {
 	return isGolderType(persisted) ? persisted : suggestion;
 }
+
+// ── Note Maturity ────────────────────────────────────────────────────────────
+// Note maturity categories based on Zettelkasten principles.
+export const NOTE_MATURITY = ["fleeting", "literature", "permanent"] as const;
+
+export type NoteMaturity = (typeof NOTE_MATURITY)[number];
+
+export function isNoteMaturity(v: unknown): v is NoteMaturity {
+	return typeof v === "string" && (NOTE_MATURITY as readonly string[]).includes(v);
+}
+
+export function effectiveMaturity(persisted: unknown, suggestion: string): string {
+	return isNoteMaturity(persisted) ? persisted : suggestion;
+}
+
+// Heuristics for suggesting note maturity when no frontmatter override exists:
+// - A note with >= 3 connections (links + backlinks) and >= 50 words is likely
+//   a well-integrated, substantial idea -> "permanent".
+// - A note with external reference tags (e.g., #source/...) is likely a
+//   reading or literature note -> "literature".
+// - Otherwise, it's considered a raw/transient thought -> "fleeting".
+export function suggestMaturity(note: {
+	wordCount: number;
+	linkCount: number;
+	backlinkCount: number;
+	ageDays: number;
+	hasSourceTag: boolean;
+}): NoteMaturity {
+	if (note.linkCount + note.backlinkCount >= 3 && note.wordCount >= 50) {
+		return "permanent";
+	}
+	if (note.hasSourceTag) {
+		return "literature";
+	}
+	return "fleeting";
+}

@@ -50,6 +50,13 @@ export interface DrawCardOptions {
 	staleDays?: number;
 	nowMs?: number;
 	mtime?: number;
+	
+	// Reading Status Lens
+	statusColor?: string | null;
+
+	// Note Maturity
+	fmMaturity?: string;
+	showMaturity?: boolean;
 }
 
 // Pure card renderer. Receives the already-resolved scale + body lines
@@ -105,6 +112,33 @@ export function drawCard(
 	ctx.beginPath();
 	roundedRectPath(ctx, x, y, w, h, r);
 	ctx.stroke();
+
+	if (opts.statusColor && !isSet) {
+		ctx.lineWidth = 2 / zoom;
+		ctx.strokeStyle = opts.statusColor;
+		ctx.beginPath();
+		roundedRectPath(ctx, x, y, w, h, r);
+		ctx.stroke();
+	}
+
+	if (opts.showMaturity && opts.fmMaturity && !isSet) {
+		ctx.beginPath();
+		const badgeR = 4 / zoom;
+		const badgeX = x + badgeR + 2 / zoom;
+		const badgeY = y + badgeR + 2 / zoom;
+		ctx.arc(badgeX, badgeY, badgeR, 0, 2 * Math.PI);
+		if (opts.fmMaturity === "fleeting") {
+			ctx.fillStyle = theme().canvasBgAlt; // grey
+		} else if (opts.fmMaturity === "literature") {
+			ctx.fillStyle = "#4a90e2"; // blue
+		} else if (opts.fmMaturity === "permanent") {
+			ctx.fillStyle = "#50e3c2"; // green
+		}
+		ctx.fill();
+		ctx.lineWidth = 1 / zoom;
+		ctx.strokeStyle = theme().accent;
+		ctx.stroke();
+	}
 
 	// Internal metrics all scale together — padding, font sizes, line
 	// heights, gap. Sole source of truth for "what scale does to a card"
@@ -177,5 +211,6 @@ export function drawCard(
 			ly += bodyLineH;
 		}
 	}
-	ctx.restore(); // Restores both the text clip and the globalAlpha if changed
+	ctx.restore(); // Restores the text clip
+	ctx.restore(); // Restores the globalAlpha (from line 87)
 }
