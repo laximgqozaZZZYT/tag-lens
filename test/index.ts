@@ -22,5 +22,6 @@ import "./display-applicability.test";
 import "./encoding-scales.test";
 import "./encoding-evaluate.test";
 import "./encoding-migrate.test";
+import "./axis-layout.test";
 
 summary();
