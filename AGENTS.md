@@ -1,14 +1,14 @@
 # AGENTS.md — Tag Lens
 
-このリポジトリで作業する全エージェントは、まず**現行バージョンの権威ドキュメント**を読むこと。
+Every agent working in this repo must first read the **authoritative docs for the current version**.
 
-➡ **`docs/0.3.12/AGENTS.md`**（落とし穴・検証ゲート・E2E/デプロイ手順）
-➡ **`docs/0.3.12/basic-design.md`** / **`docs/0.3.12/detailed-design.md`**（設計）
+➡ **`docs/0.3.12/AGENTS.md`** (gotchas, verification gate, E2E/deploy workflow)
+➡ **`docs/0.3.12/basic-design.md`** / **`docs/0.3.12/detailed-design.md`** (design)
 
-旧資料は `docs/old/` に隔離済み（参照不要）。
+Superseded material is isolated in `docs/old/` (no need to read).
 
-## 最低限の鉄則（詳細は上記）
-- 変更後は **`npm run verify`**（`tsc --noEmit && test && build`）を緑に。tsc が型の唯一のゲート。
-- `src/layout.ts` の検索は **`grep -a`**（NULバイト混入で素の grep は無言で空を返す）。
-- E2E は別プロファイル+専用ポートで本番 Obsidian を kill しない／後始末必須／「例外なし」でなく**反映**を検査。
-- Visual Encoding は表示ノード集合を変えない（SQL/dvjs フィルタとは別レイヤー）。
+## Bare-minimum rules (details above)
+- After any change, **`npm run verify`** (`tsc --noEmit && test && build`) must be green. `tsc` is the only type gate.
+- Search `src/layout.ts` with **`grep -a`** (NUL bytes make plain grep return empty silently).
+- For E2E, use a separate profile + dedicated port, never kill the user's main Obsidian, always clean up, and check **reflection** — not just "no exception".
+- Visual Encoding never changes the displayed node set (it is a separate layer from the SQL/dvjs filter).
