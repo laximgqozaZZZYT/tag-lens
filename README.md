@@ -101,7 +101,7 @@ Requires Obsidian **1.5.0** or later. Works on desktop and mobile (the heavy mod
 ## Architecture & contributing
 
 Design docs and the agent/contributor guide live under [`docs/0.3.12/`](docs/0.3.12/):
-**基本設計書** (architecture), **詳細設計書** (module reference) and **AGENTS.md**
+**basic-design** (architecture), **detailed-design** (module reference) and **AGENTS.md**
 (verification gate, gotchas, E2E/deploy workflow). Run `npm run verify`
 (`tsc --noEmit && test && build`) before committing — `tsc` is the only type gate
 (esbuild ignores types). Older, superseded notes are archived in `docs/old/`.

@@ -2,7 +2,7 @@
 
 このリポジトリで作業する全エージェント（人/AI）が最初に読む標準。
 過去に各エージェントが繰り返し踏んだ落とし穴・検証ゲート・主要ワークフローを集約する。
-設計の全体像は同ディレクトリの **基本設計書.md** / **詳細設計書.md** を参照。
+設計の全体像は同ディレクトリの **basic-design.md** / **detailed-design.md** を参照。
 
 ---
 
@@ -48,6 +48,6 @@ cp main.js manifest.json styles.css "/home/ubuntu/obsidian-plugins/開発/.obsid
 - リファクタは**挙動完全保存・verify緑・1抽出1コミット**。
 
 ## 5. 参照
-- 設計: `docs/0.3.12/基本設計書.md`, `docs/0.3.12/詳細設計書.md`
+- 設計: `docs/0.3.12/basic-design.md`, `docs/0.3.12/detailed-design.md`
 - 進行中: `docs/0.3.12/refactor-view-split.md`（view.ts 分割）
 - 旧資料（参照不要・混乱回避のため隔離）: `docs/old/`
