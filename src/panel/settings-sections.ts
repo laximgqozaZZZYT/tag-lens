@@ -1,5 +1,5 @@
 import type { MiniSettings } from "../types";
-import { MATRIX_ORDER_CRITERIA, HEATMAP_ORDER_CRITERIA, VIEW_MODES } from "../types";
+import { MATRIX_ORDER_CRITERIA, HEATMAP_ORDER_CRITERIA, VIEW_MODES, isPanorama, isCloseup } from "../types";
 import type { NodeDisplay } from "../node-display";
 
 export interface MinFontSectionDeps {
@@ -342,11 +342,27 @@ export function renderViewModeSection(parent: HTMLElement, deps: GenericSectionD
 	const section = parent.createDiv({ cls: "gim-panel-section" });
 	section.createEl("h4", { text: "View mode" });
 
-	const stableGroup = section.createDiv({ cls: "gim-viewmode-options" });
-	for (const opt of VIEW_MODES.filter((o) => !o.experimental)) {
-		renderViewModeOption(stableGroup, opt, deps);
+	// 近景 (Close-up): per-node detail views (currently Icon Gallery only).
+	const closeup = VIEW_MODES.filter((o) => isCloseup(o));
+	if (closeup.length > 0) {
+		const closeupHeader = section.createDiv({ cls: "gim-viewmode-perspective-header" });
+		closeupHeader.setCssStyles({ margin: "4px 0 2px", fontSize: "11px", color: "var(--text-muted)", fontWeight: "600" });
+		closeupHeader.createSpan({ text: "近景 (Close-up)" });
+		const closeupGroup = section.createDiv({ cls: "gim-viewmode-options" });
+		for (const opt of closeup) renderViewModeOption(closeupGroup, opt, deps);
 	}
 
+	// 遠景 (Panorama): vault-wide structural overview modes (non-experimental).
+	const panoramaStable = VIEW_MODES.filter((o) => isPanorama(o) && !o.experimental);
+	if (panoramaStable.length > 0) {
+		const panoramaHeader = section.createDiv({ cls: "gim-viewmode-perspective-header" });
+		panoramaHeader.setCssStyles({ margin: "8px 0 2px", fontSize: "11px", color: "var(--text-muted)", fontWeight: "600" });
+		panoramaHeader.createSpan({ text: "遠景 (Panorama)" });
+		const panoramaGroup = section.createDiv({ cls: "gim-viewmode-options" });
+		for (const opt of panoramaStable) renderViewModeOption(panoramaGroup, opt, deps);
+	}
+
+	// Experimental (beta): collapsible, regardless of perspective.
 	const experimental = VIEW_MODES.filter((o) => o.experimental);
 	if (experimental.length === 0) return;
 	const expSelected = experimental.some((o) => o.id === deps.settings.viewMode);

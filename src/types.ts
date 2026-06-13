@@ -288,6 +288,12 @@ export interface ViewModeOption {
 	// View-mode picker. They still render normally when selected — this flag
 	// only affects how the picker groups/labels them.
 	experimental?: boolean;
+	// Perspective grouping for the View-mode picker:
+	//   "panorama" (遠景) = vault-wide structural overview (default when absent)
+	//   "closeup"  (近景) = per-node detail view (currently Icon Gallery only)
+	// Future: selecting a node in a panorama mode will drill down to the
+	// closeup mode with that node as focus.
+	perspective?: "panorama" | "closeup";
 }
 
 export const VIEW_MODES: ViewModeOption[] = [
@@ -298,6 +304,7 @@ export const VIEW_MODES: ViewModeOption[] = [
 		id: "droste",
 		label: "Icon Gallery",
 		description: "Per-note icon: nested groups of notes sharing its tags, plus its links and backlinks",
+		perspective: "closeup",
 	},
 	{
 		// `id` stays "euler" for settings / preset compatibility; the label
@@ -408,6 +415,13 @@ export const VIEW_MODES: ViewModeOption[] = [
 		experimental: true,
 	},
 ];
+
+// Perspective helpers — used by the View-mode picker to group modes into
+// 遠景 (Panorama) and 近景 (Close-up) sections.
+export const isPanorama = (opt: ViewModeOption): boolean =>
+	opt.perspective !== "closeup";
+export const isCloseup = (opt: ViewModeOption): boolean =>
+	opt.perspective === "closeup";
 
 export const DEFAULT_SETTINGS: MiniSettings = {
 	autoFollowActiveNote: false,
