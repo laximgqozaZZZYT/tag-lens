@@ -116,6 +116,15 @@ import {
 	renderViewModeSection as renderViewModeSectionFn,
 } from "./panel/settings-sections";
 import {
+	renderSettingsViewTab,
+	renderSettingsFilterTab,
+	renderSettingsSortTab,
+	renderSettingsDisplayTab,
+	renderSettingsEncodeTab,
+	renderSettingsLayersTab,
+	renderFilterBodyTab,
+} from "./panel/settings-tabs";
+import {
 	applyLens,
 	upsertPreset,
 	removePreset,
@@ -731,10 +740,55 @@ export class MiniGraphView extends ItemView {
 		const renderSub = (): void => {
 			content.empty();
 			switch (this.settingsSubTab) {
-				case "view": this.renderSettingsView(content); break;
-				case "display": this.renderSettingsDisplay(content); break;
-				case "encode": this.renderSettingsEncode(content); break;
-				case "layers": this.renderSettingsLayers(content); break;
+				case "view": 
+					renderSettingsViewTab(content, {
+						settings: this.settings,
+						save: () => void this.save(),
+						rebuild: () => void this.rebuild(),
+						refreshSettingsTab: () => this.refreshSettingsTab(),
+						requestDraw: () => this.requestDraw(),
+					});
+					break;
+				case "display": 
+					renderSettingsDisplayTab(content, {
+						settings: this.settings,
+						save: () => void this.save(),
+						rebuild: () => void this.rebuild(),
+						requestDraw: () => this.requestDraw(),
+						refreshSettingsTab: () => this.refreshSettingsTab(),
+						scheduleRebuild: () => this.scheduleRebuild(),
+						clearCardCache: () => this.cardCache.clear(),
+						resolveFromCluster: (groupKey) => this.resolveFromCluster(groupKey),
+					});
+					break;
+				case "encode": 
+					renderSettingsEncodeTab(content, {
+						settings: this.settings,
+						save: () => void this.save(),
+						rebuild: () => this.rebuild(),
+						requestDraw: () => this.requestDraw(),
+						refreshSettingsTab: () => this.refreshSettingsTab(),
+						encLegends: this.encLegends,
+						activeStatusColors: this.activeStatusColors,
+						cardCache: this.cardCache,
+					});
+					break;
+				case "layers": 
+					renderSettingsLayersTab(content, {
+						settings: this.settings,
+						save: () => void this.save(),
+						rebuild: () => this.rebuild(),
+						requestDraw: () => this.requestDraw(),
+						refreshSettingsTab: () => this.refreshSettingsTab(),
+						laid: this.laid,
+						activeTab: this.activeTab,
+						setActiveTab: (t) => { this.activeTab = t; },
+						tabFilter: this.tabFilter,
+						setTabFilter: (f) => { this.tabFilter = f; },
+						clearCardCache: () => this.cardCache.clear(),
+						resolveFromCluster: (groupKey) => this.resolveFromCluster(groupKey),
+					});
+					break;
 			}
 		};
 		for (const { key, label } of SUBS) {
@@ -748,366 +802,7 @@ export class MiniGraphView extends ItemView {
 		renderSub();
 	}
 
-	// ── Settings sub-tabs (split out of the old single renderAllTab scroll) ──────
-	private renderSettingsView(el: HTMLElement): void {
-		this.renderViewModeSection(el);
-		if (this.settings.viewMode === "bipartite") this.renderBipartiteSection(el);
-		if (this.settings.viewMode === "lattice") this.renderLatticeSection(el);
-	}
-
-	private renderSettingsFilter(el: HTMLElement): void {
-		const isMatrix = this.settings.viewMode === "matrix";
-		const isHeatmap = this.settings.viewMode === "heatmap";
-		if (this.settings.filterMode === "dvjs") {
-			const info = el.createDiv({ text: "Return an array of paths or Dataview pages. Example:\nreturn dv.pages('\"\"').map(p => p.file.path).array();" });
-			info.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", whiteSpace: "pre-wrap" });
-			
-			const textarea = el.createEl("textarea", { cls: "gim-expr-input" });
-			textarea.value = this.settings.dvjsFilter;
-			textarea.setCssStyles({ width: "100%", minHeight: "120px", fontFamily: "var(--font-monospace)", fontSize: "11px", resize: "vertical" });
-			
-			let debounce: number | null = null;
-			textarea.addEventListener("input", () => {
-				this.settings.dvjsFilter = textarea.value;
-				void this.save();
-				if (debounce !== null) window.clearTimeout(debounce);
-				debounce = window.setTimeout(() => void this.rebuild(), 600);
-			});
-			
-			if (this.whereError) {
-				const errorDiv = el.createDiv({ text: this.whereError });
-				errorDiv.setCssStyles({ color: "var(--text-error)", fontSize: "11px", marginTop: "4px" });
-			}
-		} else {
-			this.renderExprSection(el, "WHERE", this.settings.where, this.whereError, { autoKey: "whereAuto" });
-		}
-		this.renderExprSection(el, "GROUP_BY", this.settings.groupBy, this.groupByError, { autoKey: "groupByAuto" });
-		const havingSection = this.renderExprSection(el, "HAVING", this.settings.having, this.havingError, {
-			placeholder: "e.g. count >= 3", autoKey: "havingAuto",
-		});
-		const havingHeader = havingSection.querySelector(".gim-panel-section-header") as HTMLElement;
-		if (havingHeader) {
-			const modeToggle = havingHeader.createEl("a", { cls: "view-action clickable-icon", title: "Toggle highlight mode" });
-			modeToggle.setAttribute("aria-label", this.settings.havingMode === "highlight" ? "Switch to filter mode" : "Switch to highlight mode");
-			setIcon(modeToggle, this.settings.havingMode === "highlight" ? "highlighter" : "filter");
-			modeToggle.addEventListener("click", () => {
-				this.settings.havingMode = this.settings.havingMode === "highlight" ? "filter" : "highlight";
-				void this.save();
-				this.refreshFilterTab();
-				void this.rebuild();
-			});
-		}
-		// Matrix "min column size" / heatmap "min tag size" are tag filters.
-		if (isMatrix) this.renderMatrixMinColumnControl(havingSection);
-		if (isHeatmap) this.renderHeatmapMinTagControl(havingSection);
-	}
-
-	private renderSettingsSort(el: HTMLElement): void {
-		this.renderOrderBySection(el);
-		this.renderExprSection(el, "LIMIT", this.settings.limit, this.limitError, {
-			placeholder: "limit 10 / brief 30", autoKey: "limitAuto",
-		});
-	}
-
-	private renderSettingsDisplay(el: HTMLElement): void {
-		const isMatrix = this.settings.viewMode === "matrix";
-		const isHeatmap = this.settings.viewMode === "heatmap";
-		const isLattice = this.settings.viewMode === "lattice";
-
-		const autoFollowSection = el.createDiv({ cls: "gim-panel-section" });
-		autoFollowSection.createEl("h4", { text: "Active Note View" });
-		const autoFollowRow = autoFollowSection.createEl("label", { cls: "gim-toggle-row" });
-		const autoFollowCb = autoFollowRow.createEl("input", { type: "checkbox" });
-		autoFollowCb.checked = this.settings.autoFollowActiveNote;
-		autoFollowCb.addEventListener("change", () => {
-			this.settings.autoFollowActiveNote = autoFollowCb.checked;
-			void this.save();
-		});
-		autoFollowRow.createSpan({ text: "Auto-follow active note" });
-
-		// NODE DISPLAY (size by / m×n) is now shown universally.
-		this.renderNodeDisplaySection(el);
-		this.renderMinFontSection(el);
-		// Only the world-space card toggles that actually take effect in the
-		// current mode are shown. Screen-space modes (matrix / heatmap / stream)
-		// still host their own mode-specific toggles under the same "Graph
-		// display" heading; droste / lattice get no display toggles at all.
-		const gdToggles = [
-			{ key: "showNodes" as const, label: "Show nodes" },
-			{ key: "showEnclosures" as const, label: "Show enclosures" },
-			{ key: "showEdges" as const, label: "Show edges" },
-			{ key: "showGrid" as const, label: "Show grid" },
-		].filter((t) => displayToggleApplies(this.settings.viewMode, t.key));
-		const hasModeToggles = isMatrix || isHeatmap || this.settings.viewMode === "stream";
-		if (gdToggles.length > 0 || hasModeToggles) {
-			const gdSection = this.renderToggleSection(el, "Graph display", gdToggles);
-			if (isMatrix) this.renderMatrixDisplayToggles(gdSection);
-			if (isHeatmap) this.renderHeatmapDisplayToggles(gdSection);
-			if (this.settings.viewMode === "stream") this.renderStreamDisplayToggles(gdSection);
-		}
-
-
-
-		if (displayToggleApplies(this.settings.viewMode, "showEdges")) {
-		const bridgeSection = el.createDiv({ cls: "gim-panel-section" });
-		bridgeSection.createEl("h4", { text: "Bridge finder" });
-		
-		const ghostRow = bridgeSection.createEl("label", { cls: "gim-toggle-row" });
-		const ghostCb = ghostRow.createEl("input", { type: "checkbox" });
-		ghostCb.checked = this.settings.showGhostEdges;
-		ghostCb.addEventListener("change", () => {
-			this.settings.showGhostEdges = ghostCb.checked;
-			void this.save();
-			void this.rebuild();
-		});
-		ghostRow.createSpan({ text: "Show ghost edges" });
-		
-		const jaccardRow = bridgeSection.createDiv({ cls: "gim-setting-row" });
-		jaccardRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", paddingLeft: "24px" });
-		jaccardRow.createSpan({ text: "Min Jaccard similarity:" });
-		const jaccardIn = jaccardRow.createEl("input", { type: "number", cls: "gim-number-input", attr: { step: "0.05", min: "0", max: "1" } });
-		jaccardIn.setCssStyles({ width: "60px" });
-		jaccardIn.value = String(this.settings.ghostEdgeMinJaccard);
-		jaccardIn.addEventListener("change", () => {
-			const v = parseFloat(jaccardIn.value);
-			if (!isNaN(v) && v >= 0 && v <= 1) {
-				this.settings.ghostEdgeMinJaccard = v;
-				void this.save();
-				void this.rebuild();
-			} else {
-				jaccardIn.value = String(this.settings.ghostEdgeMinJaccard);
-			}
-		});
-		}
-	}
-
-	// Encode sub-tab: bind a node attribute to a visual channel. First scope =
-	// Color only. This is the Visual Encoding layer — distinct from the SQL/dvjs
-	// Filter tab: it only changes how nodes LOOK, never which nodes appear.
-	private renderSettingsEncode(el: HTMLElement): void {
-		const section = el.createDiv({ cls: "gim-panel-section" });
-		section.createEl("h4", { text: "Encode — Color" });
-		section.createEl("div", {
-			text: "Colour each note card by an attribute. Does not filter — only changes appearance.",
-		}).setCssStyles({ fontSize: "10px", color: "var(--text-faint)", marginBottom: "6px" });
-
-		const cur = (this.settings.encoding ?? []).find((b) => b.channelId === "color");
-		const curIsFm = !!cur && cur.fieldId.startsWith("frontmatter:");
-
-		const fieldRow = section.createDiv({ cls: "gim-setting-row" });
-		fieldRow.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" });
-		fieldRow.createSpan({ text: "Color ←" });
-		const sel = fieldRow.createEl("select");
-		sel.add(new Option("(none)", ""));
-		for (const f of fieldSourceRegistry) sel.add(new Option(f.label, f.id));
-		sel.value = cur && !curIsFm ? cur.fieldId : "";
-
-		const fmRow = section.createDiv({ cls: "gim-setting-row" });
-		fmRow.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" });
-		fmRow.createSpan({ text: "or frontmatter key:" });
-		const fmIn = fmRow.createEl("input", { type: "text", cls: "gim-text-input" });
-		fmIn.setCssStyles({ width: "120px" });
-		fmIn.value = curIsFm ? cur!.fieldId.slice("frontmatter:".length) : "";
-
-		const scRow = section.createDiv({ cls: "gim-setting-row" });
-		scRow.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" });
-		scRow.createSpan({ text: "Scale:" });
-		const scSel = scRow.createEl("select");
-		for (const t of ["categorical", "linear", "log", "quantile"]) scSel.add(new Option(t, t));
-		scSel.value = cur?.scale?.type ?? "categorical";
-		const revLabel = scRow.createEl("label", { cls: "gim-toggle-row" });
-		const revCb = revLabel.createEl("input", { type: "checkbox" });
-		revCb.checked = !!cur?.scale?.reverse;
-		revLabel.createSpan({ text: "reverse" });
-
-		const apply = (): void => {
-			const fmKey = fmIn.value.trim();
-			const fieldId = fmKey ? `frontmatter:${fmKey}` : sel.value;
-			const others = (this.settings.encoding ?? []).filter((b) => b.channelId !== "color");
-			if (!fieldId) {
-				this.settings.encoding = others;
-			} else {
-				const binding: EncodingBinding = {
-					channelId: "color",
-					fieldId,
-					enabled: true,
-					scale: { type: scSel.value as ScaleType, reverse: revCb.checked },
-				};
-				this.settings.encoding = [...others, binding];
-			}
-			void this.save();
-			void this.rebuild().then(() => this.refreshSettingsTab());
-		};
-		sel.addEventListener("change", apply);
-		fmIn.addEventListener("change", apply);
-		scSel.addEventListener("change", apply);
-		revCb.addEventListener("change", apply);
-
-		// Auto-legend from the last evaluated encoding.
-		const colorLeg = this.encLegends.find((l) => l.channelId === "color");
-		if (colorLeg) {
-			const leg = section.createDiv();
-			leg.setCssStyles({ marginTop: "10px" });
-			leg.createEl("h4", { text: `Legend — ${colorLeg.fieldLabel}` });
-			if (colorLeg.legend.kind === "categorical") {
-				for (const e of colorLeg.legend.entries ?? []) {
-					const er = leg.createDiv();
-					er.setCssStyles({ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" });
-					er.createSpan().setCssStyles({
-						width: "12px", height: "12px", borderRadius: "3px", background: e.output, display: "inline-block",
-					});
-					er.createSpan({ text: e.key }).setCssStyles({ fontSize: "11px" });
-				}
-			} else if (colorLeg.legend.kind === "quantitative") {
-				leg.createDiv({
-					text: `${(colorLeg.legend.min ?? 0).toFixed(1)} … ${(colorLeg.legend.max ?? 0).toFixed(1)}${colorLeg.legend.reversed ? " (reversed)" : ""}`,
-				}).setCssStyles({ fontSize: "11px", color: "var(--text-muted)" });
-			}
-		}
-		// ---- Legacy Bindings Section ----
-		const legacySection = el.createDiv({ cls: "gim-panel-section" });
-		legacySection.setCssStyles({ marginTop: "16px", paddingTop: "8px", borderTop: "1px solid var(--background-modifier-border)" });
-		legacySection.createEl("h4", { text: "Legacy Bindings" });
-		legacySection.createEl("div", {
-			text: "These are legacy bindings mapping data to visuals. They will be fully integrated into the generic engine in the future.",
-		}).setCssStyles({ fontSize: "10px", color: "var(--text-faint)", marginBottom: "8px" });
-
-		// Freshness overlay
-		if (displayToggleApplies(this.settings.viewMode, "freshnessOverlay")) {
-			const freshnessRow = legacySection.createEl("label", { cls: "gim-toggle-row" });
-			const freshnessCb = freshnessRow.createEl("input", { type: "checkbox" });
-			freshnessCb.checked = this.settings.freshnessOverlay;
-			freshnessCb.addEventListener("change", () => {
-				this.settings.freshnessOverlay = freshnessCb.checked;
-				void this.save();
-				this.requestDraw();
-			});
-			freshnessRow.createSpan({ text: "Freshness overlay (Opacity ← ageDays)" });
-			
-			const staleRow = legacySection.createDiv({ cls: "gim-setting-row" });
-			staleRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", paddingLeft: "24px" });
-			staleRow.createSpan({ text: "Stale after N days:" });
-			const staleInput = staleRow.createEl("input", { type: "number", cls: "gim-number-input" });
-			staleInput.setCssStyles({ width: "60px" });
-			staleInput.value = this.settings.staleDays.toString();
-			staleInput.addEventListener("change", () => {
-				const v = parseInt(staleInput.value, 10);
-				if (!isNaN(v) && v > 0) {
-					this.settings.staleDays = v;
-					void this.save();
-					this.requestDraw();
-				} else {
-					staleInput.value = this.settings.staleDays.toString();
-				}
-			});
-		}
-
-		// Status overlay
-		if (displayToggleApplies(this.settings.viewMode, "statusField")) {
-			const statusFieldRow = legacySection.createDiv({ cls: "gim-setting-row" });
-			statusFieldRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px" });
-			statusFieldRow.createSpan({ text: "Status overlay (Color ← frontmatter):" });
-			const statusFieldInput = statusFieldRow.createEl("input", { type: "text", cls: "gim-text-input" });
-			statusFieldInput.setCssStyles({ width: "80px" });
-			statusFieldInput.value = this.settings.statusField;
-			statusFieldInput.addEventListener("change", () => {
-				this.settings.statusField = statusFieldInput.value.trim();
-				void this.save();
-				void this.rebuild();
-			});
-
-			if (this.settings.statusField && Object.keys(this.activeStatusColors).length > 0) {
-				const colorsContainer = legacySection.createDiv();
-				colorsContainer.setCssStyles({ marginTop: "4px", paddingLeft: "8px", display: "flex", flexDirection: "column", gap: "4px" });
-				
-				for (const key of Object.keys(this.activeStatusColors).sort()) {
-					const colorRow = colorsContainer.createDiv({ cls: "gim-setting-row" });
-					colorRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center" });
-					colorRow.createSpan({ text: key });
-					
-					const colorInput = colorRow.createEl("input", { type: "color" });
-					colorInput.value = this.settings.statusColors[key] || this.activeStatusColors[key] || "#ffffff";
-					colorInput.addEventListener("change", () => {
-						this.settings.statusColors[key] = colorInput.value;
-						void this.save();
-						this.requestDraw();
-					});
-				}
-			}
-		}
-
-		// Note maturity badge
-		if (displayToggleApplies(this.settings.viewMode, "showMaturity")) {
-			const maturityRow = legacySection.createEl("label", { cls: "gim-toggle-row" });
-			maturityRow.setCssStyles({ marginTop: "12px" });
-			const maturityCb = maturityRow.createEl("input", { type: "checkbox" });
-			maturityCb.checked = this.settings.showMaturity;
-			maturityCb.addEventListener("change", () => {
-				this.settings.showMaturity = maturityCb.checked;
-				void this.save();
-				this.requestDraw();
-			});
-			maturityRow.createSpan({ text: "Note maturity badge (Shape ← maturity)" });
-		}
-
-		// Scale card size by degree
-		const sizeRow = legacySection.createDiv({ cls: "gim-order-row" });
-		sizeRow.setCssStyles({ marginTop: "12px" });
-		sizeRow.createSpan({ text: "Scale card size by", cls: "gim-order-field" });
-		const sizeSel = sizeRow.createEl("select", { cls: "gim-order-dir" });
-		for (const opt of [
-			{ v: "fixed", t: "Fixed (None)" },
-			{ v: "indegree", t: "Incoming links" },
-			{ v: "outdegree", t: "Outgoing links" },
-		]) {
-			sizeSel.createEl("option", { value: opt.v, text: opt.t });
-		}
-		sizeSel.value = this.settings.nodeSizeMode;
-		sizeSel.addEventListener("change", () => {
-			this.settings.nodeSizeMode = sizeSel.value as "fixed" | "indegree" | "outdegree";
-			this.cardCache.clear();
-			void this.save();
-			void this.rebuild();
-		});
-	}
-
-	// Layers sub-tab: a cluster picker (chips) + the selected cluster's
-	// per-layer settings (aggregate / inherit / node-display override).
-	private renderSettingsLayers(el: HTMLElement): void {
-		const clusters = this.laid.clusters;
-		if (clusters.length === 0) {
-			const hint = el.createDiv({ cls: "gim-panel-hint" });
-			hint.setText("No layers in the current graph (set GROUP_BY to create clusters).");
-			return;
-		}
-		// Keep the selected layer valid; default to the first cluster.
-		const validKeys = new Set(clusters.map((c) => c.groupKey));
-		if (!validKeys.has(this.activeTab)) this.activeTab = clusters[0].groupKey;
-
-		const tabBar = el.createDiv({ cls: "gim-panel-tabs" });
-		if (clusters.length > 1) {
-			const filterInput = tabBar.createEl("input", { cls: "gim-panel-tab-filter", type: "search" });
-			filterInput.setAttribute("placeholder", "Filter layers… (type to search)");
-			filterInput.value = this.tabFilter;
-			filterInput.addEventListener("input", () => { this.tabFilter = filterInput.value; this.applyTabFilter(); });
-			filterInput.addEventListener("keydown", (e) => {
-				if (e.key === "Escape" && this.tabFilter !== "") {
-					e.preventDefault();
-					this.tabFilter = "";
-					filterInput.value = "";
-					this.applyTabFilter();
-				}
-			});
-		}
-		const chipsEl = tabBar.createDiv({ cls: "gim-panel-tabs-chips" });
-		for (const c of clusters) {
-			this.renderTabButton(chipsEl, c.groupKey, `${c.label} (${c.memberCount})`, clusterHue(c.groupKey), c.label);
-		}
-		this.applyTabFilter();
-
-		const content = el.createDiv({ cls: "gim-panel-content" });
-		this.renderLayerTab(content, this.activeTab);
-	}
+	// ── Settings sub-tabs have been extracted to src/panel/settings-tabs.ts ──
 
 	// Re-render the settings tab in place after a settings change. No-op unless
 	// the unified menu is open AND currently showing the Settings tab (so a
@@ -1121,65 +816,25 @@ export class MiniGraphView extends ItemView {
 
 	private renderFilterBody(host: HTMLElement): void {
 		this.filterHostEl = host;
-		host.empty();
-		
-		renderPresetSectionFn(host, {
+		renderFilterBodyTab(host, {
 			settings: this.settings,
 			save: () => void this.save(),
-			rerender: () => this.refreshFilterTab(),
 			rebuild: () => void this.rebuild(),
-			applyPreset: (name) => {
-				const preset = this.settings.lensPresets.find(p => p.name === name);
-				if (preset) {
-					applyLens(this.settings, preset);
-					void this.save();
-					this.refreshFilterTab();
-					void this.rebuild();
-				}
-			},
-			savePreset: (name) => {
-				this.settings.lensPresets = upsertPreset(this.settings.lensPresets, name, captureLens(this.settings));
-				void this.save();
-				this.refreshFilterTab();
-				// Also trigger command palette sync if needed
+			refreshFilterTab: () => this.refreshFilterTab(),
+			refreshSettingsTab: () => this.refreshSettingsTab(),
+			whereError: this.whereError,
+			groupByError: this.groupByError,
+			havingError: this.havingError,
+			limitError: this.limitError,
+			syncLensCommands: (presets) => {
 				if (this.app) {
 					const plugin = (this.app as any).plugins.plugins["tag-lens"];
 					if (plugin && plugin.syncLensCommands) {
-						plugin.syncLensCommands(this.settings.lensPresets);
+						plugin.syncLensCommands(presets);
 					}
 				}
-			},
-			removePreset: (name) => {
-				this.settings.lensPresets = removePreset(this.settings.lensPresets, name);
-				void this.save();
-				this.refreshFilterTab();
-				new Notice(`Lens '${name}' deleted. Note: its command palette entry will disappear on next reload.`);
 			}
 		});
-
-		const header = host.createDiv({ cls: "gim-panel-section" });
-		header.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", borderBottom: "none" });
-		
-		const title = header.createEl("h4", { text: "Filter", cls: "gim-panel-title" });
-		title.setCssStyles({ margin: "0" });
-
-		const modeToggle = header.createEl("a", { cls: "view-action clickable-icon" });
-		modeToggle.setAttribute("aria-label", this.settings.filterMode === "dvjs" ? "Switch to SQL Mode" : "Switch to DataviewJS Mode");
-		setIcon(modeToggle, this.settings.filterMode === "dvjs" ? "database" : "code");
-		
-		modeToggle.addEventListener("click", () => {
-			this.settings.filterMode = this.settings.filterMode === "dvjs" ? "sql" : "dvjs";
-			void this.save();
-			this.refreshFilterTab();
-			void this.rebuild();
-		});
-
-		const filterSection = host.createDiv({ cls: "gim-panel-section" });
-		this.renderSettingsFilter(filterSection);
-		
-		const sortSection = host.createDiv({ cls: "gim-panel-section" });
-		sortSection.createEl("h4", { text: "Sort" });
-		this.renderSettingsSort(sortSection);
 	}
 
 	private refreshFilterTab(): void {
@@ -1916,50 +1571,7 @@ export class MiniGraphView extends ItemView {
 		new Notice(`Converted #${tag} to #${parentPath}/${tag} in ${updatedCount} files.`);
 	}
 
-	private renderTabButton(
-		bar: HTMLElement,
-		key: string,
-		label: string,
-		hue: number | null,
-		filterText: string | null,
-	): void {
-		const btn = bar.createEl("button", { cls: "gim-panel-tab" });
-		if (this.activeTab === key) btn.addClass("active");
-		if (hue !== null) {
-			const sw = btn.createSpan({ cls: "gim-panel-tab-swatch" });
-			sw.setCssStyles({ background: theme().swatch(hue, "fill") });
-		}
-		btn.createSpan({ text: label });
-		// filterText = null ⇒ pinned (never filtered, e.g. the 全体 tab).
-		if (filterText === null) {
-			btn.dataset.alwaysVisible = "1";
-		} else {
-			btn.dataset.filterText = filterText.toLowerCase();
-		}
-		btn.addEventListener("click", () => {
-			this.activeTab = key;
-			this.refreshSettingsTab();
-		});
-	}
-
-	// Hide / show chip buttons via CSS display so the focused filter input
-	// stays focused. Substring match (case-insensitive) against the cluster
-	// label. The 全体 tab carries data-always-visible=1 and is never hidden.
-	// Also reveals the currently-active tab even if it doesn't match the
-	// filter, so the user can always see "where they are".
-	private applyTabFilter(): void {
-		if (!this.settingsHostEl) return;
-		const q = this.tabFilter.trim().toLowerCase();
-		const chips = this.settingsHostEl.querySelectorAll<HTMLElement>(".gim-panel-tab");
-		chips.forEach((btn) => {
-			if (btn.dataset.alwaysVisible === "1" || btn.classList.contains("active")) {
-				btn.setCssStyles({ display: "" });
-				return;
-			}
-			const text = btn.dataset.filterText ?? "";
-			btn.setCssStyles({ display: q === "" || text.includes(q) ? "" : "none" });
-		});
-	}
+	// ── Layers Tab UI helpers have been extracted to src/panel/settings-tabs.ts ──
 
 	private renderMinFontSection(parent: HTMLElement): void {
 		renderMinFontSectionFn(parent, {
@@ -1969,137 +1581,7 @@ export class MiniGraphView extends ItemView {
 		});
 	}
 
-	private renderLayerTab(el: HTMLElement, groupKey: string): void {
-		const cluster = this.laid.clusters.find((c) => c.groupKey === groupKey);
-		if (!cluster) {
-			const hint = el.createDiv({ cls: "gim-panel-hint" });
-			hint.setText("This layer no longer exists.");
-			return;
-		}
 
-		// Header — name, colour, count.
-		const head = el.createDiv({ cls: "gim-panel-section" });
-		head.createEl("h4", { text: cluster.label });
-		const meta = head.createDiv({ cls: "gim-layer-meta" });
-		const swatch = meta.createSpan({ cls: "gim-layer-swatch" });
-		const hue = clusterHue(cluster.groupKey);
-		swatch.setCssStyles({ background: theme().swatch(hue, "fill") });
-		meta.createSpan({ text: cluster.label });
-		meta.createSpan({
-			cls: "gim-layer-count",
-			text: `${cluster.memberCount} nodes`,
-		});
-
-		// Layer-level toggles: aggregate display + inheritance.
-		const togs = el.createDiv({ cls: "gim-panel-section" });
-		togs.createEl("h4", { text: "Display" });
-		this.renderLayerToggle(
-			togs,
-			"aggregatedLayers",
-			groupKey,
-			"Aggregate (3-card stack)",
-			() => {
-				// Aggregation shrinks the cluster bbox down to the stack and
-				// reroutes edges/trunks into the stack centre, so a rebuild
-				// pass is needed to keep enclosures and wiring in sync.
-				void this.rebuild();
-			},
-		);
-		// Inheritance source picker — choose another cluster as the parent.
-		// The child cluster's bbox will grow to engulf the parent's bbox so
-		// the two visually merge into one nested region.
-		const inhRow = togs.createDiv({ cls: "gim-order-row" });
-		inhRow.createSpan({ text: "Inherit from", cls: "gim-order-field" });
-		const inhSel = inhRow.createEl("select", { cls: "gim-order-dir" });
-		const noneOpt = inhSel.createEl("option", { value: "", text: "(none)" });
-		const current = this.settings.inheritFrom[groupKey] ?? "";
-		if (current === "") noneOpt.selected = true;
-		for (const other of this.laid.clusters) {
-			if (other.groupKey === groupKey) continue;
-			const opt = inhSel.createEl("option", {
-				value: other.groupKey,
-				text: other.label,
-			});
-			if (other.groupKey === current) opt.selected = true;
-		}
-		inhSel.addEventListener("change", () => {
-			if (inhSel.value === "") {
-				delete this.settings.inheritFrom[groupKey];
-			} else {
-				this.settings.inheritFrom[groupKey] = inhSel.value;
-			}
-			void this.save();
-			void this.rebuild();
-		});
-
-		// Per-cluster NODE_DISPLAY override. Falls back to inheritFrom →
-		// strict superset → global when fields are left empty.
-		this.renderNodeDisplaySection(el, { groupKey });
-
-		// Per-card visibility list. The user toggles each card individually;
-		// bulk Show/Hide buttons at the top operate on the whole layer.
-		const cardsSec = el.createDiv({ cls: "gim-panel-section" });
-		cardsSec.createEl("h4", { text: "Cards" });
-
-		const layerNodes = this.laid.nodes
-			.filter((n) => n.memberships.includes(groupKey))
-			.sort((a, b) => a.label.localeCompare(b.label));
-
-		const controls = cardsSec.createDiv({ cls: "gim-layer-cards-controls" });
-		const showAllBtn = controls.createEl("button", { text: "Show all" });
-		showAllBtn.addEventListener("click", () => {
-			for (const n of layerNodes) {
-				const i = this.settings.hiddenNodes.indexOf(n.id);
-				if (i >= 0) this.settings.hiddenNodes.splice(i, 1);
-			}
-			void this.save();
-			this.refreshSettingsTab();
-			this.requestDraw();
-		});
-		const hideAllBtn = controls.createEl("button", { text: "Hide all" });
-		hideAllBtn.addEventListener("click", () => {
-			for (const n of layerNodes) {
-				if (!this.settings.hiddenNodes.includes(n.id)) {
-					this.settings.hiddenNodes.push(n.id);
-				}
-			}
-			void this.save();
-			this.refreshSettingsTab();
-			this.requestDraw();
-		});
-
-		const list = cardsSec.createDiv({ cls: "gim-layer-cards" });
-		for (const n of layerNodes) {
-			const row = list.createEl("label", { cls: "gim-toggle-row" });
-			const cb = row.createEl("input", { type: "checkbox" });
-			cb.checked = !this.settings.hiddenNodes.includes(n.id);
-			cb.addEventListener("change", () => {
-				this.toggleArrayMember("hiddenNodes", n.id, !cb.checked);
-				void this.save();
-				this.requestDraw();
-			});
-			row.createSpan({ text: n.label });
-		}
-	}
-
-	// Helper: a labelled checkbox bound to an array-typed MiniSettings field.
-	private renderLayerToggle(
-		parent: HTMLElement,
-		field: "aggregatedLayers",
-		groupKey: string,
-		label: string,
-		onChange: () => void,
-	): void {
-		const row = parent.createEl("label", { cls: "gim-toggle-row" });
-		const cb = row.createEl("input", { type: "checkbox" });
-		cb.checked = this.settings[field].includes(groupKey);
-		cb.addEventListener("change", () => {
-			this.toggleArrayMember(field, groupKey, cb.checked);
-			void this.save();
-			onChange();
-		});
-		row.createSpan({ text: label });
-	}
 
 	private toggleArrayMember(
 		field: "hiddenNodes" | "aggregatedLayers",
