@@ -61,23 +61,48 @@ export function drawCardGrid(
 	const cellCount = (maxCol - minCol + 1) * (maxRow - minRow + 1);
 	if (cellCount > maxCells) return;
 
+	const axX = laid.axes?.x;
+	const axY = laid.axes?.y;
+
 	ctx.strokeStyle = theme().overlay(0.22);
 	ctx.lineWidth = 1 / zoom;
 	ctx.beginPath();
-	for (let r = minRow; r <= maxRow; r++) {
-		const top = r * H + padY;
-		const bottom = (r + 1) * H - padY;
-		for (let c = minCol; c <= maxCol; c++) {
-			const left = c * W + padX;
-			const right = (c + 1) * W - padX;
-			ctx.moveTo(left, top);
-			ctx.lineTo(right, top);
-			ctx.moveTo(left, bottom);
-			ctx.lineTo(right, bottom);
-			ctx.moveTo(left, top);
-			ctx.lineTo(left, bottom);
-			ctx.moveTo(right, top);
-			ctx.lineTo(right, bottom);
+
+	if (laid.axes) {
+		if (axX) {
+			const lines = axX.kind === "categorical" && axX.bands 
+				? [...axX.bands.map(b => b.start), axX.bands[axX.bands.length - 1].end]
+				: axX.ticks?.map(t => t.pos) || [];
+			for (const x of lines) {
+				ctx.moveTo(x, topWorld);
+				ctx.lineTo(x, bottomWorld);
+			}
+		}
+		if (axY) {
+			const lines = axY.kind === "categorical" && axY.bands
+				? [...axY.bands.map(b => b.start), axY.bands[axY.bands.length - 1].end]
+				: axY.ticks?.map(t => t.pos) || [];
+			for (const y of lines) {
+				ctx.moveTo(leftWorld, y);
+				ctx.lineTo(rightWorld, y);
+			}
+		}
+	} else {
+		for (let r = minRow; r <= maxRow; r++) {
+			const top = r * H + padY;
+			const bottom = (r + 1) * H - padY;
+			for (let c = minCol; c <= maxCol; c++) {
+				const left = c * W + padX;
+				const right = (c + 1) * W - padX;
+				ctx.moveTo(left, top);
+				ctx.lineTo(right, top);
+				ctx.moveTo(left, bottom);
+				ctx.lineTo(right, bottom);
+				ctx.moveTo(left, top);
+				ctx.lineTo(left, bottom);
+				ctx.moveTo(right, top);
+				ctx.lineTo(right, bottom);
+			}
 		}
 	}
 	ctx.stroke();
@@ -168,16 +193,42 @@ export function drawGridHeaders(
 	ctx.fillStyle = theme().textNormal;
 	ctx.textAlign = "center";
 	ctx.textBaseline = "middle";
+	const axX = laid.axes?.x;
+	const axY = laid.axes?.y;
+
 	if (!skipTicks) {
-		for (let c = minCol; c <= maxCol; c += colStride) {
-			const xC = c * W * zoom + panX + cellScreenW / 2;
-			if (xC < headerW || xC > visW) continue;
-			ctx.fillText(longitudeLabel(c), xC, headerH / 2);
-		}
-		for (let r = minRow; r <= maxRow; r += rowStride) {
-			const yC = r * H * zoom + panY + cellScreenH / 2;
-			if (yC < headerH || yC > visH) continue;
-			ctx.fillText(latitudeLabel(r), headerW / 2, yC);
+		if (laid.axes) {
+			if (axX) {
+				const ticks = axX.kind === "categorical" && axX.bands
+					? axX.bands.map(b => ({ pos: b.center, label: b.label }))
+					: axX.ticks || [];
+				for (const t of ticks) {
+					const xC = t.pos * zoom + panX;
+					if (xC < headerW || xC > visW) continue;
+					ctx.fillText(t.label, xC, headerH / 2);
+				}
+			}
+			if (axY) {
+				const ticks = axY.kind === "categorical" && axY.bands
+					? axY.bands.map(b => ({ pos: b.center, label: b.label }))
+					: axY.ticks || [];
+				for (const t of ticks) {
+					const yC = t.pos * zoom + panY;
+					if (yC < headerH || yC > visH) continue;
+					ctx.fillText(t.label, headerW / 2, yC);
+				}
+			}
+		} else {
+			for (let c = minCol; c <= maxCol; c += colStride) {
+				const xC = c * W * zoom + panX + cellScreenW / 2;
+				if (xC < headerW || xC > visW) continue;
+				ctx.fillText(longitudeLabel(c), xC, headerH / 2);
+			}
+			for (let r = minRow; r <= maxRow; r += rowStride) {
+				const yC = r * H * zoom + panY + cellScreenH / 2;
+				if (yC < headerH || yC > visH) continue;
+				ctx.fillText(latitudeLabel(r), headerW / 2, yC);
+			}
 		}
 	}
 	ctx.textAlign = "start";

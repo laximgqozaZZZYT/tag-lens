@@ -39,3 +39,27 @@ registerChannel({
 		}
 	},
 });
+
+registerChannel({
+	id: "axisX",
+	label: "Position X",
+	accepts: ["categorical", "ordinal", "quantitative", "temporal"],
+	appliesTo: (mode) => ["euler", "euler-true", "euler-venn", "bipartite", "bubblesets"].includes(mode),
+	apply: (params, scaled) => {
+		if (!scaled.missing && scaled.t != null) {
+			params.axisX = scaled.t;
+		}
+	},
+});
+
+registerChannel({
+	id: "axisY",
+	label: "Position Y",
+	accepts: ["categorical", "ordinal", "quantitative", "temporal"],
+	appliesTo: (mode) => ["euler", "euler-true", "euler-venn", "bipartite", "bubblesets"].includes(mode),
+	apply: (params, scaled) => {
+		if (!scaled.missing && scaled.t != null) {
+			params.axisY = scaled.t;
+		}
+	},
+});

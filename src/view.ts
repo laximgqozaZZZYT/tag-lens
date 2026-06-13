@@ -7,6 +7,7 @@ import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
 import { effectiveEncoding } from "./encoding/migrate";
 import { fieldSourceRegistry } from "./encoding/field-sources";
 import type { EncContext, NodeDrawParams, EncodingBinding, ScaleType } from "./encoding/types";
+import { axisLayout } from "./axis-layout";
 import { buildGraph } from "./parser";
 import {
 	layout,
@@ -31,7 +32,7 @@ import {
 } from "./query-pipeline";
 import { clusterHue } from "./canvas-utils";
 import { resolveTheme, setTheme, theme, colorAlpha } from "./theme";
-import { expandClustersByInheritance } from "./cluster-bbox";
+import { expandClustersByInheritance, computeClusterBBoxes } from "./cluster-bbox";
 import { runAggregateSnap } from "./aggregate-snap";
 import {
 	drawCardGrid as drawCardGridFn,
@@ -1431,6 +1432,10 @@ export class MiniGraphView extends ItemView {
 		this.encParams = encRes.params;
 		this.encLegends = encRes.legends;
 
+		// Custom axis layout (Encode → Position X/Y): override card placement when
+		// axisX/axisY are bound. Reads only — never changes the displayed node set.
+		this.applyAxisLayout(effEnc, encCtx);
+
 		this.activeStatusColors = {};
 		if (this.settings.statusField) {
 			const statuses = new Set<string>();
@@ -1442,6 +1447,7 @@ export class MiniGraphView extends ItemView {
 				...this.settings.statusColors,
 			};
 		}
+
 		// Aggregate-snap + inheritance operate on the Euler cluster/edge model
 		// (note→note vault links, per-cluster aggregation). Bipartite has its
 		// own node/edge model (note↔tag) and no enclosures, so running them
@@ -1494,6 +1500,61 @@ export class MiniGraphView extends ItemView {
 		if (modeChanged || (wasEmpty && !isDroste)) this.fitToView();
 		this.requestDraw();
 		this.refreshSettingsTab();
+	}
+
+	private applyAxisLayout(effEnc: EncodingBinding[], encCtx: EncContext): void {
+		const bindingX = effEnc.find((b) => b.channelId === "axisX");
+		const bindingY = effEnc.find((b) => b.channelId === "axisY");
+		if (!bindingX?.enabled && !bindingY?.enabled) {
+			this.laid.axes = undefined;
+			return;
+		}
+
+		const isCardMode =
+			this.settings.viewMode === "euler" ||
+			this.settings.viewMode === "euler-true" ||
+			this.settings.viewMode === "euler-venn" ||
+			this.settings.viewMode === "bipartite" ||
+			this.settings.viewMode === "bubblesets";
+
+		if (!isCardMode) {
+			this.laid.axes = undefined;
+			return;
+		}
+
+		const width = 360 * this.laid.slotW;
+		const height = 180 * this.laid.slotH;
+
+		const { positions, axes } = axisLayout(this.laid.nodes, encCtx, {
+			bindingX: bindingX?.enabled ? bindingX : undefined,
+			bindingY: bindingY?.enabled ? bindingY : undefined,
+			width,
+			height,
+			cell: { w: this.laid.slotW, h: this.laid.slotH },
+		});
+
+		for (const n of this.laid.nodes) {
+			const pos = positions.get(n.id);
+			if (pos) {
+				n.x = pos.x;
+				n.y = pos.y;
+			}
+		}
+
+		this.laid.axes = axes;
+
+		if (this.laid.clusters && this.laid.clusters.length > 0) {
+			const { clusters } = computeClusterBBoxes(this.laid.nodes, {
+				clusterKeys: this.laid.clusters.map((c) => c.groupKey),
+				labels: this.clusterLabels,
+				slotW: this.laid.slotW,
+				slotH: this.laid.slotH,
+				channelW: this.laid.channelW,
+				channelH: this.laid.channelH,
+				clusterSpacing: this.settings.clusterSpacing,
+			});
+			this.laid.clusters = clusters;
+		}
 	}
 
 	// Build the effective LIMIT rule list by parsing manual rows + filling in

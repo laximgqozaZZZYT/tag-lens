@@ -314,84 +314,93 @@ export interface EncodeTabDeps {
 
 export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): void {
 	const section = el.createDiv({ cls: "gim-panel-section" });
-	section.createEl("h4", { text: "Encode — Color" });
+	section.createEl("h4", { text: "Encode — Visual Channels" });
 	section.createEl("div", {
-		text: "Colour each note card by an attribute. Does not filter — only changes appearance.",
+		text: "Map note attributes to visual channels. Does not filter — only changes appearance or layout.",
 	}).setCssStyles({ fontSize: "10px", color: "var(--text-faint)", marginBottom: "6px" });
 
-	const cur = (deps.settings.encoding ?? []).find((b) => b.channelId === "color");
-	const curIsFm = !!cur && cur.fieldId.startsWith("frontmatter:");
+	const renderBindingControls = (
+		parent: HTMLElement,
+		channelId: string,
+		label: string,
+	) => {
+		const cur = (deps.settings.encoding ?? []).find((b) => b.channelId === channelId);
+		const curIsFm = !!cur && cur.fieldId.startsWith("frontmatter:");
 
-	const fieldRow = section.createDiv({ cls: "gim-setting-row" });
-	fieldRow.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" });
-	fieldRow.createSpan({ text: "Color ←" });
-	const sel = fieldRow.createEl("select");
-	sel.add(new Option("(none)", ""));
-	for (const f of fieldSourceRegistry) sel.add(new Option(f.label, f.id));
-	sel.value = cur && !curIsFm ? cur.fieldId : "";
+		const row = parent.createDiv({ cls: "gim-setting-row" });
+		row.setCssStyles({ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px", marginTop: "8px", paddingBottom: "8px", borderBottom: "1px solid var(--background-modifier-border)" });
+		
+		row.createSpan({ text: `${label} ←` }).setCssStyles({ minWidth: "60px", fontWeight: "600" });
+		const sel = row.createEl("select");
+		sel.add(new Option("(none)", ""));
+		for (const f of fieldSourceRegistry) sel.add(new Option(f.label, f.id));
+		sel.value = cur && !curIsFm ? cur.fieldId : "";
 
-	const fmRow = section.createDiv({ cls: "gim-setting-row" });
-	fmRow.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" });
-	fmRow.createSpan({ text: "or frontmatter key:" });
-	const fmIn = fmRow.createEl("input", { type: "text", cls: "gim-text-input" });
-	fmIn.setCssStyles({ width: "120px" });
-	fmIn.value = curIsFm ? cur!.fieldId.slice("frontmatter:".length) : "";
+		row.createSpan({ text: "or FM:" });
+		const fmIn = row.createEl("input", { type: "text", cls: "gim-text-input" });
+		fmIn.setCssStyles({ width: "100px" });
+		fmIn.value = curIsFm ? cur!.fieldId.slice("frontmatter:".length) : "";
 
-	const scRow = section.createDiv({ cls: "gim-setting-row" });
-	scRow.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" });
-	scRow.createSpan({ text: "Scale:" });
-	const scSel = scRow.createEl("select");
-	for (const t of ["categorical", "linear", "log", "quantile"]) scSel.add(new Option(t, t));
-	scSel.value = cur?.scale?.type ?? "categorical";
-	const revLabel = scRow.createEl("label", { cls: "gim-toggle-row" });
-	const revCb = revLabel.createEl("input", { type: "checkbox" });
-	revCb.checked = !!cur?.scale?.reverse;
-	revLabel.createSpan({ text: "reverse" });
+		row.createSpan({ text: "Scale:" });
+		const scSel = row.createEl("select");
+		for (const t of ["categorical", "linear", "log", "quantile"]) scSel.add(new Option(t, t));
+		scSel.value = cur?.scale?.type ?? "categorical";
+		
+		const revLabel = row.createEl("label", { cls: "gim-toggle-row" });
+		revLabel.setCssStyles({ margin: "0" });
+		const revCb = revLabel.createEl("input", { type: "checkbox" });
+		revCb.checked = !!cur?.scale?.reverse;
+		revLabel.createSpan({ text: "reverse" });
 
-	const apply = (): void => {
-		const fmKey = fmIn.value.trim();
-		const fieldId = fmKey ? `frontmatter:${fmKey}` : sel.value;
-		const others = (deps.settings.encoding ?? []).filter((b) => b.channelId !== "color");
-		if (!fieldId) {
-			deps.settings.encoding = others;
-		} else {
-			const binding: EncodingBinding = {
-				channelId: "color",
-				fieldId,
-				enabled: true,
-				scale: { type: scSel.value as ScaleType, reverse: revCb.checked },
-			};
-			deps.settings.encoding = [...others, binding];
-		}
-		deps.save();
-		void deps.rebuild().then(() => deps.refreshSettingsTab());
-	};
-	sel.addEventListener("change", apply);
-	fmIn.addEventListener("change", apply);
-	scSel.addEventListener("change", apply);
-	revCb.addEventListener("change", apply);
-
-	// Auto-legend from the last evaluated encoding.
-	const colorLeg = deps.encLegends.find((l) => l.channelId === "color");
-	if (colorLeg) {
-		const leg = section.createDiv();
-		leg.setCssStyles({ marginTop: "10px" });
-		leg.createEl("h4", { text: `Legend — ${colorLeg.fieldLabel}` });
-		if (colorLeg.legend.kind === "categorical") {
-			for (const e of colorLeg.legend.entries ?? []) {
-				const er = leg.createDiv();
-				er.setCssStyles({ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" });
-				er.createSpan().setCssStyles({
-					width: "12px", height: "12px", borderRadius: "3px", background: e.output, display: "inline-block",
-				});
-				er.createSpan({ text: e.key }).setCssStyles({ fontSize: "11px" });
+		const apply = (): void => {
+			const fmKey = fmIn.value.trim();
+			const fieldId = fmKey ? `frontmatter:${fmKey}` : sel.value;
+			const others = (deps.settings.encoding ?? []).filter((b) => b.channelId !== channelId);
+			if (!fieldId) {
+				deps.settings.encoding = others;
+			} else {
+				const binding: EncodingBinding = {
+					channelId,
+					fieldId,
+					enabled: true,
+					scale: { type: scSel.value as ScaleType, reverse: revCb.checked },
+				};
+				deps.settings.encoding = [...others, binding];
 			}
-		} else if (colorLeg.legend.kind === "quantitative") {
-			leg.createDiv({
-				text: `${(colorLeg.legend.min ?? 0).toFixed(1)} … ${(colorLeg.legend.max ?? 0).toFixed(1)}${colorLeg.legend.reversed ? " (reversed)" : ""}`,
-			}).setCssStyles({ fontSize: "11px", color: "var(--text-muted)" });
+			deps.save();
+			void deps.rebuild().then(() => deps.refreshSettingsTab());
+		};
+		sel.addEventListener("change", apply);
+		fmIn.addEventListener("change", apply);
+		scSel.addEventListener("change", apply);
+		revCb.addEventListener("change", apply);
+
+		// Auto-legend from the last evaluated encoding.
+		const legItem = deps.encLegends.find((l) => l.channelId === channelId);
+		if (legItem) {
+			const leg = row.createDiv();
+			leg.setCssStyles({ width: "100%", marginTop: "4px" });
+			leg.createEl("div", { text: `Legend — ${legItem.fieldLabel}` }).setCssStyles({ fontSize: "11px", fontWeight: "600", marginBottom: "2px" });
+			if (legItem.legend.kind === "categorical") {
+				for (const e of legItem.legend.entries ?? []) {
+					const er = leg.createSpan();
+					er.setCssStyles({ display: "inline-flex", alignItems: "center", gap: "4px", marginRight: "8px" });
+					if (channelId === "color") {
+						er.createSpan().setCssStyles({ width: "10px", height: "10px", borderRadius: "2px", background: e.output, display: "inline-block" });
+					}
+					er.createSpan({ text: e.key }).setCssStyles({ fontSize: "10px" });
+				}
+			} else if (legItem.legend.kind === "quantitative") {
+				leg.createDiv({
+					text: `${(legItem.legend.min ?? 0).toFixed(1)} … ${(legItem.legend.max ?? 0).toFixed(1)}${legItem.legend.reversed ? " (reversed)" : ""}`,
+				}).setCssStyles({ fontSize: "10px", color: "var(--text-muted)" });
+			}
 		}
-	}
+	};
+
+	renderBindingControls(section, "color", "Color");
+	renderBindingControls(section, "axisX", "Position X");
+	renderBindingControls(section, "axisY", "Position Y");
 	// ---- Legacy Bindings Section ----
 	const legacySection = el.createDiv({ cls: "gim-panel-section" });
 	legacySection.setCssStyles({ marginTop: "16px", paddingTop: "8px", borderTop: "1px solid var(--background-modifier-border)" });
