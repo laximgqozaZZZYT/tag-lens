@@ -364,6 +364,79 @@ function drawAxisGrid(
 	ctx.restore();
 }
 
+// Default Cartesian grid for the Icon Gallery when no custom axes are bound.
+// Draws orthogonal gridlines at every cell boundary in the visible range, plus
+// frozen screen-space headers along the top (column index) and left (row index)
+// edges so the gallery reads as a proper coordinate system.
+function drawDefaultGrid(
+	ctx: CanvasRenderingContext2D,
+	o: DrawDrosteOpts,
+	c0: number,
+	c1: number,
+	r0: number,
+	r1: number,
+): void {
+	const { dpr, cellSize, zoom, panX, panY } = o;
+	const w = ctx.canvas.width;
+	const h = ctx.canvas.height;
+	const sx = (wx: number): number => (wx * zoom + panX) * dpr;
+	const sy = (wy: number): number => (wy * zoom + panY) * dpr;
+
+	// Gridlines — subtle orthogonal lines at every cell boundary.
+	ctx.save();
+	ctx.strokeStyle = theme().overlay(0.15);
+	ctx.lineWidth = 1 * dpr;
+	ctx.beginPath();
+	for (let col = c0; col <= c1 + 1; col++) {
+		const px = sx(col * cellSize);
+		ctx.moveTo(px, 0);
+		ctx.lineTo(px, h);
+	}
+	for (let row = r0; row <= r1 + 1; row++) {
+		const py = sy(row * cellSize);
+		ctx.moveTo(0, py);
+		ctx.lineTo(w, py);
+	}
+	ctx.stroke();
+
+	// Frozen headers — column indices at the top, row indices on the left.
+	const headerH = 18 * dpr;
+	const headerW = 18 * dpr;
+	const fontPx = 11 * dpr;
+
+	// Background strips (semi-opaque so the grid peeks through slightly).
+	ctx.fillStyle = colorAlpha(theme().panelBg, 0.88);
+	ctx.fillRect(0, 0, w, headerH);
+	ctx.fillRect(0, 0, headerW, h);
+
+	// Column labels (centred in each cell).
+	ctx.fillStyle = theme().textMuted;
+	ctx.font = `600 ${fontPx}px sans-serif`;
+	ctx.textAlign = "center";
+	ctx.textBaseline = "middle";
+	for (let col = c0; col <= c1; col++) {
+		const xc = sx((col + 0.5) * cellSize);
+		if (xc < headerW || xc > w) continue;
+		ctx.fillText(String(col + 1), xc, headerH / 2);
+	}
+
+	// Row labels (centred vertically, rotated −90° for consistency with axis mode).
+	for (let row = r0; row <= r1; row++) {
+		const yc = sy((row + 0.5) * cellSize);
+		if (yc < headerH || yc > h) continue;
+		ctx.save();
+		ctx.translate(headerW / 2, yc);
+		ctx.rotate(-Math.PI / 2);
+		ctx.textAlign = "center";
+		ctx.fillText(String(row + 1), 0, 0);
+		ctx.restore();
+	}
+
+	ctx.textAlign = "start";
+	ctx.textBaseline = "alphabetic";
+	ctx.restore();
+}
+
 export function drawDroste(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): void {
 	const { canvas, dpr, gallery, cellSize, zoom, panX, panY } = o;
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -391,8 +464,12 @@ export function drawDroste(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): vo
 	for (const cell of gallery.cells) byPosMap.set(cell.row * gallery.cols + cell.col, cell.id);
 	const byPos = (col: number, row: number): string | null =>
 		byPosMap.get(row * gallery.cols + col) ?? null;
-	// Custom-axis band gridlines + labels (drawn behind the icons).
-	if (gallery.axes) drawAxisGrid(ctx, o, gallery.axes, c0, c1, r0, r1);
+	// Cartesian gridlines: axis grid when axes are bound, default cell grid otherwise.
+	if (gallery.axes) {
+		drawAxisGrid(ctx, o, gallery.axes, c0, c1, r0, r1);
+	} else {
+		drawDefaultGrid(ctx, o, c0, c1, r0, r1);
+	}
 	for (let row = r0; row <= r1; row++) {
 		for (let col = c0; col <= c1; col++) {
 			const id = byPos(col, row);

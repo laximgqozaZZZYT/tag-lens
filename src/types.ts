@@ -372,6 +372,7 @@ export const VIEW_MODES: ViewModeOption[] = [
 		id: "bubblesets",
 		label: "BubbleSets",
 		description: "Containment layout drawn as rectangular iso-contour bubbles",
+		experimental: true,
 	},
 	{
 		// Symmetric tag×tag co-occurrence heatmap: cell shade = how many notes
@@ -395,6 +396,7 @@ export const VIEW_MODES: ViewModeOption[] = [
 		id: "upset",
 		label: "UpSet plot",
 		description: "Stack of cards per intersection + dot matrix (handles ≥4-way intersections)",
+		experimental: true,
 	},
 	{
 		// Sequence Stream: tags as rows, axis (time/value) bins as columns. Each

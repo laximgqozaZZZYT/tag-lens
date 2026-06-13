@@ -2327,8 +2327,9 @@ export class MiniGraphView extends ItemView {
 		const isEuler = mode === "euler" || mode === "euler-true" || mode === "euler-venn" || mode === "bubblesets";
 
 		// 1. showGrid: draw a subtle background grid.
-		// Exclude euler since it natively draws a strong grid. Matrix/Heatmap don't have native grid.
-		if (this.settings.showGrid && !isEuler) {
+		// Exclude euler since it natively draws a strong grid. Droste draws its own
+		// Cartesian cell grid (drawDefaultGrid / drawAxisGrid). Matrix/Heatmap don't have native grid.
+		if (this.settings.showGrid && !isEuler && mode !== "droste") {
 			ctx.strokeStyle = `rgba(128, 128, 128, ${baseAlpha * 2})`;
 			ctx.lineWidth = 1;
 			ctx.beginPath();
