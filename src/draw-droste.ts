@@ -253,8 +253,11 @@ function drawAxisGrid(
 	const sy = (wy: number): number => (wy * zoom + panY) * dpr;
 	const w = ctx.canvas.width;
 	const h = ctx.canvas.height;
-	// X-band boundaries (world x) within the visible column range.
-	const xLinesFor = (ax: AxisSpec): number[] => {
+	// Band/tick boundaries (in col OR row units) within the visible range. X is
+	// filtered by the visible COLUMN range (c0..c1), Y by the visible ROW range
+	// (r0..r1) — using the column range for Y dropped horizontal lines whenever
+	// the Y bands outnumbered the X columns.
+	const linesFor = (ax: AxisSpec, lo: number, hi: number): number[] => {
 		const out: number[] = [];
 		if (ax.kind === "categorical" && ax.bands) {
 			for (const b of ax.bands) {
@@ -264,7 +267,7 @@ function drawAxisGrid(
 		} else if (ax.ticks) {
 			for (const t of ax.ticks) out.push(t.pos);
 		}
-		return [...new Set(out)].filter((u) => u >= c0 - 1 && u <= c1 + 2);
+		return [...new Set(out)].filter((u) => u >= lo - 1 && u <= hi + 2);
 	};
 
 	ctx.save();
@@ -272,14 +275,14 @@ function drawAxisGrid(
 	ctx.lineWidth = 1 * dpr;
 	ctx.beginPath();
 	if (axes.x) {
-		for (const u of xLinesFor(axes.x)) {
+		for (const u of linesFor(axes.x, c0, c1)) {
 			const px = sx(u * cellSize);
 			ctx.moveTo(px, 0);
 			ctx.lineTo(px, h);
 		}
 	}
 	if (axes.y) {
-		for (const u of xLinesFor(axes.y)) {
+		for (const u of linesFor(axes.y, r0, r1)) {
 			const py = sy(u * cellSize);
 			ctx.moveTo(0, py);
 			ctx.lineTo(w, py);
