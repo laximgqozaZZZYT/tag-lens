@@ -134,8 +134,15 @@ export function axisLayout(nodes: EncNode[], ctx: EncContext, opts: AxisLayoutOp
 	const positions = new Map<string, { x: number; y: number }>();
 	for (const group of byCell.values()) {
 		const k = group.length;
-		const anchorX = group.reduce((s, g) => s + g.ax, 0) / k;
-		const anchorY = group.reduce((s, g) => s + g.ay, 0) / k;
+		let anchorX = group.reduce((s, g) => s + g.ax, 0) / k;
+		let anchorY = group.reduce((s, g) => s + g.ay, 0) / k;
+		
+		// Snap the anchor to the nearest cell lattice intersection.
+		// This guarantees that all nodes in the packed grid fall perfectly on integer multiples of slotW/slotH,
+		// preventing misalignment with edge routing channels and cluster enclosures.
+		anchorX = Math.round(anchorX / opts.cell.w) * opts.cell.w;
+		anchorY = Math.round(anchorY / opts.cell.h) * opts.cell.h;
+
 		const cols = Math.ceil(Math.sqrt(k));
 		const rows = Math.ceil(k / cols);
 		group.forEach((g, i) => {

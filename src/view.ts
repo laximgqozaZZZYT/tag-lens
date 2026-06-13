@@ -8,6 +8,8 @@ import { effectiveEncoding } from "./encoding/migrate";
 import { fieldSourceRegistry } from "./encoding/field-sources";
 import type { EncContext, NodeDrawParams, EncodingBinding, ScaleType } from "./encoding/types";
 import { axisLayout } from "./axis-layout";
+import { LaneRegistry, routeZ } from "./edge-routing";
+import { snapAndBuildRouteData } from "./layout-shared";
 import { buildGraph } from "./parser";
 import {
 	layout,
@@ -1522,7 +1524,8 @@ export class MiniGraphView extends ItemView {
 			return;
 		}
 
-		const nSpan = Math.max(20, Math.ceil(Math.sqrt(this.laid.nodes.length)) * 4);
+		let nSpan = Math.max(20, Math.ceil(Math.sqrt(this.laid.nodes.length)) * 4);
+		if (nSpan % 2 !== 0) nSpan += 1; // Force even to ensure integer cx/cy
 		const width = nSpan * this.laid.slotW;
 		const height = nSpan * this.laid.slotH;
 
@@ -1569,6 +1572,55 @@ export class MiniGraphView extends ItemView {
 				clusterSpacing: this.settings.clusterSpacing,
 			});
 			this.laid.clusters = clusters;
+		}
+
+		if (this.laid.edges && this.laid.edges.length > 0) {
+			const { idToRect, routeObstacles } = snapAndBuildRouteData(
+				this.laid.nodes,
+				this.laid.slotW,
+				this.laid.slotH,
+			);
+			const lanes = new LaneRegistry();
+			for (const e of this.laid.edges) {
+				const a = idToRect.get(e.source);
+				const b = idToRect.get(e.target);
+				if (!a || !b) continue;
+				let path = routeZ(
+					a,
+					b,
+					lanes,
+					this.laid.slotW,
+					this.laid.slotH,
+					this.laid.channelW,
+					this.laid.channelH,
+					routeObstacles,
+					e.source,
+					e.target,
+				);
+				if (!path || path.length < 2) path = [{ x: a.x, y: a.y }, { x: b.x, y: b.y }];
+				e.path = path;
+			}
+			if (this.laid.ghostEdges) {
+				for (const e of this.laid.ghostEdges) {
+					const a = idToRect.get(e.source);
+					const b = idToRect.get(e.target);
+					if (!a || !b) continue;
+					let path = routeZ(
+						a,
+						b,
+						lanes,
+						this.laid.slotW,
+						this.laid.slotH,
+						this.laid.channelW,
+						this.laid.channelH,
+						routeObstacles,
+						e.source,
+						e.target,
+					);
+					if (!path || path.length < 2) path = [{ x: a.x, y: a.y }, { x: b.x, y: b.y }];
+					e.path = path;
+				}
+			}
 		}
 	}
 
