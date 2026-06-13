@@ -1522,8 +1522,9 @@ export class MiniGraphView extends ItemView {
 			return;
 		}
 
-		const width = 360 * this.laid.slotW;
-		const height = 180 * this.laid.slotH;
+		const nSpan = Math.max(20, Math.ceil(Math.sqrt(this.laid.nodes.length)) * 4);
+		const width = nSpan * this.laid.slotW;
+		const height = nSpan * this.laid.slotH;
 
 		const { positions, axes } = axisLayout(this.laid.nodes, encCtx, {
 			bindingX: bindingX?.enabled ? bindingX : undefined,
@@ -1533,15 +1534,29 @@ export class MiniGraphView extends ItemView {
 			cell: { w: this.laid.slotW, h: this.laid.slotH },
 		});
 
+		const cx = width / 2;
+		const cy = height / 2;
+
 		for (const n of this.laid.nodes) {
 			const pos = positions.get(n.id);
 			if (pos) {
-				n.x = pos.x;
-				n.y = pos.y;
+				n.x = pos.x - cx;
+				n.y = pos.y - cy;
 			}
 		}
 
-		this.laid.axes = axes;
+		const shiftSpec = (spec: any, offset: number) => {
+			if (!spec) return undefined;
+			const out = { ...spec };
+			if (out.bands) out.bands = out.bands.map((b: any) => ({ ...b, start: b.start - offset, end: b.end - offset, center: b.center - offset }));
+			if (out.ticks) out.ticks = out.ticks.map((t: any) => ({ ...t, pos: t.pos - offset }));
+			return out;
+		};
+
+		this.laid.axes = {
+			x: shiftSpec(axes.x, cx),
+			y: shiftSpec(axes.y, cy),
+		};
 
 		if (this.laid.clusters && this.laid.clusters.length > 0) {
 			const { clusters } = computeClusterBBoxes(this.laid.nodes, {
