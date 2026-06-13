@@ -13,7 +13,7 @@ const ctx = await esbuild.context({
 	sourcemap: false,
 	logLevel: "info",
 	treeShaking: true,
-	minify: !watch,
+	minify: false,
 });
 
 if (watch) {

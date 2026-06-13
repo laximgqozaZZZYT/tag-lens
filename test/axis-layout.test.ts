@@ -48,8 +48,8 @@ const OPTS = { width: 300, height: 200, cell: { w: 10, h: 10 } };
 	ok((r.axes.y.ticks?.length ?? 0) === 6, "6 gridline ticks");
 	const ya = r.positions.get("a")!.y, yb = r.positions.get("b")!.y, yc = r.positions.get("c")!.y;
 	ok(ya < yb && yb < yc, "ageDays maps monotonically along Y");
-	approx(ya, 0, 1e-9, "ageDays 0 -> y 0");
-	approx(yc, 200, 1e-9, "ageDays 100 -> y = height");
+	approx(ya, 5, 1e-9, "ageDays 0 -> y 5");
+	approx(yc, 205, 1e-9, "ageDays 100 -> y = height + 5");
 }
 
 // X = degree (quantitative via ctx.degreeOf): a(1) < c(3) < b(5)

@@ -68,42 +68,52 @@ export function drawCardGrid(
 	ctx.lineWidth = 1 / zoom;
 	ctx.beginPath();
 
-	if (laid.axes) {
-		if (axX) {
-			const lines = axX.kind === "categorical" && axX.bands 
-				? [...axX.bands.map(b => b.start), axX.bands[axX.bands.length - 1].end]
-				: axX.ticks?.map(t => t.pos) || [];
-			for (const x of lines) {
-				ctx.moveTo(x, topWorld);
-				ctx.lineTo(x, bottomWorld);
+	const xLines: number[] = [];
+	if (axX) {
+		if (axX.kind === "categorical" && axX.bands) {
+			for (const b of axX.bands) {
+				xLines.push(b.start);
+				xLines.push(b.end);
+			}
+		} else {
+			if (axX.ticks) {
+				xLines.push(...axX.ticks.map(t => t.pos));
 			}
 		}
-		if (axY) {
-			const lines = axY.kind === "categorical" && axY.bands
-				? [...axY.bands.map(b => b.start), axY.bands[axY.bands.length - 1].end]
-				: axY.ticks?.map(t => t.pos) || [];
-			for (const y of lines) {
-				ctx.moveTo(leftWorld, y);
-				ctx.lineTo(rightWorld, y);
+	} else {
+		for (let c = minCol; c <= maxCol; c++) {
+			xLines.push(c * W);
+		}
+	}
+
+	const yLines: number[] = [];
+	if (axY) {
+		if (axY.kind === "categorical" && axY.bands) {
+			for (const b of axY.bands) {
+				yLines.push(b.start);
+				yLines.push(b.end);
+			}
+		} else {
+			if (axY.ticks) {
+				yLines.push(...axY.ticks.map(t => t.pos));
 			}
 		}
 	} else {
 		for (let r = minRow; r <= maxRow; r++) {
-			const top = r * H + padY;
-			const bottom = (r + 1) * H - padY;
-			for (let c = minCol; c <= maxCol; c++) {
-				const left = c * W + padX;
-				const right = (c + 1) * W - padX;
-				ctx.moveTo(left, top);
-				ctx.lineTo(right, top);
-				ctx.moveTo(left, bottom);
-				ctx.lineTo(right, bottom);
-				ctx.moveTo(left, top);
-				ctx.lineTo(left, bottom);
-				ctx.moveTo(right, top);
-				ctx.lineTo(right, bottom);
-			}
+			yLines.push(r * H);
 		}
+	}
+
+	const uniqX = [...new Set(xLines)].filter(x => x >= leftWorld && x <= rightWorld);
+	const uniqY = [...new Set(yLines)].filter(y => y >= topWorld && y <= bottomWorld);
+
+	for (const x of uniqX) {
+		ctx.moveTo(x, topWorld);
+		ctx.lineTo(x, bottomWorld);
+	}
+	for (const y of uniqY) {
+		ctx.moveTo(leftWorld, y);
+		ctx.lineTo(rightWorld, y);
 	}
 	ctx.stroke();
 }
@@ -148,6 +158,9 @@ export function drawGridHeaders(
 	const headerCellCount = (maxCol - minCol) + (maxRow - minRow);
 	const skipTicks = headerCellCount > 4000;
 
+	const axX = laid.axes?.x;
+	const axY = laid.axes?.y;
+
 	ctx.fillStyle = colorAlpha(theme().panelBg, 0.98);
 	ctx.fillRect(0, 0, visW, headerH);
 	ctx.fillRect(0, 0, headerW, visH);
@@ -156,17 +169,56 @@ export function drawGridHeaders(
 		ctx.strokeStyle = theme().overlay(0.45);
 		ctx.lineWidth = 1;
 		ctx.beginPath();
-		for (let c = minCol; c <= maxCol + 1; c++) {
-			const x = c * W * zoom + panX;
-			if (x < headerW - 0.5 || x > visW + 0.5) continue;
-			ctx.moveTo(x, 0);
-			ctx.lineTo(x, headerH);
-		}
-		for (let r = minRow; r <= maxRow + 1; r++) {
-			const y = r * H * zoom + panY;
-			if (y < headerH - 0.5 || y > visH + 0.5) continue;
-			ctx.moveTo(0, y);
-			ctx.lineTo(headerW, y);
+		if (laid.axes) {
+			if (axX) {
+				const lines = axX.kind === "categorical" && axX.bands
+					? [...axX.bands.map(b => b.start), axX.bands.length > 0 ? axX.bands[axX.bands.length - 1].end : 0]
+					: axX.ticks?.map(t => t.pos) || [];
+				for (const x of lines) {
+					const sx = x * zoom + panX;
+					if (sx < headerW - 0.5 || sx > visW + 0.5) continue;
+					ctx.moveTo(sx, 0);
+					ctx.lineTo(sx, headerH);
+				}
+			} else {
+				for (let c = minCol; c <= maxCol + 1; c++) {
+					const x = c * W * zoom + panX;
+					if (x < headerW - 0.5 || x > visW + 0.5) continue;
+					ctx.moveTo(x, 0);
+					ctx.lineTo(x, headerH);
+				}
+			}
+			if (axY) {
+				const lines = axY.kind === "categorical" && axY.bands
+					? [...axY.bands.map(b => b.start), axY.bands.length > 0 ? axY.bands[axY.bands.length - 1].end : 0]
+					: axY.ticks?.map(t => t.pos) || [];
+				for (const y of lines) {
+					const sy = y * zoom + panY;
+					if (sy < headerH - 0.5 || sy > visH + 0.5) continue;
+					ctx.moveTo(0, sy);
+					ctx.lineTo(headerW, sy);
+				}
+			} else {
+				for (let r = minRow; r <= maxRow + 1; r++) {
+					const y = r * H * zoom + panY;
+					if (y < headerH - 0.5 || y > visH + 0.5) continue;
+					ctx.moveTo(0, y);
+					ctx.lineTo(headerW, y);
+				}
+			}
+		} else {
+			for (let c = minCol; c <= maxCol + 1; c++) {
+				const x = c * W * zoom + panX;
+				if (x < headerW - 0.5 || x > visW + 0.5) continue;
+				ctx.moveTo(x, 0);
+				ctx.lineTo(x, headerH);
+			}
+			for (let r = minRow; r <= maxRow + 1; r++) {
+				const y = r * H * zoom + panY;
+				if (y < headerH - 0.5 || y > visH + 0.5) continue;
+				ctx.moveTo(0, y);
+				ctx.lineTo(headerW, y);
+			}
 		}
 		ctx.stroke();
 	}
@@ -193,29 +245,60 @@ export function drawGridHeaders(
 	ctx.fillStyle = theme().textNormal;
 	ctx.textAlign = "center";
 	ctx.textBaseline = "middle";
-	const axX = laid.axes?.x;
-	const axY = laid.axes?.y;
 
 	if (!skipTicks) {
 		if (laid.axes) {
 			if (axX) {
-				const ticks = axX.kind === "categorical" && axX.bands
-					? axX.bands.map(b => ({ pos: b.center, label: b.label }))
-					: axX.ticks || [];
-				for (const t of ticks) {
-					const xC = t.pos * zoom + panX;
-					if (xC < headerW || xC > visW) continue;
-					ctx.fillText(t.label, xC, headerH / 2);
+				if (axX.kind === "categorical" && axX.bands) {
+					for (const b of axX.bands) {
+						const xC = b.center * zoom + panX;
+						if (xC < headerW || xC > visW) continue;
+						const bwScreen = (b.end - b.start) * zoom;
+						ctx.font = `700 ${fontPx}px sans-serif`;
+						const tw = ctx.measureText(b.label).width;
+						const targetFont = Math.max(6, fontPx * Math.min(1, (bwScreen - 8) / Math.max(1, tw)));
+						ctx.font = `700 ${targetFont}px sans-serif`;
+						ctx.fillText(b.label, xC, headerH / 2);
+					}
+				} else {
+					let lastRight = -1;
+					for (const t of axX.ticks || []) {
+						const xC = t.pos * zoom + panX;
+						if (xC < headerW || xC > visW) continue;
+						ctx.font = `700 ${fontPx}px sans-serif`;
+						const w = ctx.measureText(t.label).width;
+						if (xC - w / 2 < lastRight + 10) continue;
+						ctx.fillText(t.label, xC, headerH / 2);
+						lastRight = xC + w / 2;
+					}
 				}
 			}
 			if (axY) {
-				const ticks = axY.kind === "categorical" && axY.bands
-					? axY.bands.map(b => ({ pos: b.center, label: b.label }))
-					: axY.ticks || [];
-				for (const t of ticks) {
-					const yC = t.pos * zoom + panY;
-					if (yC < headerH || yC > visH) continue;
-					ctx.fillText(t.label, headerW / 2, yC);
+				if (axY.kind === "categorical" && axY.bands) {
+					for (const b of axY.bands) {
+						const yC = b.center * zoom + panY;
+						if (yC < headerH || yC > visH) continue;
+						ctx.save();
+						ctx.translate(headerW / 2, yC);
+						ctx.rotate(-Math.PI / 2);
+						const bhScreen = (b.end - b.start) * zoom;
+						ctx.font = `700 ${fontPx}px sans-serif`;
+						const th = ctx.measureText(b.label).width;
+						const targetFont = Math.max(6, fontPx * Math.min(1, (bhScreen - 8) / Math.max(1, th)));
+						ctx.font = `700 ${targetFont}px sans-serif`;
+						ctx.fillText(b.label, 0, 0);
+						ctx.restore();
+					}
+				} else {
+					let lastBottom = -1;
+					for (const t of axY.ticks || []) {
+						const yC = t.pos * zoom + panY;
+						if (yC < headerH || yC > visH) continue;
+						const h = fontPx;
+						if (yC - h / 2 < lastBottom + 10) continue;
+						ctx.fillText(t.label, headerW / 2, yC);
+						lastBottom = yC + h / 2;
+					}
 				}
 			}
 		} else {

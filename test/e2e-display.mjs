@@ -1,18 +1,30 @@
-// Zero-dependency CDP E2E driver. Connects to an Obsidian instance launched
-// with --remote-debugging-port=9222 (separate profile, dev vault), then drives
-// the Tag Lens view programmatically through EVERY view mode, checking that:
-//   1. rebuild()/draw() never throw in any mode
-//   2. the Insight dashboard (freshness/maturity/stream paths) never throws
-//   3. the Display settings panel shows only the toggles applicable to the mode
-// Requires Node 22 (global WebSocket + fetch).
+import { spawn } from "node:child_process";
 
-const CDP = "http://127.0.0.1:9223";
+const obs = spawn("obsidian", [
+  "/home/ubuntu/obsidian-plugins/開発",
+  "--user-data-dir=/tmp/obs-e2e-display",
+  "--remote-debugging-port=9223"
+], { detached: true, stdio: "ignore" });
+
+await new Promise(r => setTimeout(r, 3000));
+
+const CDP_URL = "http://127.0.0.1:9223";
 
 // ---- minimal CDP client over a single page target ----
-const list = await (await fetch(`${CDP}/json/list`)).json();
+let list = null;
+for (let i = 0; i < 20; i++) {
+  try {
+    const res = await fetch(`${CDP_URL}/json/list`);
+    if (res.ok) {
+      list = await res.json();
+      break;
+    }
+  } catch (e) {}
+  await new Promise(r => setTimeout(r, 250));
+}
+if (!list) { console.error("FAIL: fetch failed"); process.exit(1); }
+
 const page = list.find((t) => t.type === "page" && t.webSocketDebuggerUrl && t.url.startsWith("app://obsidian.md"));
-if (!page) { console.error("FAIL: no debuggable page target (is Obsidian up on 9222?)"); process.exit(1); }
-console.log(`target: ${page.title}`);
 
 const ws = new WebSocket(page.webSocketDebuggerUrl);
 await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
@@ -40,17 +52,24 @@ await send("Runtime.enable");
 const driver = `(async () => {
   const out = { fatal: null, modes: [] };
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  
+  // Wait for app
+  for (let i = 0; i < 40; i++) { 
+    if (window.app && window.app.plugins) break;
+    await sleep(250); 
+  }
+
   let plugin = null;
   try {
-    app.plugins.setEnable(true);
-    await app.plugins.disablePluginAndSave("tag-lens");
+    window.app.plugins.setEnable(true);
+    await window.app.plugins.disablePluginAndSave("tag-lens");
     await sleep(250);
-    await app.plugins.enablePluginAndSave("tag-lens");
+    await window.app.plugins.enablePluginAndSave("tag-lens");
   } catch(e) { out.fatal = "enable err: " + e; return out; }
-  for (let i = 0; i < 40; i++) { plugin = app.plugins.plugins["tag-lens"]; if (plugin) break; await sleep(250); }
+  for (let i = 0; i < 40; i++) { plugin = window.app.plugins.plugins["tag-lens"]; if (plugin) break; await sleep(250); }
   if (!plugin) { out.fatal = "plugin not loaded."; return out; }
   await plugin.activateView(); await sleep(300);
-  const leaf = app.workspace.getLeavesOfType("tag-lens-view")[0];
+  const leaf = window.app.workspace.getLeavesOfType("tag-lens-view")[0];
   if (!leaf || !leaf.view) { out.fatal = "no view leaf"; return out; }
   const view = leaf.view;
   const saved = JSON.parse(JSON.stringify(view.settings));

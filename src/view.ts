@@ -9,7 +9,7 @@ import { fieldSourceRegistry } from "./encoding/field-sources";
 import type { EncContext, NodeDrawParams, EncodingBinding, ScaleType } from "./encoding/types";
 import { axisLayout } from "./axis-layout";
 import { LaneRegistry, routeZ } from "./edge-routing";
-import { snapAndBuildRouteData } from "./layout-shared";
+import { buildIdToRect, buildRouteObstacles } from "./layout-shared";
 import { buildGraph } from "./parser";
 import {
 	layout,
@@ -1503,7 +1503,6 @@ export class MiniGraphView extends ItemView {
 		this.requestDraw();
 		this.refreshSettingsTab();
 	}
-
 	private applyAxisLayout(effEnc: EncodingBinding[], encCtx: EncContext): void {
 		const bindingX = effEnc.find((b) => b.channelId === "axisX");
 		const bindingY = effEnc.find((b) => b.channelId === "axisY");
@@ -1526,19 +1525,20 @@ export class MiniGraphView extends ItemView {
 
 		let nSpan = Math.max(20, Math.ceil(Math.sqrt(this.laid.nodes.length)) * 4);
 		if (nSpan % 2 !== 0) nSpan += 1; // Force even to ensure integer cx/cy
-		const width = nSpan * this.laid.slotW;
-		const height = nSpan * this.laid.slotH;
+		const fallbackWidth = nSpan * this.laid.slotW;
+		const fallbackHeight = nSpan * this.laid.slotH;
 
-		const { positions, axes } = axisLayout(this.laid.nodes, encCtx, {
+		const { positions, axes, width: finalWidth, height: finalHeight } = axisLayout(this.laid.nodes, encCtx, {
 			bindingX: bindingX?.enabled ? bindingX : undefined,
 			bindingY: bindingY?.enabled ? bindingY : undefined,
-			width,
-			height,
+			width: fallbackWidth,
+			height: fallbackHeight,
 			cell: { w: this.laid.slotW, h: this.laid.slotH },
+			measureText: (text, font) => this.measureLatticeText(text, font),
 		});
 
-		const cx = width / 2;
-		const cy = height / 2;
+		const cx = finalWidth / 2;
+		const cy = finalHeight / 2;
 
 		for (const n of this.laid.nodes) {
 			const pos = positions.get(n.id);
@@ -1575,11 +1575,8 @@ export class MiniGraphView extends ItemView {
 		}
 
 		if (this.laid.edges && this.laid.edges.length > 0) {
-			const { idToRect, routeObstacles } = snapAndBuildRouteData(
-				this.laid.nodes,
-				this.laid.slotW,
-				this.laid.slotH,
-			);
+			const idToRect = buildIdToRect(this.laid.nodes);
+			const routeObstacles = buildRouteObstacles(this.laid.nodes, this.laid.slotW, this.laid.slotH);
 			const lanes = new LaneRegistry();
 			for (const e of this.laid.edges) {
 				const a = idToRect.get(e.source);
