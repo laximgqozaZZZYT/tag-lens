@@ -1,12 +1,19 @@
 # Tag Lens
 
-Lightweight tag-membership visualisations for an Obsidian vault: a per-note
-**Icon Gallery**, an intersection lattice, a tag co-occurrence heatmap, an
-UpSet plot, and BubbleSets — plus several experimental region / graph views.
+Tag-membership visualisations for an Obsidian vault — **11 view modes** (per-note
+**Icon Gallery**, intersection lattice, co-occurrence heatmap, UpSet, BubbleSets,
+Sequence Stream, and the experimental region / graph family) driven by a **unified
+control panel** (Filter / Notes / Settings / Insight).
+
+On top of the views it adds a **Visual Encoding engine** (bind note attributes →
+visual channels such as colour), an **Insight dashboard** (cognitive-load metric,
+Gap / Bridge finders, tag-classification suggestions), freshness / status / maturity
+overlays, Saved Lenses, Active-Note follow, and PNG export. **Fully local — no
+network requests.**
 
 Designed for vaults where notes are tagged in deeply overlapping ways and a
 single force-directed graph would just hairball. Each view answers a different
-question.
+question; encoding and overlays let you read your own dimensions into the figure.
 
 ## View modes
 
@@ -90,6 +97,14 @@ Tag Lens reads the **tags** (frontmatter `tags` and inline `#tag` markers), **no
 ## Compatibility
 
 Requires Obsidian **1.5.0** or later. Works on desktop and mobile (the heavy modes — Euler family in the Experimental section — are best on desktop).
+
+## Architecture & contributing
+
+Design docs and the agent/contributor guide live under [`docs/0.3.12/`](docs/0.3.12/):
+**基本設計書** (architecture), **詳細設計書** (module reference) and **AGENTS.md**
+(verification gate, gotchas, E2E/deploy workflow). Run `npm run verify`
+(`tsc --noEmit && test && build`) before committing — `tsc` is the only type gate
+(esbuild ignores types). Older, superseded notes are archived in `docs/old/`.
 
 ## Licence
 
