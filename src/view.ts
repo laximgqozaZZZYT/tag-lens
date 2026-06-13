@@ -6,8 +6,9 @@ import { renderInsightTab } from "./insight/render";
 import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
 import { effectiveEncoding } from "./encoding/migrate";
 import { fieldSourceRegistry } from "./encoding/field-sources";
-import type { EncContext, NodeDrawParams, EncodingBinding, ScaleType } from "./encoding/types";
+import type { EncContext, EncNode, NodeDrawParams, EncodingBinding, ScaleType } from "./encoding/types";
 import { axisLayout } from "./axis-layout";
+import { assignGalleryAxes } from "./droste-axis";
 import { LaneRegistry, routeZ } from "./edge-routing";
 import { buildIdToRect, buildRouteObstacles } from "./layout-shared";
 import { buildGraph } from "./parser";
@@ -1511,6 +1512,13 @@ export class MiniGraphView extends ItemView {
 			return;
 		}
 
+		// Icon Gallery (droste): a bespoke (col,row) tile grid, not the card lattice.
+		// Re-assign each cell's (col,row) from the axes (cells stay; positions only).
+		if (this.settings.viewMode === "droste") {
+			this.applyDrosteAxisLayout(bindingX, bindingY);
+			return;
+		}
+
 		const isCardMode =
 			this.settings.viewMode === "euler" ||
 			this.settings.viewMode === "euler-true" ||
@@ -1619,6 +1627,85 @@ export class MiniGraphView extends ItemView {
 				}
 			}
 		}
+	}
+
+	// Icon Gallery (droste) custom-axis Cartesian layout. Re-assigns every gallery
+	// cell's (col,row) from the bound axes and stores the band/tick geometry on the
+	// gallery so drawDroste paints variable-width gridlines + labels. NEVER changes
+	// which cells are shown — positions only (selection non-interference invariant).
+	// When NO axis is bound the early guard in applyAxisLayout never reaches here, so
+	// the gallery keeps the fresh default contact-sheet tiling from buildGallery.
+	private applyDrosteAxisLayout(
+		bindingX: EncodingBinding | undefined,
+		bindingY: EncodingBinding | undefined,
+	): void {
+		this.laid.axes = undefined;
+		const g = this.laid.drosteGallery;
+		if (!g || g.cells.length === 0) {
+			if (g) g.axes = undefined;
+			return;
+		}
+
+		// EncNode per cell from the FULL gallery graph snapshot (drosteData), so
+		// mtime/status/maturity/ageDays/tags are all available. Fall back to a
+		// memberships-only node from the gallery index if the graph snapshot is
+		// missing (keeps tag/degree axes working without it).
+		const nodeById = new Map<string, GraphNode>();
+		for (const n of this.drosteData?.nodes ?? []) nodeById.set(n.id, n);
+		const nodeFor = (id: string): EncNode => {
+			const n = nodeById.get(id);
+			if (n) {
+				return {
+					id: n.id,
+					label: n.label,
+					memberships: n.memberships,
+					mtime: n.mtime,
+					ageDays: n.ageDays,
+					fmStatus: n.fmStatus,
+					fmMaturity: n.fmMaturity,
+				};
+			}
+			return { id, memberships: g.nodeKeys.get(id) ?? [], label: g.nodeLabel.get(id) };
+		};
+
+		// Degree from the FULL gallery adjacency (links + backlinks), so the degree
+		// axis reflects the whole vault the gallery bakes — not the LIMIT-trimmed
+		// edge set used by the other modes' encCtx.
+		const degreeOf = (id: string) => {
+			const out = (g.links.get(id) ?? []).length;
+			const inc = (g.backlinks.get(id) ?? []).length;
+			return { inDeg: inc, outDeg: out, degree: inc + out };
+		};
+		const ctx: EncContext = {
+			nowMs: Date.now(),
+			degreeOf,
+			frontmatterOf: (id) => {
+				const f = this.app.vault.getAbstractFileByPath(id);
+				return f instanceof TFile
+					? (this.app.metadataCache.getFileCache(f)?.frontmatter as Record<string, unknown> | undefined)
+					: undefined;
+			},
+		};
+
+		const res = assignGalleryAxes(
+			g.cells,
+			nodeFor,
+			ctx,
+			bindingX?.enabled ? bindingX : undefined,
+			bindingY?.enabled ? bindingY : undefined,
+		);
+		for (const cell of g.cells) {
+			const p = res.pos.get(cell.id);
+			if (p) {
+				cell.col = p.col;
+				cell.row = p.row;
+			}
+		}
+		g.cols = res.cols;
+		g.rows = res.rows;
+		g.axes = res.axes;
+		// laid.axes stays undefined: droste draws its own grid (column/row units →
+		// cellSize world coords), distinct from the card lattice's world-coord grid.
 	}
 
 	// Build the effective LIMIT rule list by parsing manual rows + filling in

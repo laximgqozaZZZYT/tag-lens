@@ -1,4 +1,5 @@
 import { buildIcon, type DrosteGallery, type IconDiagram } from "./droste-layout";
+import type { AxisSpec } from "./axis-layout";
 import { theme, colorAlpha } from "./theme";
 import { truncateToWidth } from "./canvas-utils";
 
@@ -233,6 +234,133 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 	}
 }
 
+// Custom-axis Cartesian grid for the Icon Gallery. Band/tick positions are in
+// COLUMN/ROW units (multiples of cellSize → world coords). Categorical axes draw
+// a gridline at each band boundary + a centred band label; quantitative axes draw
+// a gridline at each tick + a value label. Labels are drawn in SCREEN space at the
+// top / left edges so they stay legible regardless of pan/zoom.
+function drawAxisGrid(
+	ctx: CanvasRenderingContext2D,
+	o: DrawDrosteOpts,
+	axes: { x?: AxisSpec; y?: AxisSpec },
+	c0: number,
+	c1: number,
+	r0: number,
+	r1: number,
+): void {
+	const { dpr, cellSize, zoom, panX, panY } = o;
+	const sx = (wx: number): number => (wx * zoom + panX) * dpr;
+	const sy = (wy: number): number => (wy * zoom + panY) * dpr;
+	const w = ctx.canvas.width;
+	const h = ctx.canvas.height;
+	// X-band boundaries (world x) within the visible column range.
+	const xLinesFor = (ax: AxisSpec): number[] => {
+		const out: number[] = [];
+		if (ax.kind === "categorical" && ax.bands) {
+			for (const b of ax.bands) {
+				out.push(b.start);
+				out.push(b.end);
+			}
+		} else if (ax.ticks) {
+			for (const t of ax.ticks) out.push(t.pos);
+		}
+		return [...new Set(out)].filter((u) => u >= c0 - 1 && u <= c1 + 2);
+	};
+
+	ctx.save();
+	ctx.strokeStyle = theme().overlay(0.22);
+	ctx.lineWidth = 1 * dpr;
+	ctx.beginPath();
+	if (axes.x) {
+		for (const u of xLinesFor(axes.x)) {
+			const px = sx(u * cellSize);
+			ctx.moveTo(px, 0);
+			ctx.lineTo(px, h);
+		}
+	}
+	if (axes.y) {
+		for (const u of xLinesFor(axes.y)) {
+			const py = sy(u * cellSize);
+			ctx.moveTo(0, py);
+			ctx.lineTo(w, py);
+		}
+	}
+	ctx.stroke();
+
+	// Labels — screen-pinned headers at the top (X) and left (Y) edges.
+	const headerH = 18 * dpr;
+	const headerW = 18 * dpr;
+	const fontPx = 11 * dpr;
+	ctx.fillStyle = colorAlpha(theme().panelBg, 0.92);
+	if (axes.x) ctx.fillRect(0, 0, w, headerH);
+	if (axes.y) ctx.fillRect(0, 0, headerW, h);
+	ctx.fillStyle = theme().textNormal;
+	ctx.font = `700 ${fontPx}px sans-serif`;
+	ctx.textBaseline = "middle";
+
+	if (axes.x) {
+		ctx.textAlign = "center";
+		if (axes.x.kind === "categorical" && axes.x.bands) {
+			for (const b of axes.x.bands) {
+				const xc = sx(b.center * cellSize);
+				if (xc < headerW || xc > w) continue;
+				const bw = (b.end - b.start) * cellSize * zoom * dpr;
+				const tw = ctx.measureText(b.label).width;
+				const f = Math.max(7 * dpr, fontPx * Math.min(1, (bw - 6 * dpr) / Math.max(1, tw)));
+				ctx.font = `700 ${f}px sans-serif`;
+				ctx.fillText(b.label, xc, headerH / 2);
+				ctx.font = `700 ${fontPx}px sans-serif`;
+			}
+		} else if (axes.x.ticks) {
+			let lastRight = -Infinity;
+			for (const t of axes.x.ticks) {
+				const xc = sx(t.pos * cellSize);
+				if (xc < headerW || xc > w) continue;
+				const tw = ctx.measureText(t.label).width;
+				if (xc - tw / 2 < lastRight + 8 * dpr) continue;
+				ctx.fillText(t.label, xc, headerH / 2);
+				lastRight = xc + tw / 2;
+			}
+		}
+	}
+	if (axes.y) {
+		if (axes.y.kind === "categorical" && axes.y.bands) {
+			for (const b of axes.y.bands) {
+				const yc = sy(b.center * cellSize);
+				if (yc < headerH || yc > h) continue;
+				ctx.save();
+				ctx.translate(headerW / 2, yc);
+				ctx.rotate(-Math.PI / 2);
+				const bh = (b.end - b.start) * cellSize * zoom * dpr;
+				const tw = ctx.measureText(b.label).width;
+				const f = Math.max(7 * dpr, fontPx * Math.min(1, (bh - 6 * dpr) / Math.max(1, tw)));
+				ctx.font = `700 ${f}px sans-serif`;
+				ctx.textAlign = "center";
+				ctx.fillText(b.label, 0, 0);
+				ctx.restore();
+				ctx.font = `700 ${fontPx}px sans-serif`;
+			}
+		} else if (axes.y.ticks) {
+			ctx.textAlign = "center";
+			let lastBottom = -Infinity;
+			for (const t of axes.y.ticks) {
+				const yc = sy(t.pos * cellSize);
+				if (yc < headerH || yc > h) continue;
+				if (yc - fontPx / 2 < lastBottom + 6 * dpr) continue;
+				ctx.save();
+				ctx.translate(headerW / 2, yc);
+				ctx.rotate(-Math.PI / 2);
+				ctx.fillText(t.label, 0, 0);
+				ctx.restore();
+				lastBottom = yc + fontPx / 2;
+			}
+		}
+	}
+	ctx.textAlign = "start";
+	ctx.textBaseline = "alphabetic";
+	ctx.restore();
+}
+
 export function drawDroste(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): void {
 	const { canvas, dpr, gallery, cellSize, zoom, panX, panY } = o;
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -252,10 +380,16 @@ export function drawDroste(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): vo
 	const c1 = Math.min(gallery.cols - 1, Math.ceil(wx1 / cellSize) + 1);
 	const r0 = Math.max(0, Math.floor(wy0 / cellSize) - 1);
 	const r1 = Math.min(gallery.rows - 1, Math.ceil(wy1 / cellSize) + 1);
-	const byPos = (col: number, row: number): string | null => {
-		const i = row * gallery.cols + col;
-		return i >= 0 && i < gallery.cells.length ? gallery.cells[i].id : null;
-	};
+	// Look up the cell at (col,row) by its OWN col/row, not the dense
+	// row*cols+col index — the custom-axis Cartesian mode scatters cells onto
+	// arbitrary (col,row) positions, so a positional index would be wrong. Built
+	// once per paint; the default contact-sheet tiling resolves identically.
+	const byPosMap = new Map<number, string>();
+	for (const cell of gallery.cells) byPosMap.set(cell.row * gallery.cols + cell.col, cell.id);
+	const byPos = (col: number, row: number): string | null =>
+		byPosMap.get(row * gallery.cols + col) ?? null;
+	// Custom-axis band gridlines + labels (drawn behind the icons).
+	if (gallery.axes) drawAxisGrid(ctx, o, gallery.axes, c0, c1, r0, r1);
 	for (let row = r0; row <= r1; row++) {
 		for (let col = c0; col <= c1; col++) {
 			const id = byPos(col, row);

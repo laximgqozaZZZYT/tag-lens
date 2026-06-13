@@ -1,4 +1,5 @@
 import type { GraphData, GraphNode } from "./types";
+import type { AxisSpec } from "./axis-layout";
 import { NONE_BUCKET } from "./types";
 
 // Print Gallery source plane (spec §2/§3, FINAL). We do NOT hand-build tiles. We
@@ -193,6 +194,10 @@ export interface DrosteGallery {
 	labels: Map<string, string>;                // cluster-key → human label
 	links: Map<string, string[]>;               // id → ids it links TO (outgoing)
 	backlinks: Map<string, string[]>;           // id → ids that link to it (incoming)
+	// Custom-axis Cartesian mode (Encode → Position X/Y). When set, cells' (col,row)
+	// have been re-assigned from the axes and the renderer draws band gridlines +
+	// labels. undefined ⇒ default contact-sheet tiling (no axis grid).
+	axes?: { x?: AxisSpec; y?: AxisSpec };
 }
 
 export interface IconSet { keys: string[]; label: string; members: { id: string; label: string }[]; overflow: number; hue?: number; }
