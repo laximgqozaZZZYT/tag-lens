@@ -34,10 +34,11 @@ export async function convertToNestedTag(
 		const cache = app.metadataCache.getFileCache(f);
 		if (!cache) continue;
 		
+		const fmTags: unknown = cache.frontmatter?.tags;
 		const hasTag = cache.tags?.some(t => t.tag === `#${tag}`) || 
-					   ((cache.frontmatter?.tags) && (
-						   (Array.isArray(cache.frontmatter.tags) && cache.frontmatter.tags.includes(tag)) ||
-						   cache.frontmatter.tags === tag
+					   (fmTags && (
+						   (Array.isArray(fmTags) && fmTags.some(t => typeof t === "string" && t === tag)) ||
+						   (typeof fmTags === "string" && fmTags === tag)
 					   ));
 		
 		if (hasTag) {

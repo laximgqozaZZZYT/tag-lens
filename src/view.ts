@@ -2736,7 +2736,7 @@ export class MiniGraphView extends ItemView {
 			
 			const keys = Object.keys(this.activeStatusColors).sort();
 			const padX = 12, padY = 8, spacingY = 20, circleR = 5;
-			const cw = this.canvas.clientWidth || 0, ch = this.canvas.clientHeight || 0;
+			const ch = this.canvas.clientHeight || 0;
 			
 			let maxTw = 0;
 			for (const key of keys) {

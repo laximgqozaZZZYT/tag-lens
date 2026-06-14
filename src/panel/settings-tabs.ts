@@ -32,6 +32,7 @@ import {
 	toggleArrayMember,
 } from "../panel-sections";
 import type { LaidOut } from "../layout";
+import type { NodeDisplay } from "../node-display";
 
 export interface ViewTabDeps {
 	settings: MiniSettings;
@@ -233,7 +234,7 @@ export interface DisplayTabDeps {
 	rebuildMatrixDisplay?: () => void;
 	scheduleRebuild?: () => void;
 	clearCardCache: () => void;
-	resolveFromCluster: (groupKey: string) => any;
+	resolveFromCluster: (groupKey: string) => NodeDisplay;
 }
 
 export function renderSettingsDisplayTab(el: HTMLElement, deps: DisplayTabDeps): void {
@@ -328,7 +329,7 @@ export interface EncodeTabDeps {
 	tabFilter: string;
 	setTabFilter: (filter: string) => void;
 	clearCardCache: () => void;
-	resolveFromCluster: (groupKey: string) => any;
+	resolveFromCluster: (groupKey: string) => NodeDisplay;
 }
 
 export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): void {

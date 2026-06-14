@@ -144,7 +144,7 @@ export function renderInsightAlerts(host: HTMLElement, deps: InsightDeps, comput
 	for (const cond of triggered) {
 		if (cond.offenders) {
 			for (const o of cond.offenders) {
-				allCards.push({ label: cond.label, severity: cond.severity as "CRITICAL" | "WARNING" | "INFO", summary: cond.summary, detail: cond.detail, advice: cond.advice, offender: o });
+				allCards.push({ label: cond.label, severity: cond.severity, summary: cond.summary, detail: cond.detail, advice: cond.advice, offender: o });
 			}
 		}
 	}
@@ -453,14 +453,46 @@ export function renderInsightSuggest(host: HTMLElement, deps: InsightDeps): void
 		const btnConvert = actionsDiv.createEl("button", { text: "Convert to Nested Tag" });
 		btnConvert.setCssStyles({ fontSize: "10px", padding: "2px 6px", cursor: "pointer" });
 		btnConvert.addEventListener("click", () => {
-			// eslint-disable-next-line no-alert -- Simple prompt needed for nested tag conversion path
-			const parent = window.prompt(`Convert #${s.tag} to a nested tag. Enter parent path (e.g. "Programming"):`);
-			if (parent) {
-				convertToNestedTag(deps.app, s.tag, parent.trim())
-					.then(() => renderInsightSuggest(host, deps))
-					.catch((e: Error) => new Notice(`Error: ${e.message}`));
-			}
+			new PromptModal(deps.app, `Convert #${s.tag} to a nested tag. Enter parent path (e.g. "Programming"):`, (parent) => {
+				if (parent && parent.trim()) {
+					convertToNestedTag(deps.app, s.tag, parent.trim())
+						.then(() => renderInsightSuggest(host, deps))
+						.catch((e: Error) => new Notice(`Error: ${e.message}`));
+				}
+			}).open();
 		});
+	}
+}
+
+class PromptModal extends Modal {
+	private submitted = false;
+	constructor(app: App, private message: string, private onSubmit: (val: string | null) => void) {
+		super(app);
+	}
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.createEl("h4", { text: this.message });
+		const input = contentEl.createEl("input", { type: "text" });
+		input.style.width = "100%";
+		const submitBtn = contentEl.createEl("button", { text: "Submit" });
+		submitBtn.style.marginTop = "10px";
+		const finish = (val: string | null) => {
+			if (!this.submitted) {
+				this.submitted = true;
+				this.onSubmit(val);
+				this.close();
+			}
+		};
+		submitBtn.addEventListener("click", () => finish(input.value));
+		input.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") finish(input.value);
+			if (e.key === "Escape") finish(null);
+		});
+		input.focus();
+	}
+	onClose() {
+		if (!this.submitted) this.onSubmit(null);
+		this.contentEl.empty();
 	}
 }
 

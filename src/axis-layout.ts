@@ -1,7 +1,7 @@
 function formatAxisLabel(key: string): string {
 	let s = key;
 	if (s.startsWith("tag=") || s.startsWith("tag:")) s = s.slice(4);
-	try { s = decodeURIComponent(s); } catch (e) { /* ignore decode error */ }
+	try { s = decodeURIComponent(s); } catch { /* ignore decode error */ }
 	return s;
 }
 
