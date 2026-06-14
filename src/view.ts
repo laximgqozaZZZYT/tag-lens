@@ -102,13 +102,16 @@ import {
 import {
 	renderExprSection as renderExprSectionFn,
 	renderToggleSection as renderToggleSectionFn,
+	renderOrderBySection as renderOrderBySectionFn,
 	toggleArrayMember as toggleArrayMemberFn,
 	renderPresetSection as renderPresetSectionFn,
 } from "./panel-sections";
 import {
 	renderMinFontSection as renderMinFontSectionFn,
 	renderNodeDisplaySection as renderNodeDisplaySectionFn,
+	renderMatrixOrderBySection as renderMatrixOrderBySectionFn,
 	renderMatrixMinColumnControl as renderMatrixMinColumnControlFn,
+	renderHeatmapOrderBySection as renderHeatmapOrderBySectionFn,
 	renderHeatmapMinTagControl as renderHeatmapMinTagControlFn,
 	renderHeatmapDisplayToggles as renderHeatmapDisplayTogglesFn,
 	renderMatrixDisplayToggles as renderMatrixDisplayTogglesFn,
@@ -290,7 +293,7 @@ export class MiniGraphView extends ItemView {
 	private noteMenuErrorLogged = false;
 	// Which top-level tab the unified menu shows. In-memory only — opening via the toolbar
 	// gear always resets to "notes"; a manual switch survives graph rebuilds.
-	private activeMenuTab: "filter" | "notes" | "settings" | "insight" = "filter";
+	private activeMenuTab: "filter" | "settings" | "insight" = "filter";
 	// Sensitivity coefficient K for the Insight tab's cognitive-load thresholds
 	// (1.0–5.0). In-memory; survives rebuilds, adjustable via the tab's slider.
 	private clInsightK = 2.0;
@@ -381,6 +384,7 @@ export class MiniGraphView extends ItemView {
 	// Which Settings sub-tab is shown: View / Filter / Sort / Display / Layers.
 	// In-memory, preserved across graph rebuilds. Default View.
 	private settingsSubTab: "view" | "display" | "encode" = "view";
+	private filterSubTab: "search" | "result" = "search";
 	private insightSubTab: "overview" | "alerts" | "suggest" = "overview";
 	// UpSet mode: signature key (= `signature.join("|")`) of the column
 	// currently selected by the user (highlighted in the matrix; drives
@@ -676,7 +680,8 @@ export class MiniGraphView extends ItemView {
 		this.settings.noteMenuVisible = !this.settings.noteMenuVisible;
 		void this.save();
 		if (this.settings.noteMenuVisible) {
-			this.activeMenuTab = "notes";
+			this.activeMenuTab = "filter";
+			this.filterSubTab = "result";
 			this.requestDraw();
 		} else {
 			this.removeNoteMenu();
@@ -903,6 +908,36 @@ export class MiniGraphView extends ItemView {
 		return resolveFromClusterFn(groupKey, this.nodeDisplayDeps());
 	}
 
+	private renderOrderBySection(parent: HTMLElement): void {
+		// Matrix mode replaces the field/dir ORDER_BY with its seriation options
+		// (co-occurrence / block-priority / original) + group / collapse toggles,
+		// so all row ordering lives in this one section.
+		if (this.settings.viewMode === "matrix") {
+			this.renderMatrixOrderBySection(parent);
+			return;
+		}
+		if (this.settings.viewMode === "heatmap") {
+			this.renderHeatmapOrderBySection(parent);
+			return;
+		}
+		renderOrderBySectionFn(parent, {
+			settings: this.settings,
+			save: () => void this.save(),
+		});
+	}
+
+	// Matrix ORDER_BY: SAME structure as every other mode — a criterion select
+	// + an asc/desc direction select. The criterion options are matrix-specific
+	// (co-occurrence / block-priority) and map to matrixBlockPriority; the
+	// direction maps to matrixSortDir. No matrix-only checkboxes live here.
+	private renderMatrixOrderBySection(parent: HTMLElement): void {
+		renderMatrixOrderBySectionFn(parent, {
+			settings: this.settings,
+			save: () => void this.save(),
+			rebuild: () => void this.rebuild(),
+		});
+	}
+
 	// Matrix "min column size" — a column (tag) filter, rendered inside the
 	// HAVING filter section (no standalone Matrix section).
 	private renderMatrixMinColumnControl(section: HTMLElement): void {
@@ -910,6 +945,18 @@ export class MiniGraphView extends ItemView {
 			settings: this.settings,
 			save: () => void this.save(),
 			rebuild: () => void this.rebuild(),
+		});
+	}
+
+	// Heatmap ORDER_BY: SAME criterion + asc/desc structure as other modes.
+	// Criterion = co-occurrence (Jaccard seriation) / size; direction reverses
+	// the tag order. No heatmap-only controls live in ORDER_BY.
+	private renderHeatmapOrderBySection(parent: HTMLElement): void {
+		renderHeatmapOrderBySectionFn(parent, {
+			settings: this.settings,
+			save: () => void this.save(),
+			rebuild: () => void this.rebuild(),
+			requestDraw: () => this.requestDraw(),
 		});
 	}
 
@@ -3319,16 +3366,65 @@ export class MiniGraphView extends ItemView {
 		// Two tab panes under a flex wrapper that fills the rest of the panel.
 		const bodyWrap = panel.createDiv();
 		bodyWrap.setCssStyles({ display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: "0", overflow: "hidden" });
-		const filterTab = bodyWrap.createDiv({ cls: "gim-menu-filter" });
-		filterTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
-		const notesTab = bodyWrap.createDiv();
-		notesTab.setCssStyles({ display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: "0" });
+		
+		const filterTabWrap = bodyWrap.createDiv({ cls: "gim-menu-filter-wrap" });
+		filterTabWrap.setCssStyles({ display: "none", flexDirection: "column", flex: "1 1 auto", minHeight: "0" });
+		
+		const filterSubBar = filterTabWrap.createDiv();
+		filterSubBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", borderBottom: "1px solid var(--background-modifier-border)", padding: "4px 6px 0" });
+		
+		const searchTab = filterTabWrap.createDiv({ cls: "gim-menu-filter-search" });
+		searchTab.setCssStyles({ display: "block", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
+		
+		const resultTab = filterTabWrap.createDiv({ cls: "gim-menu-filter-result" });
+		resultTab.setCssStyles({ display: "none", flexDirection: "column", flex: "1 1 auto", minHeight: "0" });
+
 		const settingsTab = bodyWrap.createDiv({ cls: "gim-menu-settings" });
 		settingsTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
 		const insightTab = bodyWrap.createDiv();
 		insightTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
-		type MenuTab = "filter" | "notes" | "settings" | "insight";
-		const TABS: MenuTab[] = ["filter", "notes", "settings", "insight"];
+
+		// -- Filter Sub-tabs: Search | Result --
+		type FilterSubTab = "search" | "result";
+		const F_SUBS: { key: FilterSubTab; label: string }[] = [
+			{ key: "search", label: "Search" },
+			{ key: "result", label: "Result" },
+		];
+		const fSubBtns = new Map<string, HTMLElement>();
+		const styleFSubs = (): void => {
+			for (const { key } of F_SUBS) {
+				const b = fSubBtns.get(key);
+				if (!b) continue;
+				const on = this.filterSubTab === key;
+				b.setCssStyles({
+					background: "transparent", border: "none",
+					borderBottom: on ? "2px solid var(--interactive-accent)" : "2px solid transparent",
+					borderRadius: "0", padding: "4px 8px", marginBottom: "-1px",
+					color: on ? "var(--text-normal)" : "var(--text-muted)", fontWeight: on ? "600" : "400",
+					cursor: "pointer", fontSize: "10.5px", lineHeight: "1.3",
+				});
+			}
+		};
+		const showFSubTab = (key: FilterSubTab): void => {
+			this.filterSubTab = key;
+			searchTab.setCssStyles({ display: key === "search" ? "block" : "none" });
+			resultTab.setCssStyles({ display: key === "result" ? "flex" : "none" });
+			styleFSubs();
+		};
+		for (const { key, label } of F_SUBS) {
+			const b = filterSubBar.createEl("button", { text: label });
+			fSubBtns.set(key, b);
+			b.addEventListener("mousedown", (ev) => ev.stopPropagation());
+			b.addEventListener("click", (ev) => { ev.stopPropagation(); showFSubTab(key); });
+			b.addEventListener("mouseenter", () => {
+				if (this.filterSubTab !== key) { b.setCssStyles({ color: "var(--text-muted)" }); b.setCssStyles({ borderBottomColor: "var(--background-modifier-border)" }); }
+			});
+			b.addEventListener("mouseleave", () => styleFSubs());
+		}
+		showFSubTab(this.filterSubTab);
+
+		type MenuTab = "filter" | "settings" | "insight";
+		const TABS: MenuTab[] = ["filter", "settings", "insight"];
 		const tabBtns: Partial<Record<MenuTab, HTMLElement>> = {};
 		const styleTabs = (): void => {
 			for (const key of TABS) {
@@ -3346,12 +3442,11 @@ export class MiniGraphView extends ItemView {
 		};
 		const showTab = (key: MenuTab): void => {
 			this.activeMenuTab = key;
-			filterTab.setCssStyles({ display: key === "filter" ? "block" : "none" });
-			notesTab.setCssStyles({ display: key === "notes" ? "flex" : "none" });
+			filterTabWrap.setCssStyles({ display: key === "filter" ? "flex" : "none" });
 			settingsTab.setCssStyles({ display: key === "settings" ? "block" : "none" });
 			insightTab.setCssStyles({ display: key === "insight" ? "block" : "none" });
 			
-			if (key === "filter") this.renderFilterBody(filterTab);
+			if (key === "filter") this.renderFilterBody(searchTab);
 			else this.filterHostEl = null;
 
 			if (key === "settings") this.renderSettingsBody(settingsTab);
@@ -3391,18 +3486,17 @@ export class MiniGraphView extends ItemView {
 			b.addEventListener("mouseleave", () => styleTabs());
 		};
 		mkTab("filter", "Filter");
-		mkTab("notes", "Notes");
 		mkTab("settings", "Settings");
 		mkTab("insight", "Insight");
-		// Note-count + click hint, shown at the top of the Notes pane.
-		const notesHint = notesTab.createDiv({ text: `${nodes.length} notes — click to ${verb}` });
+		// Note-count + click hint, shown at the top of the Result pane.
+		const notesHint = resultTab.createDiv({ text: `${nodes.length} notes — click to ${verb}` });
 		notesHint.setCssStyles({ fontSize: "10px", color: "var(--text-faint)", padding: "4px 8px 0" });
 		// ── Grouping selector (Folder / Tag) ────────────────────────────────────
 		// A small radio group in the header switches the tree between the FOLDER
 		// tree (by note path, default) and the TAG tree (by GROUP_BY membership
 		// keys). The chosen grouping survives rebuilds (this.noteMenuGroupBy) and
 		// reloads (settings.noteMenuGroupBy). Changing it re-renders the tree.
-		const groupBar = notesTab.createDiv();
+		const groupBar = resultTab.createDiv();
 		groupBar.setCssStyles({
 			display: "flex", gap: "10px", marginTop: "4px", fontWeight: "400",
 			fontSize: "11px", color: "var(--text-muted)", cursor: "default",
@@ -3433,7 +3527,7 @@ export class MiniGraphView extends ItemView {
 		// same key the per-row checkboxes use. Does NOT call rebuild(); a plain
 		// requestDraw() is enough because the draw() skipNode filter re-reads
 		// hiddenNodes fresh every frame.
-		const bulkBar = notesTab.createDiv();
+		const bulkBar = resultTab.createDiv();
 		bulkBar.setCssStyles({
 			display: "flex", gap: "6px", marginTop: "4px",
 		});
@@ -3477,9 +3571,8 @@ export class MiniGraphView extends ItemView {
 			this.requestDraw();
 			this.noteMenuRedraw?.();
 		});
-		// Search input lives in a relatively-positioned wrapper so the suggestion
-		// dropdown can be absolutely positioned directly beneath it.
-		const searchWrap = notesTab.createDiv();
+		// Search input for filtering the tree.
+		const searchWrap = resultTab.createDiv();
 		searchWrap.setCssStyles({ position: "relative", margin: "6px 8px", flex: "0 0 auto" });
 		const search = searchWrap.createEl("input", { attr: { type: "text", placeholder: "Search: word, #tag, key:value" } });
 		search.setCssStyles({ display: "block", width: "100%", boxSizing: "border-box", padding: "4px 6px", background: "var(--background-primary)", border: "1px solid var(--background-modifier-border)", borderRadius: "4px", color: "var(--text-normal)" });
@@ -3495,7 +3588,7 @@ export class MiniGraphView extends ItemView {
 			boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "70", overflow: "auto", maxHeight: "240px",
 			display: "none",
 		});
-		const body = notesTab.createDiv({ cls: "gim-notemenu-body" });
+		const body = resultTab.createDiv({ cls: "gim-tree-scroll" });
 		// flex:1 1 auto + minHeight:0 → the tree scroll area grows/shrinks with the
 		// panel height (set above / on resize) instead of a fixed maxHeight.
 		body.setCssStyles({ overflow: "auto", padding: "4px 6px 8px", flex: "1 1 auto", minHeight: "0" });
