@@ -5163,13 +5163,69 @@ export class MiniGraphView extends ItemView {
 			tdTail.setCssStyles({ padding: "8px", textAlign: "center", color: "var(--text-faint)", fontStyle: "italic" });
 		}
 
-		// Link Preview placeholder
-		const linkTitle = host.createEl("h4", { text: "Link Preview (Future Extension)" });
+		// Link Preview
+		const linkTitle = host.createEl("h4", { text: "Link Preview" });
 		linkTitle.setCssStyles({ margin: "16px 0 8px 0" });
 
-		const linkContainer = host.createDiv();
-		linkContainer.setCssStyles({ overflow: "auto", maxHeight: "200px", border: "1px solid var(--background-modifier-border)", borderRadius: "4px", padding: "12px", textAlign: "center", color: "var(--text-muted)", fontStyle: "italic", fontSize: "11px" });
-		linkContainer.textContent = "Edge/Link data will be displayed here.";
+		const linkTableContainer = host.createDiv();
+		linkTableContainer.setCssStyles({ overflow: "auto", maxHeight: "250px", border: "1px solid var(--background-modifier-border)", borderRadius: "4px" });
+
+		const linkTable = linkTableContainer.createEl("table");
+		linkTable.setCssStyles({ width: "100%", borderCollapse: "collapse", fontSize: "11px", textAlign: "left" });
+
+		const linkThead = linkTable.createEl("thead");
+		linkThead.setCssStyles({ position: "sticky", top: "0", background: "var(--background-secondary)", zIndex: "1" });
+		
+		const trLinkHead = linkThead.createEl("tr");
+		["Source", "Target", "Description"].forEach(col => {
+			const th = trLinkHead.createEl("th", { text: col });
+			th.setCssStyles({ padding: "6px", borderBottom: "1px solid var(--background-modifier-border)", color: "var(--text-muted)" });
+		});
+
+		const linkTbody = linkTable.createEl("tbody");
+		
+		// Create a fast lookup map for node labels
+		const nodeLabelMap = new Map<string, string>();
+		for (const n of nodes) {
+			nodeLabelMap.set(stripTabPrefix(n.id), n.label);
+			nodeLabelMap.set(n.id, n.label);
+		}
+
+		// Use the currently laid out edges
+		const edges = this.laid.edges || [];
+		const edgeLimit = Math.min(edges.length, 500);
+
+		if (edges.length === 0) {
+			const tr = linkTbody.createEl("tr");
+			const td = tr.createEl("td", { text: "No links to display." });
+			td.setAttr("colspan", "3");
+			td.setCssStyles({ padding: "12px", textAlign: "center", color: "var(--text-muted)", fontStyle: "italic" });
+		} else {
+			for (let i = 0; i < edgeLimit; i++) {
+				const e = edges[i];
+				const tr = linkTbody.createEl("tr");
+				tr.setCssStyles({ borderBottom: "1px solid var(--background-modifier-border-hover)" });
+
+				const srcLabel = nodeLabelMap.get(e.source) || e.source;
+				const tgtLabel = nodeLabelMap.get(e.target) || e.target;
+
+				const tdSrc = tr.createEl("td", { text: srcLabel });
+				tdSrc.setCssStyles({ padding: "6px" });
+				
+				const tdTgt = tr.createEl("td", { text: tgtLabel });
+				tdTgt.setCssStyles({ padding: "6px" });
+
+				const tdDesc = tr.createEl("td", { text: "(none)" });
+				tdDesc.setCssStyles({ padding: "6px", color: "var(--text-faint)", fontStyle: "italic" });
+			}
+
+			if (edges.length > edgeLimit) {
+				const trTail = linkTbody.createEl("tr");
+				const tdTail = trTail.createEl("td", { text: `... and ${edges.length - edgeLimit} more links` });
+				tdTail.setAttr("colspan", "3");
+				tdTail.setCssStyles({ padding: "8px", textAlign: "center", color: "var(--text-faint)", fontStyle: "italic" });
+			}
+		}
 	}
 }
 
