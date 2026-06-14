@@ -146,12 +146,17 @@ export interface MiniSettings {
 	// View mode for the [全体] tab. "euler" = the current Euler-diagram
 	// rectangle layout. Future modes will be appended here.
 	viewMode: ViewMode;
+	// The active panorama mode (used when drill-down is NOT active).
+	panoramaMode: ViewMode;
 	// The target closeup mode to switch to when drilling down from a panorama mode.
 	closeupMode: ViewMode;
-	// Transient filter applied when drilling down from a panorama mode into
-	// a closeup mode. If populated, the parser restricts the graph to ONLY
-	// these node IDs.
-	drillDownNodeIds?: string[];
+	// The currently active perspective. The canvas respects this and copies either
+	// panoramaMode or closeupMode into viewMode.
+	perspective: "panorama" | "closeup";
+	// Transient filter applied when a user clicks a node in panorama mode
+	// to switch to closeup mode. If populated, the parser restricts the graph to
+	// ONLY these node IDs.
+	focusNodeIds?: string[];
 	// Visual Encoding bindings (attribute -> visual channel). Independent of the
 	// SQL/dvjs filter layer: never changes which notes appear. See src/encoding/.
 	encoding: EncodingBinding[];
@@ -482,7 +487,9 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	// their saved viewMode — this default only applies on first load / when
 	// no viewMode is persisted.
 	viewMode: "heatmap",
+	panoramaMode: "heatmap",
 	closeupMode: "droste",
+	perspective: "panorama",
 	encoding: [],
 	upsetColumnSort: "size",
 	upsetMinColumnSize: 1,

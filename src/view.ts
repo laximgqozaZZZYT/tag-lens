@@ -395,8 +395,6 @@ export class MiniGraphView extends ItemView {
 	// Bipartite mode: id of the SET node whose neighbours are PINNED-
 	// highlighted by a click (persists across hover). null = none.
 	private pinnedSet: string | null = null;
-	// Floating badge shown when Drill-down is active.
-	private drillDownBadge: HTMLElement | null = null;
 	// Lattice mode: selected / hovered node key (signature key) for highlight
 	// and the floating note-list overlay. Cleared when the selected key no
 	// longer exists after a relayout (clearStaleSelection).
@@ -1144,12 +1142,10 @@ export class MiniGraphView extends ItemView {
 		// builder. Errors from the query parsers are surfaced into panel
 		// state so the user sees them inline.
 		const { effGroupBy, effWhere, filterMode, dvjsFilter } = resolveEffectiveQuery(this.settings);
-		const { result, errors } = buildGraph(this.app, effWhere, effGroupBy, filterMode, dvjsFilter, this.settings.statusField, this.settings.drillDownNodeIds);
+		const { result, errors } = buildGraph(this.app, effWhere, effGroupBy, filterMode, dvjsFilter, this.settings.statusField, this.settings.focusNodeIds);
 		this.whereError = errors.where ?? "";
 		this.groupByError = errors.groupBy ?? "";
 		let { data, clusterLabels } = result;
-
-		this.updateDrillDownBadge();
 
 		// ── Early-out: skip the (expensive) relayout/redraw/menu-rebuild when the
 		// graph INPUTS are byte-for-byte identical to the last build. buildGraph
@@ -3343,6 +3339,18 @@ export class MiniGraphView extends ItemView {
 		titleRow.createSpan({ text: "Tag Lens" });
 		const headBtns = titleRow.createDiv();
 		headBtns.setCssStyles({ display: "flex", alignItems: "center", gap: "2px", flex: "0 0 auto" });
+		
+		// Return to Panorama button (only visible in Close-up perspective)
+		if (this.settings.perspective === "closeup") {
+			const panBtn = headBtns.createSpan();
+			panBtn.setCssStyles({ cursor: "pointer", color: "var(--interactive-accent)", display: "inline-flex", alignItems: "center", padding: "0 2px" });
+			setIcon(panBtn, "map"); // "map" or "expand" icon
+			panBtn.setAttr("aria-label", "Return to Panorama view");
+			panBtn.addEventListener("mousedown", (ev) => ev.stopPropagation());
+			panBtn.addEventListener("dblclick", (ev) => ev.stopPropagation());
+			panBtn.addEventListener("click", (ev) => { ev.stopPropagation(); this.switchToPanorama(); });
+		}
+
 		// Pin/unpin: dock the menu to the right edge (standard pin affordance).
 		const pinBtn = headBtns.createSpan();
 		pinBtn.setCssStyles({ cursor: "pointer", color: pinned ? "var(--interactive-accent)" : "var(--text-muted)", display: "inline-flex", alignItems: "center", padding: "0 2px" });
@@ -4099,7 +4107,7 @@ export class MiniGraphView extends ItemView {
 	}
 
 
-	// Heatmap cell click → Drill-down into the shared notes (or all notes on diagonal).
+	// Heatmap cell click → Switch to Close-up focusing on shared notes.
 	private openHeatmapDetail(i: number, j: number, sx: number, sy: number): void {
 		const h = this.laid.heatmap;
 		if (!h) return;
@@ -4113,7 +4121,7 @@ export class MiniGraphView extends ItemView {
 		}
 		ids = [...new Set(ids)];
 		this.heatmapSelected = null;
-		this.drillDown(ids);
+		this.switchToCloseup(ids);
 	}
 
 	private openStreamDetail(r: number, c: number, sx: number, sy: number): void {
@@ -4121,82 +4129,35 @@ export class MiniGraphView extends ItemView {
 		if (!s) return;
 		const cell = s.matrix.find(m => m.r === r && m.c === c);
 		if (!cell || cell.nodeIds.length === 0) return;
-		this.drillDown(cell.nodeIds);
+		this.switchToCloseup(cell.nodeIds);
 	}
 
-	// Lattice node click (header / overview / density / Other) → Drill-down
-	// to the notes in that exact intersection.
+	// Lattice node click (header / overview / density / Other) → Switch to
+	// Close-up for the notes in that exact intersection.
 	private openLatticeDetail(
 		node: import("./layout").LatticeNodeMeta,
 		sx: number,
 		sy: number,
 	): void {
 		this.latticeSelectedKey = null;
-		this.drillDown(node.nodeIds);
+		this.switchToCloseup(node.nodeIds);
 	}
 
-	private drillDown(ids: string[]): void {
+	private switchToCloseup(ids: string[]): void {
 		this.closeDetail();
-		this.settings.drillDownNodeIds = ids;
+		this.settings.focusNodeIds = ids;
+		this.settings.perspective = "closeup";
 		this.settings.viewMode = this.settings.closeupMode || "droste";
 		this.save();
 		this.rebuild();
 	}
 
-	public clearDrillDown(): void {
-		if (this.settings.drillDownNodeIds) {
-			this.settings.drillDownNodeIds = undefined;
-			this.save();
-			this.rebuild();
-		}
-	}
-
-	private updateDrillDownBadge(): void {
-		if (!this.settings.drillDownNodeIds) {
-			if (this.drillDownBadge) {
-				this.drillDownBadge.remove();
-				this.drillDownBadge = null;
-			}
-			return;
-		}
-
-		if (!this.drillDownBadge) {
-			const badge = this.root.createDiv();
-			badge.setCssStyles({
-				position: "absolute",
-				top: "16px",
-				left: "16px", // Top-left of the canvas (floating over graph)
-				background: "var(--background-secondary)",
-				border: "1px solid var(--interactive-accent)",
-				color: "var(--text-normal)",
-				padding: "6px 12px",
-				borderRadius: "16px",
-				font: "12px sans-serif",
-				boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-				zIndex: "40",
-				display: "flex",
-				alignItems: "center",
-				gap: "8px"
-			});
-			const text = badge.createSpan();
-			const close = badge.createSpan({ text: "×" });
-			close.setCssStyles({
-				cursor: "pointer",
-				color: "var(--text-muted)",
-				fontWeight: "bold",
-				fontSize: "14px"
-			});
-			close.addEventListener("click", () => this.clearDrillDown());
-			close.addEventListener("mouseenter", () => close.style.color = "var(--text-error)");
-			close.addEventListener("mouseleave", () => close.style.color = "var(--text-muted)");
-			
-			// Store elements on the badge for easy update
-			(badge as any)._textEl = text;
-			this.drillDownBadge = badge;
-		}
-
-		const count = this.settings.drillDownNodeIds.length;
-		(this.drillDownBadge as any)._textEl.setText(`Drill-down active: ${count} notes`);
+	public switchToPanorama(): void {
+		this.settings.focusNodeIds = undefined;
+		this.settings.perspective = "panorama";
+		this.settings.viewMode = this.settings.panoramaMode || "heatmap";
+		this.save();
+		this.rebuild();
 	}
 
 	// Generic floating note-list overlay. Used by both heatmap (tag×tag) and

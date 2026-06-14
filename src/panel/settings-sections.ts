@@ -311,20 +311,43 @@ export function renderLatticeSection(parent: HTMLElement, deps: GenericSectionDe
 export function renderViewModeOption(
 	container: HTMLElement,
 	opt: (typeof VIEW_MODES)[number],
-	deps: GenericSectionDeps
+	deps: GenericSectionDeps,
+	type: "panorama" | "closeup"
 ): void {
 	const item = container.createEl("label", { cls: "gim-viewmode-option" });
 	const input = item.createEl("input", {
 		type: "radio",
-		attr: { name: "gim-viewmode" },
+		attr: { name: `gim-viewmode-${type}` },
 	});
 	input.value = opt.id;
-	input.checked = deps.settings.viewMode === opt.id;
+	
+	if (type === "panorama") {
+		input.checked = deps.settings.panoramaMode === opt.id;
+	} else {
+		input.checked = deps.settings.closeupMode === opt.id;
+	}
+
 	input.addEventListener("change", () => {
 		if (!input.checked) return;
 		const next = input.value as MiniSettings["viewMode"];
-		if (deps.settings.viewMode === next) return;
-		deps.settings.viewMode = next;
+		
+		let changed = false;
+		if (type === "panorama" && deps.settings.panoramaMode !== next) {
+			deps.settings.panoramaMode = next;
+			if (deps.settings.perspective === "panorama") {
+				deps.settings.viewMode = next;
+			}
+			changed = true;
+		} else if (type === "closeup" && deps.settings.closeupMode !== next) {
+			deps.settings.closeupMode = next;
+			if (deps.settings.perspective === "closeup") {
+				deps.settings.viewMode = next;
+			}
+			changed = true;
+		}
+
+		if (!changed) return;
+
 		deps.save();
 		deps.rebuild();
 		deps.refreshSettingsTab?.();
@@ -349,7 +372,7 @@ export function renderViewModeSection(parent: HTMLElement, deps: GenericSectionD
 		closeupHeader.setCssStyles({ margin: "4px 0 2px", fontSize: "11px", color: "var(--text-muted)", fontWeight: "600" });
 		closeupHeader.createSpan({ text: "Close-up" });
 		const closeupGroup = section.createDiv({ cls: "gim-viewmode-options" });
-		for (const opt of closeup) renderViewModeOption(closeupGroup, opt, deps);
+		for (const opt of closeup) renderViewModeOption(closeupGroup, opt, deps, "closeup");
 	}
 
 	// Panorama: vault-wide structural overview modes (non-experimental).
@@ -359,7 +382,7 @@ export function renderViewModeSection(parent: HTMLElement, deps: GenericSectionD
 		panoramaHeader.setCssStyles({ margin: "8px 0 2px", fontSize: "11px", color: "var(--text-muted)", fontWeight: "600" });
 		panoramaHeader.createSpan({ text: "Panorama" });
 		const panoramaGroup = section.createDiv({ cls: "gim-viewmode-options" });
-		for (const opt of panoramaStable) renderViewModeOption(panoramaGroup, opt, deps);
+		for (const opt of panoramaStable) renderViewModeOption(panoramaGroup, opt, deps, "panorama");
 	}
 
 	// Experimental (beta): collapsible, regardless of perspective.
@@ -380,7 +403,10 @@ export function renderViewModeSection(parent: HTMLElement, deps: GenericSectionD
 
 	const expGroup = section.createDiv({ cls: "gim-viewmode-options" });
 	expGroup.setCssStyles({ display: expSelected ? "" : "none" });
-	for (const opt of experimental) renderViewModeOption(expGroup, opt, deps);
+	for (const opt of experimental) {
+		const type = isCloseup(opt) ? "closeup" : "panorama";
+		renderViewModeOption(expGroup, opt, deps, type);
+	}
 
 	header.addEventListener("click", () => {
 		const open = expGroup.style.display === "none";
@@ -388,21 +414,6 @@ export function renderViewModeSection(parent: HTMLElement, deps: GenericSectionD
 		caret.setText(open ? "▾ " : "▸ ");
 	});
 
-	// Drill-down target selector
-	const drillDownRow = section.createDiv({ cls: "gim-setting-row" });
-	drillDownRow.setCssStyles({ marginTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" });
-	const drillDownLabel = drillDownRow.createDiv({ text: "Drill-down target" });
-	drillDownLabel.setCssStyles({ fontSize: "12px", color: "var(--text-normal)" });
-	const drillDownSel = drillDownRow.createEl("select");
-	drillDownSel.setCssStyles({ fontSize: "12px", padding: "2px 4px", borderRadius: "4px" });
-	for (const opt of closeup) {
-		const option = drillDownSel.createEl("option", { text: opt.label, value: opt.id });
-		if (deps.settings.closeupMode === opt.id) option.selected = true;
-	}
-	drillDownSel.addEventListener("change", () => {
-		deps.settings.closeupMode = drillDownSel.value as any;
-		deps.save();
-	});
 }
 
 export function renderBipartiteSection(parent: HTMLElement, deps: GenericSectionDeps): void {
