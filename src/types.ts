@@ -379,7 +379,7 @@ export const VIEW_MODES: ViewModeOption[] = [
 		id: "bubblesets",
 		label: "BubbleSets",
 		description: "Containment layout drawn as rectangular iso-contour bubbles",
-		experimental: true,
+		perspective: "closeup",
 	},
 	{
 		// Symmetric tag×tag co-occurrence heatmap: cell shade = how many notes
