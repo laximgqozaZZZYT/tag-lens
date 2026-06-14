@@ -127,7 +127,9 @@ export function buildGraph(
 		const facts = makeFacts(f, cache, tagProperties);
 
 		let isCore = false;
-		if (filterMode === "dvjs") {
+		if (focusSet) {
+			isCore = true;
+		} else if (filterMode === "dvjs") {
 			isCore = !!(matchedPaths && matchedPaths.has(f.path));
 		} else {
 			isCore = !!(!whereAst || isMatched(evalQuery(whereAst, facts)));
