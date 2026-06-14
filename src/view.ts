@@ -102,16 +102,13 @@ import {
 import {
 	renderExprSection as renderExprSectionFn,
 	renderToggleSection as renderToggleSectionFn,
-	renderOrderBySection as renderOrderBySectionFn,
 	toggleArrayMember as toggleArrayMemberFn,
 	renderPresetSection as renderPresetSectionFn,
 } from "./panel-sections";
 import {
 	renderMinFontSection as renderMinFontSectionFn,
 	renderNodeDisplaySection as renderNodeDisplaySectionFn,
-	renderMatrixOrderBySection as renderMatrixOrderBySectionFn,
 	renderMatrixMinColumnControl as renderMatrixMinColumnControlFn,
-	renderHeatmapOrderBySection as renderHeatmapOrderBySectionFn,
 	renderHeatmapMinTagControl as renderHeatmapMinTagControlFn,
 	renderHeatmapDisplayToggles as renderHeatmapDisplayTogglesFn,
 	renderMatrixDisplayToggles as renderMatrixDisplayTogglesFn,
@@ -126,7 +123,6 @@ import {
 	renderSettingsSortTab,
 	renderSettingsDisplayTab,
 	renderSettingsEncodeTab,
-	renderSettingsLayersTab,
 	renderFilterBodyTab,
 } from "./panel/settings-tabs";
 import {
@@ -384,7 +380,7 @@ export class MiniGraphView extends ItemView {
 	private activeTab: string = "__all__";
 	// Which Settings sub-tab is shown: View / Filter / Sort / Display / Layers.
 	// In-memory, preserved across graph rebuilds. Default View.
-	private settingsSubTab: "view" | "display" | "encode" | "layers" = "view";
+	private settingsSubTab: "view" | "display" | "encode" = "view";
 	private insightSubTab: "overview" | "alerts" | "suggest" = "overview";
 	// UpSet mode: signature key (= `signature.join("|")`) of the column
 	// currently selected by the user (highlighted in the matrix; drives
@@ -728,12 +724,11 @@ export class MiniGraphView extends ItemView {
 		const subBar = host.createDiv();
 		subBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", marginBottom: "6px", borderBottom: "1px solid var(--background-modifier-border)" });
 		const content = host.createDiv({ cls: "gim-panel-content" });
-		type SubKey = "view" | "display" | "encode" | "layers";
+		type SubKey = "view" | "display" | "encode";
 		const SUBS: { key: SubKey; label: string }[] = [
 			{ key: "view", label: "View" },
 			{ key: "display", label: "Display" },
 			{ key: "encode", label: "Encode" },
-			{ key: "layers", label: "Layers" },
 		];
 		const subBtns = new Map<string, HTMLElement>();
 		const styleSubs = (): void => {
@@ -784,15 +779,6 @@ export class MiniGraphView extends ItemView {
 						encLegends: this.encLegends,
 						activeStatusColors: this.activeStatusColors,
 						cardCache: this.cardCache,
-					});
-					break;
-				case "layers": 
-					renderSettingsLayersTab(content, {
-						settings: this.settings,
-						save: () => void this.save(),
-						rebuild: () => this.rebuild(),
-						requestDraw: () => this.requestDraw(),
-						refreshSettingsTab: () => this.refreshSettingsTab(),
 						laid: this.laid,
 						activeTab: this.activeTab,
 						setActiveTab: (t) => { this.activeTab = t; },
@@ -917,36 +903,6 @@ export class MiniGraphView extends ItemView {
 		return resolveFromClusterFn(groupKey, this.nodeDisplayDeps());
 	}
 
-	private renderOrderBySection(parent: HTMLElement): void {
-		// Matrix mode replaces the field/dir ORDER_BY with its seriation options
-		// (co-occurrence / block-priority / original) + group / collapse toggles,
-		// so all row ordering lives in this one section.
-		if (this.settings.viewMode === "matrix") {
-			this.renderMatrixOrderBySection(parent);
-			return;
-		}
-		if (this.settings.viewMode === "heatmap") {
-			this.renderHeatmapOrderBySection(parent);
-			return;
-		}
-		renderOrderBySectionFn(parent, {
-			settings: this.settings,
-			save: () => void this.save(),
-		});
-	}
-
-	// Matrix ORDER_BY: SAME structure as every other mode — a criterion select
-	// + an asc/desc direction select. The criterion options are matrix-specific
-	// (co-occurrence / block-priority) and map to matrixBlockPriority; the
-	// direction maps to matrixSortDir. No matrix-only checkboxes live here.
-	private renderMatrixOrderBySection(parent: HTMLElement): void {
-		renderMatrixOrderBySectionFn(parent, {
-			settings: this.settings,
-			save: () => void this.save(),
-			rebuild: () => void this.rebuild(),
-		});
-	}
-
 	// Matrix "min column size" — a column (tag) filter, rendered inside the
 	// HAVING filter section (no standalone Matrix section).
 	private renderMatrixMinColumnControl(section: HTMLElement): void {
@@ -954,18 +910,6 @@ export class MiniGraphView extends ItemView {
 			settings: this.settings,
 			save: () => void this.save(),
 			rebuild: () => void this.rebuild(),
-		});
-	}
-
-	// Heatmap ORDER_BY: SAME criterion + asc/desc structure as other modes.
-	// Criterion = co-occurrence (Jaccard seriation) / size; direction reverses
-	// the tag order. No heatmap-only controls live in ORDER_BY.
-	private renderHeatmapOrderBySection(parent: HTMLElement): void {
-		renderHeatmapOrderBySectionFn(parent, {
-			settings: this.settings,
-			save: () => void this.save(),
-			rebuild: () => void this.rebuild(),
-			requestDraw: () => this.requestDraw(),
 		});
 	}
 
