@@ -74,7 +74,12 @@ export function renderInsightTab(host: HTMLElement, deps: InsightDeps): void {
 	for (const { key, label } of SUBS) {
 		const b = subBar.createEl("button", { text: label });
 		subBtns.set(key, b);
-		b.addEventListener("click", () => { deps.setInsightSubTab(key); styleSubs(); renderSub(); });
+		b.addEventListener("click", () => { 
+			deps.insightSubTab = key;
+			deps.setInsightSubTab(key); 
+			styleSubs(); 
+			renderSub(); 
+		});
 		b.addEventListener("mouseenter", () => { if (deps.insightSubTab !== key) { b.setCssStyles({ color: "var(--text-muted)" }); b.setCssStyles({ borderBottomColor: "var(--background-modifier-border)" }); } });
 		b.addEventListener("mouseleave", () => styleSubs());
 	}
