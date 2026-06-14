@@ -486,11 +486,13 @@ export class MiniGraphView extends ItemView {
 		});
 
 		this.addAction("square-dashed-mouse-pointer", "Marquee zoom (or Shift+drag)", () => this.marquee.arm());
-		this.addAction("zoom-in", "Zoom in", () => this.zoomBy(1.4));
 		
+		// To place this to the RIGHT of "Zoom in" (assuming Obsidian prepends actions),
+		// we must add it BEFORE "Zoom in" so it ends up later in the right-to-left stack.
 		this.panoramaActionEl = this.addAction("map", "Return to Panorama view", () => this.switchToPanorama());
 		this.updatePanoramaActionVisibility();
 
+		this.addAction("zoom-in", "Zoom in", () => this.zoomBy(1.4));
 		this.addAction("zoom-out", "Zoom out", () => this.zoomBy(1 / 1.4));
 		this.addAction("maximize", "Fit to view", () => this.fitToView());
 		this.addAction("image-down", "Export image (PNG)", (e) => this.openExportMenu(e));
@@ -4150,7 +4152,9 @@ export class MiniGraphView extends ItemView {
 	}
 
 	public switchToPanorama(): void {
+		this.settings.focusNodeIds = undefined;
 		delete this.settings.focusNodeIds;
+		delete (this.settings as any).drillDownNodeIds; // Cleanup legacy state if any
 		this.settings.perspective = "panorama";
 		this.settings.viewMode = this.settings.panoramaMode || "heatmap";
 		this.save();
