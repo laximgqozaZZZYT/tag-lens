@@ -400,6 +400,8 @@ export class MiniGraphView extends ItemView {
 	// longer exists after a relayout (clearStaleSelection).
 	private latticeSelectedKey: string | null = null;
 	private latticeHoverKey: string | null = null;
+	// Action button element for returning to panorama
+	private panoramaActionEl: HTMLElement | null = null;
 	// Lattice: keys of nodes whose body is expanded into a list of file
 	// names (header checkbox checked). Transient — relayout prunes keys
 	// whose node no longer exists.
@@ -485,6 +487,10 @@ export class MiniGraphView extends ItemView {
 
 		this.addAction("square-dashed-mouse-pointer", "Marquee zoom (or Shift+drag)", () => this.marquee.arm());
 		this.addAction("zoom-in", "Zoom in", () => this.zoomBy(1.4));
+		
+		this.panoramaActionEl = this.addAction("map", "Return to Panorama view", () => this.switchToPanorama());
+		this.updatePanoramaActionVisibility();
+
 		this.addAction("zoom-out", "Zoom out", () => this.zoomBy(1 / 1.4));
 		this.addAction("maximize", "Fit to view", () => this.fitToView());
 		this.addAction("image-down", "Export image (PNG)", (e) => this.openExportMenu(e));
@@ -3339,17 +3345,6 @@ export class MiniGraphView extends ItemView {
 		titleRow.createSpan({ text: "Tag Lens" });
 		const headBtns = titleRow.createDiv();
 		headBtns.setCssStyles({ display: "flex", alignItems: "center", gap: "2px", flex: "0 0 auto" });
-		
-		// Return to Panorama button (only visible in Close-up perspective)
-		if (this.settings.perspective === "closeup") {
-			const panBtn = headBtns.createSpan();
-			panBtn.setCssStyles({ cursor: "pointer", color: "var(--interactive-accent)", display: "inline-flex", alignItems: "center", padding: "0 2px" });
-			setIcon(panBtn, "map"); // "map" or "expand" icon
-			panBtn.setAttr("aria-label", "Return to Panorama view");
-			panBtn.addEventListener("mousedown", (ev) => ev.stopPropagation());
-			panBtn.addEventListener("dblclick", (ev) => ev.stopPropagation());
-			panBtn.addEventListener("click", (ev) => { ev.stopPropagation(); this.switchToPanorama(); });
-		}
 
 		// Pin/unpin: dock the menu to the right edge (standard pin affordance).
 		const pinBtn = headBtns.createSpan();
@@ -4145,19 +4140,28 @@ export class MiniGraphView extends ItemView {
 
 	private switchToCloseup(ids: string[]): void {
 		this.closeDetail();
-		this.settings.focusNodeIds = ids;
+		// Ensure array is a clean copy so we don't accidentally mutate or retain references
+		this.settings.focusNodeIds = [...ids];
 		this.settings.perspective = "closeup";
 		this.settings.viewMode = this.settings.closeupMode || "droste";
 		this.save();
+		this.updatePanoramaActionVisibility();
 		this.rebuild();
 	}
 
 	public switchToPanorama(): void {
-		this.settings.focusNodeIds = undefined;
+		delete this.settings.focusNodeIds;
 		this.settings.perspective = "panorama";
 		this.settings.viewMode = this.settings.panoramaMode || "heatmap";
 		this.save();
+		this.updatePanoramaActionVisibility();
 		this.rebuild();
+	}
+
+	private updatePanoramaActionVisibility(): void {
+		if (this.panoramaActionEl) {
+			this.panoramaActionEl.style.display = this.settings.perspective === "closeup" ? "" : "none";
+		}
 	}
 
 	// Generic floating note-list overlay. Used by both heatmap (tag×tag) and
