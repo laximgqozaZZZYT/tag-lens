@@ -39,20 +39,20 @@ are shown — it only assigns per-node draw parameters.
 ## 2. View modes (11)
 
 Modes are grouped by **perspective** in the View-mode picker:
-- **近景 (Close-up)**: per-note detail views (currently Icon Gallery only)
-- **遠景 (Panorama)**: vault-wide structural overviews
+- **Close-up**: per-note detail views (currently Icon Gallery only)
+- **Panorama**: vault-wide structural overviews
 
 | id | Name | Summary | Kind | Perspective |
 |---|---|---|---|---|
-| `droste` | Icon Gallery | Per-note icon (nested groups of same/partial-shared tags + links/backlinks), tiled | single diagram | 近景 |
-| `lattice` | Intersection lattice | Degree-tiered Hasse-style layout + subset links; overview/density/individual auto-switch by count/zoom | screen-space | 遠景 |
-| `heatmap` | Co-occurrence heatmap | tag×tag co-occurrence grid (Jaccard or log+p95 count); gap overlay | screen-space | 遠景 |
-| `upset` | UpSet plot | Cards per intersection signature + dot matrix (handles ≥4-way) | hybrid (experimental) | 遠景 |
-| `matrix` | Connection matrix | notes×tags dot grid (seriated) | screen-space (experimental) | 遠景 |
-| `bipartite` | Tag graph | bipartite notes + tag nodes (force / concentric / clustered) | card (experimental) | 遠景 |
-| `bubblesets` | BubbleSets | containment layout as rectangular iso-contours | card (experimental) | 遠景 |
-| `euler` / `euler-true` / `euler-venn` | Nested set / Containment map / Euler | containment/overlap rectangle family | card (experimental) | 遠景 |
-| `stream` | Sequence Stream | tag × time/value-bin stream (dropped-thread detection) | screen-space (experimental) | 遠景 |
+| `droste` | Icon Gallery | Per-note icon (nested groups of same/partial-shared tags + links/backlinks), tiled | single diagram | Close-up |
+| `lattice` | Intersection lattice | Degree-tiered Hasse-style layout + subset links; overview/density/individual auto-switch by count/zoom | screen-space | Panorama |
+| `heatmap` | Co-occurrence heatmap | tag×tag co-occurrence grid (Jaccard or log+p95 count); gap overlay | screen-space | Panorama |
+| `upset` | UpSet plot | Cards per intersection signature + dot matrix (handles ≥4-way) | hybrid (experimental) | Panorama |
+| `matrix` | Connection matrix | notes×tags dot grid (seriated) | screen-space (experimental) | Panorama |
+| `bipartite` | Tag graph | bipartite notes + tag nodes (force / concentric / clustered) | card (experimental) | Panorama |
+| `bubblesets` | BubbleSets | containment layout as rectangular iso-contours | card (experimental) | Panorama |
+| `euler` / `euler-true` / `euler-venn` | Nested set / Containment map / Euler | containment/overlap rectangle family | card (experimental) | Panorama |
+| `stream` | Sequence Stream | tag × time/value-bin stream (dropped-thread detection) | screen-space (experimental) | Panorama |
 
 > "Card modes" = those drawing world-space cards via drawBodyTile/drawCard
 > (euler family / bipartite / bubblesets / upset). Overlays (status colour, freshness,

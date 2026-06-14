@@ -289,8 +289,8 @@ export interface ViewModeOption {
 	// only affects how the picker groups/labels them.
 	experimental?: boolean;
 	// Perspective grouping for the View-mode picker:
-	//   "panorama" (遠景) = vault-wide structural overview (default when absent)
-	//   "closeup"  (近景) = per-node detail view (currently Icon Gallery only)
+	//   "panorama" = vault-wide structural overview (default when absent)
+	//   "closeup"  = per-node detail view (currently Icon Gallery only)
 	// Future: selecting a node in a panorama mode will drill down to the
 	// closeup mode with that node as focus.
 	perspective?: "panorama" | "closeup";
@@ -417,7 +417,7 @@ export const VIEW_MODES: ViewModeOption[] = [
 ];
 
 // Perspective helpers — used by the View-mode picker to group modes into
-// 遠景 (Panorama) and 近景 (Close-up) sections.
+// Panorama and Close-up sections.
 export const isPanorama = (opt: ViewModeOption): boolean =>
 	opt.perspective !== "closeup";
 export const isCloseup = (opt: ViewModeOption): boolean =>

@@ -342,22 +342,22 @@ export function renderViewModeSection(parent: HTMLElement, deps: GenericSectionD
 	const section = parent.createDiv({ cls: "gim-panel-section" });
 	section.createEl("h4", { text: "View mode" });
 
-	// 近景 (Close-up): per-node detail views (currently Icon Gallery only).
+	// Close-up: per-node detail views (currently Icon Gallery only).
 	const closeup = VIEW_MODES.filter((o) => isCloseup(o));
 	if (closeup.length > 0) {
 		const closeupHeader = section.createDiv({ cls: "gim-viewmode-perspective-header" });
 		closeupHeader.setCssStyles({ margin: "4px 0 2px", fontSize: "11px", color: "var(--text-muted)", fontWeight: "600" });
-		closeupHeader.createSpan({ text: "近景 (Close-up)" });
+		closeupHeader.createSpan({ text: "Close-up" });
 		const closeupGroup = section.createDiv({ cls: "gim-viewmode-options" });
 		for (const opt of closeup) renderViewModeOption(closeupGroup, opt, deps);
 	}
 
-	// 遠景 (Panorama): vault-wide structural overview modes (non-experimental).
+	// Panorama: vault-wide structural overview modes (non-experimental).
 	const panoramaStable = VIEW_MODES.filter((o) => isPanorama(o) && !o.experimental);
 	if (panoramaStable.length > 0) {
 		const panoramaHeader = section.createDiv({ cls: "gim-viewmode-perspective-header" });
 		panoramaHeader.setCssStyles({ margin: "8px 0 2px", fontSize: "11px", color: "var(--text-muted)", fontWeight: "600" });
-		panoramaHeader.createSpan({ text: "遠景 (Panorama)" });
+		panoramaHeader.createSpan({ text: "Panorama" });
 		const panoramaGroup = section.createDiv({ cls: "gim-viewmode-options" });
 		for (const opt of panoramaStable) renderViewModeOption(panoramaGroup, opt, deps);
 	}
