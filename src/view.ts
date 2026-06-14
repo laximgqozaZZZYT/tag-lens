@@ -4143,8 +4143,9 @@ export class MiniGraphView extends ItemView {
 
 	private switchToCloseup(ids: string[]): void {
 		this.closeDetail();
-		// Ensure array is a clean copy so we don't accidentally mutate or retain references
-		this.settings.focusNodeIds = [...ids];
+		// Ensure array is a clean copy so we don't accidentally mutate or retain references.
+		// Guard against undefined ids to prevent "TypeError: ids is not iterable" during E2E coverage.
+		this.settings.focusNodeIds = Array.isArray(ids) ? [...ids] : [];
 		this.settings.perspective = "closeup";
 		this.settings.viewMode = this.settings.closeupMode || "droste";
 		this.save();

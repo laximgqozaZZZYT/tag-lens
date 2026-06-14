@@ -34,14 +34,16 @@ cp main.js manifest.json styles.css "/home/ubuntu/obsidian-plugins/開発/.obsid
 Reload Obsidian after copying.
 
 ## 3. E2E (real Obsidian / CDP)
-- Zero-dependency CDP driver (Node 22 global WebSocket/fetch). Reference: `test/e2e-display.mjs`.
+- Zero-dependency CDP driver (Node 22 global WebSocket/fetch). Reference: `test/e2e-display.mjs`, `test/e2e-closeup.mjs`.
 - **Never kill the user's main Obsidian (`~/.config/obsidian`).** Always launch a *separate instance with
   its own profile and port*, and on exit kill **only** that profile's process
   (e.g. `--user-data-dir=/tmp/obs-<name> --remote-debugging-port=92XX`, with obsidian.json pre-registering
   the dev vault `open:true`). **Always clean up afterwards (kill + remove /tmp)** — leaked processes have happened.
+- **Target Vault:** E2E scripts must operate on the dev vault located at `/home/ubuntu/obsidian-plugins/開発`. Ensure `obsidian.json` sets this path.
 - **A "no exception" result is not a pass.** Bugs that render nothing yet throw nothing (`fillStyle=number`,
   dropped layout fields) slip past a no-exception check. Verify the **actual reflection** (draw params /
   laid.nodes / pixels). Beware writing expectations as a mirror of the implementation — that yields false positives.
+- **Closeup Transitions:** Validate `switchToCloseup` and `switchToPanorama` roundtrips across all view modes to prevent `undefined` array iteration (`ids is not iterable`) or filtering issues.
 
 ## 4. Working principles
 - Don't take reviewer/grep/E2E results at face value; confirm against the real code (a "works" verdict was wrong twice).
