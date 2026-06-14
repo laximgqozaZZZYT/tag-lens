@@ -60,11 +60,21 @@ export function computeCognitiveLoad(app: App, k: number): ComputedCognitiveLoad
 		const tags = new Set<string>();
 		if (cache?.tags) for (const t of cache.tags) tags.add(stripHash(t.tag));
 		const fmTags = (cache?.frontmatter as Record<string, unknown> | undefined)?.tags;
-		if (Array.isArray(fmTags)) for (const t of fmTags) tags.add(stripHash(String(t)));
-		else if (typeof fmTags === "string") tags.add(stripHash(fmTags));
+		if (Array.isArray(fmTags)) {
+			for (const t of fmTags) {
+				const tr = stripHash(String(t)).trim();
+				if (tr) tags.add(tr);
+			}
+		} else if (typeof fmTags === "string") {
+			for (const t of fmTags.split(",")) {
+				const tr = stripHash(t).trim();
+				if (tr) tags.add(tr);
+			}
+		}
 		noteTagCount.set(f.path, tags.size);
 		for (const t of tags) tagNoteCount.set(t, (tagNoteCount.get(t) ?? 0) + 1);
 	}
+	console.log("[E2E DEBUG] tagNoteCount timeline =", tagNoteCount.get("timeline"), "beat =", tagNoteCount.get("beat"));
 	const distinctTags = Math.max(1, tagNoteCount.size);
 
 	const triggered: TriggeredAlert[] = [];
@@ -87,28 +97,17 @@ export function computeCognitiveLoad(app: App, k: number): ComputedCognitiveLoad
 			offenders: topN(hits, ([, c]) => c, ([p, c]) => `${p === "/" ? "(root)" : p} (${c} files)`),
 		});
 	}
-	// [Contextual Ambiguity] notes per tag > (notes/10)*K
+
+	// [High Degree Node] link/backlink > max(50, linkDensity * 5 * K)
 	{
-		const thr = (totalNotes / 10) * k;
-		const hits = [...tagNoteCount.entries()].filter(([, c]) => c > thr);
-		if (hits.length > 0) triggered.push({
-			id: "contextualAmbiguity", label: "Contextual Ambiguity", severity: "WARNING",
-			summary: "Tag is too broad",
-			detail: "This tag is applied to an excessive percentage of your total notes (Tag Abstractness).",
-			advice: "Delete the tag or split it into more specific sub-tags.",
-			offenders: topN(hits, ([, c]) => c, ([t, c]) => `#${t} (${c} notes)`),
-		});
-	}
-	// [Network Hub] link/backlink > (links/notes)*K^2
-	{
-		const thr = linkDensity * Math.pow(k, 2);
+		const thr = Math.max(50, linkDensity * 5 * k);
 		const hits = files
 			.map((f) => ({ f, lc: (outCount.get(f.path) ?? 0) + (inCount.get(f.path) ?? 0) }))
 			.filter((x) => x.lc > thr);
 		if (hits.length > 0) triggered.push({
-			id: "networkHub", label: "Network Hub", severity: "CRITICAL",
+			id: "highDegreeNode", label: "High Degree Node", severity: "CRITICAL",
 			summary: "Excessive links",
-			detail: "The link density of this note vastly exceeds the vault average.",
+			detail: "The degree (total links and backlinks) of this note vastly exceeds the vault average, indicating it is a massive hub.",
 			advice: "Isolate this hub note or visualize it using a subset graph.",
 			offenders: topN(hits, (x) => x.lc, (x) => `${basename(x.f.path)} (${x.lc} links)`),
 		});
@@ -139,7 +138,122 @@ export function computeCognitiveLoad(app: App, k: number): ComputedCognitiveLoad
 		});
 	}
 
+	// [Orphan Notes] notes with 0 tags AND 0 links
+	{
+		const orphans = files.filter(f => {
+			const tags = noteTagCount.get(f.path) ?? 0;
+			const links = (outCount.get(f.path) ?? 0) + (inCount.get(f.path) ?? 0);
+			return tags === 0 && links === 0;
+		});
+		if (orphans.length > 0) triggered.push({
+			id: "orphanNotes", label: "Orphan Notes", severity: "INFO",
+			summary: `${orphans.length} note${orphans.length > 1 ? "s have" : " has"} no tags and no links`,
+			detail: "These notes are completely disconnected — they have neither tags nor links/backlinks, making them invisible to any tag-based or graph-based navigation.",
+			advice: "Add tags or links to integrate them into your knowledge graph, or delete them if they are no longer needed.",
+			offenders: topN(orphans, (f) => f.stat.size, (f) => basename(f.path)),
+		});
+	}
+
+	// [Redundant Tag Pair] Jaccard >= 0.9 between two tags' member sets
+	{
+		const tagMembers = new Map<string, Set<string>>();
+		for (const f of files) {
+			const cache = app.metadataCache.getFileCache(f);
+			const tags = new Set<string>();
+			if (cache?.tags) for (const t of cache.tags) tags.add(stripHash(t.tag));
+			const fmTags = (cache?.frontmatter as Record<string, unknown> | undefined)?.tags;
+			if (Array.isArray(fmTags)) for (const t of fmTags) tags.add(stripHash(String(t)));
+			else if (typeof fmTags === "string") tags.add(stripHash(fmTags));
+			for (const t of tags) {
+				let s = tagMembers.get(t);
+				if (!s) { s = new Set(); tagMembers.set(t, s); }
+				s.add(f.path);
+			}
+		}
+		const redundant = findRedundantTagPairs(tagMembers, 0.9, 10);
+		if (redundant.length > 0) triggered.push({
+			id: "redundantTagPair", label: "Redundant Tag Pair", severity: "INFO",
+			summary: `${redundant.length} tag pair${redundant.length > 1 ? "s" : ""} with near-identical membership`,
+			detail: "These tag pairs have a Jaccard similarity ≥ 0.9, meaning they are applied to almost exactly the same notes. They may be candidates for merging or aliasing.",
+			advice: "Consider merging one tag into the other, or converting one into a nested sub-tag of the other.",
+			offenders: redundant.map(r => `#${r.a} ↔ #${r.b} (Jaccard ${(r.jaccard * 100).toFixed(0)}%)`),
+		});
+	}
+
+	// [Over-broad Tag] tag covers > 40% of all notes
+	{
+		const threshold = 0.4;
+		const overbroad = findOverbroadTags(tagNoteCount, totalNotes, threshold);
+		if (overbroad.length > 0) triggered.push({
+			id: "overbroadTag", label: "Over-broad Tag", severity: "INFO",
+			summary: `${overbroad.length} tag${overbroad.length > 1 ? "s cover" : " covers"} over 40% of all notes`,
+			detail: "A tag that is applied to a very large proportion of the vault provides little discriminative value for navigation or filtering.",
+			advice: "Consider splitting into more specific sub-tags, or removing the tag if it adds no value.",
+			offenders: overbroad.map(o => `#${o.tag} (${o.count} notes, ${(o.ratio * 100).toFixed(0)}%)`),
+		});
+	}
+
 	return { score: Math.min(100, triggered.length * 20), globalStats: { totalNotes, totalFolders, totalLinks, distinctTags }, triggered };
+}
+
+// ── Pure detection helpers (exported for unit testing) ───────────────────────
+
+export interface RedundantPair {
+	a: string;
+	b: string;
+	jaccard: number;
+}
+
+/** Find tag pairs whose member sets have Jaccard similarity ≥ minJaccard. */
+export function findRedundantTagPairs(
+	tagMembers: Map<string, Set<string>>,
+	minJaccard: number,
+	maxResults: number
+): RedundantPair[] {
+	const tags = Array.from(tagMembers.entries());
+	const results: RedundantPair[] = [];
+	for (let i = 0; i < tags.length; i++) {
+		const [aKey, aSet] = tags[i];
+		if (aSet.size < 2) continue; // singletons can't be meaningfully redundant
+		for (let j = i + 1; j < tags.length; j++) {
+			const [bKey, bSet] = tags[j];
+			if (bSet.size < 2) continue;
+			let inter = 0;
+			for (const id of aSet) { if (bSet.has(id)) inter++; }
+			const union = aSet.size + bSet.size - inter;
+			if (union === 0) continue;
+			const jaccard = inter / union;
+			if (jaccard >= minJaccard) {
+				results.push({ a: aKey, b: bKey, jaccard });
+			}
+		}
+	}
+	results.sort((a, b) => b.jaccard - a.jaccard);
+	return results.slice(0, maxResults);
+}
+
+export interface OverbroadTag {
+	tag: string;
+	count: number;
+	ratio: number;
+}
+
+/** Find tags that cover more than `threshold` fraction of all notes. */
+export function findOverbroadTags(
+	tagNoteCount: Map<string, number>,
+	totalNotes: number,
+	threshold: number
+): OverbroadTag[] {
+	if (totalNotes === 0) return [];
+	const results: OverbroadTag[] = [];
+	for (const [tag, count] of tagNoteCount) {
+		const ratio = count / totalNotes;
+		if (ratio > threshold) {
+			results.push({ tag, count, ratio });
+		}
+	}
+	results.sort((a, b) => b.ratio - a.ratio);
+	return results;
 }
 
 export interface TagSuggestion {

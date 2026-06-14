@@ -2,8 +2,8 @@
 
 Every agent working in this repo must first read the **authoritative docs for the current version**.
 
-➡ **`docs/0.3.12/AGENTS.md`** (gotchas, verification gate, E2E/deploy workflow)
-➡ **`docs/0.3.12/basic-design.md`** / **`docs/0.3.12/detailed-design.md`** (design)
+➡ **`docs/0.3.17/AGENTS.md`** (gotchas, verification gate, E2E/deploy workflow)
+➡ **`docs/0.3.17/basic-design.md`** / **`docs/0.3.17/detailed-design.md`** (design)
 
 Superseded material is isolated in `docs/old/` (no need to read).
 
