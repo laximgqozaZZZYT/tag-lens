@@ -5094,7 +5094,7 @@ export class MiniGraphView extends ItemView {
 		title.setCssStyles({ margin: "0 0 8px 0" });
 
 		const tableContainer = host.createDiv();
-		tableContainer.setCssStyles({ overflow: "auto", border: "1px solid var(--background-modifier-border)", borderRadius: "4px" });
+		tableContainer.setCssStyles({ overflow: "auto", maxHeight: "250px", border: "1px solid var(--background-modifier-border)", borderRadius: "4px" });
 
 		const table = tableContainer.createEl("table");
 		table.setCssStyles({ width: "100%", borderCollapse: "collapse", fontSize: "11px", textAlign: "left" });
@@ -5162,6 +5162,14 @@ export class MiniGraphView extends ItemView {
 			tdTail.setAttr("colspan", "4");
 			tdTail.setCssStyles({ padding: "8px", textAlign: "center", color: "var(--text-faint)", fontStyle: "italic" });
 		}
+
+		// Link Preview placeholder
+		const linkTitle = host.createEl("h4", { text: "Link Preview (Future Extension)" });
+		linkTitle.setCssStyles({ margin: "16px 0 8px 0" });
+
+		const linkContainer = host.createDiv();
+		linkContainer.setCssStyles({ overflow: "auto", maxHeight: "200px", border: "1px solid var(--background-modifier-border)", borderRadius: "4px", padding: "12px", textAlign: "center", color: "var(--text-muted)", fontStyle: "italic", fontSize: "11px" });
+		linkContainer.textContent = "Edge/Link data will be displayed here.";
 	}
 }
 
