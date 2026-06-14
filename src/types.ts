@@ -12,6 +12,9 @@ export interface GraphNode {
 	fmStatus?: string;
 	fmMaturity?: string;
 	ageDays?: number;
+	// Peripheral node included because it links to/from a core node (when expandNeighborhood is true).
+	// These nodes did NOT pass the main filter.
+	isPeripheral?: boolean;
 }
 
 export interface GraphEdge {
@@ -94,6 +97,8 @@ export interface MiniSettings {
 	groupByAuto: boolean;
 	havingAuto: boolean;
 	limitAuto: boolean;
+	// Whether to expand the filtered "core" set to include 1-hop links/backlinks.
+	expandNeighborhood: boolean;
 	// "concentric": focus at centre, others fill expanding rings around it.
 	// "flow": focus at top-left, others fill columns to the right (main flow
 	// direction = toward the focus / "stage").
@@ -463,6 +468,7 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	groupByAuto: true,
 	havingAuto: true,
 	limitAuto: true,
+	expandNeighborhood: false,
 	anchorPlacement: "concentric",
 	showBody: true,
 	nodeRows: 1,

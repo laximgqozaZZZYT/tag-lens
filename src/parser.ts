@@ -31,6 +31,7 @@ export function buildGraph(
 	dvjsFilter: string = "",
 	statusField: string = "",
 	focusNodeIds?: string[],
+	expandNeighborhood: boolean = false,
 ): { result: BuildResult; errors: BuildErrors } {
 	const errors: BuildErrors = {};
 	let whereAst: QueryAst | null = null;
@@ -114,17 +115,51 @@ export function buildGraph(
 
 	const focusSet = focusNodeIds ? new Set(focusNodeIds) : null;
 
+	const coreIds = new Set<string>();
+	const peripheralIds = new Set<string>();
+	const factsCache = new Map<string, FileFacts>();
+
+	// Pass 1: Find all Core files that pass the filters
 	for (const f of files) {
 		if (focusSet && !focusSet.has(f.path)) continue;
 
 		const cache = app.metadataCache.getFileCache(f);
 		const facts = makeFacts(f, cache, tagProperties);
 
+		let isCore = false;
 		if (filterMode === "dvjs") {
-			if (!matchedPaths || !matchedPaths.has(f.path)) continue;
+			isCore = !!(matchedPaths && matchedPaths.has(f.path));
 		} else {
-			if (whereAst && !isMatched(evalQuery(whereAst, facts))) continue;
+			isCore = !!(!whereAst || isMatched(evalQuery(whereAst, facts)));
 		}
+
+		if (isCore) {
+			coreIds.add(f.path);
+			factsCache.set(f.path, facts);
+		}
+	}
+
+	// Pass 1b: If neighborhood expansion is enabled, find 1-hop links/backlinks
+	if (expandNeighborhood) {
+		const resolved = app.metadataCache.resolvedLinks;
+		for (const [src, targets] of Object.entries(resolved)) {
+			const srcIsCore = coreIds.has(src);
+			for (const tgt of Object.keys(targets)) {
+				const tgtIsCore = coreIds.has(tgt);
+				if (srcIsCore && !tgtIsCore) peripheralIds.add(tgt);
+				if (tgtIsCore && !srcIsCore) peripheralIds.add(src);
+			}
+		}
+	}
+
+	// Pass 2: Process Core and Peripheral files
+	for (const f of files) {
+		const isCore = coreIds.has(f.path);
+		const isPeripheral = peripheralIds.has(f.path);
+		if (!isCore && !isPeripheral) continue;
+
+		const cache = app.metadataCache.getFileCache(f);
+		const facts = factsCache.get(f.path) || makeFacts(f, cache, tagProperties);
 
 		const memberships: string[] = [];
 		const seen = new Set<string>();
@@ -175,7 +210,16 @@ export function buildGraph(
 			maturitySuggestion,
 		);
 
-		nodes.push({ id: f.path, label: f.basename, memberships, mtime: f.stat.mtime, fmStatus, fmMaturity, ageDays });
+		nodes.push({ 
+			id: f.path, 
+			label: f.basename, 
+			memberships, 
+			mtime: f.stat.mtime, 
+			fmStatus, 
+			fmMaturity, 
+			ageDays,
+			isPeripheral: isCore ? undefined : true
+		});
 		idSet.add(f.path);
 	}
 

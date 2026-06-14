@@ -19,6 +19,7 @@ export interface EncNode {
 	ageDays?: number;
 	fmStatus?: string;
 	fmMaturity?: string;
+	isPeripheral?: boolean;
 }
 
 // Side data the accessors may need, injected by the caller (view.ts wires it).

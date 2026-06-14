@@ -1150,7 +1150,7 @@ export class MiniGraphView extends ItemView {
 		// builder. Errors from the query parsers are surfaced into panel
 		// state so the user sees them inline.
 		const { effGroupBy, effWhere, filterMode, dvjsFilter } = resolveEffectiveQuery(this.settings);
-		const { result, errors } = buildGraph(this.app, effWhere, effGroupBy, filterMode, dvjsFilter, this.settings.statusField, this.settings.focusNodeIds);
+		const { result, errors } = buildGraph(this.app, effWhere, effGroupBy, filterMode, dvjsFilter, this.settings.statusField, this.settings.focusNodeIds, this.settings.expandNeighborhood);
 		this.whereError = errors.where ?? "";
 		this.groupByError = errors.groupBy ?? "";
 		let { data, clusterLabels } = result;
@@ -1671,6 +1671,7 @@ export class MiniGraphView extends ItemView {
 					ageDays: n.ageDays,
 					fmStatus: n.fmStatus,
 					fmMaturity: n.fmMaturity,
+					isPeripheral: n.isPeripheral,
 				};
 			}
 			return { id, memberships: g.nodeKeys.get(id) ?? [], label: g.nodeLabel.get(id) };

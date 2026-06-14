@@ -312,6 +312,7 @@ function emitBipartite(
 			fmStatus: n.fmStatus,
 			fmMaturity: n.fmMaturity,
 			ageDays: n.ageDays,
+			isPeripheral: n.isPeripheral,
 		};
 	});
 	// Clustered: draw NOTES first, TAG centres LAST so the big tag cards sit on

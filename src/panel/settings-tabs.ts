@@ -116,6 +116,18 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 			{ autoKey: "whereAuto" }
 		);
 	}
+	
+	const expandRow = el.createEl("label", { cls: "gim-toggle-row" });
+	expandRow.setCssStyles({ marginTop: "8px", marginBottom: "8px" });
+	const expandCb = expandRow.createEl("input", { type: "checkbox" });
+	expandCb.checked = deps.settings.expandNeighborhood;
+	expandCb.addEventListener("change", () => {
+		deps.settings.expandNeighborhood = expandCb.checked;
+		deps.save();
+		deps.rebuild();
+	});
+	expandRow.createSpan({ text: "Include 1-hop links & backlinks" });
+
 	renderExprSection(
 		el,
 		"GROUP_BY",

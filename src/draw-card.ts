@@ -92,6 +92,9 @@ export function drawCard(
 	if (opts.freshnessOverlay && opts.mtime != null && opts.nowMs != null && opts.staleDays != null) {
 		ctx.globalAlpha = freshnessAlpha(opts.mtime, opts.nowMs, opts.staleDays);
 	}
+	if (n.isPeripheral) {
+		ctx.globalAlpha *= 0.5;
+	}
 
 	// Fill first so the stroke below sits cleanly on top.
 	ctx.beginPath();
@@ -113,9 +116,13 @@ export function drawCard(
 			: isTint
 				? theme().swatch(tintHue, "fill")
 				: theme().accent;
+	if (n.isPeripheral) {
+		ctx.setLineDash([4 / zoom, 4 / zoom]);
+	}
 	ctx.beginPath();
 	roundedRectPath(ctx, x, y, w, h, r);
 	ctx.stroke();
+	ctx.setLineDash([]);
 
 	if (opts.statusColor && !isSet) {
 		ctx.lineWidth = 2 / zoom;

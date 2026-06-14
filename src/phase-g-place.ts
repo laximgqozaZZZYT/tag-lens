@@ -272,5 +272,6 @@ function emitNode(
 		fmStatus: n.fmStatus,
 		fmMaturity: n.fmMaturity,
 		ageDays: n.ageDays,
+		isPeripheral: n.isPeripheral,
 	});
 }
