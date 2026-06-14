@@ -7,7 +7,7 @@ import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
 import { effectiveEncoding } from "./encoding/migrate";
 import { fieldSourceRegistry } from "./encoding/field-sources";
 import type { EncContext, EncNode, NodeDrawParams, EncodingBinding, ScaleType } from "./encoding/types";
-import { axisLayout } from "./axis-layout";
+import { axisLayout, type AxisSpec, type AxisBand, type AxisTick } from "./axis-layout";
 import { assignGalleryAxes } from "./droste-axis";
 import { LaneRegistry, routeZ } from "./edge-routing";
 import { buildIdToRect, buildRouteObstacles } from "./layout-shared";
@@ -1555,11 +1555,11 @@ export class MiniGraphView extends ItemView {
 			}
 		}
 
-		const shiftSpec = (spec: any, offset: number) => {
+		const shiftSpec = (spec: AxisSpec | undefined, offset: number): AxisSpec | undefined => {
 			if (!spec) return undefined;
 			const out = { ...spec };
-			if (out.bands) out.bands = out.bands.map((b: any) => ({ ...b, start: b.start - offset, end: b.end - offset, center: b.center - offset }));
-			if (out.ticks) out.ticks = out.ticks.map((t: any) => ({ ...t, pos: t.pos - offset }));
+			if (out.bands) out.bands = out.bands.map((b: AxisBand) => ({ ...b, start: b.start - offset, end: b.end - offset, center: b.center - offset }));
+			if (out.ticks) out.ticks = out.ticks.map((t: AxisTick) => ({ ...t, pos: t.pos - offset }));
 			return out;
 		};
 

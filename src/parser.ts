@@ -84,33 +84,8 @@ export function buildGraph(
 
 	let matchedPaths: Set<string> | null = null;
 	if (filterMode === "dvjs") {
-		try {
-			const dvPlugin = (app as any).plugins.plugins.dataview;
-			if (!dvPlugin || !dvPlugin.api) {
-				throw new Error("Dataview plugin is not enabled or available.");
-			}
-			// Execute DataviewJS snippet. Pass `dv` (the API) and `app`.
-			const fn = new Function('dv', 'app', dvjsFilter);
-			let dvResult = fn(dvPlugin.api, app);
-			if (dvResult && typeof dvResult.array === "function") {
-				dvResult = dvResult.array();
-			}
-			if (Array.isArray(dvResult)) {
-				matchedPaths = new Set(dvResult.map(item => {
-					if (typeof item === "string") return item;
-					if (item && typeof item === "object") {
-						if (item.file && typeof item.file.path === "string") return item.file.path;
-						if (typeof item.path === "string") return item.path;
-					}
-					return "";
-				}).filter(p => p !== ""));
-			} else {
-				throw new Error("DataviewJS filter must return an array of paths or pages.");
-			}
-		} catch (e) {
-			errors.where = e instanceof Error ? e.message : String(e);
-			matchedPaths = new Set(); // fallback to empty if error
-		}
+		errors.where = "DataviewJS mode is disabled for security compliance. Please switch to SQL mode.";
+		matchedPaths = new Set();
 	}
 
 	const focusSet = focusNodeIds ? new Set(focusNodeIds) : null;

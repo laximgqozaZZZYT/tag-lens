@@ -56,6 +56,10 @@ export interface SortTabDeps {
 }
 
 export function renderSettingsSortTab(el: HTMLElement, deps: SortTabDeps): void {
+	renderOrderBySection(el, {
+		settings: deps.settings,
+		save: deps.save,
+	});
 	renderExprSection(
 		el,
 		"LIMIT",
@@ -215,9 +219,9 @@ export function renderFilterBodyTab(host: HTMLElement, deps: FilterBodyDeps): vo
 	const filterSection = host.createDiv({ cls: "gim-panel-section" });
 	renderSettingsFilterTab(filterSection, deps);
 
-	const limitSection = host.createDiv({ cls: "gim-panel-section" });
-	limitSection.createEl("h4", { text: "Limit" });
-	renderSettingsSortTab(limitSection, { ...deps, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); } });
+	const sortSection = host.createDiv({ cls: "gim-panel-section" });
+	sortSection.createEl("h4", { text: "Sort" });
+	renderSettingsSortTab(sortSection, { ...deps, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); } });
 }
 
 export interface DisplayTabDeps {
