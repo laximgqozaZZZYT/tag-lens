@@ -293,7 +293,7 @@ export class MiniGraphView extends ItemView {
 	private noteMenuErrorLogged = false;
 	// Which top-level tab the unified menu shows. In-memory only — opening via the toolbar
 	// gear always resets to "notes"; a manual switch survives graph rebuilds.
-	private activeMenuTab: "filter" | "settings" | "insight" = "filter";
+	private activeMenuTab: "data" | "settings" | "insight" = "data";
 	// Sensitivity coefficient K for the Insight tab's cognitive-load thresholds
 	// (1.0–5.0). In-memory; survives rebuilds, adjustable via the tab's slider.
 	private clInsightK = 2.0;
@@ -302,7 +302,7 @@ export class MiniGraphView extends ItemView {
 	// The live container the settings tab renders into (replaces the old docking
 	// panel's `panelEl` as the host that `applyTabFilter`/`renderTabButton` query).
 	private settingsHostEl: HTMLElement | null = null;
-	private filterHostEl: HTMLElement | null = null;
+	private dataHostEl: HTMLElement | null = null;
 	private insightHostEl: HTMLElement | null = null;
 	// The last note "located" on canvas via the navigator (non-droste modes),
 	// used to highlight its row in the menu.
@@ -384,7 +384,7 @@ export class MiniGraphView extends ItemView {
 	// Which Settings sub-tab is shown: View / Filter / Sort / Display / Layers.
 	// In-memory, preserved across graph rebuilds. Default View.
 	private settingsSubTab: "view" | "display" | "encode" = "view";
-	private filterSubTab: "search" | "result" = "search";
+	private dataSubTab: "logic" | "tree" | "table" = "logic";
 	private insightSubTab: "overview" | "alerts" | "suggest" = "overview";
 	// UpSet mode: signature key (= `signature.join("|")`) of the column
 	// currently selected by the user (highlighted in the matrix; drives
@@ -680,8 +680,8 @@ export class MiniGraphView extends ItemView {
 		this.settings.noteMenuVisible = !this.settings.noteMenuVisible;
 		void this.save();
 		if (this.settings.noteMenuVisible) {
-			this.activeMenuTab = "filter";
-			this.filterSubTab = "result";
+			this.activeMenuTab = "data";
+			this.dataSubTab = "tree";
 			this.requestDraw();
 		} else {
 			this.removeNoteMenu();
@@ -818,8 +818,8 @@ export class MiniGraphView extends ItemView {
 		}
 	}
 
-	private renderFilterBody(host: HTMLElement): void {
-		this.filterHostEl = host;
+	private renderDataLogicBody(host: HTMLElement): void {
+		this.dataHostEl = host;
 		renderFilterBodyTab(host, {
 			settings: this.settings,
 			save: () => void this.save(),
@@ -842,8 +842,8 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private refreshFilterTab(): void {
-		if (this.noteMenu && this.activeMenuTab === "filter" && this.filterHostEl) {
-			this.renderFilterBody(this.filterHostEl);
+		if (this.noteMenu && this.activeMenuTab === "data" && this.dataHostEl) {
+			this.renderDataLogicBody(this.dataHostEl);
 		}
 	}
 
@@ -3367,35 +3367,39 @@ export class MiniGraphView extends ItemView {
 		const bodyWrap = panel.createDiv();
 		bodyWrap.setCssStyles({ display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: "0", overflow: "hidden" });
 		
-		const filterTabWrap = bodyWrap.createDiv({ cls: "gim-menu-filter-wrap" });
-		filterTabWrap.setCssStyles({ display: "none", flexDirection: "column", flex: "1 1 auto", minHeight: "0" });
+		const dataTabWrap = bodyWrap.createDiv({ cls: "gim-menu-data-wrap" });
+		dataTabWrap.setCssStyles({ display: "none", flexDirection: "column", flex: "1 1 auto", minHeight: "0" });
 		
-		const filterSubBar = filterTabWrap.createDiv();
-		filterSubBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", borderBottom: "1px solid var(--background-modifier-border)", padding: "4px 6px 0" });
+		const dataSubBar = dataTabWrap.createDiv();
+		dataSubBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", borderBottom: "1px solid var(--background-modifier-border)", padding: "4px 6px 0" });
 		
-		const searchTab = filterTabWrap.createDiv({ cls: "gim-menu-filter-search" });
-		searchTab.setCssStyles({ display: "block", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
+		const logicTab = dataTabWrap.createDiv({ cls: "gim-menu-data-logic" });
+		logicTab.setCssStyles({ display: "block", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
 		
-		const resultTab = filterTabWrap.createDiv({ cls: "gim-menu-filter-result" });
-		resultTab.setCssStyles({ display: "none", flexDirection: "column", flex: "1 1 auto", minHeight: "0" });
+		const treeTab = dataTabWrap.createDiv({ cls: "gim-menu-data-tree" });
+		treeTab.setCssStyles({ display: "none", flexDirection: "column", flex: "1 1 auto", minHeight: "0" });
+
+		const tableTab = dataTabWrap.createDiv({ cls: "gim-menu-data-table" });
+		tableTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
 
 		const settingsTab = bodyWrap.createDiv({ cls: "gim-menu-settings" });
 		settingsTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
 		const insightTab = bodyWrap.createDiv();
 		insightTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
 
-		// -- Filter Sub-tabs: Search | Result --
-		type FilterSubTab = "search" | "result";
-		const F_SUBS: { key: FilterSubTab; label: string }[] = [
-			{ key: "search", label: "Search" },
-			{ key: "result", label: "Result" },
+		// -- Data Sub-tabs: Logic | Tree | Table --
+		type DataSubTab = "logic" | "tree" | "table";
+		const D_SUBS: { key: DataSubTab; label: string }[] = [
+			{ key: "logic", label: "Logic" },
+			{ key: "tree", label: "Tree" },
+			{ key: "table", label: "Table" },
 		];
-		const fSubBtns = new Map<string, HTMLElement>();
-		const styleFSubs = (): void => {
-			for (const { key } of F_SUBS) {
-				const b = fSubBtns.get(key);
+		const dSubBtns = new Map<string, HTMLElement>();
+		const styleDSubs = (): void => {
+			for (const { key } of D_SUBS) {
+				const b = dSubBtns.get(key);
 				if (!b) continue;
-				const on = this.filterSubTab === key;
+				const on = this.dataSubTab === key;
 				b.setCssStyles({
 					background: "transparent", border: "none",
 					borderBottom: on ? "2px solid var(--interactive-accent)" : "2px solid transparent",
@@ -3405,26 +3409,33 @@ export class MiniGraphView extends ItemView {
 				});
 			}
 		};
-		const showFSubTab = (key: FilterSubTab): void => {
-			this.filterSubTab = key;
-			searchTab.setCssStyles({ display: key === "search" ? "block" : "none" });
-			resultTab.setCssStyles({ display: key === "result" ? "flex" : "none" });
-			styleFSubs();
+		const showDSubTab = (key: DataSubTab): void => {
+			this.dataSubTab = key;
+			logicTab.setCssStyles({ display: key === "logic" ? "block" : "none" });
+			treeTab.setCssStyles({ display: key === "tree" ? "flex" : "none" });
+			tableTab.setCssStyles({ display: key === "table" ? "block" : "none" });
+			if (key === "table") {
+				// Re-render table tab when activated
+				this.renderDataTableView(tableTab, nodes);
+			} else {
+				tableTab.empty();
+			}
+			styleDSubs();
 		};
-		for (const { key, label } of F_SUBS) {
-			const b = filterSubBar.createEl("button", { text: label });
-			fSubBtns.set(key, b);
+		for (const { key, label } of D_SUBS) {
+			const b = dataSubBar.createEl("button", { text: label });
+			dSubBtns.set(key, b);
 			b.addEventListener("mousedown", (ev) => ev.stopPropagation());
-			b.addEventListener("click", (ev) => { ev.stopPropagation(); showFSubTab(key); });
+			b.addEventListener("click", (ev) => { ev.stopPropagation(); showDSubTab(key); });
 			b.addEventListener("mouseenter", () => {
-				if (this.filterSubTab !== key) { b.setCssStyles({ color: "var(--text-muted)" }); b.setCssStyles({ borderBottomColor: "var(--background-modifier-border)" }); }
+				if (this.dataSubTab !== key) { b.setCssStyles({ color: "var(--text-muted)" }); b.setCssStyles({ borderBottomColor: "var(--background-modifier-border)" }); }
 			});
-			b.addEventListener("mouseleave", () => styleFSubs());
+			b.addEventListener("mouseleave", () => styleDSubs());
 		}
-		showFSubTab(this.filterSubTab);
+		showDSubTab(this.dataSubTab);
 
-		type MenuTab = "filter" | "settings" | "insight";
-		const TABS: MenuTab[] = ["filter", "settings", "insight"];
+		type MenuTab = "data" | "settings" | "insight";
+		const TABS: MenuTab[] = ["data", "settings", "insight"];
 		const tabBtns: Partial<Record<MenuTab, HTMLElement>> = {};
 		const styleTabs = (): void => {
 			for (const key of TABS) {
@@ -3442,12 +3453,12 @@ export class MiniGraphView extends ItemView {
 		};
 		const showTab = (key: MenuTab): void => {
 			this.activeMenuTab = key;
-			filterTabWrap.setCssStyles({ display: key === "filter" ? "flex" : "none" });
+			dataTabWrap.setCssStyles({ display: key === "data" ? "flex" : "none" });
 			settingsTab.setCssStyles({ display: key === "settings" ? "block" : "none" });
 			insightTab.setCssStyles({ display: key === "insight" ? "block" : "none" });
 			
-			if (key === "filter") this.renderFilterBody(searchTab);
-			else this.filterHostEl = null;
+			if (key === "data") this.renderDataLogicBody(logicTab);
+			else this.dataHostEl = null;
 
 			if (key === "settings") this.renderSettingsBody(settingsTab);
 			else this.settingsHostEl = null;
@@ -3485,18 +3496,18 @@ export class MiniGraphView extends ItemView {
 			});
 			b.addEventListener("mouseleave", () => styleTabs());
 		};
-		mkTab("filter", "Filter");
+		mkTab("data", "Data");
 		mkTab("settings", "Settings");
 		mkTab("insight", "Insight");
 		// Note-count + click hint, shown at the top of the Result pane.
-		const notesHint = resultTab.createDiv({ text: `${nodes.length} notes — click to ${verb}` });
+		const notesHint = treeTab.createDiv({ text: `${nodes.length} notes — click to ${verb}` });
 		notesHint.setCssStyles({ fontSize: "10px", color: "var(--text-faint)", padding: "4px 8px 0" });
 		// ── Grouping selector (Folder / Tag) ────────────────────────────────────
 		// A small radio group in the header switches the tree between the FOLDER
 		// tree (by note path, default) and the TAG tree (by GROUP_BY membership
 		// keys). The chosen grouping survives rebuilds (this.noteMenuGroupBy) and
 		// reloads (settings.noteMenuGroupBy). Changing it re-renders the tree.
-		const groupBar = resultTab.createDiv();
+		const groupBar = treeTab.createDiv();
 		groupBar.setCssStyles({
 			display: "flex", gap: "10px", marginTop: "4px", fontWeight: "400",
 			fontSize: "11px", color: "var(--text-muted)", cursor: "default",
@@ -3527,7 +3538,7 @@ export class MiniGraphView extends ItemView {
 		// same key the per-row checkboxes use. Does NOT call rebuild(); a plain
 		// requestDraw() is enough because the draw() skipNode filter re-reads
 		// hiddenNodes fresh every frame.
-		const bulkBar = resultTab.createDiv();
+		const bulkBar = treeTab.createDiv();
 		bulkBar.setCssStyles({
 			display: "flex", gap: "6px", marginTop: "4px",
 		});
@@ -3572,7 +3583,7 @@ export class MiniGraphView extends ItemView {
 			this.noteMenuRedraw?.();
 		});
 		// Search input for filtering the tree.
-		const searchWrap = resultTab.createDiv();
+		const searchWrap = treeTab.createDiv();
 		searchWrap.setCssStyles({ position: "relative", margin: "6px 8px", flex: "0 0 auto" });
 		const search = searchWrap.createEl("input", { attr: { type: "text", placeholder: "Search: word, #tag, key:value" } });
 		search.setCssStyles({ display: "block", width: "100%", boxSizing: "border-box", padding: "4px 6px", background: "var(--background-primary)", border: "1px solid var(--background-modifier-border)", borderRadius: "4px", color: "var(--text-normal)" });
@@ -3588,7 +3599,7 @@ export class MiniGraphView extends ItemView {
 			boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "70", overflow: "auto", maxHeight: "240px",
 			display: "none",
 		});
-		const body = resultTab.createDiv({ cls: "gim-tree-scroll" });
+		const body = treeTab.createDiv({ cls: "gim-tree-scroll" });
 		// flex:1 1 auto + minHeight:0 → the tree scroll area grows/shrinks with the
 		// panel height (set above / on resize) instead of a fixed maxHeight.
 		body.setCssStyles({ overflow: "auto", padding: "4px 6px 8px", flex: "1 1 auto", minHeight: "0" });
@@ -5069,6 +5080,88 @@ export class MiniGraphView extends ItemView {
 			this.requestDraw();
 		}, { passive: false });
 		c.addEventListener("dblclick", () => this.fitToView());
+	}
+
+	/**
+	 * Renders the table preview of nodes.
+	 * Currently displays basic metadata (path, tags, status).
+	 * Future extension: Can be extended to display edges or other relationship data.
+	 */
+	private renderDataTableView(host: HTMLElement, nodes: ReadonlyArray<NoteRef>): void {
+		host.empty();
+		
+		const title = host.createEl("h4", { text: "Node Preview" });
+		title.setCssStyles({ margin: "0 0 8px 0" });
+
+		const tableContainer = host.createDiv();
+		tableContainer.setCssStyles({ overflow: "auto", border: "1px solid var(--background-modifier-border)", borderRadius: "4px" });
+
+		const table = tableContainer.createEl("table");
+		table.setCssStyles({ width: "100%", borderCollapse: "collapse", fontSize: "11px", textAlign: "left" });
+
+		const thead = table.createEl("thead");
+		thead.setCssStyles({ position: "sticky", top: "0", background: "var(--background-secondary)", zIndex: "1" });
+		
+		const trHead = thead.createEl("tr");
+		["Name", "Tags", "Status", "Path"].forEach(col => {
+			const th = trHead.createEl("th", { text: col });
+			th.setCssStyles({ padding: "6px", borderBottom: "1px solid var(--background-modifier-border)", color: "var(--text-muted)" });
+		});
+
+		const tbody = table.createEl("tbody");
+		
+		// Render up to 500 nodes to prevent massive UI freezing
+		const limit = Math.min(nodes.length, 500);
+		for (let i = 0; i < limit; i++) {
+			const n = nodes[i];
+			const tr = tbody.createEl("tr");
+			tr.setCssStyles({ borderBottom: "1px solid var(--background-modifier-border-hover)" });
+
+			// Name
+			const tdName = tr.createEl("td");
+			tdName.setCssStyles({ padding: "6px" });
+			const a = tdName.createEl("a", { text: n.label });
+			a.setCssStyles({ cursor: "pointer", color: "var(--text-accent)", textDecoration: "none" });
+			a.addEventListener("click", () => {
+				const dest = this.app.metadataCache.getFirstLinkpathDest(n.id, "");
+				if (dest) this.app.workspace.getLeaf(false).openFile(dest);
+			});
+
+			// Tags
+			const tdTags = tr.createEl("td");
+			tdTags.setCssStyles({ padding: "6px", color: "var(--text-muted)", maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
+			const tags = n.tags ?? [];
+			tdTags.title = tags.join(", ");
+			tdTags.textContent = tags.join(", ");
+
+			// Status
+			const tdStatus = tr.createEl("td");
+			tdStatus.setCssStyles({ padding: "6px" });
+			
+			let statusStr = "";
+			if (n.frontmatter && n.frontmatter["status"]) {
+				statusStr = n.frontmatter["status"].join(", ");
+			}
+			if (statusStr) {
+				tdStatus.createSpan({ text: statusStr }).setCssStyles({
+					background: "var(--background-modifier-border)",
+					padding: "2px 4px",
+					borderRadius: "3px",
+					fontSize: "9px"
+				});
+			}
+
+			// Path
+			const tdPath = tr.createEl("td", { text: n.path || n.id });
+			tdPath.setCssStyles({ padding: "6px", color: "var(--text-muted)", maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
+		}
+
+		if (nodes.length > limit) {
+			const trTail = tbody.createEl("tr");
+			const tdTail = trTail.createEl("td", { text: `... and ${nodes.length - limit} more nodes` });
+			tdTail.setAttr("colspan", "4");
+			tdTail.setCssStyles({ padding: "8px", textAlign: "center", color: "var(--text-faint)", fontStyle: "italic" });
+		}
 	}
 }
 
