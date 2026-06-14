@@ -387,6 +387,22 @@ export function renderViewModeSection(parent: HTMLElement, deps: GenericSectionD
 		expGroup.setCssStyles({ display: open ? "" : "none" });
 		caret.setText(open ? "▾ " : "▸ ");
 	});
+
+	// Drill-down target selector
+	const drillDownRow = section.createDiv({ cls: "gim-setting-row" });
+	drillDownRow.setCssStyles({ marginTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" });
+	const drillDownLabel = drillDownRow.createDiv({ text: "Drill-down target" });
+	drillDownLabel.setCssStyles({ fontSize: "12px", color: "var(--text-normal)" });
+	const drillDownSel = drillDownRow.createEl("select");
+	drillDownSel.setCssStyles({ fontSize: "12px", padding: "2px 4px", borderRadius: "4px" });
+	for (const opt of closeup) {
+		const option = drillDownSel.createEl("option", { text: opt.label, value: opt.id });
+		if (deps.settings.closeupMode === opt.id) option.selected = true;
+	}
+	drillDownSel.addEventListener("change", () => {
+		deps.settings.closeupMode = drillDownSel.value as any;
+		deps.save();
+	});
 }
 
 export function renderBipartiteSection(parent: HTMLElement, deps: GenericSectionDeps): void {

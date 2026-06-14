@@ -30,6 +30,7 @@ export function buildGraph(
 	filterMode: "sql" | "dvjs" = "sql",
 	dvjsFilter: string = "",
 	statusField: string = "",
+	drillDownNodeIds?: string[],
 ): { result: BuildResult; errors: BuildErrors } {
 	const errors: BuildErrors = {};
 	let whereAst: QueryAst | null = null;
@@ -111,7 +112,11 @@ export function buildGraph(
 		}
 	}
 
+	const drillDownSet = drillDownNodeIds ? new Set(drillDownNodeIds) : null;
+
 	for (const f of files) {
+		if (drillDownSet && !drillDownSet.has(f.path)) continue;
+
 		const cache = app.metadataCache.getFileCache(f);
 		const facts = makeFacts(f, cache, tagProperties);
 

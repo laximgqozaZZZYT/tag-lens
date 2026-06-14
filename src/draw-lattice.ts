@@ -595,12 +595,8 @@ function drawHeader(
 		ctx.stroke();
 	}
 
-	// LOD: skip the tag rows when their RENDERED screen size would dip
-	// below ~9 px. The header band + count + colour still convey identity.
-	if (titleScreenPx < HEADER_MIN_SCREEN_PX) {
-		ctx.restore();
-		return;
-	}
+	// LOD: We no longer skip tag rows. The minFont floor guarantees they remain
+	// visible at the configured minimum screen size, even when heavily zoomed out.
 
 	// Tag rows — one display line per LatticeNodeMeta.displayLines entry.
 	// Layout sized the node to fit each line PLUS the checkbox column, so

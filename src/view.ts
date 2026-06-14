@@ -395,6 +395,8 @@ export class MiniGraphView extends ItemView {
 	// Bipartite mode: id of the SET node whose neighbours are PINNED-
 	// highlighted by a click (persists across hover). null = none.
 	private pinnedSet: string | null = null;
+	// Floating badge shown when Drill-down is active.
+	private drillDownBadge: HTMLElement | null = null;
 	// Lattice mode: selected / hovered node key (signature key) for highlight
 	// and the floating note-list overlay. Cleared when the selected key no
 	// longer exists after a relayout (clearStaleSelection).
@@ -1142,10 +1144,12 @@ export class MiniGraphView extends ItemView {
 		// builder. Errors from the query parsers are surfaced into panel
 		// state so the user sees them inline.
 		const { effGroupBy, effWhere, filterMode, dvjsFilter } = resolveEffectiveQuery(this.settings);
-		const { result, errors } = buildGraph(this.app, effWhere, effGroupBy, filterMode, dvjsFilter, this.settings.statusField);
+		const { result, errors } = buildGraph(this.app, effWhere, effGroupBy, filterMode, dvjsFilter, this.settings.statusField, this.settings.drillDownNodeIds);
 		this.whereError = errors.where ?? "";
 		this.groupByError = errors.groupBy ?? "";
 		let { data, clusterLabels } = result;
+
+		this.updateDrillDownBadge();
 
 		// ── Early-out: skip the (expensive) relayout/redraw/menu-rebuild when the
 		// graph INPUTS are byte-for-byte identical to the last build. buildGraph
@@ -4095,9 +4099,7 @@ export class MiniGraphView extends ItemView {
 	}
 
 
-	// Heatmap cell click → a floating overlay listing the notes shared by the
-	// tag pair (or, on the diagonal, all notes of the tag). Each row opens the
-	// file. Reuses openFile; styled inline so it works without extra CSS.
+	// Heatmap cell click → Drill-down into the shared notes (or all notes on diagonal).
 	private openHeatmapDetail(i: number, j: number, sx: number, sy: number): void {
 		const h = this.laid.heatmap;
 		if (!h) return;
@@ -4110,12 +4112,8 @@ export class MiniGraphView extends ItemView {
 			ids = a.filter((id) => setB.has(id));
 		}
 		ids = [...new Set(ids)];
-		const ti = h.tags[i].label;
-		const tj = h.tags[j].label;
-		const title = i === j ? `${ti} (${ids.length})` : `${ti} × ${tj} (${ids.length})`;
-		this.showNodeListOverlay(title, ids, sx, sy, () => {
-			this.heatmapSelected = null;
-		});
+		this.heatmapSelected = null;
+		this.drillDown(ids);
 	}
 
 	private openStreamDetail(r: number, c: number, sx: number, sy: number): void {
@@ -4123,30 +4121,82 @@ export class MiniGraphView extends ItemView {
 		if (!s) return;
 		const cell = s.matrix.find(m => m.r === r && m.c === c);
 		if (!cell || cell.nodeIds.length === 0) return;
-		const title = `${s.rows[r]} × ${s.cols[c]} (${cell.count})`;
-		this.showNodeListOverlay(title, cell.nodeIds, sx, sy, () => {
-			this.requestDraw();
-		});
+		this.drillDown(cell.nodeIds);
 	}
 
-	// Lattice node click (header / overview / density / Other) → same overlay
-	// as heatmap: a floating list of every note in that exact intersection.
-	// `node.nodeIds` is the precomputed sorted list (see lattice-layout step
-	// 4 for Other bundles), so we just pass through to the generic overlay.
+	// Lattice node click (header / overview / density / Other) → Drill-down
+	// to the notes in that exact intersection.
 	private openLatticeDetail(
 		node: import("./layout").LatticeNodeMeta,
 		sx: number,
 		sy: number,
 	): void {
-		const sigTitle = node.isOther
-			? `Other (×${node.signature.length || node.count})`
-			: node.displayTags.length
-				? node.displayTags.map((s) => `#${s}`).join(" * ")
-				: "(no tags)";
-		const title = `${sigTitle} (${node.nodeIds.length})`;
-		this.showNodeListOverlay(title, node.nodeIds, sx, sy, () => {
-			this.latticeSelectedKey = null;
-		});
+		this.latticeSelectedKey = null;
+		this.drillDown(node.nodeIds);
+	}
+
+	private drillDown(ids: string[]): void {
+		this.closeDetail();
+		this.settings.drillDownNodeIds = ids;
+		this.settings.viewMode = this.settings.closeupMode || "droste";
+		this.save();
+		this.rebuild();
+	}
+
+	public clearDrillDown(): void {
+		if (this.settings.drillDownNodeIds) {
+			this.settings.drillDownNodeIds = undefined;
+			this.save();
+			this.rebuild();
+		}
+	}
+
+	private updateDrillDownBadge(): void {
+		if (!this.settings.drillDownNodeIds) {
+			if (this.drillDownBadge) {
+				this.drillDownBadge.remove();
+				this.drillDownBadge = null;
+			}
+			return;
+		}
+
+		if (!this.drillDownBadge) {
+			const badge = this.root.createDiv();
+			badge.setCssStyles({
+				position: "absolute",
+				top: "16px",
+				left: "16px", // Top-left of the canvas (floating over graph)
+				background: "var(--background-secondary)",
+				border: "1px solid var(--interactive-accent)",
+				color: "var(--text-normal)",
+				padding: "6px 12px",
+				borderRadius: "16px",
+				font: "12px sans-serif",
+				boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+				zIndex: "40",
+				display: "flex",
+				alignItems: "center",
+				gap: "8px"
+			});
+			const text = badge.createSpan();
+			const close = badge.createSpan({ text: "×" });
+			close.setCssStyles({
+				cursor: "pointer",
+				color: "var(--text-muted)",
+				fontWeight: "bold",
+				fontSize: "14px"
+			});
+			close.addEventListener("click", () => this.clearDrillDown());
+			close.addEventListener("mouseenter", () => close.style.color = "var(--text-error)");
+			close.addEventListener("mouseleave", () => close.style.color = "var(--text-muted)");
+			
+			// Store elements on the badge for easy update
+			(badge as any)._textEl = text;
+			this.drillDownBadge = badge;
+		}
+
+		const count = this.settings.drillDownNodeIds.length;
+		(this.drillDownBadge as any)._textEl.setText(`Drill-down active: ${count} notes`);
 	}
 
 	// Generic floating note-list overlay. Used by both heatmap (tag×tag) and
