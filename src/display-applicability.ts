@@ -19,13 +19,7 @@ export type DisplayToggleKey =
 
 // Modes whose figure is built from world-space cards via drawBodyTile/drawCard:
 // every card toggle and per-card overlay applies.
-const CARD_MODES: ReadonlySet<ViewMode> = new Set<ViewMode>([
-	"euler",
-	"euler-true",
-	"euler-venn",
-	"bipartite",
-	"bubblesets",
-]);
+
 
 export function displayToggleApplies(mode: ViewMode, key: DisplayToggleKey): boolean {
 	return true;

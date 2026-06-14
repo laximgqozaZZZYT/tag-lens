@@ -37,8 +37,6 @@ export function drawCardGrid(
 	const channelW = laid.channelW;
 	const channelH = laid.channelH;
 	if (W <= 0 || H <= 0) return;
-	const padX = channelW / 2;
-	const padY = channelH / 2;
 
 	// Visible world rect: invert the (pan, zoom) screen transform.
 	// In CSS pixels: world.x = (screen_x − panX) / zoom.

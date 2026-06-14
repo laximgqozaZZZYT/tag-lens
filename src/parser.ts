@@ -162,7 +162,7 @@ export function buildGraph(
 
 		let fmStatus: string | undefined;
 		if (statusField) {
-			const raw = cache?.frontmatter?.[statusField];
+			const raw: unknown = cache?.frontmatter?.[statusField];
 			if (raw !== undefined && raw !== null) {
 				fmStatus = String(raw).trim().toLowerCase();
 			}
@@ -175,13 +175,14 @@ export function buildGraph(
 		const wordCount = Math.max(1, Math.floor(f.stat.size / 5)); // rough estimate
 		const linkCount = (cache?.links?.length ?? 0) + (cache?.frontmatterLinks?.length ?? 0);
 		const backlinkCount = backlinkCounts.get(f.path) || 0;
+		const fmTags: unknown = cache?.frontmatter?.tags;
 		const hasSourceTag = (cache?.tags ?? []).some(t => t.tag.toLowerCase().startsWith("#source/")) ||
-			(cache?.frontmatter?.tags && (
-				(Array.isArray(cache.frontmatter.tags) && cache.frontmatter.tags.some((t: string) => t.toLowerCase().startsWith("source/"))) ||
-				(typeof cache.frontmatter.tags === "string" && cache.frontmatter.tags.toLowerCase().startsWith("source/"))
+			(fmTags && (
+				(Array.isArray(fmTags) && fmTags.some((t: unknown) => typeof t === "string" && t.toLowerCase().startsWith("source/"))) ||
+				(typeof fmTags === "string" && fmTags.toLowerCase().startsWith("source/"))
 			));
 		const maturitySuggestion = suggestMaturity({ wordCount, linkCount, backlinkCount, ageDays, hasSourceTag: !!hasSourceTag });
-		const rawMaturity = cache?.frontmatter?.["maturity"];
+		const rawMaturity: unknown = cache?.frontmatter?.["maturity"];
 		const fmMaturity = effectiveMaturity(
 			typeof rawMaturity === "string" ? rawMaturity.trim().toLowerCase() : undefined,
 			maturitySuggestion,

@@ -42,18 +42,18 @@ export default class GraphIslandMiniPlugin extends Plugin {
 				callback: () => {
 					let v = this.firstView();
 					if (!v) {
-						this.activateView().then(() => {
+						void this.activateView().then(() => {
 							v = this.firstView();
 							if (v) {
 								applyLens(this.settings, preset);
 								v.updateSettings(this.settings);
-								this.saveSettings();
+								void this.saveSettings();
 							}
 						});
 					} else {
 						applyLens(this.settings, preset);
 						v.updateSettings(this.settings);
-						this.saveSettings();
+						void this.saveSettings();
 					}
 				},
 			});

@@ -189,18 +189,17 @@ export function axisLayout(nodes: EncNode[], ctx: EncContext, opts: AxisLayoutOp
 	const positions = new Map<string, { x: number; y: number }>();
 	const occupied = new Set<string>();
 
-	const maxColSpan = Math.max(1, Math.round(outWidth / opts.cell.w)) + 1;
-	const maxRowSpan = Math.max(1, Math.round(outHeight / opts.cell.h)) + 1;
-
 	const sortedCellKeys = [...byCell.keys()].sort();
 	for (const cellKey of sortedCellKeys) {
 		const group = byCell.get(cellKey)!;
 		
 		group.sort((a, b) => {
-			const wA = (a.node as any).width ?? opts.cell.w;
-			const hA = (a.node as any).height ?? opts.cell.h;
-			const wB = (b.node as any).width ?? opts.cell.w;
-			const hB = (b.node as any).height ?? opts.cell.h;
+			const nA = a.node as EncNode & { width?: number; height?: number };
+			const nB = b.node as EncNode & { width?: number; height?: number };
+			const wA = nA.width ?? opts.cell.w;
+			const hA = nA.height ?? opts.cell.h;
+			const wB = nB.width ?? opts.cell.w;
+			const hB = nB.height ?? opts.cell.h;
 			const areaA = wA * hA;
 			const areaB = wB * hB;
 			if (areaA !== areaB) return areaB - areaA;
@@ -215,9 +214,9 @@ export function axisLayout(nodes: EncNode[], ctx: EncContext, opts: AxisLayoutOp
 		let targetRow = Math.floor(anchorY / opts.cell.h);
 
 		for (const item of group) {
-			const n = item.node;
-			const nodeW = (n as any).width ?? opts.cell.w;
-			const nodeH = (n as any).height ?? opts.cell.h;
+			const n = item.node as EncNode & { width?: number; height?: number };
+			const nodeW = n.width ?? opts.cell.w;
+			const nodeH = n.height ?? opts.cell.h;
 			const colSpan = Math.max(1, Math.ceil(nodeW / opts.cell.w));
 			const rowSpan = Math.max(1, Math.ceil(nodeH / opts.cell.h));
 
@@ -236,7 +235,6 @@ export function axisLayout(nodes: EncNode[], ctx: EncContext, opts: AxisLayoutOp
 			let col = initCol;
 			let row = initRow;
 			if (isBlocked(col, row)) {
-				let found = false;
 				outer: for (let radius = 1; radius < 256; radius++) {
 					for (let dc = -radius; dc <= radius; dc++) {
 						for (let dr = -radius; dr <= radius; dr++) {
@@ -244,7 +242,6 @@ export function axisLayout(nodes: EncNode[], ctx: EncContext, opts: AxisLayoutOp
 							if (!isBlocked(initCol + dc, initRow + dr)) {
 								col = initCol + dc;
 								row = initRow + dr;
-								found = true;
 								break outer;
 							}
 						}

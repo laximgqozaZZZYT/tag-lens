@@ -77,7 +77,7 @@ const OVERVIEW_BAR_H = 12;
 // screen pixels, the renderer falls back to "count only" instead of
 // truncated tag rows (no bare "…" labels). Header band + colour stay so
 // nodes remain visually identifiable.
-const HEADER_MIN_SCREEN_PX = 9;
+
 // Screen-fixed left gutter that holds the tier labels. Drawn TOPMOST after
 // every world-space pass so nodes can pan freely beneath it (the gutter is
 // opaque — labels stay legible even when nodes scroll under it). Wide
@@ -548,7 +548,6 @@ function drawHeader(
 	// pitch, the rows become unreadable and we fall back to "count only"
 	// instead of a bare "…".
 	const titleFontWorld = floorWorldFontPx(TITLE_PX, minFont, z);
-	const titleScreenPx = titleFontWorld * z;
 	const countFontPx = floorWorldFontPx(COUNT_FONT_PX, minFont, z);
 
 	// Right-aligned count — always drawn (it's the smallest atom of identity

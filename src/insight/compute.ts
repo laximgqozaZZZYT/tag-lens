@@ -200,7 +200,6 @@ export function computeTagSuggestions(app: App): TagSuggestion[] {
 	const totalTagsCount = allCounts.length;
 	const medianCount = totalTagsCount > 0 ? allCounts[Math.floor(totalTagsCount * 0.5)] : 0;
 	const p90Count = totalTagsCount > 0 ? allCounts[Math.floor(totalTagsCount * 0.9)] : 0;
-	const p75Count = totalTagsCount > 0 ? allCounts[Math.floor(totalTagsCount * 0.75)] : 0;
 	const p25Count = totalTagsCount > 0 ? allCounts[Math.floor(totalTagsCount * 0.25)] : 0;
 
 	const getGolderSuggestion = (stat: TagStat): string => {

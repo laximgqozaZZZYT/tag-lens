@@ -144,7 +144,7 @@ export function renderInsightAlerts(host: HTMLElement, deps: InsightDeps, comput
 	for (const cond of triggered) {
 		if (cond.offenders) {
 			for (const o of cond.offenders) {
-				allCards.push({ label: cond.label, severity: cond.severity as any, summary: cond.summary, detail: cond.detail, advice: cond.advice, offender: o });
+				allCards.push({ label: cond.label, severity: cond.severity as "CRITICAL" | "WARNING" | "INFO", summary: cond.summary, detail: cond.detail, advice: cond.advice, offender: o });
 			}
 		}
 	}
@@ -414,7 +414,7 @@ export function renderInsightSuggest(host: HTMLElement, deps: InsightDeps): void
 		tagLink.addEventListener("click", () => {
 			const dest = deps.app.metadataCache.getFirstLinkpathDest(s.tag, "");
 			if (dest) {
-				deps.app.workspace.getLeaf(false).openFile(dest);
+				void deps.app.workspace.getLeaf(false).openFile(dest);
 			} else {
 				new Notice(`Tag page for #${s.tag} does not exist yet.`);
 			}
@@ -443,19 +443,22 @@ export function renderInsightSuggest(host: HTMLElement, deps: InsightDeps): void
 
 		const btnApply = actionsDiv.createEl("button", { text: "Apply Classification" });
 		btnApply.setCssStyles({ fontSize: "10px", padding: "2px 6px", cursor: "pointer" });
-		btnApply.addEventListener("click", async () => {
+		btnApply.addEventListener("click", () => {
 			const selectedType = selectEl.value;
-			await applyGolderClassification(deps.app, s.tag, selectedType);
-			renderInsightSuggest(host, deps); // refresh
+			applyGolderClassification(deps.app, s.tag, selectedType)
+				.then(() => renderInsightSuggest(host, deps))
+				.catch((e: Error) => new Notice(`Error: ${e.message}`));
 		});
 
 		const btnConvert = actionsDiv.createEl("button", { text: "Convert to Nested Tag" });
 		btnConvert.setCssStyles({ fontSize: "10px", padding: "2px 6px", cursor: "pointer" });
-		btnConvert.addEventListener("click", async () => {
+		btnConvert.addEventListener("click", () => {
+			// eslint-disable-next-line no-alert -- Simple prompt needed for nested tag conversion path
 			const parent = window.prompt(`Convert #${s.tag} to a nested tag. Enter parent path (e.g. "Programming"):`);
 			if (parent) {
-				await convertToNestedTag(deps.app, s.tag, parent.trim());
-				renderInsightSuggest(host, deps); // refresh
+				convertToNestedTag(deps.app, s.tag, parent.trim())
+					.then(() => renderInsightSuggest(host, deps))
+					.catch((e: Error) => new Notice(`Error: ${e.message}`));
 			}
 		});
 	}

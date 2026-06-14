@@ -31,7 +31,7 @@ export function layoutStream(data: GraphData, opts: StreamLayoutOptions): Stream
 		
 		let binLabel = "";
 		if (binning === "month" || binning === "week") {
-			const ts = typeof rawKey === "number" ? rawKey : parseFloat(rawKey as string);
+			const ts = typeof rawKey === "number" ? rawKey : parseFloat(rawKey);
 			if (!isNaN(ts) && ts > 0) {
 				const d = new Date(ts);
 				if (binning === "month") {

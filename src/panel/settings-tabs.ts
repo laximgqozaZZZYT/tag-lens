@@ -358,7 +358,7 @@ export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): v
 		row.createSpan({ text: "or FM:" });
 		const fmIn = row.createEl("input", { type: "text", cls: "gim-text-input" });
 		fmIn.setCssStyles({ width: "100px" });
-		fmIn.value = curIsFm ? cur!.fieldId.slice("frontmatter:".length) : "";
+		fmIn.value = curIsFm ? cur?.fieldId.slice("frontmatter:".length) ?? "" : "";
 
 		row.createSpan({ text: "Scale:" });
 		const scSel = row.createEl("select");

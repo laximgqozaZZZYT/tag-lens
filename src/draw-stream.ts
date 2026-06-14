@@ -1,5 +1,4 @@
 import type { LaidOut } from "./layout";
-import { colorAlpha } from "./theme";
 import { clusterHue } from "./canvas-utils";
 import type { StreamData } from "./stream-layout";
 

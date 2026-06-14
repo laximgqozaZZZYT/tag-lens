@@ -1,12 +1,9 @@
-import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon, Notice, Modal, Menu, App, MarkdownView } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon, Notice, Menu, MarkdownView } from "obsidian";
 import { exportFileName, exportCanvasDims } from "./image-export";
-import { effectiveClassification } from "./tag-classification";
-import { displayToggleApplies } from "./display-applicability";
 import { renderInsightTab } from "./insight/render";
 import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
 import { effectiveEncoding } from "./encoding/migrate";
-import { fieldSourceRegistry } from "./encoding/field-sources";
-import type { EncContext, EncNode, NodeDrawParams, EncodingBinding, ScaleType } from "./encoding/types";
+import type { EncContext, EncNode, NodeDrawParams, EncodingBinding } from "./encoding/types";
 import { axisLayout, type AxisSpec, type AxisBand, type AxisTick } from "./axis-layout";
 import { assignGalleryAxes } from "./droste-axis";
 import { LaneRegistry, routeZ } from "./edge-routing";
@@ -20,11 +17,6 @@ import {
 	type ClusterRect,
 } from "./layout";
 import type { MiniSettings, GraphNode, GraphData, ViewMode } from "./types";
-import {
-	VIEW_MODES,
-	MATRIX_ORDER_CRITERIA,
-	HEATMAP_ORDER_CRITERIA,
-} from "./types";
 import { CARD_CELL_W, CARD_CELL_H } from "./types";
 import { type LimitRule, applyLimitRules } from "./limit";
 import { filterMemberships, filterLabels } from "./query-filters";
@@ -104,7 +96,6 @@ import {
 	renderToggleSection as renderToggleSectionFn,
 	renderOrderBySection as renderOrderBySectionFn,
 	toggleArrayMember as toggleArrayMemberFn,
-	renderPresetSection as renderPresetSectionFn,
 } from "./panel-sections";
 import {
 	renderMinFontSection as renderMinFontSectionFn,
@@ -122,19 +113,10 @@ import {
 } from "./panel/settings-sections";
 import {
 	renderSettingsViewTab,
-	renderSettingsFilterTab,
-	renderSettingsSortTab,
 	renderSettingsDisplayTab,
 	renderSettingsEncodeTab,
 	renderFilterBodyTab,
 } from "./panel/settings-tabs";
-import {
-	applyLens,
-	upsertPreset,
-	removePreset,
-	captureLens,
-} from "./lens-presets";
-import { staleClusters } from "./freshness";
 import { findGaps, type TagGap } from "./gap-finder";
 import { findBridges, type BridgeCandidate } from "./bridge-finder";
 import {
@@ -584,14 +566,14 @@ export class MiniGraphView extends ItemView {
 			window.clearTimeout(this.activeFileDebounceTimer);
 		}
 		
-		this.activeFileDebounceTimer = window.setTimeout(async () => {
-			await this.updateViewContextToElement(file.path);
+		this.activeFileDebounceTimer = window.setTimeout(() => {
+			void this.updateViewContextToElement(file.path);
 		}, 1200);
 	}
 
 	private async updateViewContextToElement(activePath: string) {
 		// メモリ上のグラフデータ（キャッシュ）の存在チェック。存在しない場合は処理をスキップ
-		const currentGraphData: GraphData = this.drosteData as any; 
+		const currentGraphData: GraphData | null = this.drosteData; 
 		if (!currentGraphData || !currentGraphData.nodes) return;
 
 		const activeFile = this.app.vault.getAbstractFileByPath(activePath);
@@ -831,11 +813,17 @@ export class MiniGraphView extends ItemView {
 			havingError: this.havingError,
 			limitError: this.limitError,
 			syncLensCommands: (presets) => {
-				if (this.app) {
-					const plugin = (this.app as any).plugins.plugins["tag-lens"];
-					if (plugin && plugin.syncLensCommands) {
-						plugin.syncLensCommands(presets);
-					}
+				interface AppWithPlugins {
+					plugins: {
+						plugins: {
+							"tag-lens"?: { syncLensCommands?: (p: typeof presets) => void };
+						};
+					};
+				}
+				const appExt = this.app as unknown as AppWithPlugins;
+				const plugin = appExt.plugins?.plugins?.["tag-lens"];
+				if (plugin && plugin.syncLensCommands) {
+					plugin.syncLensCommands(presets);
 				}
 			}
 		});
@@ -4196,20 +4184,20 @@ export class MiniGraphView extends ItemView {
 		this.settings.focusNodeIds = Array.isArray(ids) ? [...ids] : [];
 		this.settings.perspective = "closeup";
 		this.settings.viewMode = this.settings.closeupMode || "droste";
-		this.save();
+		void this.save();
 		this.updatePanoramaActionVisibility();
-		this.rebuild();
+		void this.rebuild();
 	}
 
 	public switchToPanorama(): void {
 		this.settings.focusNodeIds = undefined;
 		delete this.settings.focusNodeIds;
-		delete (this.settings as any).drillDownNodeIds; // Cleanup legacy state if any
+		delete (this.settings as unknown as Record<string, unknown>).drillDownNodeIds; // Cleanup legacy state if any
 		this.settings.perspective = "panorama";
 		this.settings.viewMode = this.settings.panoramaMode || "heatmap";
-		this.save();
+		void this.save();
 		this.updatePanoramaActionVisibility();
-		this.rebuild();
+		void this.rebuild();
 	}
 
 	private updatePanoramaActionVisibility(): void {
@@ -4814,13 +4802,16 @@ export class MiniGraphView extends ItemView {
 					menu.addItem((item) => {
 						item.setTitle("Set maturity");
 						item.setIcon("pencil");
-						const subMenu = (item as any).setSubmenu() as Menu;
+						interface MenuItemWithSubmenu { setSubmenu: () => Menu; }
+						const subMenu = (item as unknown as MenuItemWithSubmenu).setSubmenu();
 						for (const maturity of ["fleeting", "literature", "permanent"]) {
 							subMenu.addItem((subItem) => {
 								subItem.setTitle(maturity);
 								subItem.onClick(async () => {
-									await this.app.fileManager.processFrontMatter(file, (fm) => {
-										fm.maturity = maturity;
+									await this.app.fileManager.processFrontMatter(file, (fm: unknown) => {
+										if (typeof fm === "object" && fm !== null) {
+											(fm as Record<string, unknown>).maturity = maturity;
+										}
 									});
 									new Notice(`Set maturity '${maturity}' on ${file.basename}`);
 								});
@@ -5124,7 +5115,7 @@ export class MiniGraphView extends ItemView {
 			a.setCssStyles({ cursor: "pointer", color: "var(--text-accent)", textDecoration: "none" });
 			a.addEventListener("click", () => {
 				const dest = this.app.metadataCache.getFirstLinkpathDest(n.id, "");
-				if (dest) this.app.workspace.getLeaf(false).openFile(dest);
+				if (dest) void this.app.workspace.getLeaf(false).openFile(dest);
 			});
 
 			// Tags
