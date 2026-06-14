@@ -473,9 +473,9 @@ class PromptModal extends Modal {
 		const { contentEl } = this;
 		contentEl.createEl("h4", { text: this.message });
 		const input = contentEl.createEl("input", { type: "text" });
-		input.style.width = "100%";
+		input.setCssStyles({ width: "100%" });
 		const submitBtn = contentEl.createEl("button", { text: "Submit" });
-		submitBtn.style.marginTop = "10px";
+		submitBtn.setCssStyles({ marginTop: "10px" });
 		const finish = (val: string | null) => {
 			if (!this.submitted) {
 				this.submitted = true;

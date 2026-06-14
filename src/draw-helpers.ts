@@ -34,8 +34,6 @@ export function drawCardGrid(
 ): void {
 	const W = laid.slotW;
 	const H = laid.slotH;
-	const channelW = laid.channelW;
-	const channelH = laid.channelH;
 	if (W <= 0 || H <= 0) return;
 
 	// Visible world rect: invert the (pan, zoom) screen transform.
