@@ -58,6 +58,7 @@ import {
 import { drawMatrix, matrixGeom, MATRIX_BADGE_W } from "./draw-matrix";
 import type { MatrixLine } from "./draw-matrix";
 import { drawHeatmap, heatmapGeom } from "./draw-heatmap";
+import { clampSpreadsheetPan } from "./spreadsheet-pan";
 import { drawDroste } from "./draw-droste";
 import { layoutStream } from "./stream-layout";
 import { drawStream, streamGeom } from "./draw-stream";
@@ -1129,7 +1130,18 @@ export class MiniGraphView extends ItemView {
 		// builder. Errors from the query parsers are surfaced into panel
 		// state so the user sees them inline.
 		const { effGroupBy, effWhere, filterMode, dvjsFilter } = resolveEffectiveQuery(this.settings);
-		const { result, errors } = buildGraph(this.app, effWhere, effGroupBy, filterMode, dvjsFilter, this.settings.statusField, this.settings.focusNodeIds, this.settings.expandNeighborhood);
+		const { result, errors } = buildGraph(
+			this.app,
+			effWhere,
+			effGroupBy,
+			filterMode,
+			dvjsFilter,
+			this.settings.statusField,
+			this.settings.focusNodeIds,
+			// Prevent recursive expansion in closeup view. The focused nodes
+			// already include the relevant neighborhood from the panorama state.
+			this.settings.focusNodeIds ? false : this.settings.expandNeighborhood
+		);
 		this.whereError = errors.where ?? "";
 		this.groupByError = errors.groupBy ?? "";
 		let { data, clusterLabels } = result;
@@ -2251,31 +2263,36 @@ export class MiniGraphView extends ItemView {
 	// left edge of column A) at screen x = headerW. That gives the upper-
 	// bound constraint panX ≤ headerW − minCol*W*zoom. Same logic for Y.
 	private clampPan(): void {
-		const panelW = this.pinnedMenuWidth();
-		const visW = Math.max(1, this.canvas.clientWidth - panelW);
+		// Connection matrix / heatmap: these screen-space frozen-pane grids are
+		// drawn AND hit-tested across the FULL canvas width (drawMatrix/drawHeatmap
+		// use canvas.width/dpr; matrixColAt/heatmapCellAt use canvas.clientWidth) —
+		// the pinned note menu is an overlay, it does not narrow the canvas. So the
+		// clamp must compute geometry with the same full clientWidth, NOT
+		// clientWidth-panelW; otherwise the panel-narrowed width yields a smaller
+		// labelBand and clamps panX to the left of the drawn label band, hiding the
+		// first column(s) and shifting every click off by ≥1 cell (clicking the
+		// apparent "battle" diagonal lands on a different tag's cell).
+		const fullW = Math.max(1, this.canvas.clientWidth);
+		const fullH = this.canvas.clientHeight;
 
-		// Connection matrix: spreadsheet scroll — never reveal empty space
-		// before row/col 0 or past the last row/col.
 		if (this.laid.matrix) {
 			const m = this.laid.matrix;
-			const g = matrixGeom(m, this.zoom, visW);
+			const g = matrixGeom(m, this.zoom, fullW);
 			const colsW = m.cols.length * g.colScreenW;
 			const rowsH = this.matrixLines.length * g.rowScreenH; // floored pitch
-			const minPanX = Math.min(g.labelBand, visW - colsW);
-			this.panX = Math.min(g.labelBand, Math.max(minPanX, this.panX));
-			const minPanY = Math.min(g.headerH, this.canvas.clientHeight - rowsH);
-			this.panY = Math.min(g.headerH, Math.max(minPanY, this.panY));
+			const c = clampSpreadsheetPan(this.panX, this.panY, g.labelBand, g.headerH, colsW, rowsH, fullW, fullH);
+			this.panX = c.panX;
+			this.panY = c.panY;
 			return;
 		}
 		if (this.laid.heatmap) {
 			// Spreadsheet scroll over the square grid.
 			const h = this.laid.heatmap;
-			const g = heatmapGeom(h, this.zoom, visW);
+			const g = heatmapGeom(h, this.zoom, fullW);
 			const grid = h.n * g.cellPx;
-			const minPanX = Math.min(g.labelBand, visW - grid);
-			this.panX = Math.min(g.labelBand, Math.max(minPanX, this.panX));
-			const minPanY = Math.min(g.headerH, this.canvas.clientHeight - grid);
-			this.panY = Math.min(g.headerH, Math.max(minPanY, this.panY));
+			const c = clampSpreadsheetPan(this.panX, this.panY, g.labelBand, g.headerH, grid, grid, fullW, fullH);
+			this.panX = c.panX;
+			this.panY = c.panY;
 			return;
 		}
 		// Euler mode: free pan in all directions (world-map tiling

@@ -24,5 +24,6 @@ import "./encoding-evaluate.test";
 import "./encoding-migrate.test";
 import "./axis-layout.test";
 import "./droste-axis.test";
+import "./spreadsheet-pan.test";
 
 summary();
