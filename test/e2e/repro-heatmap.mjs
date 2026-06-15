@@ -1,9 +1,10 @@
+import { VAULT } from "../config.mjs";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 
-const DIR = "/tmp/obs-e2e-heatmap2";
+const DIR = "/tmp/obs-e2e-heatmap3";
 const obs = spawn("obsidian", [
-  "/home/ubuntu/obsidian-plugins/開発",
+  VAULT,
   "--user-data-dir=" + DIR,
   "--remote-debugging-port=9232"
 ], { detached: true, stdio: "ignore" });
@@ -51,15 +52,36 @@ const driver = `(async () => {
   let errors = [];
   
   for (let i = 0; i < h.n; i++) {
-    for (let j = 0; j < h.n; j++) {
+    for (let j = i; j < h.n; j++) {
       const expectedCount = h.counts[i * h.n + j];
+      if (expectedCount === 0) continue;
+      
       const nodeIdsI = h.nodeIds[i] || [];
       const nodeIdsJ = h.nodeIds[j] || [];
       const setB = new Set(nodeIdsJ);
       const ids = [...new Set(nodeIdsI.filter(id => setB.has(id)))];
       
-      if (ids.length !== expectedCount) {
-        errors.push(\`[\${i},\${j}] expected \${expectedCount}, intersection=\${ids.length}, Tag1=\${h.tags[i].label}, Tag2=\${h.tags[j].label}\`);
+      // Let's verify that EVERY node in ids ACTUALLY has BOTH tags in its actual file cache!
+      for (const id of ids) {
+         const file = window.app.vault.getAbstractFileByPath(id);
+         if (!file) {
+            errors.push(\`File not found: \${id}\`);
+            continue;
+         }
+         const cache = window.app.metadataCache.getFileCache(file);
+         // Get all tags
+         const tags = (cache?.tags || []).map(t => t.tag.toLowerCase());
+         if (cache?.frontmatter?.tags) {
+            const fmt = cache.frontmatter.tags;
+            if (Array.isArray(fmt)) tags.push(...fmt.map(t => "#" + String(t).toLowerCase()));
+            else if (typeof fmt === "string") tags.push(...fmt.split(",").map(t => "#" + t.trim().toLowerCase()));
+         }
+         
+         const hasTag1 = tags.some(t => t === h.tags[i].key.toLowerCase());
+         const hasTag2 = tags.some(t => t === h.tags[j].key.toLowerCase());
+         if (!hasTag1 || !hasTag2) {
+            errors.push(\`Node \${id} does not have both tags! Tag1=\${h.tags[i].key}(\${hasTag1}), Tag2=\${h.tags[j].key}(\${hasTag2})\`);
+         }
       }
     }
   }

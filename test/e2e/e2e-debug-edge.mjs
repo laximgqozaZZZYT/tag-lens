@@ -1,9 +1,10 @@
+import { VAULT } from "../config.mjs";
 import { spawn } from "child_process";
 const CDP = "http://127.0.0.1:9224";
 
 async function run() {
   const obs = spawn("obsidian", [
-    "/home/ubuntu/obsidian-plugins/開発",
+    VAULT,
     "--user-data-dir=/tmp/obs-e2e-axis",
     "--remote-debugging-port=9224"
   ], { detached: true, stdio: "ignore" });
@@ -49,10 +50,13 @@ async function run() {
     const nodes = view.laid.nodes;
     if (edges.length === 0) return "no edges";
     const e = edges[0];
-    const targetNode = nodes.find(n => n.id === e.target);
+    const sourceNode = nodes.find(n => n.id === e.source);
+    if (!sourceNode) return "no source node found for edge";
     return {
-      targetId: e.target,
-      targetNodeExists: !!targetNode,
+      sourceId: e.source,
+      edgePath0: e.path[0],
+      sourceNodeXY: { x: sourceNode.x, y: sourceNode.y },
+      edgePathLength: e.path.length
     };
   })()`;
 

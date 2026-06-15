@@ -1,12 +1,13 @@
+import { VAULT } from "../config.mjs";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 
 const DIR = "/tmp/obs-e2e-heatmap";
 if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
-fs.writeFileSync(`${DIR}/obsidian.json`, JSON.stringify({"vaults":{"dev":{"path":"/home/ubuntu/obsidian-plugins/開発","ts":1718270000000,"open":true}}}));
+fs.writeFileSync(`${DIR}/obsidian.json`, JSON.stringify({"vaults":{"dev":{"path":VAULT,"ts":1718270000000,"open":true}}}));
 
 const obs = spawn("obsidian", [
-  "/home/ubuntu/obsidian-plugins/開発",
+  VAULT,
   "--user-data-dir=" + DIR,
   "--remote-debugging-port=9231"
 ], { detached: true, stdio: "ignore" });

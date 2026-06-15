@@ -1,9 +1,10 @@
+import { VAULT } from "../config.mjs";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 
-const DIR = "/tmp/obs-e2e-heatmap6";
+const DIR = "/tmp/obs-e2e-heatmap2";
 const obs = spawn("obsidian", [
-  "/home/ubuntu/obsidian-plugins/開発",
+  VAULT,
   "--user-data-dir=" + DIR,
   "--remote-debugging-port=9232"
 ], { detached: true, stdio: "ignore" });
@@ -37,12 +38,6 @@ await req("Runtime.enable");
 
 const driver = `(async () => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
-  
-  for (let i=0; i<40; i++) {
-    if (window.app && window.app.plugins && window.app.plugins.plugins["tag-lens"]) break;
-    await sleep(250);
-  }
-
   let plugin = window.app.plugins.plugins["tag-lens"];
   if (!plugin) return { err: "no plugin" };
   await plugin.activateView(); await sleep(500);
@@ -50,47 +45,26 @@ const driver = `(async () => {
 
   view.settings.viewMode = "heatmap";
   view.settings.heatmapCriterion = "co-occurrence";
-  view.settings.expandNeighborhood = false;
   await view.rebuild();
   await sleep(200);
 
   const h = view.laid.heatmap;
-  let log = [];
+  let errors = [];
   
-  let targetI = -1;
-  let targetJ = -1;
   for (let i = 0; i < h.n; i++) {
     for (let j = 0; j < h.n; j++) {
-       if (h.tags[i].key.includes("battle") && h.tags[j].key.includes("battle")) {
-          targetI = i;
-          targetJ = j;
-          break;
-       }
+      const expectedCount = h.counts[i * h.n + j];
+      const nodeIdsI = h.nodeIds[i] || [];
+      const nodeIdsJ = h.nodeIds[j] || [];
+      const setB = new Set(nodeIdsJ);
+      const ids = [...new Set(nodeIdsI.filter(id => setB.has(id)))];
+      
+      if (ids.length !== expectedCount) {
+        errors.push(\`[\${i},\${j}] expected \${expectedCount}, intersection=\${ids.length}, Tag1=\${h.tags[i].label}, Tag2=\${h.tags[j].label}\`);
+      }
     }
   }
-  
-  if (targetI === -1) {
-     return { err: "battle tag not found" };
-  }
-
-  const expectedCount = h.counts[targetI * h.n + targetJ];
-  log.push(\`Found battle*battle at [\${targetI},\${targetJ}]. Count = \${expectedCount}\`);
-  
-  // Click it
-  view.openHeatmapDetail(targetI, targetJ, 0, 0);
-  await sleep(1000); // wait for rebuild
-  
-  log.push(\`FocusNodeIds length: \${view.settings.focusNodeIds.length}\`);
-  log.push(\`Resulting viewMode: \${view.settings.viewMode}\`);
-  
-  const nodes = view.laid.nodes;
-  log.push(\`Laid out nodes count: \${nodes.length}\`);
-  
-  for (const n of nodes) {
-     log.push(\`Node: \${n.label} (tags: \${n.memberships.join(",")})\`);
-  }
-  
-  return log;
+  return errors;
 })()`;
 
 const res = await req("Runtime.evaluate", { expression: driver, awaitPromise: true, returnByValue: true });

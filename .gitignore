@@ -16,7 +16,11 @@ docs/*
 !docs/superpowers/
 !docs/[0-9]*/
 
-# Droste stage verification artifacts
+# Disposable debug/experiment scripts. Put one-off scratch here so the test/ root
+# stays clean; reusable CDP E2E harnesses live in test/e2e/ and ARE tracked.
+test/scratch/
+
+# Image artifacts written to the repo root by scratch render/preview scripts.
 stage1-mesh.svg
 stage1-mesh.png
 mvexact.png
@@ -26,9 +30,7 @@ mvobl.png
 tex-verify.png
 logGrid-full.png
 stage1-plugin.png
-test/render-mv*.mjs
-test/verifytex.mjs
-test/verify-plugin.mjs
+stage1-plugin.svg
 soft-test.png
 soft-full.png
 fwd-grid.png
@@ -44,56 +46,29 @@ fwd-conformal.png
 fwd-conformal.svg
 fwd-conf2.png
 fwd-conf2.svg
-stage1-plugin.svg
-test/fwd-conf*.mjs
-test/angle-check.mjs
-test/verify-stage1.mjs
 preview5.png
 preview5.svg
-test/preview5.mjs
 preview5b.png
 preview5b.svg
-test/preview5b.mjs
 preview-nest2.png
 preview-nest2.svg
 preview-nest5.png
 preview-nest5.svg
-test/preview-nest.mjs
 preview-chain.png
 preview-chain.svg
-test/preview-chain.mjs
 preview-zoom0.png
 preview-zoom0.svg
 preview-zoom05.png
 preview-zoom05.svg
-test/preview-zoom.mjs
-test/seq-report.mjs
-test/preview-lens.mjs
 lens-*.png
 lens-*.svg
 gallery-*.png
-test/bake-own-tile.mjs
-test/bake-vec.mjs
-test/fwd-grid.mjs
-test/gen-own-tile.mjs
-test/gen-tile-exp.mjs
-test/layout-check.mjs
-test/test-cheby.mjs
-test/test-mip.mjs
-test/test-power.mjs
-test/test-scallop.mjs
-test/test-soft-full.mjs
-test/test-soft.mjs
-test/test_overflow_detail.mjs
-test/preview-hive.mjs
 hive-*.png
 
 # Playwright MCP browser snapshot artifacts
 .playwright-mcp/
 
-# Scratch / debug artifacts left by E2E + UI tooling (Kaizen cleanup)
+# Misc scratch artifacts left by E2E + UI tooling (Kaizen cleanup)
 ui-tester-log.txt
-test/ui-tester.mjs
-test/gallery.html
 capture-toggles.js
 update_dev_vault.py

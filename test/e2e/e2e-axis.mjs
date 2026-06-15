@@ -1,3 +1,4 @@
+import { VAULT } from "../config.mjs";
 import { spawn } from "child_process";
 import fs from "fs";
 
@@ -5,7 +6,7 @@ const CDP = "http://127.0.0.1:9224";
 
 async function run() {
   const obs = spawn("obsidian", [
-    "/home/ubuntu/obsidian-plugins/開発",
+    VAULT,
     "--user-data-dir=/tmp/obs-e2e-axis",
     "--remote-debugging-port=9224"
   ], { detached: true, stdio: "ignore" });

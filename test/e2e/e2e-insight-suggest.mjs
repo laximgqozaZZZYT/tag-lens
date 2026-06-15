@@ -1,8 +1,9 @@
+import { VAULT } from "../config.mjs";
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const VAULT_DIR = "/home/ubuntu/obsidian-plugins/開発";
+const VAULT_DIR = VAULT;
 const CDP_URL = "http://127.0.0.1:9224";
 
 // Cleanup function to remove any artifact files from previous test runs

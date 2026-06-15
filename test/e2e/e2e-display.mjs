@@ -1,7 +1,8 @@
+import { VAULT } from "../config.mjs";
 import { spawn } from "node:child_process";
 
 const obs = spawn("obsidian", [
-  "/home/ubuntu/obsidian-plugins/開発",
+  VAULT,
   "--user-data-dir=/tmp/obs-e2e-display",
   "--remote-debugging-port=9223"
 ], { detached: true, stdio: "ignore" });

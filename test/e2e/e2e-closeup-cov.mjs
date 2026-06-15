@@ -1,13 +1,23 @@
+import { VAULT } from "../config.mjs";
 import { spawn } from "node:child_process";
+import fs from "node:fs";
+
+// Copy the working configuration from obs-e2e-display
+const SRC = "/tmp/obs-e2e-display";
+const DIR = "/tmp/obs-e2e-closeup-cov";
+if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
+if (fs.existsSync(SRC + "/obsidian.json")) {
+  fs.copyFileSync(SRC + "/obsidian.json", DIR + "/obsidian.json");
+}
 
 const obs = spawn("obsidian", [
-  "/home/ubuntu/obsidian-plugins/開発",
-  "--user-data-dir=/tmp/obs-e2e-closeup3",
-  "--remote-debugging-port=9230"
+  VAULT,
+  "--user-data-dir=" + DIR,
+  "--remote-debugging-port=9229"
 ], { detached: true, stdio: "ignore" });
 
 await new Promise(r => setTimeout(r, 4000));
-const CDP_URL = "http://127.0.0.1:9230";
+const CDP_URL = "http://127.0.0.1:9229";
 
 let list = null;
 for (let i = 0; i < 20; i++) {
@@ -41,6 +51,15 @@ const req = (method, params = {}) => new Promise((resolve) => {
 });
 
 await req("Runtime.enable");
+await req("Log.enable");
+
+const evs = [];
+ws.addEventListener("message", (msg) => {
+  const data = JSON.parse(msg.data);
+  if (data.method === "Runtime.exceptionThrown") {
+    evs.push("Exception: " + data.params.exceptionDetails.exception.description);
+  }
+});
 
 const driver = `(async () => {
   const out = { fatal: null, log: [], failed: false };
@@ -88,13 +107,13 @@ const driver = `(async () => {
       }
       
       view.switchToCloseup(nodeIds);
-      out.log.push("[" + m + "] switchToCloseup ok");
+      out.log.push(\`[\${m}] switchToCloseup ok\`);
       
       view.switchToPanorama();
-      out.log.push("[" + m + "] switchToPanorama ok");
+      out.log.push(\`[\${m}] switchToPanorama ok\`);
     } catch(e) {
       out.failed = true;
-      out.log.push("[" + m + "] Error: " + String(e && e.stack ? e.stack : e));
+      out.log.push(\`[\${m}] Error: \` + String(e && e.stack ? e.stack : e));
     }
   }
   return out;
@@ -103,8 +122,9 @@ const driver = `(async () => {
 const evaluatePromise = req("Runtime.evaluate", { expression: driver, awaitPromise: true, returnByValue: true });
 const timeoutPromise = new Promise((_, rej) => setTimeout(() => rej(new Error("Timeout")), 60000));
 const resp = await Promise.race([evaluatePromise, timeoutPromise]);
-console.log(JSON.stringify(resp, null, 2));
+console.log(JSON.stringify(resp));
+if (evs.length) console.log("Exceptions caught:", evs);
 
 try { process.kill(-obs.pid); } catch(e){}
 ws.close();
-process.exit(resp.result?.result?.value?.failed ? 1 : 0);
+process.exit(resp.result?.result?.value?.failed || evs.length ? 1 : 0);

@@ -1,9 +1,10 @@
+import { VAULT } from "../config.mjs";
 import { spawn } from "child_process";
 const CDP = "http://127.0.0.1:9224";
 
 async function run() {
   const obs = spawn("obsidian", [
-    "/home/ubuntu/obsidian-plugins/開発",
+    VAULT,
     "--user-data-dir=/tmp/obs-e2e-axis",
     "--remote-debugging-port=9224"
   ], { detached: true, stdio: "ignore" });
@@ -47,9 +48,9 @@ async function run() {
     try {
       await view.rebuild();
     } catch(e) {
-      return e.stack || String(e);
+      return e.stack;
     }
-    return "SUCCESS!";
+    return window.tagLensDebugLog;
   })()`;
 
   const evaluatePromise = send("Runtime.evaluate", { expression: driver, awaitPromise: true, returnByValue: true });

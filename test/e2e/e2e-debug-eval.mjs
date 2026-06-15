@@ -1,9 +1,10 @@
+import { VAULT } from "../config.mjs";
 import { spawn } from "child_process";
 const CDP = "http://127.0.0.1:9224";
 
 async function run() {
   const obs = spawn("obsidian", [
-    "/home/ubuntu/obsidian-plugins/開発",
+    VAULT,
     "--user-data-dir=/tmp/obs-e2e-axis",
     "--remote-debugging-port=9224"
   ], { detached: true, stdio: "ignore" });
@@ -44,24 +45,17 @@ async function run() {
     const view = window.app.workspace.getLeavesOfType("tag-lens-view")[0].view;
     view.settings.viewMode = "euler";
     view.settings.encoding = [{ channelId: "axisX", fieldId: "degree", enabled: true, scale: { type: "linear" } }];
-    await view.rebuild();
-    const edges = view.laid.edges || [];
-    const nodes = view.laid.nodes;
-    if (edges.length === 0) return "no edges";
-    const e = edges[0];
-    const sourceNode = nodes.find(n => n.id === e.source);
-    if (!sourceNode) return "no source node found for edge";
-    return {
-      sourceId: e.source,
-      edgePath0: e.path[0],
-      sourceNodeXY: { x: sourceNode.x, y: sourceNode.y },
-      edgePathLength: e.path.length
-    };
+    try {
+      await view.rebuild();
+    } catch(e) {
+      return e.stack || String(e);
+    }
+    return "SUCCESS!";
   })()`;
 
   const evaluatePromise = send("Runtime.evaluate", { expression: driver, awaitPromise: true, returnByValue: true });
   const resp = await evaluatePromise;
-  console.log(JSON.stringify(resp.result.result.value, null, 2));
+  console.log(JSON.stringify(resp, null, 2));
 
   ws.close();
   try { process.kill(-obs.pid); } catch(e){}
