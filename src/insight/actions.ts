@@ -1,10 +1,18 @@
 import { App, Notice } from "obsidian";
+import { isValidTagName } from "./tag-path";
 
 export async function applyGolderClassification(
 	app: App,
 	tag: string,
 	golderType: string
 ): Promise<void> {
+	// Guard against path-injection: reject any tag name that cannot be safely
+	// used as a vault-relative file path component.
+	if (!isValidTagName(tag)) {
+		new Notice(`Invalid tag name: ${tag}`);
+		return;
+	}
+
 	let tagPage = app.metadataCache.getFirstLinkpathDest(tag, "");
 	if (!tagPage) {
 		try {
