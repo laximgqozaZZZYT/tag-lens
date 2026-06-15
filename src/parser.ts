@@ -29,7 +29,6 @@ export function buildGraph(
 	groupByRows: string[],
 	filterMode: "sql" | "dvjs" = "sql",
 	dvjsFilter: string = "",
-	statusField: string = "",
 	focusNodeIds?: string[],
 	expandNeighborhood: boolean = false,
 ): { result: BuildResult; errors: BuildErrors } {
@@ -160,13 +159,7 @@ export function buildGraph(
 			if (!clusterLabels.has("all")) clusterLabels.set("all", "all");
 		}
 
-		let fmStatus: string | undefined;
-		if (statusField) {
-			const raw: unknown = cache?.frontmatter?.[statusField];
-			if (raw !== undefined && raw !== null) {
-				fmStatus = String(raw).trim().toLowerCase();
-			}
-		}
+
 
 		// Maturity: always compute the heuristic suggestion, then let a VALID
 		// frontmatter `maturity` override win. effectiveMaturity falls back to the
@@ -193,7 +186,6 @@ export function buildGraph(
 			label: f.basename, 
 			memberships, 
 			mtime: f.stat.mtime, 
-			fmStatus, 
 			fmMaturity, 
 			ageDays,
 			isPeripheral: isCore ? undefined : true

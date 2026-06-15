@@ -269,7 +269,6 @@ function emitNode(
 		width: w,
 		height: h,
 		mtime: n.mtime,
-		fmStatus: n.fmStatus,
 		fmMaturity: n.fmMaturity,
 		ageDays: n.ageDays,
 		isPeripheral: n.isPeripheral,

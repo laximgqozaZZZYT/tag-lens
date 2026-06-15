@@ -63,3 +63,50 @@ registerChannel({
 		}
 	},
 });
+
+registerChannel({
+	id: "size",
+	label: "Size",
+	accepts: ["quantitative", "ordinal"],
+	appliesTo: () => true,
+	apply: (params, scaled) => {
+		if (scaled.missing || scaled.t == null) {
+			params.sizeScale = 1.0;
+			return;
+		}
+		// Map t (0..1) to size scale (1x to 4x).
+		// By defaulting the scale config domain to [0, 3], this perfectly
+		// replicates the legacy `Math.min(4, degree + 1)` behavior.
+		params.sizeScale = 1.0 + scaled.t * 3.0;
+	},
+});
+
+registerChannel({
+	id: "opacity",
+	label: "Opacity (Freshness)",
+	accepts: ["temporal", "quantitative"],
+	appliesTo: () => true,
+	apply: (params, scaled) => {
+		// Missing mtime defaults to fully opaque (safety fix)
+		if (scaled.missing || scaled.t == null) {
+			params.opacity = 1.0;
+			return;
+		}
+		// linear interpolation between 1.0 and 0.35
+		// t=0 (newest) -> 1.0, t=1 (stalest) -> 0.35
+		params.opacity = 1.0 - scaled.t * (1.0 - 0.35);
+	},
+});
+
+registerChannel({
+	id: "border",
+	label: "Border Color",
+	accepts: ["categorical"],
+	appliesTo: () => true,
+	apply: (params, scaled) => {
+		if (scaled.missing) return;
+		if (scaled.output) {
+			params.borderColor = scaled.output;
+		}
+	},
+});

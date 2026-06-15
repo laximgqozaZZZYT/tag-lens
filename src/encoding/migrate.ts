@@ -9,16 +9,34 @@ import type { EncodingBinding } from "./types";
 export interface LegacyEncodingSettings {
 	statusField?: string;
 	statusColors?: Record<string, string>;
+	nodeSizeMode?: "fixed" | "indegree" | "outdegree";
+	freshnessOverlay?: boolean;
+	staleDays?: number;
 }
 
 export function synthesizeEncodingFromLegacy(s: LegacyEncodingSettings): EncodingBinding[] {
 	const out: EncodingBinding[] = [];
 	if (s.statusField && s.statusField.trim()) {
 		out.push({
-			channelId: "color",
-			fieldId: "status",
-			// copy the palette so callers can't mutate the source settings via it
+			channelId: "border",
+			fieldId: "frontmatter:" + s.statusField,
 			scale: { type: "categorical", palette: { ...(s.statusColors ?? {}) } },
+			enabled: true,
+		});
+	}
+	if (s.nodeSizeMode && s.nodeSizeMode !== "fixed") {
+		out.push({
+			channelId: "size",
+			fieldId: s.nodeSizeMode === "indegree" ? "inDegree" : "outDegree",
+			scale: { type: "linear", domain: [0, 3] }, // replicates Math.min(4, degree + 1)
+			enabled: true,
+		});
+	}
+	if (s.freshnessOverlay) {
+		out.push({
+			channelId: "opacity",
+			fieldId: "ageDays",
+			scale: { type: "linear", domain: [0, s.staleDays ?? 30] },
 			enabled: true,
 		});
 	}

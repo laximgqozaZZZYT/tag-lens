@@ -88,7 +88,6 @@ import {
 	type CardContent,
 	computeCardSize,
 	computeChannelDims,
-	computeSizeScale as computeSizeScaleFn,
 	measureCard as measureCardFn,
 	minFontScale,
 } from "./card-sizing";
@@ -765,7 +764,6 @@ export class MiniGraphView extends ItemView {
 						requestDraw: () => this.requestDraw(),
 						refreshSettingsTab: () => this.refreshSettingsTab(),
 						encLegends: this.encLegends,
-						activeStatusColors: this.activeStatusColors,
 						cardCache: this.cardCache,
 						laid: this.laid,
 						activeTab: this.activeTab,
@@ -1121,7 +1119,6 @@ export class MiniGraphView extends ItemView {
 	// expensive relayout/redraw when nothing relevant changed — e.g. editing a
 	// note's body text that touches no tags/memberships. "" = no build yet.
 	private lastRebuildSig = "";
-	private activeStatusColors: Record<string, string> = {};
 
 	private async rebuild(): Promise<void> {
 		const gen = ++this.rebuildGen;
@@ -1136,7 +1133,6 @@ export class MiniGraphView extends ItemView {
 			effGroupBy,
 			filterMode,
 			dvjsFilter,
-			this.settings.statusField,
 			this.settings.focusNodeIds,
 			// Prevent recursive expansion in closeup view. The focused nodes
 			// already include the relevant neighborhood from the panorama state.
@@ -1303,9 +1299,35 @@ export class MiniGraphView extends ItemView {
 		// otherwise occupy.
 		const { layoutData, preTrulyAgg } = filterLayoutData(data, this.settings);
 
+		// Visual Encoding: map displayed nodes' attributes -> per-node draw params.
+		// Runs BEFORE `cardFor` so the physical pixel dimensions of the cards
+		// (derived from `sizeScale`) are available to the layout engine.
+		const encCtx: EncContext = {
+			nowMs: Date.now(),
+			degreeOf: (id) => {
+				const d = this.degreeMap.get(id);
+				if (d == null) return undefined;
+				return {
+					inDeg: this.inDegreeMap.get(id) ?? 0,
+					outDeg: this.outDegreeMap.get(id) ?? 0,
+					degree: d,
+				};
+			},
+			frontmatterOf: (id) => {
+				const f = this.app.vault.getAbstractFileByPath(id);
+				return f instanceof TFile
+					? (this.app.metadataCache.getFileCache(f)?.frontmatter as Record<string, unknown> | undefined)
+					: undefined;
+			},
+		};
+		const effEnc = effectiveEncoding(this.settings.encoding, this.settings);
+		const encRes = evaluateEncoding(layoutData.nodes, effEnc, encCtx, this.settings.viewMode);
+		this.encParams = encRes.params;
+		this.encLegends = encRes.legends;
+
 		// Card sizes derive from the user-configured row × column span
 		// times the canonical CARD_CELL_W × CARD_CELL_H lattice step, with
-		// an optional degree-driven scale that preserves the m : n aspect.
+		// an optional encoding-driven scale that preserves the m : n aspect.
 		const sized = layoutData.nodes.map((n) => this.cardFor(n));
 		const wasEmpty = this.laid.clusters.length === 0;
 		// Seed the bipartite force layout from the previous frame's positions
@@ -1414,41 +1436,12 @@ export class MiniGraphView extends ItemView {
 		// Stage 5: id → incident-edge-index adjacency for hover lookups.
 		this.adjacency = buildAdjacency(this.laid.edges);
 
-		// Visual Encoding: map displayed nodes' attributes -> per-node draw params.
-		// Reads only; NEVER changes which nodes are shown (see src/encoding/).
-		const encCtx: EncContext = {
-			nowMs: Date.now(),
-			degreeOf: (id) => {
-				const d = this.degreeMap.get(id);
-				return d == null ? undefined : { inDeg: 0, outDeg: 0, degree: d };
-			},
-			frontmatterOf: (id) => {
-				const f = this.app.vault.getAbstractFileByPath(id);
-				return f instanceof TFile
-					? (this.app.metadataCache.getFileCache(f)?.frontmatter as Record<string, unknown> | undefined)
-					: undefined;
-			},
-		};
-		const effEnc = effectiveEncoding(this.settings.encoding, this.settings);
-		const encRes = evaluateEncoding(this.laid.nodes, effEnc, encCtx, this.settings.viewMode);
-		this.encParams = encRes.params;
-		this.encLegends = encRes.legends;
-
 		// Custom axis layout (Encode → Position X/Y): override card placement when
 		// axisX/axisY are bound. Reads only — never changes the displayed node set.
+		// Runs AFTER layout because it requires `this.laid.slotW` to compute coordinates.
 		this.applyAxisLayout(effEnc, encCtx);
 
-		this.activeStatusColors = {};
-		if (this.settings.statusField) {
-			const statuses = new Set<string>();
-			for (const n of this.laid.nodes) {
-				if (n.fmStatus) statuses.add(n.fmStatus);
-			}
-			this.activeStatusColors = {
-				...autoAssignColors([...statuses]),
-				...this.settings.statusColors,
-			};
-		}
+
 
 		// Aggregate-snap + inheritance operate on the Euler cluster/edge model
 		// (note→note vault links, per-cluster aggregation). Bipartite has its
@@ -1659,8 +1652,6 @@ export class MiniGraphView extends ItemView {
 					label: n.label,
 					memberships: n.memberships,
 					mtime: n.mtime,
-					ageDays: n.ageDays,
-					fmStatus: n.fmStatus,
 					fmMaturity: n.fmMaturity,
 					isPeripheral: n.isPeripheral,
 				};
@@ -1757,11 +1748,10 @@ export class MiniGraphView extends ItemView {
 	// together instead of size scaling while font stays at 12 px.
 	private getCardScale(nodeId: string): number {
 		const display = this.getNodeDisplay(nodeId);
-		const scaleFactor = this.computeSizeScale(nodeId, display.nodeSizeMode);
+		const scaleFactor = this.encParams.get(nodeId)?.sizeScale ?? 1.0;
 		return visualScale(display, scaleFactor, {
 			nodeRows: this.settings.nodeRows,
 			nodeCols: this.settings.nodeCols,
-			nodeSizeMode: this.settings.nodeSizeMode,
 		});
 	}
 
@@ -1780,7 +1770,7 @@ export class MiniGraphView extends ItemView {
 			cols: Math.max(1, display.nodeCols),
 			channelW,
 			channelH,
-			scaleFactor: this.computeSizeScale(n.id, display.nodeSizeMode),
+			scaleFactor: this.encParams.get(n.id)?.sizeScale ?? 1.0,
 			minFontPx: this.settings.minFontPx,
 		});
 		const scale = this.getCardScale(n.id);
@@ -1797,17 +1787,7 @@ export class MiniGraphView extends ItemView {
 		return { ...n, width, height };
 	}
 
-	private computeSizeScale(
-		nodeId: string,
-		mode?: "fixed" | "indegree" | "outdegree",
-	): number {
-		const m = mode ?? this.settings.nodeSizeMode;
-		// Pick the directional degree map matching the chosen size mode.
-		// "fixed" ignores the degree entirely (computeSizeScaleFn returns 1).
-		const map = m === "indegree" ? this.inDegreeMap : this.outDegreeMap;
-		const deg = map.get(nodeId) ?? 0;
-		return computeSizeScaleFn(m, deg);
-	}
+
 
 	// Build cluster_key → member_id_set and cluster_key → strict_superset
 	// keys. Called once per rebuild so the override resolver can walk the
@@ -1825,7 +1805,6 @@ export class MiniGraphView extends ItemView {
 			defaults: {
 				nodeRows: this.settings.nodeRows,
 				nodeCols: this.settings.nodeCols,
-				nodeSizeMode: this.settings.nodeSizeMode,
 			},
 		};
 	}
@@ -1847,7 +1826,6 @@ export class MiniGraphView extends ItemView {
 			this.nodeDisplayCache.get(nodeId) ?? {
 				nodeRows: this.settings.nodeRows,
 				nodeCols: this.settings.nodeCols,
-				nodeSizeMode: this.settings.nodeSizeMode,
 			}
 		);
 	}
@@ -2387,9 +2365,6 @@ export class MiniGraphView extends ItemView {
 		};
 
 		if (this.settings.showMaturity) drawBadge("Maturity: ON", "rgba(0, 150, 0, 0.8)");
-		if (this.settings.freshnessOverlay) drawBadge("Freshness: ON", "rgba(0, 0, 150, 0.8)");
-		if (this.settings.statusField) drawBadge(`Status: ${this.settings.statusField}`, "rgba(150, 0, 150, 0.8)");
-
 		// Node size fallback badge for modes that don't scale cards natively
 		if (!isEuler && mode !== "bipartite" && mode !== "upset") {
 			if (this.settings.nodeRows !== 1 || this.settings.nodeCols !== 1) {
@@ -2745,46 +2720,7 @@ export class MiniGraphView extends ItemView {
 			ctx.fillText(text, 8 + padX, 8 + padY, Math.max(0, cw - 24));
 		}
 
-		if (this.settings.statusField && Object.keys(this.activeStatusColors).length > 0) {
-			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-			ctx.font = "12px sans-serif";
-			ctx.textBaseline = "middle";
-			ctx.textAlign = "left";
-			
-			const keys = Object.keys(this.activeStatusColors).sort();
-			const padX = 12, padY = 8, spacingY = 20, circleR = 5;
-			const ch = this.canvas.clientHeight || 0;
-			
-			let maxTw = 0;
-			for (const key of keys) {
-				const tw = ctx.measureText(key).width;
-				if (tw > maxTw) maxTw = tw;
-			}
-			
-			const boxW = padX * 2 + circleR * 2 + 8 + maxTw;
-			const boxH = padY * 2 + (keys.length - 1) * spacingY + 12;
-			const boxX = 16;
-			let boxY = ch - 16 - boxH;
-			if (this.laid.upset) boxY -= upsetFooterHeight(ch, this.laid.upset.sets.length);
 
-			ctx.fillStyle = colorAlpha(theme().canvasBgAlt, 0.85);
-			ctx.beginPath();
-			ctx.roundRect(boxX, boxY, boxW, boxH, 6);
-			ctx.fill();
-			
-			let cy = boxY + padY + 6;
-			for (const key of keys) {
-				ctx.fillStyle = this.activeStatusColors[key];
-				ctx.beginPath();
-				ctx.arc(boxX + padX + circleR, cy, circleR, 0, 2 * Math.PI);
-				ctx.fill();
-				
-				ctx.fillStyle = theme().textMuted;
-				ctx.fillText(key, boxX + padX + circleR * 2 + 8, cy);
-				cy += spacingY;
-			}
-		}
-		
 		this.drawGlobalDisplayFallbacks(ctx, dpr, this.settings.viewMode);
 	}
 
@@ -2987,14 +2923,11 @@ export class MiniGraphView extends ItemView {
 			// titles, so when zooming out the note names drop to markers first and
 			// the island's tag label is the last to disappear.
 			titleLodPx: clustered ? (isSet ? 26 : 48) : undefined,
-			statusColor: n.fmStatus ? resolveStatusColor(n.fmStatus, this.activeStatusColors) : undefined,
 			fmMaturity: n.fmMaturity,
 			showMaturity: this.settings.showMaturity,
-			freshnessOverlay: this.settings.freshnessOverlay,
-			staleDays: this.settings.staleDays,
-			mtime: n.mtime,
-			nowMs: Date.now(),
 			encFillColor: this.encParams.get(n.id)?.fillColor,
+			encOpacity: this.encParams.get(n.id)?.opacity,
+			encBorderColor: this.encParams.get(n.id)?.borderColor,
 		});
 	}
 

@@ -14,7 +14,7 @@ ok(synthesizeEncodingFromLegacy({}).length === 0, "absent statusField -> no bind
 	const enc = synthesizeEncodingFromLegacy({ statusField: "status", statusColors: { done: "#0f0" } });
 	ok(enc.length === 1, "one binding synthesized");
 	const b = enc[0];
-	ok(b.channelId === "color" && b.fieldId === "status" && b.enabled, "color <- status, enabled");
+	ok(b.channelId === "border" && b.fieldId === "frontmatter:status" && b.enabled, "border <- frontmatter:status, enabled");
 	ok(b.scale.type === "categorical" && b.scale.palette.done === "#0f0", "palette carried through");
 }
 
@@ -30,19 +30,19 @@ ok(synthesizeEncodingFromLegacy({}).length === 0, "absent statusField -> no bind
 {
 	const explicit = [{ channelId: "color", fieldId: "ageDays", enabled: true }];
 	ok(effectiveEncoding(explicit, { statusField: "status" })[0].fieldId === "ageDays", "explicit encoding wins");
-	ok(effectiveEncoding([], { statusField: "status" })[0].fieldId === "status", "empty -> legacy fallback");
+	ok(effectiveEncoding([], { statusField: "status" })[0].fieldId === "frontmatter:status", "empty -> legacy fallback");
 	ok(effectiveEncoding(undefined, {}).length === 0, "undefined + no legacy -> empty");
 }
 
 // integration: migrate -> evaluate reproduces the exact legacy status colour
 {
-	const ctx: EncContext = { nowMs: 0 };
+	const ctx: EncContext = { nowMs: 0, frontmatterOf: (id) => id === "a" ? { status: "done" } : id === "b" ? { status: "wip" } : undefined };
 	const nodes: EncNode[] = [
-		{ id: "a", memberships: [], fmStatus: "done" },
-		{ id: "b", memberships: [], fmStatus: "wip" },
+		{ id: "a", memberships: [] },
+		{ id: "b", memberships: [] },
 	];
 	const enc = synthesizeEncodingFromLegacy({ statusField: "status", statusColors: { done: "#abcdef" } });
 	const r = evaluateEncoding(nodes, enc, ctx);
-	ok(r.params.get("a").fillColor === "#abcdef", "legacy palette colour reproduced for mapped value");
-	ok(typeof r.params.get("b").fillColor === "string" && r.params.get("b").fillColor !== "#abcdef", "unmapped value auto-coloured");
+	ok(r.params.get("a").borderColor === "#abcdef", "legacy palette colour reproduced for mapped value");
+	ok(typeof r.params.get("b").borderColor === "string" && r.params.get("b").borderColor !== "#abcdef", "unmapped value auto-coloured");
 }

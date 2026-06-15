@@ -93,20 +93,7 @@ export function computeChannelDims(
 	return { channelW, channelH };
 }
 
-// Per-node degree → size multiplier:
-//   fixed   ⇒ 1× regardless of degree
-//   in/out  ⇒ min(4, degree + 1)
-//
-// The 4× cap is critical for Bug #1 — a 5× hub card would inflate the
-// global stride enough to leave large empty regions inside multi-
-// membership cluster bboxes. (See cardFor comment in view.ts history.)
-export function computeSizeScale(
-	mode: "fixed" | "indegree" | "outdegree" | undefined,
-	degree: number,
-): number {
-	if (!mode || mode === "fixed") return 1;
-	return Math.min(4, degree + 1);
-}
+
 
 // Wrap title + body into the card's inner area. `scale` here is the
 // SAME visualScale that the renderer uses, so the line counts produced

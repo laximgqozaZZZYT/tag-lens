@@ -39,12 +39,7 @@ export function resolveFieldSource(fieldId: string): FieldSource | undefined {
 }
 
 // ── built-in field sources ───────────────────────────────────────────────────
-registerFieldSource({
-	id: "status",
-	label: "Status (frontmatter)",
-	kind: "categorical",
-	accessor: (n) => n.fmStatus ?? null,
-});
+
 registerFieldSource({
 	id: "maturity",
 	label: "Maturity",

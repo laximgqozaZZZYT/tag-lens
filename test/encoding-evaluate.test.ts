@@ -8,9 +8,9 @@ import type { EncNode, EncContext, EncodingBinding } from "../src/encoding/types
 const ctx: EncContext = { nowMs: 0, degreeOf: () => undefined, frontmatterOf: () => undefined };
 function nodes(): EncNode[] {
 	return [
-		{ id: "a", memberships: ["x"], fmStatus: "done", ageDays: 0 },
-		{ id: "b", memberships: ["y"], fmStatus: "wip", ageDays: 50 },
-		{ id: "c", memberships: ["x"], ageDays: 100 }, // no status
+		{ id: "a", label: "A", memberships: ["x"], ageDays: 0 },
+		{ id: "b", label: "B", memberships: ["y"], ageDays: 50 },
+		{ id: "c", label: "C", memberships: ["x"], ageDays: 100 },
 	];
 }
 const bind = (channelId: string, fieldId: string, extra: Partial<EncodingBinding> = {}): EncodingBinding => ({
@@ -22,7 +22,8 @@ const bind = (channelId: string, fieldId: string, extra: Partial<EncodingBinding
 
 // color <- status (categorical): defined where status exists, missing otherwise
 {
-	const r = evaluateEncoding(nodes(), [bind("color", "status")], ctx);
+	const testCtx = { ...ctx, frontmatterOf: (id: string) => id === "a" ? { status: "done" } : id === "b" ? { status: "wip" } : undefined };
+	const r = evaluateEncoding(nodes(), [bind("color", "frontmatter:status")], testCtx);
 	ok(typeof r.params.get("a").fillColor === "string", "a gets a status colour");
 	ok(typeof r.params.get("b").fillColor === "string", "b gets a status colour");
 	ok(r.params.get("a").fillColor !== r.params.get("b").fillColor, "different statuses -> different colours");
@@ -41,8 +42,8 @@ const bind = (channelId: string, fieldId: string, extra: Partial<EncodingBinding
 {
 	const ns = nodes();
 	const beforeKeys = ns.map((n) => Object.keys(n).length);
-	evaluateEncoding(ns, [bind("color", "status"), bind("color", "ageDays")], ctx);
-	ok(ns[0].fmStatus === "done" && ns[1].ageDays === 50, "node field values unchanged");
+	evaluateEncoding(ns, [bind("color", "frontmatter:status"), bind("color", "ageDays")], ctx);
+	ok(ns[1].ageDays === 50, "node field values unchanged");
 	ok(ns.every((n, i) => Object.keys(n).length === beforeKeys[i]), "no new keys written onto nodes");
 }
 
@@ -54,13 +55,13 @@ const bind = (channelId: string, fieldId: string, extra: Partial<EncodingBinding
 
 // disabled binding is skipped (no params produced)
 {
-	const r = evaluateEncoding(nodes(), [bind("color", "status", { enabled: false })], ctx);
+	const r = evaluateEncoding(nodes(), [bind("color", "frontmatter:status", { enabled: false })], ctx);
 	ok(r.params.size === 0 && r.legends.length === 0, "disabled binding produces nothing");
 }
 
 // unknown field / channel id is skipped gracefully
 {
-	const r = evaluateEncoding(nodes(), [bind("color", "frobnicate"), bind("nope", "status")], ctx);
+	const r = evaluateEncoding(nodes(), [bind("color", "frobnicate"), bind("nope", "frontmatter:status")], ctx);
 	ok(r.params.size === 0 && r.legends.length === 0, "unknown ids skipped without throwing");
 }
 

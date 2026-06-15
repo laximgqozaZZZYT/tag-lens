@@ -14,7 +14,6 @@ import {
 	truncateToWidth,
 	floorWorldFontPx,
 } from "./canvas-utils";
-import { freshnessAlpha } from "./freshness";
 
 // Wrapped + truncated body lines for a card. Computed once by
 // `cardFor()` / measureCard, then cached under the (id, mode, scale)
@@ -45,14 +44,11 @@ export interface DrawCardOptions {
 	// bare coloured marker — no title, no lone "…". Used by clustered bipartite.
 	titleLodPx?: number;
 	
-	// Freshness Overlay
-	freshnessOverlay?: boolean;
-	staleDays?: number;
-	nowMs?: number;
-	mtime?: number;
-	
-	// Reading Status Lens
-	statusColor?: string | null;
+	// Visual Encoding (Opacity channel): override global alpha.
+	encOpacity?: number;
+
+	// Visual Encoding (Border channel): resolved stroke colour.
+	encBorderColor?: string;
 
 	// Note Maturity
 	fmMaturity?: string;
@@ -89,8 +85,8 @@ export function drawCard(
 	const r = Math.min(CARD_RADIUS_PX, w / 2, h / 2);
 
 	ctx.save();
-	if (opts.freshnessOverlay && opts.mtime != null && opts.nowMs != null && opts.staleDays != null) {
-		ctx.globalAlpha = freshnessAlpha(opts.mtime, opts.nowMs, opts.staleDays);
+	if (opts.encOpacity != null) {
+		ctx.globalAlpha = opts.encOpacity;
 	}
 	if (n.isPeripheral) {
 		ctx.globalAlpha *= 0.5;
@@ -124,9 +120,9 @@ export function drawCard(
 	ctx.stroke();
 	ctx.setLineDash([]);
 
-	if (opts.statusColor && !isSet) {
+	if (opts.encBorderColor && !isSet) {
 		ctx.lineWidth = 2 / zoom;
-		ctx.strokeStyle = opts.statusColor;
+		ctx.strokeStyle = opts.encBorderColor;
 		ctx.beginPath();
 		roundedRectPath(ctx, x, y, w, h, r);
 		ctx.stroke();

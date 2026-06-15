@@ -17,7 +17,6 @@ export interface EncNode {
 	memberships: string[];
 	mtime?: number;
 	ageDays?: number;
-	fmStatus?: string;
 	fmMaturity?: string;
 	isPeripheral?: boolean;
 }

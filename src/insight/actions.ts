@@ -5,10 +5,15 @@ export async function applyGolderClassification(
 	tag: string,
 	golderType: string
 ): Promise<void> {
-	const tagPage = app.metadataCache.getFirstLinkpathDest(tag, "");
+	let tagPage = app.metadataCache.getFirstLinkpathDest(tag, "");
 	if (!tagPage) {
-		new Notice(`Tag page for #${tag} does not exist yet.`);
-		return;
+		try {
+			tagPage = await app.vault.create(`${tag}.md`, "");
+			new Notice(`Created new tag page: ${tag}.md`);
+		} catch (e) {
+			new Notice(`Failed to create tag page ${tag}.md: ${e instanceof Error ? e.message : String(e)}`);
+			return;
+		}
 	}
 	const file = tagPage;
 	await app.fileManager.processFrontMatter(file, (fm: unknown) => {

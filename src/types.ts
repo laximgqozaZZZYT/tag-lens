@@ -9,7 +9,6 @@ export interface GraphNode {
 	score?: number;
 	filtered?: boolean;
 	mtime?: number;
-	fmStatus?: string;
 	fmMaturity?: string;
 	ageDays?: number;
 	// Peripheral node included because it links to/from a core node (when expandNeighborhood is true).
@@ -52,13 +51,7 @@ export interface MiniSettings {
 	cardMaxChars: number;
 	filterMode: "sql" | "dvjs";
 	dvjsFilter: string;
-	freshnessOverlay: boolean;
 	staleDays: number;
-	// Status overlay: frontmatter field whose (lowercased) value colours each
-	// card's outline. "" disables the overlay. `statusColors` maps a field value
-	// to a hex colour; values without an entry get an auto-assigned stable hue.
-	statusField: string;
-	statusColors: Record<string, string>;
 	// Note maturity badge on cards (Zettelkasten fleeting / literature /
 	// permanent), derived in the parser and optionally overridden per-note.
 	showMaturity: boolean;
@@ -108,10 +101,9 @@ export interface MiniSettings {
 	// Card span in grid units. nodeRows = m (height in cells), nodeCols = n
 	// (width in cells). Default 1 × 1 (= a single cell). When nodeSizeMode
 	// != "fixed" the (m, n) pair is multiplied by a shared scale factor so
-	// the m : n aspect ratio survives.
+	// card fills its cell span exactly at every Min font size.
 	nodeRows: number;
 	nodeCols: number;
-	nodeSizeMode: "fixed" | "indegree" | "outdegree";
 	// Draw the node cards. When false, only enclosures / edges / grid show.
 	showNodes: boolean;
 	showEnclosures: boolean;
@@ -142,7 +134,6 @@ export interface MiniSettings {
 		{
 			nodeRows?: number;
 			nodeCols?: number;
-			nodeSizeMode?: "fixed" | "indegree" | "outdegree";
 		}
 	>;
 	panelVisible: boolean;
@@ -449,10 +440,7 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	cardMaxChars: 160,
 	filterMode: "sql",
 	dvjsFilter: "return dv.pages('\"\"').map(p => p.file.path).array();",
-	freshnessOverlay: false,
 	staleDays: 14,
-	statusField: "",
-	statusColors: {},
 	showMaturity: false,
 	streamAxisField: "mtime",
 	streamBinning: "month",
@@ -473,7 +461,6 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	showBody: true,
 	nodeRows: 1,
 	nodeCols: 1,
-	nodeSizeMode: "fixed",
 	showNodes: true,
 	showEnclosures: true,
 	showEdges: true,

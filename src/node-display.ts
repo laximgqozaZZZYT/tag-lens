@@ -6,15 +6,11 @@ import type { GraphNode } from "./types";
 export interface NodeDisplay {
 	nodeRows: number;
 	nodeCols: number;
-	nodeSizeMode: "fixed" | "indegree" | "outdegree";
 }
-
-export type NodeSizeMode = "fixed" | "indegree" | "outdegree";
 
 export interface NodeDisplayOverride {
 	nodeRows?: number;
 	nodeCols?: number;
-	nodeSizeMode?: NodeSizeMode;
 }
 
 // Defaults used as the final fallback when no override applies anywhere
@@ -22,7 +18,6 @@ export interface NodeDisplayOverride {
 export interface NodeDisplayDefaults {
 	nodeRows: number;
 	nodeCols: number;
-	nodeSizeMode: NodeSizeMode;
 }
 
 // Dependencies the resolver needs to walk the chain. Pulled in once per
@@ -68,7 +63,6 @@ export function resolveNodeDisplay(
 	return {
 		nodeRows: lookup("nodeRows") ?? defaults.nodeRows,
 		nodeCols: lookup("nodeCols") ?? defaults.nodeCols,
-		nodeSizeMode: lookup("nodeSizeMode") ?? defaults.nodeSizeMode,
 	};
 }
 
@@ -122,6 +116,5 @@ export function resolveFromCluster(
 	return {
 		nodeRows: lookup("nodeRows") ?? defaults.nodeRows,
 		nodeCols: lookup("nodeCols") ?? defaults.nodeCols,
-		nodeSizeMode: lookup("nodeSizeMode") ?? defaults.nodeSizeMode,
 	};
 }

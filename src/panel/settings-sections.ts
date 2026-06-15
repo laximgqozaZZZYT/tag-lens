@@ -54,7 +54,6 @@ export function renderNodeDisplaySection(
 	const overrideFor = (): {
 		nodeRows?: number;
 		nodeCols?: number;
-		nodeSizeMode?: "fixed" | "indegree" | "outdegree";
 	} => {
 		if (!scope) return {};
 		let ov = deps.settings.nodeDisplayOverrides[scope.groupKey];
@@ -71,7 +70,6 @@ export function renderNodeDisplaySection(
 		: {
 				nodeRows: deps.settings.nodeRows,
 				nodeCols: deps.settings.nodeCols,
-				nodeSizeMode: deps.settings.nodeSizeMode,
 			};
 
 	// "Size (m × n)". For layer scope, empty value means "use inherited".
@@ -108,8 +106,7 @@ export function renderNodeDisplaySection(
 			else delete ov.nodeCols;
 			if (
 				ov.nodeRows === undefined &&
-				ov.nodeCols === undefined &&
-				ov.nodeSizeMode === undefined
+				ov.nodeCols === undefined
 			) {
 				delete deps.settings.nodeDisplayOverrides[scope.groupKey];
 			}
@@ -124,46 +121,7 @@ export function renderNodeDisplaySection(
 	mIn.addEventListener("change", applySize);
 	nIn.addEventListener("change", applySize);
 
-	if (scope) {
-		const modeRow = section.createDiv({ cls: "gim-order-row" });
-		modeRow.createSpan({ text: "Size by", cls: "gim-order-field" });
-		const sel = modeRow.createEl("select", { cls: "gim-order-dir" });
-		const formatSizeMode = (m: "fixed" | "indegree" | "outdegree"): string => {
-			return m === "fixed" ? "Fixed" : m === "indegree" ? "Incoming" : "Outgoing";
-		};
-		sel.createEl("option", {
-			value: "",
-			text: `Inherited (${formatSizeMode(resolvedFor.nodeSizeMode)})`,
-		});
-		for (const opt of [
-			{ v: "fixed", t: "Fixed" },
-			{ v: "indegree", t: "Incoming links" },
-			{ v: "outdegree", t: "Outgoing links" },
-		]) {
-			sel.createEl("option", { value: opt.v, text: opt.t });
-		}
-		const ov = deps.settings.nodeDisplayOverrides[scope.groupKey];
-		sel.value = ov?.nodeSizeMode ?? "";
-		sel.addEventListener("change", () => {
-			const ov = overrideFor();
-			if (sel.value === "") delete ov.nodeSizeMode;
-			else
-				ov.nodeSizeMode = sel.value as
-					| "fixed"
-					| "indegree"
-					| "outdegree";
-			if (
-				ov.nodeRows === undefined &&
-				ov.nodeCols === undefined &&
-				ov.nodeSizeMode === undefined
-			) {
-				delete deps.settings.nodeDisplayOverrides[scope.groupKey];
-			}
-			deps.clearCardCache();
-			deps.save();
-			deps.rebuild();
-		});
-	}
+
 }
 
 export interface StreamSectionDeps {

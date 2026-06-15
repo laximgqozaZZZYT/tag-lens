@@ -168,8 +168,8 @@ export function renderInsightAlerts(host: HTMLElement, deps: InsightDeps, comput
 		});
 	}
 
-	// Freshness Overlay: Stalled Cluster check
-	if (deps.settings.freshnessOverlay) {
+	// Stalled Cluster check (Insight driven by staleDays)
+	if (deps.settings.staleDays > 0) {
 		// Extract cluster timestamps from graph nodes
 		const clusterMap = new Map<string, { newest: number; size: number }>();
 		for (const node of deps.laid.nodes) {

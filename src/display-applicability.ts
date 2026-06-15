@@ -13,9 +13,7 @@ export type DisplayToggleKey =
 	| "showEnclosures"
 	| "showEdges"
 	| "showGrid"
-	| "showMaturity"
-	| "freshnessOverlay"
-	| "statusField";
+	| "showMaturity";
 
 // Modes whose figure is built from world-space cards via drawBodyTile/drawCard:
 // every card toggle and per-card overlay applies.

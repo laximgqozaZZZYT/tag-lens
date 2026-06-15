@@ -321,7 +321,6 @@ export interface EncodeTabDeps {
 	requestDraw: () => void;
 	refreshSettingsTab: () => void;
 	encLegends: BindingLegend[];
-	activeStatusColors: Record<string, string>;
 	cardCache: { clear: () => void };
 	laid: LaidOut;
 	activeTab: string;
@@ -441,18 +440,7 @@ export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): v
 	legacySection.setCssStyles({ marginTop: "12px", paddingTop: "8px", borderTop: "1px dashed var(--background-modifier-border)" });
 	legacySection.createEl("h5", { text: "Legacy Bindings" }).setCssStyles({ margin: "0 0 6px 0", fontSize: "12px" });
 
-	// Freshness overlay
-	if (displayToggleApplies(deps.settings.viewMode, "freshnessOverlay")) {
-		const freshnessRow = legacySection.createEl("label", { cls: "gim-toggle-row" });
-		const freshnessCb = freshnessRow.createEl("input", { type: "checkbox" });
-		freshnessCb.checked = deps.settings.freshnessOverlay;
-		freshnessCb.addEventListener("change", () => {
-			deps.settings.freshnessOverlay = freshnessCb.checked;
-			deps.save();
-			deps.requestDraw();
-		});
-		freshnessRow.createSpan({ text: "Freshness overlay (Opacity ← ageDays)" });
-		
+	// Stale days (used by Opacity encoding and Insight alerts)
 		const staleRow = legacySection.createDiv({ cls: "gim-setting-row" });
 		staleRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", paddingLeft: "24px" });
 		staleRow.createSpan({ text: "Stale after N days:" });
@@ -469,41 +457,6 @@ export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): v
 				staleInput.value = deps.settings.staleDays.toString();
 			}
 		});
-	}
-
-	// Status overlay
-	if (displayToggleApplies(deps.settings.viewMode, "statusField")) {
-		const statusFieldRow = legacySection.createDiv({ cls: "gim-setting-row" });
-		statusFieldRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px" });
-		statusFieldRow.createSpan({ text: "Status overlay (Color ← frontmatter):" });
-		const statusFieldInput = statusFieldRow.createEl("input", { type: "text", cls: "gim-text-input" });
-		statusFieldInput.setCssStyles({ width: "80px" });
-		statusFieldInput.value = deps.settings.statusField;
-		statusFieldInput.addEventListener("change", () => {
-			deps.settings.statusField = statusFieldInput.value.trim();
-			deps.save();
-			void deps.rebuild();
-		});
-
-		if (deps.settings.statusField && Object.keys(deps.activeStatusColors).length > 0) {
-			const colorsContainer = legacySection.createDiv();
-			colorsContainer.setCssStyles({ marginTop: "4px", paddingLeft: "8px", display: "flex", flexDirection: "column", gap: "4px" });
-			
-			for (const key of Object.keys(deps.activeStatusColors).sort()) {
-				const colorRow = colorsContainer.createDiv({ cls: "gim-setting-row" });
-				colorRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center" });
-				colorRow.createSpan({ text: key });
-				
-				const colorInput = colorRow.createEl("input", { type: "color" });
-				colorInput.value = deps.settings.statusColors[key] || deps.activeStatusColors[key] || "#ffffff";
-				colorInput.addEventListener("change", () => {
-					deps.settings.statusColors[key] = colorInput.value;
-					deps.save();
-					deps.requestDraw();
-				});
-			}
-		}
-	}
 
 	// Note maturity badge
 	if (displayToggleApplies(deps.settings.viewMode, "showMaturity")) {
@@ -519,25 +472,7 @@ export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): v
 		maturityRow.createSpan({ text: "Note maturity badge (Shape ← maturity)" });
 	}
 
-	// Scale card size by degree
-	const sizeRow = legacySection.createDiv({ cls: "gim-order-row" });
-	sizeRow.setCssStyles({ marginTop: "12px" });
-	sizeRow.createSpan({ text: "Scale card size by", cls: "gim-order-field" });
-	const sizeSel = sizeRow.createEl("select", { cls: "gim-order-dir" });
-	for (const opt of [
-		{ v: "fixed", t: "Fixed (None)" },
-		{ v: "indegree", t: "Incoming links" },
-		{ v: "outdegree", t: "Outgoing links" },
-	]) {
-		sizeSel.createEl("option", { value: opt.v, text: opt.t });
-	}
-	sizeSel.value = deps.settings.nodeSizeMode;
-	sizeSel.addEventListener("change", () => {
-		deps.settings.nodeSizeMode = sizeSel.value as "fixed" | "indegree" | "outdegree";
-		deps.cardCache.clear();
-		deps.save();
-		void deps.rebuild();
-	});
+
 
 	// ---- Layers & Overrides Section ----
 	const layerContainer = el.createDiv({ cls: "gim-panel-section" });

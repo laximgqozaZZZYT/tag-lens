@@ -74,9 +74,7 @@ const driver = `(async () => {
   const view = leaf.view;
   const saved = JSON.parse(JSON.stringify(view.settings));
   // Force the overlay-driven branches ON so every mode exercises them.
-  view.settings.freshnessOverlay = true;
   view.settings.showMaturity = true;
-  view.settings.statusField = "status";
   const MODES = ["droste","euler","euler-true","euler-venn","bipartite","matrix","bubblesets","heatmap","lattice","upset","stream"];
   for (const m of MODES) {
     const e = { mode: m, rebuild: "ok", draw: "ok", settings: "ok", insight: "ok", toggles: [], sections: [], laidNodes: 0, matDef: 0, encParams: 0, encNodesUnchanged: false };
@@ -190,7 +188,7 @@ for (const e of report.modes) {
 		if (!present && exp.has(label)) fail(e.mode, `toggle "${label}" missing but should be shown`);
 	}
 	// section gating
-	for (const name of ["Graph display", "Freshness overlay", "Status overlay", "Bridge finder"]) {
+	for (const name of ["Graph display", "Bridge finder"]) {
 		const want = expectSection(e.mode, name);
 		if (want === null) continue;
 		const got = e.sections.some((s) => s.includes(name));
