@@ -1,5 +1,5 @@
 import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon, Notice, Menu, MarkdownView } from "obsidian";
-import { exportFileName, exportCanvasDims } from "./image-export";
+import { exportCanvasDims } from "./image-export";
 import { renderInsightTab } from "./insight/render";
 import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
 import { effectiveEncoding } from "./encoding/migrate";
@@ -40,7 +40,7 @@ import {
 	computeMemberSets,
 	computeStrictSupersets,
 } from "./cluster-relations";
-import { autoAssignColors, resolveStatusColor } from "./status-overlay";
+
 import {
 	resolveNodeDisplay as resolveNodeDisplayFn,
 	resolveFromCluster as resolveFromClusterFn,
@@ -92,25 +92,9 @@ import {
 	minFontScale,
 } from "./card-sizing";
 import {
-	renderExprSection as renderExprSectionFn,
-	renderToggleSection as renderToggleSectionFn,
-	renderOrderBySection as renderOrderBySectionFn,
 	toggleArrayMember as toggleArrayMemberFn,
 } from "./panel-sections";
-import {
-	renderMinFontSection as renderMinFontSectionFn,
-	renderNodeDisplaySection as renderNodeDisplaySectionFn,
-	renderMatrixOrderBySection as renderMatrixOrderBySectionFn,
-	renderMatrixMinColumnControl as renderMatrixMinColumnControlFn,
-	renderHeatmapOrderBySection as renderHeatmapOrderBySectionFn,
-	renderHeatmapMinTagControl as renderHeatmapMinTagControlFn,
-	renderHeatmapDisplayToggles as renderHeatmapDisplayTogglesFn,
-	renderMatrixDisplayToggles as renderMatrixDisplayTogglesFn,
-	renderStreamDisplayToggles as renderStreamDisplayTogglesFn,
-	renderLatticeSection as renderLatticeSectionFn,
-	renderBipartiteSection as renderBipartiteSectionFn,
-	renderViewModeSection as renderViewModeSectionFn,
-} from "./panel/settings-sections";
+
 import {
 	renderSettingsViewTab,
 	renderSettingsDisplayTab,
@@ -188,11 +172,10 @@ export class MiniGraphView extends ItemView {
 	private hoverTarget: HoverTarget = null;
 	private tipEl: HTMLDivElement | null = null;
 	private hoverGen = 0;
-	private hoveredEdge: [string, string] | null = null;
-	private currentFrameMs = 0;
+
 	private currentGaps: TagGap[] = [];
 	private currentBridges: BridgeCandidate[] = [];
-	private hoveredGhostEdge: BridgeCandidate | null = null;
+
 	// Marquee state machine lives in its own controller — the view
 	// just queries it (isArmed / isActive) and pumps pointer events.
 	private marquee!: MarqueeController;
@@ -288,7 +271,7 @@ export class MiniGraphView extends ItemView {
 	// panel's `panelEl` as the host that `applyTabFilter`/`renderTabButton` query).
 	private settingsHostEl: HTMLElement | null = null;
 	private dataHostEl: HTMLElement | null = null;
-	private insightHostEl: HTMLElement | null = null;
+
 	// The last note "located" on canvas via the navigator (non-droste modes),
 	// used to highlight its row in the menu.
 	private locatedNoteId: string | null = null;
@@ -838,18 +821,6 @@ export class MiniGraphView extends ItemView {
 	}
 
 
-	// ── Layers Tab UI helpers have been extracted to src/panel/settings-tabs.ts ──
-
-	private renderMinFontSection(parent: HTMLElement): void {
-		renderMinFontSectionFn(parent, {
-			settings: this.settings,
-			save: () => void this.save(),
-			requestDraw: () => this.requestDraw(),
-		});
-	}
-
-
-
 	private toggleArrayMember(
 		field: "hiddenNodes" | "aggregatedLayers",
 		value: string,
@@ -858,214 +829,12 @@ export class MiniGraphView extends ItemView {
 		toggleArrayMemberFn(this.settings, field, value, present);
 	}
 
-	// LAYOUT section: per-cluster anchor placement strategy (concentric ring
-	// around the focus cluster vs. flow direction from focus to the right).
-	// "Node display" section: body preview toggle + base card size + the
-	// size-by-link mode. Changing any size knob triggers a full rebuild
-	// because the cell pitch is derived from the base size and the layout
-	// has to redo cell snap.
-	// Render NODE_DISPLAY controls. With no scope it edits the GLOBAL
-	// settings (used in the 全体 tab). With `scope = { groupKey }` it edits
-	// `nodeDisplayOverrides[groupKey]` instead, and unset fields fall back
-	// through `inheritFrom` source → strict supersets → global, in that
-	// priority order.
-	private renderNodeDisplaySection(
-		parent: HTMLElement,
-		scope?: { groupKey: string },
-	): void {
-		renderNodeDisplaySectionFn(
-			parent,
-			{
-				settings: this.settings,
-				save: () => void this.save(),
-				rebuild: () => void this.rebuild(),
-				clearCardCache: () => this.cardCache.clear(),
-				resolveFromCluster: (groupKey) => this.resolveFromCluster(groupKey),
-			},
-			scope,
-		);
-	}
-
-	private formatSizeMode(m: "fixed" | "indegree" | "outdegree"): string {
-		return m === "fixed" ? "Fixed" : m === "indegree" ? "Incoming" : "Outgoing";
-	}
-
 	// Resolve a cluster's "rendered" NODE_DISPLAY (= what the inheritance
 	// chain produces when this cluster has no override) so the per-layer
 	// panel can show it as placeholder text and the user can tell what
 	// they're overriding.
 	private resolveFromCluster(groupKey: string): NodeDisplay {
 		return resolveFromClusterFn(groupKey, this.nodeDisplayDeps());
-	}
-
-	private renderOrderBySection(parent: HTMLElement): void {
-		// Matrix mode replaces the field/dir ORDER_BY with its seriation options
-		// (co-occurrence / block-priority / original) + group / collapse toggles,
-		// so all row ordering lives in this one section.
-		if (this.settings.viewMode === "matrix") {
-			this.renderMatrixOrderBySection(parent);
-			return;
-		}
-		if (this.settings.viewMode === "heatmap") {
-			this.renderHeatmapOrderBySection(parent);
-			return;
-		}
-		renderOrderBySectionFn(parent, {
-			settings: this.settings,
-			save: () => void this.save(),
-		});
-	}
-
-	// Matrix ORDER_BY: SAME structure as every other mode — a criterion select
-	// + an asc/desc direction select. The criterion options are matrix-specific
-	// (co-occurrence / block-priority) and map to matrixBlockPriority; the
-	// direction maps to matrixSortDir. No matrix-only checkboxes live here.
-	private renderMatrixOrderBySection(parent: HTMLElement): void {
-		renderMatrixOrderBySectionFn(parent, {
-			settings: this.settings,
-			save: () => void this.save(),
-			rebuild: () => void this.rebuild(),
-		});
-	}
-
-	// Matrix "min column size" — a column (tag) filter, rendered inside the
-	// HAVING filter section (no standalone Matrix section).
-	private renderMatrixMinColumnControl(section: HTMLElement): void {
-		renderMatrixMinColumnControlFn(section, {
-			settings: this.settings,
-			save: () => void this.save(),
-			rebuild: () => void this.rebuild(),
-		});
-	}
-
-	// Heatmap ORDER_BY: SAME criterion + asc/desc structure as other modes.
-	// Criterion = co-occurrence (Jaccard seriation) / size; direction reverses
-	// the tag order. No heatmap-only controls live in ORDER_BY.
-	private renderHeatmapOrderBySection(parent: HTMLElement): void {
-		renderHeatmapOrderBySectionFn(parent, {
-			settings: this.settings,
-			save: () => void this.save(),
-			rebuild: () => void this.rebuild(),
-			requestDraw: () => this.requestDraw(),
-		});
-	}
-
-	// Heatmap "min tag size" — a tag (axis) filter, rendered inside HAVING.
-	private renderHeatmapMinTagControl(section: HTMLElement): void {
-		renderHeatmapMinTagControlFn(section, {
-			settings: this.settings,
-			save: () => void this.save(),
-			rebuild: () => void this.rebuild(),
-		});
-	}
-
-	// Heatmap colour-scale toggle in GRAPH DISPLAY (display-only repaint).
-	private renderHeatmapDisplayToggles(section: HTMLElement): void {
-		renderHeatmapDisplayTogglesFn(section, {
-			settings: this.settings,
-			save: () => void this.save(),
-			rebuild: () => void this.rebuild(),
-			requestDraw: () => this.requestDraw(),
-		});
-	}
-
-	// Lattice (intersection lattice) mode settings — degree-tier layout,
-	// LOD, per-tier cap, and the subset-link back layer. Mirrors the
-	// renderBipartiteSection shape (own panel section).
-	private renderLatticeSection(parent: HTMLElement): void {
-		renderLatticeSectionFn(parent, {
-			settings: this.settings,
-			save: () => void this.save(),
-			rebuild: () => void this.rebuild(),
-			requestDraw: () => this.requestDraw(),
-		});
-	}
-
-	private renderViewModeSection(parent: HTMLElement): void {
-		renderViewModeSectionFn(parent, {
-			settings: this.settings,
-			save: () => void this.save(),
-			rebuild: () => void this.rebuild(),
-			refreshSettingsTab: () => this.refreshSettingsTab(),
-		});
-	}
-
-	private renderBipartiteSection(parent: HTMLElement): void {
-		renderBipartiteSectionFn(parent, {
-			settings: this.settings,
-			save: () => void this.save(),
-			rebuild: () => void this.rebuild(),
-		});
-	}
-
-	private renderToggleSection(
-		parent: HTMLElement,
-		heading: string,
-		toggles: {
-			key: "showNodes" | "showBody" | "showEnclosures" | "showEdges" | "showGrid" | "showMaturity";
-			label: string;
-		}[],
-	): HTMLElement {
-		return renderToggleSectionFn(
-			parent,
-			{ settings: this.settings, save: () => void this.save(), redraw: () => this.requestDraw() },
-			heading,
-			toggles,
-		);
-	}
-
-	// Append the matrix-only display toggles (Group identical rows / Collapse
-	// groups) into the GRAPH DISPLAY section, alongside the Show toggles. They
-	// are display operations (no relayout): the projection rebuilds on the
-	// display-only repaint path. Collapse depends on Group.
-	private renderMatrixDisplayToggles(section: HTMLElement): void {
-		renderMatrixDisplayTogglesFn(section, {
-			settings: this.settings,
-			save: () => void this.save(),
-			rebuild: () => void this.rebuild(),
-			refreshSettingsTab: () => this.refreshSettingsTab(),
-			rebuildMatrixDisplay: () => this.rebuildMatrixDisplay(),
-			requestDraw: () => this.requestDraw(),
-		});
-	}
-
-	private renderStreamDisplayToggles(section: HTMLElement): void {
-		renderStreamDisplayTogglesFn(section, {
-			settings: this.settings,
-			save: () => void this.save(),
-			scheduleRebuild: () => this.scheduleRebuild(),
-		});
-	}
-
-	private renderExprSection(
-		parent: HTMLElement,
-		label: string,
-		rows: string[],
-		error: string,
-		opts: {
-			placeholder?: string;
-			autoKey?: "whereAuto" | "groupByAuto" | "havingAuto" | "limitAuto";
-		} = {},
-	): HTMLElement {
-		return renderExprSectionFn(
-			parent,
-			label,
-			rows,
-			error,
-			{
-				settings: this.settings,
-				save: () => void this.save(),
-				rerender: () => {
-					this.refreshSettingsTab();
-					this.refreshFilterTab();
-				},
-				// WHERE / GROUP_BY / HAVING / LIMIT are pipeline settings — any
-				// expression change must trigger a full rebuild so the graph,
-				// note menu, and mode-specific layout all reflect the new query.
-				rebuild: () => void this.rebuild(),
-			},
-			opts,
-		);
 	}
 
 	// Settings that only affect WHAT is painted, not the placement. Toggling
@@ -1816,10 +1585,6 @@ export class MiniGraphView extends ItemView {
 		};
 	}
 
-	private resolveNodeDisplay(n: GraphNode): NodeDisplay {
-		return resolveNodeDisplayFn(n, this.nodeDisplayDeps());
-	}
-
 	private recomputeNodeDisplayCache(nodes: GraphNode[]): void {
 		this.nodeDisplayCache.clear();
 		const deps = this.nodeDisplayDeps();
@@ -2357,7 +2122,6 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private draw(): void {
-		this.currentFrameMs = Date.now();
 		const ctx = this.ctx;
 		if (!ctx) return;
 		// `exportDprMul` is 1 during normal painting; >1 only while exportImage()
@@ -3241,7 +3005,6 @@ export class MiniGraphView extends ItemView {
 			else this.settingsHostEl = null;
 			
 			if (key === "insight") {
-				this.insightHostEl = insightTab;
 				renderInsightTab(insightTab, {
 					app: this.app,
 					settings: this.settings,
@@ -3257,8 +3020,6 @@ export class MiniGraphView extends ItemView {
 					insightSubTab: this.insightSubTab,
 					setInsightSubTab: (tab) => { this.insightSubTab = tab; }
 				});
-			} else {
-				this.insightHostEl = null;
 			}
 			styleTabs();
 		};
@@ -3718,7 +3479,7 @@ export class MiniGraphView extends ItemView {
 		// Replace the current token in the input with `text`. Tags/notes get a
 		// trailing space (term complete); "key:" stays open (no space) so the user
 		// can keep typing the value.
-		const acceptSuggestion = (text: string, kind: Suggestion["kind"]): void => {
+		const acceptSuggestion = (text: string, _kind: Suggestion["kind"]): void => {
 			const val = search.value;
 			const tok = currentToken(val);
 			const head = val.slice(0, val.length - tok.length);
@@ -3931,7 +3692,7 @@ export class MiniGraphView extends ItemView {
 
 
 	// Heatmap cell click → Switch to Close-up focusing on shared notes.
-	private openHeatmapDetail(i: number, j: number, sx: number, sy: number): void {
+	private openHeatmapDetail(i: number, j: number, _sx: number, _sy: number): void {
 		const h = this.laid.heatmap;
 		if (!h) return;
 		const a = h.nodeIds[i] ?? [];
@@ -3947,7 +3708,7 @@ export class MiniGraphView extends ItemView {
 		this.switchToCloseup(ids);
 	}
 
-	private openStreamDetail(r: number, c: number, sx: number, sy: number): void {
+	private openStreamDetail(r: number, c: number, _sx: number, _sy: number): void {
 		const s = this.laid.stream;
 		if (!s) return;
 		const cell = s.matrix.find(m => m.r === r && m.c === c);
@@ -3959,8 +3720,8 @@ export class MiniGraphView extends ItemView {
 	// Close-up for the notes in that exact intersection.
 	private openLatticeDetail(
 		node: import("./layout").LatticeNodeMeta,
-		sx: number,
-		sy: number,
+		_sx: number,
+		_sy: number,
 	): void {
 		this.latticeSelectedKey = null;
 		this.switchToCloseup(node.nodeIds);
@@ -3995,105 +3756,11 @@ export class MiniGraphView extends ItemView {
 		}
 	}
 
-	// Generic floating note-list overlay. Used by both heatmap (tag×tag) and
-	// lattice (intersection signature) clicks: title is caller-formatted, ids
-	// are the file-path tokens to list, (sx, sy) is the click point used by
-	// positionDetail, and onCloseSelection clears the caller's selection
-	// state when the panel's × is pressed.
-	private showNodeListOverlay(
-		title: string,
-		ids: string[],
-		sx: number,
-		sy: number,
-		onCloseSelection?: () => void,
-	): void {
-		this.closeDetail();
-		const panel = this.root.createDiv({ cls: "gim-detail-panel" });
-		panel.setCssStyles({
-			position: "absolute",
-			width: "248px",
-			maxHeight: "320px",
-			display: "flex",
-			flexDirection: "column",
-			background: "var(--background-secondary)",
-			border: "1px solid var(--background-modifier-border)",
-			borderRadius: "6px",
-			boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
-			zIndex: "50",
-			font: "13px sans-serif",
-			color: "var(--text-normal)",
-		});
-
-		const head = panel.createDiv({ cls: "gim-detail-head" });
-		head.setCssStyles({
-			display: "flex",
-			alignItems: "center",
-			justifyContent: "space-between",
-			padding: "6px 8px",
-			borderBottom: "1px solid var(--background-modifier-border)",
-			fontWeight: "700",
-		});
-		head.createSpan({ text: title });
-		const close = head.createEl("button", { text: "×" });
-		close.setCssStyles({
-			background: "transparent",
-			border: "none",
-			color: "var(--text-muted)",
-			cursor: "pointer",
-			fontSize: "16px",
-		});
-		close.addEventListener("click", () => {
-			if (onCloseSelection) onCloseSelection();
-			this.closeDetail();
-			this.requestDraw();
-		});
-
-		const list = panel.createDiv({ cls: "gim-detail-list" });
-		list.setCssStyles({ overflowY: "auto", padding: "4px 0" });
-		if (ids.length === 0) {
-			const empty = list.createDiv({ text: "(no shared notes)" });
-			empty.setCssStyles({ padding: "6px 10px", color: "var(--text-faint)" });
-		}
-		for (const id of ids) {
-			const sep = id.indexOf("\t");
-			const path = sep >= 0 ? id.slice(sep + 1) : id;
-			const f = this.app.vault.getAbstractFileByPath(path);
-			const name = f instanceof TFile ? f.basename : path;
-			const row = list.createDiv({ cls: "gim-detail-row", text: name });
-			row.setCssStyles({
-				padding: "4px 10px",
-				cursor: "pointer",
-				whiteSpace: "nowrap",
-				overflow: "hidden",
-				textOverflow: "ellipsis",
-			});
-			row.addEventListener("mouseenter", () => { row.setCssStyles({ background: "var(--background-modifier-hover)" }); });
-			row.addEventListener("mouseleave", () => { row.setCssStyles({ background: "transparent" }); });
-			row.addEventListener("click", () => {
-				this.openFile(id);
-			});
-		}
-		this.detailEl = panel;
-		this.positionDetail(sx, sy, panel);
-	}
-
 	private closeDetail(): void {
 		if (this.detailEl) {
 			this.detailEl.remove();
 			this.detailEl = null;
 		}
-	}
-
-	private positionDetail(sx: number, sy: number, el: HTMLElement): void {
-		const rect = this.canvas.getBoundingClientRect();
-		const w = 248;
-		const h = Math.min(320, el.offsetHeight || 320);
-		let x = Math.min(sx + 14, rect.width - w - 8);
-		x = Math.max(8, x);
-		let y = Math.min(sy + 8, rect.height - h - 8);
-		y = Math.max(8, y);
-		el.setCssStyles({ left: `${x}px` });
-		el.setCssStyles({ top: `${y}px` });
 	}
 
 	// Build the visible display lines: rows bundled into signature blocks, and
@@ -4280,7 +3947,6 @@ export class MiniGraphView extends ItemView {
 			} else if (this.tipEl) {
 				this.positionTip(sx, sy, this.tipEl);
 			}
-			return;
 			return;
 		}
 		if (this.settings.viewMode === "stream" && this.laid.stream) {
