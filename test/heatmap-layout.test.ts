@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import * as assert from "node:assert";
-import { layoutHeatmap } from "../src/heatmap-layout";
+import { layoutHeatmap } from "../src/layout/heatmap-layout";
 import type { GraphData } from "../src/types";
-import type { LayoutOptions } from "../src/layout";
+import type { LayoutOptions } from "../src/layout/layout";
 
 // Regression guard for the heatmap cell→notes mapping that backs
 // `openHeatmapDetail`. The reported bug was: clicking the battle×battle

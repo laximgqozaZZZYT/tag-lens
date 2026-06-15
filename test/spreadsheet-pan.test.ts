@@ -5,7 +5,7 @@
 // the first column(s) and shifting every cell click off by ≥1 cell (clicking
 // the apparent "battle" diagonal opened a different tag's notes).
 import { ok, approx } from "./assert";
-import { clampSpreadsheetPan } from "../src/spreadsheet-pan";
+import { clampSpreadsheetPan } from "../src/interaction/spreadsheet-pan";
 
 // Mirror heatmapGeom's labelBand formula for the test.
 const labelBandOf = (w: number) => Math.min(380, Math.max(170, w * 0.27));

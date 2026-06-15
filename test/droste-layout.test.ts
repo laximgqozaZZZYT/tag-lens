@@ -1,5 +1,5 @@
 import { approx, ok } from "./assert";
-import { layoutDroste, drosteRoles, drosteUV, drosteInvSource } from "../src/droste-layout";
+import { layoutDroste, drosteRoles, drosteUV, drosteInvSource } from "../src/layout/droste-layout";
 import type { GraphData } from "../src/types";
 
 // Fixture for the T-based containment order. N = n0 with tags {A,B} ⇒ T={A,B}.

@@ -13,7 +13,7 @@ import {
 	makeOverlay,
 	colorAlpha,
 	type SwatchRole,
-} from "../src/theme";
+} from "../src/draw/theme";
 
 // --- parseColor ---------------------------------------------------------
 {

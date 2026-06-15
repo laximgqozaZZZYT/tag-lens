@@ -1,8 +1,8 @@
 import { App, setIcon, Modal, Notice } from "obsidian";
-import type { LaidOut } from "../layout";
+import type { LaidOut } from "../layout/layout";
 import type { MiniSettings } from "../types";
-import { staleClusters } from "../freshness";
-import { streamGeom } from "../draw-stream";
+import { staleClusters } from "../visual/freshness";
+import { streamGeom } from "../draw/draw-stream";
 import { computeCognitiveLoad, computeTagSuggestions, type ComputedCognitiveLoad } from "./compute";
 import { applyGolderClassification, convertToNestedTag } from "./actions";
 

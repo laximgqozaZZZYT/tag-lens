@@ -26,7 +26,7 @@ import {
 	buildFolderPathKey,
 	type NoteRef,
 	type TreeNode,
-} from "../src/note-menu";
+} from "../src/interaction/note-menu";
 
 const menuNotes: NoteRef[] = [
 	{ id: "Area/a.md", label: "a" },

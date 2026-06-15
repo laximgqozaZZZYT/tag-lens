@@ -1,5 +1,5 @@
 import { ok } from "./assert";
-import { captureLens, applyLens, upsertPreset, removePreset, validatePresetName } from "../src/lens-presets";
+import { captureLens, applyLens, upsertPreset, removePreset, validatePresetName } from "../src/interaction/lens-presets";
 import { DEFAULT_SETTINGS, MiniSettings } from "../src/types";
 
 // captureLens copies arrays deeply

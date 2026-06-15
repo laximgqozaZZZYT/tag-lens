@@ -1,5 +1,5 @@
 import { ok, approx } from "./assert";
-import { freshnessAlpha, staleClusters } from "../src/freshness";
+import { freshnessAlpha, staleClusters } from "../src/visual/freshness";
 
 // freshnessAlpha
 {

@@ -1,6 +1,6 @@
 import { ok } from "./assert";
-import { computeDroppedClusters } from "../src/query-pipeline";
-import { filterMemberships } from "../src/query-filters";
+import { computeDroppedClusters } from "../src/query/query-pipeline";
+import { filterMemberships } from "../src/query/query-filters";
 import type { GraphNode, GraphData } from "../src/types";
 
 // Mock graph nodes for testing

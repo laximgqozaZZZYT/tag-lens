@@ -2,8 +2,8 @@
 // quantitative bins, single-axis binding, selection non-interference (every cell
 // placed exactly once at a unique position), and band-geometry for the grid.
 import { ok } from "./assert";
-import { assignGalleryAxes } from "../src/droste-axis";
-import type { GalleryCell } from "../src/droste-layout";
+import { assignGalleryAxes } from "../src/layout/droste-axis";
+import type { GalleryCell } from "../src/layout/droste-layout";
 import type { EncContext, EncNode, EncodingBinding } from "../src/encoding/types";
 
 const ctx: EncContext = {

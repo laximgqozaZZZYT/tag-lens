@@ -1,45 +1,45 @@
 import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon, Notice, Menu, MarkdownView } from "obsidian";
-import { exportCanvasDims } from "./image-export";
+import { exportCanvasDims } from "./visual/image-export";
 import { renderInsightTab } from "./insight/render";
 import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
 import { effectiveEncoding } from "./encoding/migrate";
 import type { EncContext, EncNode, NodeDrawParams, EncodingBinding } from "./encoding/types";
-import { axisLayout, type AxisSpec, type AxisBand, type AxisTick } from "./axis-layout";
-import { assignGalleryAxes } from "./droste-axis";
-import { LaneRegistry, routeZ } from "./edge-routing";
-import { buildIdToRect, buildRouteObstacles } from "./layout-shared";
-import { buildGraph } from "./parser";
+import { axisLayout, type AxisSpec, type AxisBand, type AxisTick } from "./layout/axis-layout";
+import { assignGalleryAxes } from "./layout/droste-axis";
+import { LaneRegistry, routeZ } from "./layout/edge-routing";
+import { buildIdToRect, buildRouteObstacles } from "./layout/layout-shared";
+import { buildGraph } from "./query/parser";
 import {
 	layout,
 	type LaidOut,
 	type PositionedNode,
 	type SizedNode,
 	type ClusterRect,
-} from "./layout";
+} from "./layout/layout";
 import type { MiniSettings, GraphNode, GraphData, ViewMode } from "./types";
 import { CARD_CELL_W, CARD_CELL_H } from "./types";
-import { type LimitRule, applyLimitRules } from "./limit";
-import { filterMemberships, filterLabels } from "./query-filters";
+import { type LimitRule, applyLimitRules } from "./query/limit";
+import { filterMemberships, filterLabels } from "./query/query-filters";
 import {
 	parseLimitRules as parseLimitRulesFn,
 	getSortKey as getSortKeyFn,
 	computeDroppedClusters as computeDroppedClustersFn,
-} from "./query-pipeline";
-import { clusterHue } from "./canvas-utils";
-import { resolveTheme, setTheme, theme, colorAlpha } from "./theme";
-import { expandClustersByInheritance, computeClusterBBoxes } from "./cluster-bbox";
-import { runAggregateSnap } from "./aggregate-snap";
+} from "./query/query-pipeline";
+import { clusterHue } from "./draw/canvas-utils";
+import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
+import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
+import { runAggregateSnap } from "./layout/aggregate-snap";
 import {
 	drawCardGrid as drawCardGridFn,
 	drawGridHeaders as drawGridHeadersFn,
 	drawClusterLabels as drawClusterLabelsFn,
 	drawAggregateStack as drawAggregateStackFn,
 	drawOverviewLabels as drawOverviewLabelsFn,
-} from "./draw-helpers";
+} from "./draw/draw-helpers";
 import {
 	computeMemberSets,
 	computeStrictSupersets,
-} from "./cluster-relations";
+} from "./layout/cluster-relations";
 
 import {
 	resolveNodeDisplay as resolveNodeDisplayFn,
@@ -47,35 +47,35 @@ import {
 	visualScale,
 	type NodeDisplay,
 	type NodeDisplayDeps,
-} from "./node-display";
-import { drawEnclosures } from "./draw-enclosures";
-import { drawBaseEdges, drawAccentEdges, drawGhostEdges } from "./draw-edges";
+} from "./visual/node-display";
+import { drawEnclosures } from "./draw/draw-enclosures";
+import { drawBaseEdges, drawAccentEdges, drawGhostEdges } from "./draw/draw-edges";
 import {
 	drawUpsetFooter,
 	upsetFooterHeight,
 	LEFT_BAND_PX as UPSET_LEFT_BAND_PX,
-} from "./draw-upset";
-import { drawMatrix, matrixGeom, MATRIX_BADGE_W } from "./draw-matrix";
-import type { MatrixLine } from "./draw-matrix";
-import { drawHeatmap, heatmapGeom } from "./draw-heatmap";
-import { clampSpreadsheetPan } from "./spreadsheet-pan";
-import { drawDroste } from "./draw-droste";
-import { layoutStream } from "./stream-layout";
-import { drawStream, streamGeom } from "./draw-stream";
+} from "./draw/draw-upset";
+import { drawMatrix, matrixGeom, MATRIX_BADGE_W } from "./draw/draw-matrix";
+import type { MatrixLine } from "./draw/draw-matrix";
+import { drawHeatmap, heatmapGeom } from "./draw/draw-heatmap";
+import { clampSpreadsheetPan } from "./interaction/spreadsheet-pan";
+import { drawDroste } from "./draw/draw-droste";
+import { layoutStream } from "./layout/stream-layout";
+import { drawStream, streamGeom } from "./draw/draw-stream";
 import {
 	drawLattice,
 	latticeCellAt,
 	latticeHeaderCheckboxHit,
 	latticeNamedRowAt,
 	TIER_GUTTER as LATTICE_TIER_GUTTER,
-} from "./draw-lattice";
-import { latticeNodeAt } from "./lattice-layout";
-import { drawCard as drawCardFn } from "./draw-card";
+} from "./draw/draw-lattice";
+import { latticeNodeAt } from "./layout/lattice-layout";
+import { drawCard as drawCardFn } from "./draw/draw-card";
 import {
 	hitTest as hitTestFn,
 	screenToWorld as screenToWorldFn,
 	type HoverTarget,
-} from "./hit-test";
+} from "./interaction/hit-test";
 import {
 	resolveEffectiveQuery,
 	resolveEffectiveHaving,
@@ -83,17 +83,17 @@ import {
 	filterEdgesByAlive,
 	filterLayoutData,
 	buildAdjacency,
-} from "./rebuild-pipeline";
+} from "./query/rebuild-pipeline";
 import {
 	type CardContent,
 	computeCardSize,
 	computeChannelDims,
 	measureCard as measureCardFn,
 	minFontScale,
-} from "./card-sizing";
+} from "./layout/card-sizing";
 import {
 	toggleArrayMember as toggleArrayMemberFn,
-} from "./panel-sections";
+} from "./panel/panel-sections";
 
 import {
 	renderSettingsViewTab,
@@ -104,16 +104,16 @@ import {
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes, menuLimitedNodes } from "./panel/menu-notes";
 import { copyBlobToClipboard, saveBlobToVault } from "./panel/export-image";
-import { findGaps, type TagGap } from "./gap-finder";
-import { findBridges, type BridgeCandidate } from "./bridge-finder";
+import { findGaps, type TagGap } from "./query/gap-finder";
+import { findBridges, type BridgeCandidate } from "./query/bridge-finder";
 import {
 	HOVER_DELAY_MS,
 	sameTarget,
 	computeHighlight,
 	positionTip as positionTipFn,
-} from "./highlight";
-import { MarqueeController } from "./marquee-controller";
-import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./note-menu";
+} from "./interaction/highlight";
+import { MarqueeController } from "./interaction/marquee-controller";
+import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
 
 export const VIEW_TYPE_MINI = "tag-lens-view";
 
@@ -2590,7 +2590,7 @@ export class MiniGraphView extends ItemView {
 	}
 
 	// Debug: last-drawn cluster label boxes (world space).
-	_labelBoxes: import("./draw-helpers").PlacedLabelBox[] = [];
+	_labelBoxes: import("./draw/draw-helpers").PlacedLabelBox[] = [];
 
 	private drawAggregateStack(
 		ctx: CanvasRenderingContext2D,
@@ -3719,7 +3719,7 @@ export class MiniGraphView extends ItemView {
 	// Lattice node click (header / overview / density / Other) → Switch to
 	// Close-up for the notes in that exact intersection.
 	private openLatticeDetail(
-		node: import("./layout").LatticeNodeMeta,
+		node: import("./layout/layout").LatticeNodeMeta,
 		_sx: number,
 		_sy: number,
 	): void {

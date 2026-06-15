@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import * as assert from "node:assert";
-import { layoutStream } from "../src/stream-layout";
+import { layoutStream } from "../src/layout/stream-layout";
 import type { GraphData } from "../src/types";
 import { TFile } from "obsidian";
 

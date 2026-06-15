@@ -7,7 +7,7 @@ import {
 	evalQuery,
 	isMatched,
 	type FileFacts,
-} from "../src/query";
+} from "../src/query/query";
 
 function facts(tags: string[], frontmatter: Record<string, unknown> = {}, tagProperties?: Record<string, Record<string, unknown>>): FileFacts {
 	return { path: "n.md", tags, frontmatter, tagProperties };

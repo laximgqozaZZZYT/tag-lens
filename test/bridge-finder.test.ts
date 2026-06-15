@@ -1,5 +1,5 @@
 import { ok as assertOk, approx } from "./assert";
-import { findBridges } from "../src/bridge-finder";
+import { findBridges } from "../src/query/bridge-finder";
 
 // Simple graph with two pairs.
 // 1 and 2 share "A", "B", "C". 2 also has "D".

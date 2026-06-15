@@ -2,7 +2,7 @@
 // placement, single-axis binding, in-cell packing, and the selection
 // non-interference invariant (every node placed exactly once).
 import { ok, approx } from "./assert";
-import { axisLayout } from "../src/axis-layout";
+import { axisLayout } from "../src/layout/axis-layout";
 import type { EncNode, EncContext, EncodingBinding } from "../src/encoding/types";
 
 const ctx: EncContext = {

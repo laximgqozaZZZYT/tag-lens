@@ -1,6 +1,6 @@
 import type { MiniSettings } from "../types";
 import { MATRIX_ORDER_CRITERIA, HEATMAP_ORDER_CRITERIA, VIEW_MODES, isPanorama, isCloseup } from "../types";
-import type { NodeDisplay } from "../node-display";
+import type { NodeDisplay } from "../visual/node-display";
 
 export interface MinFontSectionDeps {
 	settings: MiniSettings;

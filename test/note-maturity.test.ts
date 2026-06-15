@@ -1,5 +1,5 @@
 import { ok } from "./assert";
-import { suggestMaturity, effectiveMaturity } from "../src/tag-classification";
+import { suggestMaturity, effectiveMaturity } from "../src/query/tag-classification";
 
 // note maturity - heuristics
 // A fleeting note

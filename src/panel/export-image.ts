@@ -2,7 +2,7 @@
 // from the pure ./image-export helpers (exportFileName/exportCanvasDims) so those
 // stay unit-testable. Extracted from view.ts as free functions taking deps.
 import { App, Notice } from "obsidian";
-import { exportFileName } from "../image-export";
+import { exportFileName } from "../visual/image-export";
 
 export interface ExportIODeps {
 	app: App;

@@ -1,5 +1,5 @@
 import { ok, approx } from "./assert";
-import { findGaps } from "../src/gap-finder";
+import { findGaps } from "../src/query/gap-finder";
 
 const tags = [
 	{ key: "a", label: "A", size: 100 },

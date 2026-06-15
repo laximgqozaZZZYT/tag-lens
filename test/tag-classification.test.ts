@@ -2,7 +2,7 @@
 // a persisted (applied) classification must win over the heuristic suggestion,
 // while absent/garbage persisted values fall back to the suggestion.
 import { ok } from "./assert";
-import { effectiveClassification, isGolderType } from "../src/tag-classification";
+import { effectiveClassification, isGolderType } from "../src/query/tag-classification";
 
 // persisted choice wins over the suggestion (the core bug being fixed)
 ok(

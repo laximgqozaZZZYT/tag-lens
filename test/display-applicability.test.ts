@@ -2,7 +2,7 @@
 // UpSet gets only the card-level subset, and screen-space / diagram modes get
 // none of the world-space card toggles.
 import { ok } from "./assert";
-import { displayToggleApplies, type DisplayToggleKey } from "../src/display-applicability";
+import { displayToggleApplies, type DisplayToggleKey } from "../src/visual/display-applicability";
 
 const ALL_KEYS: DisplayToggleKey[] = [
 	"showNodes",

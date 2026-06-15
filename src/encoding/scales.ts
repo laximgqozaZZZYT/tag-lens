@@ -2,7 +2,7 @@
 // Pure (no DOM/Obsidian). Quantitative scales emit { t: 0..1 }; categorical
 // scales emit { category, output } where output is a concrete colour string.
 // Reuses clusterHue (canvas-utils) for stable auto palettes.
-import { clusterHue } from "../canvas-utils";
+import { clusterHue } from "../draw/canvas-utils";
 import type { ScaleConfig, ScaledValue } from "./types";
 
 export interface LegendEntry {

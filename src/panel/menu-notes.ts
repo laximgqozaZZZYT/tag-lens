@@ -4,11 +4,11 @@
 // the one place Obsidian metadata is read for the navigator. Behaviour-preserving.
 import { App, TFile } from "obsidian";
 import type { GraphNode, GraphData, MiniSettings } from "../types";
-import { stripTabPrefix } from "../note-menu";
-import { resolveEffectiveHaving, computeDegreeMaps } from "../rebuild-pipeline";
-import { computeDroppedClusters, getSortKey } from "../query-pipeline";
-import { applyLimitRules, type LimitRule } from "../limit";
-import { filterMemberships } from "../query-filters";
+import { stripTabPrefix } from "../interaction/note-menu";
+import { resolveEffectiveHaving, computeDegreeMaps } from "../query/rebuild-pipeline";
+import { computeDroppedClusters, getSortKey } from "../query/query-pipeline";
+import { applyLimitRules, type LimitRule } from "../query/limit";
+import { filterMemberships } from "../query/query-filters";
 
 // Concrete projected note shape (matches view's `menuNotes` field).
 export interface MenuNote {

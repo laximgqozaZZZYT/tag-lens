@@ -1,5 +1,5 @@
 import { ok } from "./assert";
-import { resolveStatusColor, autoAssignColors } from "../src/status-overlay";
+import { resolveStatusColor, autoAssignColors } from "../src/visual/status-overlay";
 
 const customColors = {
 	"to-read": "#ff0000",

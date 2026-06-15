@@ -1,5 +1,5 @@
 import { approx } from "./assert";
-import { drosteForward, drosteInverseBranch, subdivideSegment, type DrosteParams } from "../src/conformal";
+import { drosteForward, drosteInverseBranch, subdivideSegment, type DrosteParams } from "../src/layout/conformal";
 
 const P: DrosteParams = { k: 2.5, twistDir: 1, R0: 100 };
 

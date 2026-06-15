@@ -2,7 +2,7 @@
 // table tab. Extracted from view.ts as a free function (DI) per the view-split
 // plan: the view side becomes a thin delegator. Behaviour-preserving.
 import type { App } from "obsidian";
-import { stripTabPrefix, type NoteRef } from "../note-menu";
+import { stripTabPrefix, type NoteRef } from "../interaction/note-menu";
 
 // Only the edge fields the Link Preview needs (PositionedEdge is assignable).
 export interface DataTableEdge {

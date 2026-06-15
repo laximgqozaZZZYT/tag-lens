@@ -17,12 +17,12 @@
 //     selectAll removes all listed hide-keys; deselectAll adds them all.
 
 import { ok } from "./assert";
-import { buildGallery } from "../src/droste-layout";
-import { filterLayoutData } from "../src/rebuild-pipeline";
-import { hideKey, nodeIsHidden, navigatorNodeSource } from "../src/note-menu";
+import { buildGallery } from "../src/layout/droste-layout";
+import { filterLayoutData } from "../src/query/rebuild-pipeline";
+import { hideKey, nodeIsHidden, navigatorNodeSource } from "../src/interaction/note-menu";
 import type { GraphData, MiniSettings } from "../src/types";
-import type { NoteRef } from "../src/note-menu";
-import { updateRow, removeRow } from "../src/panel-sections";
+import type { NoteRef } from "../src/interaction/note-menu";
+import { updateRow, removeRow } from "../src/panel/panel-sections";
 
 // ─── Minimal MiniSettings stub (only the fields filterLayoutData needs) ───────
 function stubSettings(hiddenNodes: string[]): MiniSettings {

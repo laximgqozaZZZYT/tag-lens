@@ -1,5 +1,5 @@
 import { App } from "obsidian";
-import { effectiveClassification } from "../tag-classification";
+import { effectiveClassification } from "../query/tag-classification";
 
 export interface GlobalStats {
 	totalNotes: number;

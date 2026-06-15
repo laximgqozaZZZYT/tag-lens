@@ -1,6 +1,6 @@
 import { Plugin, PluginSettingTab, Setting, WorkspaceLeaf } from "obsidian";
 import { DEFAULT_SETTINGS, MiniSettings, LensPreset } from "./types";
-import { applyLens } from "./lens-presets";
+import { applyLens } from "./interaction/lens-presets";
 import { MiniGraphView, VIEW_TYPE_MINI } from "./view";
 
 export default class GraphIslandMiniPlugin extends Plugin {

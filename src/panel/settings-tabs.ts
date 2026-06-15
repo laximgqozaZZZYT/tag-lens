@@ -8,16 +8,16 @@ import {
 	renderOrderBySection,
 	renderExprSection,
 	renderPresetSection,
-} from "../panel-sections";
+} from "./panel-sections";
 import { setIcon, Notice } from "obsidian";
-import { applyLens, captureLens, upsertPreset, removePreset } from "../lens-presets";
-import { displayToggleApplies } from "../display-applicability";
+import { applyLens, captureLens, upsertPreset, removePreset } from "../interaction/lens-presets";
+import { displayToggleApplies } from "../visual/display-applicability";
 import type { LensPreset } from "../types";
 import { fieldSourceRegistry } from "../encoding/field-sources";
 import type { EncodingBinding, ScaleType } from "../encoding/types";
 import type { BindingLegend } from "../encoding/evaluate";
-import { clusterHue } from "../canvas-utils";
-import { theme } from "../theme";
+import { clusterHue } from "../draw/canvas-utils";
+import { theme } from "../draw/theme";
 import {
 	renderMatrixMinColumnControl,
 	renderHeatmapMinTagControl,
@@ -30,9 +30,9 @@ import {
 import {
 	renderToggleSection,
 	toggleArrayMember,
-} from "../panel-sections";
-import type { LaidOut } from "../layout";
-import type { NodeDisplay } from "../node-display";
+} from "./panel-sections";
+import type { LaidOut } from "../layout/layout";
+import type { NodeDisplay } from "../visual/node-display";
 
 export interface ViewTabDeps {
 	settings: MiniSettings;

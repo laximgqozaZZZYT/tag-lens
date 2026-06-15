@@ -1,7 +1,7 @@
 // PNG-export pure-helper tests: filename slug/stamp formatting and the
 // dimension-clamping that keeps an export under the browser canvas limit.
 import { ok } from "./assert";
-import { exportFileName, exportCanvasDims, MAX_EXPORT_DIM } from "../src/image-export";
+import { exportFileName, exportCanvasDims, MAX_EXPORT_DIM } from "../src/visual/image-export";
 
 // filename: slugifies the mode label and zero-pads every stamp field.
 // (Date month is 0-based, so 5 -> June.)
