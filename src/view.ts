@@ -118,7 +118,7 @@ import {
 	renderFilterBodyTab,
 } from "./panel/settings-tabs";
 import { renderDataTableView } from "./panel/data-table-view";
-import { projectMenuNotes } from "./panel/menu-notes";
+import { projectMenuNotes, menuLimitedNodes } from "./panel/menu-notes";
 import { findGaps, type TagGap } from "./gap-finder";
 import { findBridges, type BridgeCandidate } from "./bridge-finder";
 import {
@@ -1281,7 +1281,11 @@ export class MiniGraphView extends ItemView {
 		const menuNodeSource = navigatorNodeSource({
 			isDroste: this.settings.viewMode === "droste",
 			galleryNodes: drosteFullData?.nodes ?? [],
-			limitedNodes: this.menuLimitedNodes(menuSourceData),
+			limitedNodes: menuLimitedNodes(menuSourceData, {
+				app: this.app,
+				settings: this.settings,
+				tiers: this.parseLimitRules(),
+			}),
 		});
 		this.menuNotes = projectMenuNotes(menuNodeSource, this.app);
 
@@ -3024,63 +3028,6 @@ export class MiniGraphView extends ItemView {
 	// stability with `menuClickAction` (click ROUTING stays mode-appropriate).
 	private currentMenuNotes(): NoteRef[] {
 		return menuNoteList(this.laid, this.menuNotes);
-	}
-
-	// Build the navigator's universal note set MODE-INDEPENDENTLY.
-	//
-	// Source = the pristine post-buildGraph graph (post WHERE/GROUP_BY, pre any
-	// HAVING/LIMIT). We then re-run the HAVING and LIMIT stages here using the
-	// user's REAL `havingAuto` (never the lattice/droste auto-HAVING exemption
-	// applied to the on-canvas `data`). Because no view mode is special-cased,
-	// the resulting note SET, order, and memberships depend ONLY on the vault +
-	// the WHERE/GROUP_BY/HAVING/LIMIT settings — so the menu's note list, Folder
-	// tree, Tag tree, and search are IDENTICAL across every view mode.
-	//
-	// (Manual/explicit HAVING and WHERE/LIMIT still apply — those are intended
-	// filters shared by all modes; only the mode-dependent auto-HAVING exemption
-	// is removed from the menu.)
-	// The mode-invariant LIMIT-trimmed node set for the navigator: applies the
-	// user's REAL HAVING + LIMIT (stages 1–2) so the same vault + settings yield
-	// an identical list in every NON-droste mode. Returns the surviving GraphNodes
-	// (un-projected) so the caller can pick this OR the full droste snapshot via
-	// `navigatorNodeSource` before the single projection pass.
-	private menuLimitedNodes(source: GraphData): GraphNode[] {
-		// 1. HAVING — using the user's real havingAuto (mode-independent).
-		let graph: GraphData = { nodes: source.nodes.slice(), edges: source.edges.slice() };
-		const eff = resolveEffectiveHaving(
-			this.settings.having,
-			this.settings.havingAuto,
-			graph.nodes.length,
-		);
-		const { dropped } = computeDroppedClustersFn(
-			graph.nodes,
-			eff,
-			this.settings.havingAuto,
-		);
-		if (this.settings.havingMode !== "highlight" && dropped.size > 0) {
-			const droppedSet = new Set(dropped.keys());
-			graph = filterMemberships(graph, droppedSet);
-		}
-
-		// 2. LIMIT — same rules as the canvas, ranked by a SELF-CONTAINED degree
-		//    map (from this graph's own edges) + this graph's memberships, so the
-		//    selection never depends on the mode-specific on-canvas state.
-		const degreeMap = computeDegreeMaps(graph.edges).degreeMap;
-		const membById = new Map(graph.nodes.map((n) => [n.id, n.memberships]));
-		const tiers = this.parseLimitRules();
-		const { visibleNodes } = applyLimitRules(
-			graph.nodes,
-			tiers,
-			this.settings.orderField,
-			this.settings.orderDir,
-			(id, field) =>
-				getSortKeyFn(id, field, {
-					app: this.app,
-					degreeMap,
-					membershipsOf: (nid) => membById.get(nid),
-				}),
-		);
-		return visibleNodes;
 	}
 
 	// Which row to highlight as "current": the droste focus in droste mode,

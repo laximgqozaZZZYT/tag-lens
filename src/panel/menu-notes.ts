@@ -3,8 +3,12 @@
 // from view.ts (DI pattern) — note-menu.ts itself stays pure/DOM-less; this is
 // the one place Obsidian metadata is read for the navigator. Behaviour-preserving.
 import { App, TFile } from "obsidian";
-import type { GraphNode } from "../types";
+import type { GraphNode, GraphData, MiniSettings } from "../types";
 import { stripTabPrefix } from "../note-menu";
+import { resolveEffectiveHaving, computeDegreeMaps } from "../rebuild-pipeline";
+import { computeDroppedClusters, getSortKey } from "../query-pipeline";
+import { applyLimitRules, type LimitRule } from "../limit";
+import { filterMemberships } from "../query-filters";
 
 // Concrete projected note shape (matches view's `menuNotes` field).
 export interface MenuNote {
@@ -63,6 +67,53 @@ export function noteSearchMeta(
 		}
 	}
 	return { tags: [...tagSet], frontmatter };
+}
+
+// Build the navigator's universal note set MODE-INDEPENDENTLY: re-run the user's
+// REAL HAVING + LIMIT (stages 1-2) on the pristine post-buildGraph graph so the
+// same vault + settings yield an identical list in every NON-droste mode.
+// Returns the surviving (un-projected) GraphNodes so the caller can pick this OR
+// the full droste snapshot before the single projection pass.
+export function menuLimitedNodes(
+	source: GraphData,
+	deps: { app: App; settings: MiniSettings; tiers: LimitRule[] },
+): GraphNode[] {
+	const { app, settings, tiers } = deps;
+	// 1. HAVING — using the user's real havingAuto (mode-independent).
+	let graph: GraphData = { nodes: source.nodes.slice(), edges: source.edges.slice() };
+	const eff = resolveEffectiveHaving(
+		settings.having,
+		settings.havingAuto,
+		graph.nodes.length,
+	);
+	const { dropped } = computeDroppedClusters(
+		graph.nodes,
+		eff,
+		settings.havingAuto,
+	);
+	if (settings.havingMode !== "highlight" && dropped.size > 0) {
+		const droppedSet = new Set(dropped.keys());
+		graph = filterMemberships(graph, droppedSet);
+	}
+
+	// 2. LIMIT — same rules as the canvas, ranked by a SELF-CONTAINED degree map
+	//    (from this graph's own edges) + this graph's memberships, so the selection
+	//    never depends on the mode-specific on-canvas state.
+	const degreeMap = computeDegreeMaps(graph.edges).degreeMap;
+	const membById = new Map(graph.nodes.map((n) => [n.id, n.memberships]));
+	const { visibleNodes } = applyLimitRules(
+		graph.nodes,
+		tiers,
+		settings.orderField,
+		settings.orderDir,
+		(id, field) =>
+			getSortKey(id, field, {
+				app,
+				degreeMap,
+				membershipsOf: (nid) => membById.get(nid),
+			}),
+	);
+	return visibleNodes;
 }
 
 // Project navigator GraphNodes to MenuNotes, backfilling search metadata
