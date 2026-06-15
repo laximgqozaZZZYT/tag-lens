@@ -7,11 +7,14 @@ main.js
 # distributable plugin. Kept locally only.
 scripts/
 # Ignore docs/ contents (local notes w/ absolute paths) EXCEPT the
-# version-controlled design specs under docs/superpowers/. Git can't re-include
-# a path whose parent dir is excluded, so exclude docs/* (one level) not docs/.
+# version-controlled design specs. Git can't re-include a path whose parent dir
+# is excluded, so exclude docs/* (one level) not docs/.
+# Re-include every version spec dir (docs/<x.y.z>/, name starts with a digit) so
+# new releases are tracked automatically without editing this file each bump.
+# docs/old/ stays ignored (archived stale notes); docs/superpowers/ kept too.
 docs/*
 !docs/superpowers/
-!docs/0.3.12/
+!docs/[0-9]*/
 
 # Droste stage verification artifacts
 stage1-mesh.svg
