@@ -119,6 +119,7 @@ import {
 } from "./panel/settings-tabs";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes, menuLimitedNodes } from "./panel/menu-notes";
+import { copyBlobToClipboard, saveBlobToVault } from "./panel/export-image";
 import { findGaps, type TagGap } from "./gap-finder";
 import { findBridges, type BridgeCandidate } from "./bridge-finder";
 import {
@@ -1966,53 +1967,11 @@ export class MiniGraphView extends ItemView {
 			return;
 		}
 
+		const ioDeps = { app: this.app, viewMode: this.settings.viewMode };
 		if (opts.target === "clipboard") {
-			await this.copyBlobToClipboard(blob);
+			await copyBlobToClipboard(blob, ioDeps);
 		} else {
-			await this.saveBlobToVault(blob);
-		}
-	}
-
-	private async copyBlobToClipboard(blob: Blob): Promise<void> {
-		const w = activeWindow as unknown as {
-			ClipboardItem?: new (items: Record<string, Blob>) => unknown;
-			navigator?: { clipboard?: { write?: (data: unknown[]) => Promise<void> } };
-		};
-		const Ctor = w.ClipboardItem;
-		const write = w.navigator?.clipboard?.write;
-		if (!Ctor || !write) {
-			new Notice("Tag Lens: clipboard image copy unavailable — saving to vault instead.");
-			await this.saveBlobToVault(blob);
-			return;
-		}
-		try {
-			await write.call(w.navigator!.clipboard, [new Ctor({ "image/png": blob })]);
-			new Notice("Tag Lens: view copied to clipboard.");
-		} catch (e) {
-			new Notice("Tag Lens: clipboard copy failed — saving to vault instead.");
-			console.error("[tag-lens] clipboard copy failed:", e);
-			await this.saveBlobToVault(blob);
-		}
-	}
-
-	private async saveBlobToVault(blob: Blob): Promise<void> {
-		const name = exportFileName(this.settings.viewMode, new Date());
-		const fm = this.app.fileManager as unknown as {
-			getAvailablePathForAttachment?: (n: string, src?: string) => Promise<string> | string;
-		};
-		let path = name;
-		try {
-			if (typeof fm.getAvailablePathForAttachment === "function") {
-				path = await fm.getAvailablePathForAttachment(name, "");
-			}
-			const buf = await blob.arrayBuffer();
-			const file = await this.app.vault.createBinary(path, buf);
-			new Notice(`Tag Lens: image saved to ${file.path}`);
-		} catch (e) {
-			new Notice(
-				`Tag Lens: failed to save image — ${e instanceof Error ? e.message : String(e)}`,
-			);
-			console.error("[tag-lens] save image failed:", e);
+			await saveBlobToVault(blob, ioDeps);
 		}
 	}
 
