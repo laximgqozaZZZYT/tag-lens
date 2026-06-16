@@ -129,14 +129,20 @@ function buildAxis(
 		};
 	}
 
-	// quantitative
+	// quantitative — place ticks at evenly-spaced VALUES and position each via the
+	// SAME forward scale used for node coords, so a gridline's label always matches
+	// where a node of that value lands. Identical to even spacing for linear;
+	// correctly compressed for log / ranked for quantile (fixes the bug where the
+	// label was linearly interpolated while the position was non-linear).
 	const min = scale.legend.min ?? 0;
 	const max = scale.legend.max ?? 1;
 	const ticks: AxisTick[] = [];
 	const N = 5;
 	for (let i = 0; i <= N; i++) {
-		const t = i / N;
-		ticks.push({ pos: t * extent, label: (min + (max - min) * t).toFixed(1) });
+		const v = min + (max - min) * (i / N);
+		const s = scale.apply(v);
+		const pos = (s.missing || s.t == null ? i / N : s.t) * extent;
+		ticks.push({ pos, label: v.toFixed(1) });
 	}
 	return {
 		spec: { kind: "quantitative", fieldLabel: field.label, min, max, ticks },
