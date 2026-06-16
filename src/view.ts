@@ -2811,6 +2811,7 @@ export class MiniGraphView extends ItemView {
 			encFillColor: this.encParams.get(n.id)?.fillColor,
 			encOpacity: this.encParams.get(n.id)?.opacity,
 			encBorderColor: this.encParams.get(n.id)?.borderColor,
+			encShape: this.encParams.get(n.id)?.shape,
 		});
 	}
 

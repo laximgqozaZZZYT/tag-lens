@@ -14,6 +14,8 @@ import {
 	truncateToWidth,
 	floorWorldFontPx,
 } from "./canvas-utils";
+import { shapeMarkerPath } from "./draw-shape";
+import type { NodeShape } from "../encoding/shapes";
 
 // Wrapped + truncated body lines for a card. Computed once by
 // `cardFor()` / measureCard, then cached under the (id, mode, scale)
@@ -57,6 +59,10 @@ export interface DrawCardOptions {
 	// Visual Encoding (Color channel): resolved fill colour for a NOTE card.
 	// Additive — when absent the card keeps its default background.
 	encFillColor?: string;
+
+	// Visual Encoding (Shape channel): resolved shape token for a NOTE card,
+	// drawn as a small marker badge in the top-right corner. Additive.
+	encShape?: string;
 }
 
 // Pure card renderer. Receives the already-resolved scale + body lines
@@ -144,6 +150,20 @@ export function drawCard(
 		ctx.fill();
 		ctx.lineWidth = 1 / zoom;
 		ctx.strokeStyle = theme().accent;
+		ctx.stroke();
+	}
+
+	// Shape channel: a small marker badge in the top-RIGHT corner (mirrors the
+	// maturity badge top-left). Note cards only, so it never fights a SET fill.
+	if (opts.encShape && !isSet) {
+		const mR = 4 / zoom;
+		const mX = x + w - mR - 2 / zoom;
+		const mY = y + mR + 2 / zoom;
+		shapeMarkerPath(ctx, opts.encShape as NodeShape, mX, mY, mR);
+		ctx.fillStyle = opts.encFillColor ?? theme().accent;
+		ctx.fill();
+		ctx.lineWidth = 1 / zoom;
+		ctx.strokeStyle = theme().textNormal;
 		ctx.stroke();
 	}
 
