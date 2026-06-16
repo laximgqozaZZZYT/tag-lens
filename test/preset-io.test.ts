@@ -1,6 +1,6 @@
 // F1-1 — pure preset (de)serialization. Round-trip fidelity + tolerant parsing.
 import { ok } from "./assert";
-import { serializePresets, parsePresets, PRESET_SCHEMA, PRESET_SCHEMA_VERSION } from "../src/interaction/preset-io";
+import { serializePresets, parsePresets, presetFileName, PRESET_SCHEMA, PRESET_SCHEMA_VERSION } from "../src/interaction/preset-io";
 import { captureLens } from "../src/interaction/lens-presets";
 import { DEFAULT_SETTINGS } from "../src/types";
 import type { LensPreset } from "../src/types";
@@ -68,6 +68,13 @@ const sample: LensPreset[] = [
 {
 	const { presets, errors } = parsePresets(JSON.stringify({ foo: 1 }));
 	ok(presets.length === 0 && errors.length === 1, "plain object rejected");
+}
+
+// presetFileName: stable padded stamp + .json extension.
+{
+	const name = presetFileName(new Date(2026, 0, 5, 9, 8, 7)); // 2026-01-05 09:08:07
+	ok(name === "tag-lens-presets-20260105-090807.json", "padded filename (got " + name + ")");
+	ok(name.endsWith(".json"), "json extension (not .png)");
 }
 
 // Forward-compat: an `encoding` array on a preset is carried through.

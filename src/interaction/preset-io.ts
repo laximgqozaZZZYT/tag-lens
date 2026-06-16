@@ -26,6 +26,19 @@ export function serializePresets(presets: LensPreset[]): string {
 	return JSON.stringify(bundle, null, 2);
 }
 
+function pad2(n: number): string {
+	return n < 10 ? `0${n}` : `${n}`;
+}
+
+// `tag-lens-presets-YYYYMMDD-HHmmss.json`. Distinct from the PNG exportFileName
+// (which hardcodes .png) so image and preset exports never collide.
+export function presetFileName(d: Date): string {
+	const stamp =
+		`${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}` +
+		`-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
+	return `tag-lens-presets-${stamp}.json`;
+}
+
 export interface ParseResult {
 	presets: LensPreset[];
 	errors: string[];

@@ -116,6 +116,7 @@ import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
+import { serializePresets, presetFileName } from "./interaction/preset-io";
 import { hitMatrixLine, hitMatrixCol, hitHeatmapCell } from "./interaction/hit-modes";
 
 export const VIEW_TYPE_MINI = "tag-lens-view";
@@ -818,16 +819,61 @@ export class MiniGraphView extends ItemView {
 		});
 	}
 
-	// Data ▸ JSON tab: import/export Lens presets as JSON (F1). Filled in by
-	// F1-5 (export) and F1-6 (import + bundled). Stub scaffold for now.
+	// Data ▸ JSON tab: import/export Lens presets as JSON (F1). Export here;
+	// import + bundled presets added by F1-6.
 	private renderDataJsonBody(host: HTMLElement): void {
 		host.empty();
 		const title = host.createDiv({ text: "Presets — JSON import / export" });
-		title.setCssStyles({ fontWeight: "600", fontSize: "12px", marginBottom: "4px" });
-		const hint = host.createDiv({
-			text: `${this.settings.lensPresets.length} preset(s) saved. Export/import coming next.`,
+		title.setCssStyles({ fontWeight: "600", fontSize: "12px", marginBottom: "6px" });
+
+		// ── Export ──
+		const count = this.settings.lensPresets.length;
+		const expLabel = host.createDiv({ text: `Export (${count} preset${count === 1 ? "" : "s"})` });
+		expLabel.setCssStyles({ fontSize: "11px", fontWeight: "600", margin: "4px 0 2px" });
+		const json = serializePresets(this.settings.lensPresets);
+		const ta = host.createEl("textarea");
+		ta.value = json;
+		ta.readOnly = true;
+		ta.setCssStyles({
+			width: "100%", height: "120px", fontFamily: "var(--font-monospace, monospace)",
+			fontSize: "10px", resize: "vertical", boxSizing: "border-box",
 		});
-		hint.setCssStyles({ fontSize: "10.5px", color: "var(--text-muted)" });
+		ta.addEventListener("mousedown", (ev) => ev.stopPropagation());
+		const btnRow = host.createDiv();
+		btnRow.setCssStyles({ display: "flex", gap: "6px", marginTop: "4px" });
+		const copyBtn = btnRow.createEl("button", { text: "Copy to clipboard" });
+		copyBtn.addEventListener("click", (ev) => { ev.stopPropagation(); void this.copyTextToClipboard(json); });
+		const saveBtn = btnRow.createEl("button", { text: "Save .json to vault" });
+		saveBtn.addEventListener("click", (ev) => { ev.stopPropagation(); void this.savePresetsJson(json); });
+	}
+
+	private async copyTextToClipboard(text: string): Promise<void> {
+		const clip = (activeWindow as unknown as { navigator?: { clipboard?: { writeText?: (t: string) => Promise<void> } } }).navigator?.clipboard;
+		if (!clip?.writeText) { new Notice("Tag Lens: clipboard unavailable."); return; }
+		try {
+			await clip.writeText(text);
+			new Notice("Tag Lens: presets copied to clipboard.");
+		} catch (e) {
+			new Notice("Tag Lens: clipboard copy failed.");
+			console.error("[tag-lens] preset clipboard copy failed:", e);
+		}
+	}
+
+	private async savePresetsJson(json: string): Promise<void> {
+		try {
+			const fm = this.app.fileManager as unknown as {
+				getAvailablePathForAttachment?: (n: string, src?: string) => Promise<string> | string;
+			};
+			let path = presetFileName(new Date());
+			if (typeof fm.getAvailablePathForAttachment === "function") {
+				path = await fm.getAvailablePathForAttachment(path, "");
+			}
+			const file = await this.app.vault.create(path, json);
+			new Notice(`Tag Lens: presets saved to ${file.path}`);
+		} catch (e) {
+			new Notice(`Tag Lens: failed to save presets — ${e instanceof Error ? e.message : String(e)}`);
+			console.error("[tag-lens] save presets failed:", e);
+		}
 	}
 
 	private refreshFilterTab(): void {
