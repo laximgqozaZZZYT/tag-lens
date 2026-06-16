@@ -71,6 +71,7 @@ import {
 } from "./draw/draw-lattice";
 import { latticeNodeAt } from "./layout/lattice-layout";
 import { drawCard as drawCardFn } from "./draw/draw-card";
+import { drawLegend } from "./draw/legend-layout";
 import {
 	hitTest as hitTestFn,
 	screenToWorld as screenToWorldFn,
@@ -2303,6 +2304,19 @@ export class MiniGraphView extends ItemView {
 
 		if (mode === "heatmap" && this.settings.heatmapJaccard) {
 			drawBadge("Jaccard: ON", "rgba(100, 100, 100, 0.8)");
+		}
+
+		// F4: on-canvas encoding legend (colour / shape / size key). Bottom-left so
+		// it clears the meta badges (top-left) and the toolbar (top-right). Pure
+		// overlay — never affects the figure or selection.
+		if (this.settings.showLegend && this.encLegends.length) {
+			const t = theme();
+			drawLegend(ctx, this.encLegends, cw / dpr, ch / dpr, "bottom-left", 10, {
+				panelBg: colorAlpha(t.panelBg, 0.92),
+				border: t.border,
+				text: t.textNormal,
+				textMuted: t.textMuted,
+			});
 		}
 
 		ctx.restore();

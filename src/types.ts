@@ -117,6 +117,8 @@ export interface MiniSettings {
 	// rows/columns are inferred from actual card centres, not from cluster
 	// bounding boxes (so clusters can overlap the grid freely).
 	showGrid: boolean;
+	// F4: paint the encoding legend (colour/shape/size … key) on the canvas.
+	showLegend: boolean;
 	// Per-card visibility. List of node IDs explicitly hidden globally.
 	// Managed via per-layer card toggles in the settings panel.
 	hiddenNodes: string[];
@@ -470,6 +472,7 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	showEnclosures: true,
 	showEdges: true,
 	showGrid: true,
+	showLegend: true,
 	hiddenNodes: [],
 	aggregatedLayers: [],
 	inheritFrom: {},

@@ -3,6 +3,7 @@
 // paints in screen space. DOM-free + measurer-injected so it unit-tests in Node.
 import type { BindingLegend } from "../encoding/evaluate";
 import { shapeForKey, type NodeShape } from "../encoding/shapes";
+import { shapeMarkerPath } from "./draw-shape";
 
 export interface LegendItem {
 	label: string;
@@ -110,4 +111,105 @@ export function buildLegendBox(legends: BindingLegend[], opts: LegendLayoutOpts)
 
 function capitalize(s: string): string {
 	return s.length ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
+// ── on-canvas renderer ──────────────────────────────────────────────────────
+// Paints the legend in SCREEN space at (originX, originY) — the caller is
+// responsible for setting an identity/dpr transform first. Theme colours are
+// injected so this file stays free of ./theme coupling.
+export interface LegendTheme {
+	panelBg: string;
+	border: string;
+	text: string;
+	textMuted: string;
+}
+
+export type LegendAnchor = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+export function drawLegend(
+	ctx: CanvasRenderingContext2D,
+	legends: BindingLegend[],
+	canvasW: number,
+	canvasH: number,
+	anchor: LegendAnchor,
+	margin: number,
+	theme: LegendTheme,
+	o?: Partial<LegendLayoutOpts>,
+): { width: number; height: number } {
+	if (!legends.length) return { width: 0, height: 0 };
+	const fontPx = o?.fontPx ?? 11;
+	const swatch = o?.swatch ?? 10;
+	const padX = o?.padX ?? 8;
+	ctx.font = `${fontPx}px sans-serif`;
+	const opts: LegendLayoutOpts = {
+		measure: (t) => ctx.measureText(t).width,
+		fontPx, swatch, padX,
+		padY: o?.padY, rowGap: o?.rowGap, sectionGap: o?.sectionGap, maxItemsPerSection: o?.maxItemsPerSection,
+	};
+	const box = buildLegendBox(legends, opts);
+	if (!box.sections.length) return { width: 0, height: 0 };
+
+	const originX = anchor.endsWith("right") ? canvasW - box.width - margin : margin;
+	const originY = anchor.startsWith("bottom") ? canvasH - box.height - margin : margin;
+
+	// Panel background.
+	ctx.fillStyle = theme.panelBg;
+	ctx.strokeStyle = theme.border;
+	ctx.lineWidth = 1;
+	ctx.beginPath();
+	ctx.rect(originX, originY, box.width, box.height);
+	ctx.fill();
+	ctx.stroke();
+
+	const sw = swatch;
+	for (const sec of box.sections) {
+		ctx.font = `600 ${fontPx}px sans-serif`;
+		ctx.fillStyle = theme.textMuted;
+		ctx.textAlign = "start";
+		ctx.textBaseline = "alphabetic";
+		ctx.fillText(sec.title, originX + padX, originY + sec.titleY + fontPx);
+
+		for (const it of sec.items) {
+			const sx = originX + padX;
+			const sy = originY + it.y;
+			if (sec.gradient) {
+				// A small left-to-right value ramp (light → strong) for quantitative.
+				const barW = sw * 4;
+				for (let i = 0; i < barW; i++) {
+					const t = i / barW;
+					ctx.fillStyle = `hsl(210, 70%, ${Math.round(75 - t * 55)}%)`;
+					ctx.fillRect(sx + i, sy, 1, sw);
+				}
+				ctx.fillStyle = theme.text;
+				ctx.textBaseline = "middle";
+				ctx.fillText(it.label, sx + barW + 6, sy + sw / 2);
+				ctx.textBaseline = "alphabetic";
+			} else if (it.shape) {
+				shapeMarkerPath(ctx, it.shape, sx + sw / 2, sy + sw / 2, sw / 2);
+				ctx.fillStyle = theme.text;
+				ctx.fill();
+				ctx.lineWidth = 1;
+				ctx.strokeStyle = theme.border;
+				ctx.stroke();
+				ctx.fillStyle = theme.text;
+				ctx.font = `${fontPx}px sans-serif`;
+				ctx.textBaseline = "middle";
+				ctx.fillText(it.label, sx + sw + 6, sy + sw / 2);
+				ctx.textBaseline = "alphabetic";
+			} else {
+				// Colour swatch (or a muted box for the "+N more" overflow row).
+				ctx.fillStyle = it.color ?? theme.textMuted;
+				ctx.fillRect(sx, sy, sw, sw);
+				ctx.strokeStyle = theme.border;
+				ctx.lineWidth = 1;
+				ctx.strokeRect(sx, sy, sw, sw);
+				ctx.fillStyle = it.color ? theme.text : theme.textMuted;
+				ctx.font = `${fontPx}px sans-serif`;
+				ctx.textBaseline = "middle";
+				ctx.fillText(it.label, sx + sw + 6, sy + sw / 2);
+				ctx.textBaseline = "alphabetic";
+			}
+		}
+	}
+	return { width: box.width, height: box.height };
 }

@@ -41,7 +41,7 @@ for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) {
 		"matrixSort", "matrixSortDir", "maxNeighborhoodSize", "minFontPx", "nodeCols",
 		"nodeDisplayOverrides", "nodeOffsets", "nodeRows", "nodeSpacing", "noteMenuVisible",
 		"orderDir", "orderField", "panelVisible", "panoramaMode", "perspective",
-		"showBody", "showEdges", "showEnclosures", "showGhostEdges", "showGrid",
+		"showBody", "showEdges", "showEnclosures", "showGhostEdges", "showGrid", "showLegend",
 		"showMaturity", "showNodes", "staleDays", "streamAxisField", "streamBinning",
 		"streamRowSort", "upsetColumnSort", "upsetMinColumnSize", "viewMode", "where",
 		"whereAuto",
