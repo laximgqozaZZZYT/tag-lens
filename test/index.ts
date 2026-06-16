@@ -12,6 +12,7 @@ import "./image-export.test";
 import "./tag-classification.test";
 import "./lens-presets.test";
 import "./preset-io.test";
+import "./svg-recorder.test";
 import "./bundled-presets.test";
 import "./freshness.test";
 import "./gap-finder.test";
