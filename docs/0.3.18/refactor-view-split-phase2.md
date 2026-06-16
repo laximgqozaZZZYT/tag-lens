@@ -2,7 +2,34 @@
 
 Continues `docs/0.3.17/refactor-view-split.md`. Tier 1–3 + the first Phase-2 work
 (data-table-view, menu-notes, export-image, dead-code removal, src/ reclassification)
-are done — `view.ts` is **4,532 lines**.
+are done — `view.ts` was **4,532 lines**.
+
+## STATUS — L1–L7 COMPLETE (2026-06-16), view.ts now 4,443 lines
+Two tasks turned out to target code that was already extracted or dead — the
+kaizen-correct action there was removal, not extraction (confirmed against real
+code per AGENTS.md "don't trust the plan/grep"):
+- **L1** (a5175fa) — DEAD-CODE REMOVAL. draw()'s contentBBox/worldViewport had
+  zero readers after the world-map tiling was reduced to a single revolution
+  (they were `void`-ed under a stale comment). Removed ~40 LOC.
+- **L2** (cc6241a) — extracted `note-menu-geom.ts`: defaultMenuRect /
+  resolveMenuRect / pinnedMenuWidth + NOTE_MENU_MIN. (clampRect was already
+  in note-menu.ts.) + test/note-menu-geom.test.ts.
+- **L3** (6178108) — extracted `zoom-math.ts` zoomAroundPointer (wheel + zoomBy).
+- **L4** (6f98570) — added `zoom-math.ts` fitTransform (fitToRect).
+- **L5+L6** (b116da4) — extracted `hit-modes.ts`
+  hitMatrixLine/hitMatrixCol/hitHeatmapCell (combined; same module + test).
+- **L7** (a407be0) — DEAD-CODE REMOVAL. positionTip was already extracted
+  (highlight.ts positionTipFn); positionDetail never existed; detailEl/closeDetail
+  were vestigial (detailEl never assigned — detail overlays replaced by
+  switchToCloseup). Removed field + method + 6 no-op call sites.
+- **L8** (drosteHitTest pure core) — NOT done; was always optional/medium-risk.
+
+Net: 3 new pure modules (148 LOC) + 3 new test files (218 LOC, ~50 assertions),
+view.ts −89 lines, and new unit coverage on previously-untested geometry. All
+commits verify-green. Remaining backlog below (features F1–F4, N2) is untouched.
+
+---
+## Original plan (kept for reference)
 
 ## Principle (revised): extract PURE helpers, not coupled glue
 The four giants (`ensureNoteMenu` 787, `rebuild` 380, `draw` 335, `attachInputs` 346)
