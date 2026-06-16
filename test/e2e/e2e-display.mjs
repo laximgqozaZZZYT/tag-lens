@@ -1,11 +1,23 @@
 import { VAULT } from "../config.mjs";
 import { spawn } from "node:child_process";
+import fs from "node:fs";
+
+// Pre-register the vault (open:true) in this profile so a FRESH profile opens
+// straight into the dev vault — otherwise Obsidian stalls on the vault picker /
+// trust prompt and window.app.plugins never initialises.
+const DIR = "/tmp/obs-e2e-display";
+if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
+fs.writeFileSync(`${DIR}/obsidian.json`, JSON.stringify({ vaults: { dev: { path: VAULT, ts: 1718270000000, open: true } } }));
 
 const obs = spawn("obsidian", [
   VAULT,
-  "--user-data-dir=/tmp/obs-e2e-display",
+  "--user-data-dir=" + DIR,
   "--remote-debugging-port=9223"
 ], { detached: true, stdio: "ignore" });
+
+// Best-effort cleanup: kill the detached Obsidian process GROUP on exit so the
+// instance never leaks (it holds port 9223 and blocks the next run otherwise).
+process.on("exit", () => { try { process.kill(-obs.pid); } catch (e) {} });
 
 await new Promise(r => setTimeout(r, 3000));
 
@@ -63,9 +75,12 @@ const driver = `(async () => {
   let plugin = null;
   try {
     window.app.plugins.setEnable(true);
-    await window.app.plugins.disablePluginAndSave("tag-lens");
-    await sleep(250);
-    await window.app.plugins.enablePluginAndSave("tag-lens");
+    // Obsidian launched with the freshly-deployed main.js, so the plugin is
+    // already loaded. Only enable it if it isn't — re-enabling an already-loaded
+    // plugin re-runs registerView() and throws "existing view type".
+    if (!window.app.plugins.plugins["tag-lens"]) {
+      await window.app.plugins.enablePluginAndSave("tag-lens");
+    }
   } catch(e) { out.fatal = "enable err: " + e; return out; }
   for (let i = 0; i < 40; i++) { plugin = window.app.plugins.plugins["tag-lens"]; if (plugin) break; await sleep(250); }
   if (!plugin) { out.fatal = "plugin not loaded."; return out; }
@@ -78,7 +93,7 @@ const driver = `(async () => {
   view.settings.showMaturity = true;
   const MODES = ["droste","euler","euler-true","euler-venn","bipartite","matrix","bubblesets","heatmap","lattice","upset","stream"];
   for (const m of MODES) {
-    const e = { mode: m, rebuild: "ok", draw: "ok", settings: "ok", insight: "ok", toggles: [], sections: [], laidNodes: 0, matDef: 0, encParams: 0, encNodesUnchanged: false };
+    const e = { mode: m, rebuild: "ok", draw: "ok", settings: "ok", insight: "ok", toggles: [], sections: [], encodeToggles: [], laidNodes: 0, matDef: 0, encParams: 0, encNodesUnchanged: false };
     try { 
       view.settings.viewMode = m; 
       
@@ -107,15 +122,30 @@ const driver = `(async () => {
       e.matDef = ln.filter((n) => n.fmMaturity != null).length;
     } catch (err) { /* leave zeros */ }
     try {
+      // Display tab: real settings render path (renderSettingsBody dispatches on
+      // settingsSubTab). Scan the produced DOM for toggle rows + section headers.
       const div = document.createElement("div");
-      view.renderSettingsDisplay(div);
+      view.settingsSubTab = "display";
+      view.renderSettingsBody(div);
       e.toggles = Array.from(div.querySelectorAll(".gim-toggle-row")).map(r => (r.textContent||"").trim());
       e.sections = Array.from(div.querySelectorAll("h4")).map(h => (h.textContent||"").trim());
+      // "Note maturity badge" lives in the Encode tab (Legacy Bindings), not Display.
+      const divEnc = document.createElement("div");
+      view.settingsSubTab = "encode";
+      view.renderSettingsBody(divEnc);
+      e.encodeToggles = Array.from(divEnc.querySelectorAll(".gim-toggle-row")).map(r => (r.textContent||"").trim());
+      view.settingsSubTab = "display";
     } catch (err) { e.settings = String(err && err.stack || err); }
     try {
-      const div2 = document.createElement("div");
+      // Insight renders only via the live menu's Insight tab (renderInsightTab).
+      // Open the menu, let draw() build it, then activate the Insight tab.
+      if (!view.settings.noteMenuVisible) view.toggleNoteMenu();
       view.insightSubTab = "alerts";
-      view.renderInsightBody(div2);
+      view.draw();
+      await sleep(60);
+      const insBtn = Array.from(document.querySelectorAll("button")).find(b => (b.textContent||"").trim() === "Insight");
+      if (!insBtn) { e.insight = "insight tab button not found"; }
+      else { insBtn.click(); await sleep(60); }
     } catch (err) { e.insight = String(err && err.stack || err); }
     out.modes.push(e);
   }
@@ -146,7 +176,10 @@ if (report.fatal) { console.error("FAIL (fatal):", report.fatal); process.exit(1
 
 // ---- expected Display-panel gating (mirror src/display-applicability.ts) ----
 const CARD = new Set(["euler", "euler-true", "euler-venn", "bipartite", "bubblesets"]);
-const CARD_TOGGLE_LABELS = ["Show nodes", "Show enclosures", "Show edges", "Show grid", "Note maturity badge"];
+// Display-tab "Graph display" toggles (gated by displayToggleApplies; currently
+// all-true so every mode shows all four). "Note maturity badge" is NOT here — it
+// lives in the Encode tab (checked separately via e.encodeToggles).
+const CARD_TOGGLE_LABELS = ["Show nodes", "Show enclosures", "Show edges", "Show grid"];
 const has = (arr, label) => arr.some((t) => t.includes(label));
 function expectedCardToggles(mode) {
 	return new Set(CARD_TOGGLE_LABELS);
@@ -187,6 +220,10 @@ for (const e of report.modes) {
 		const present = has(e.toggles, label);
 		if (present && !exp.has(label)) fail(e.mode, `toggle "${label}" shown but should be hidden`);
 		if (!present && exp.has(label)) fail(e.mode, `toggle "${label}" missing but should be shown`);
+	}
+	// maturity overlay control lives in the Encode tab (Legacy Bindings)
+	if (!has(e.encodeToggles, "Note maturity badge")) {
+		fail(e.mode, `Encode tab missing "Note maturity badge" toggle`);
 	}
 	// section gating
 	for (const name of ["Graph display", "Bridge finder"]) {
