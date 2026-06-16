@@ -64,6 +64,7 @@ export interface NodeDrawParams {
 	sizeScale?: number;
 	opacity?: number;
 	icon?: string;
+	shape?: string;
 	borderColor?: string;
 	groupKey?: string;
 	axisX?: number;

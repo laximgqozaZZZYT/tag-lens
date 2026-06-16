@@ -3,6 +3,7 @@
 // the CHANNEL turns normalized -> concrete NodeDrawParams. Adding size/opacity/
 // shape/group/axis/label/border later is a registerChannel() call each.
 import type { VisualChannel } from "./types";
+import { shapeForKey } from "./shapes";
 
 export const channelRegistry: VisualChannel[] = [];
 
@@ -95,6 +96,20 @@ registerChannel({
 		// linear interpolation between 1.0 and 0.35
 		// t=0 (newest) -> 1.0, t=1 (stalest) -> 0.35
 		params.opacity = 1.0 - scaled.t * (1.0 - 0.35);
+	},
+});
+
+registerChannel({
+	id: "shape",
+	label: "Shape",
+	accepts: ["categorical", "ordinal"],
+	appliesTo: () => true,
+	apply: (params, scaled) => {
+		if (scaled.missing) return;
+		// Use the category key (not the palette colour) so shape is independent of
+		// the colour channel. Stable mapping shared with the on-canvas legend.
+		const key = scaled.category ?? scaled.output;
+		if (key) params.shape = shapeForKey(key);
 	},
 });
 
