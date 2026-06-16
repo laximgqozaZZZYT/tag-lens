@@ -3,6 +3,15 @@
 Accessible from a NEW **Data ▸ JSON** sub-tab (Data is an existing top-level tab
 with sub-tabs Logic/Tree/Table; JSON is added as the 4th).
 
+## STATUS — F1 COMPLETE (2026-06-16)
+- **F1-1** (f9841b1) preset-io.ts: serializePresets / parsePresets (tolerant, never throws) + test.
+- **F1-2** (0f08f1b) LensPreset.encoding? + capturePreset/applyLens/upsertPreset(encoding) backward-compat + tests.
+- **F1-3** (e9fb630) bundled-presets.ts: BUNDLED_PRESETS (5 modes, no encoding) + mergeBundled + test.
+- **F1-4** (502d9d9) Data ▸ JSON sub-tab scaffold (DataSubTab "json", renderDataJsonBody stub).
+- **F1-5** (5c5744c) export UI: textarea + copy-to-clipboard + save-.json-to-vault (presetFileName) + test.
+- **F1-6** (9e6727f) import UI: paste→parse→mergePresets(overwrite-by-name)→save→syncLensCommands; "Load bundled"; status+errors. mergePresets + test.
+All commits verify-green; final 861 assertions. No conflict with PNG export (separate paths/files/UI).
+
 ## Conflict analysis (vs existing features) — DONE
 - **PNG export** (`view.ts openExportMenu` → `exportImage` → `saveBlobToVault`/
   `copyBlobToClipboard`, files `tag-lens-<mode>-<stamp>.png`): **no functional
