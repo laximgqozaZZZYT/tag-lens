@@ -15,6 +15,7 @@ import "./preset-io.test";
 import "./svg-recorder.test";
 import "./shape-channel.test";
 import "./draw-shape.test";
+import "./legend-layout.test";
 import "./bundled-presets.test";
 import "./freshness.test";
 import "./gap-finder.test";
