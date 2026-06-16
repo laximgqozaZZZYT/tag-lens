@@ -29,6 +29,7 @@ import "./spreadsheet-pan.test";
 import "./insight-alerts.test";
 import "./tag-path.test";
 import "./note-menu-geom.test";
+import "./zoom-math.test";
 import "./settings-parity.test";
 import "./attribute-propagation.test";
 

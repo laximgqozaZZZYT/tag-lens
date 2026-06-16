@@ -115,6 +115,7 @@ import {
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, pinnedMenuWidth } from "./interaction/note-menu-geom";
+import { zoomAroundPointer } from "./interaction/zoom-math";
 
 export const VIEW_TYPE_MINI = "tag-lens-view";
 
@@ -1745,12 +1746,10 @@ export class MiniGraphView extends ItemView {
 		const rect = this.canvas.getBoundingClientRect();
 		const sx = rect.width / 2;
 		const sy = rect.height / 2;
-		const next = Math.max(0.005, Math.min(8, this.zoom * factor));
-		const wx = (sx - this.panX) / this.zoom;
-		const wy = (sy - this.panY) / this.zoom;
-		this.zoom = next;
-		this.panX = sx - wx * next;
-		this.panY = sy - wy * next;
+		const t = zoomAroundPointer({ zoom: this.zoom, panX: this.panX, panY: this.panY }, factor, sx, sy);
+		this.zoom = t.zoom;
+		this.panX = t.panX;
+		this.panY = t.panY;
 		this.cancelHover();
 		this.requestDraw();
 	}
@@ -4459,12 +4458,10 @@ export class MiniGraphView extends ItemView {
 			// UpSet footer scroll path retired — the matrix is in world
 			// space now, so the normal zoom-on-wheel below applies.
 			const factor = Math.exp(-e.deltaY * 0.0015);
-			const next = Math.max(0.005, Math.min(8, this.zoom * factor));
-			const wx = (sx - this.panX) / this.zoom;
-			const wy = (sy - this.panY) / this.zoom;
-			this.zoom = next;
-			this.panX = sx - wx * next;
-			this.panY = sy - wy * next;
+			const t = zoomAroundPointer({ zoom: this.zoom, panX: this.panX, panY: this.panY }, factor, sx, sy);
+			this.zoom = t.zoom;
+			this.panX = t.panX;
+			this.panY = t.panY;
 			this.requestDraw();
 		}, { passive: false });
 		c.addEventListener("dblclick", () => this.fitToView());
