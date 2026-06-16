@@ -1,7 +1,7 @@
 // PNG-export pure-helper tests: filename slug/stamp formatting and the
 // dimension-clamping that keeps an export under the browser canvas limit.
 import { ok } from "./assert";
-import { exportFileName, exportCanvasDims, MAX_EXPORT_DIM } from "../src/visual/image-export";
+import { exportFileName, svgFileName, exportCanvasDims, MAX_EXPORT_DIM } from "../src/visual/image-export";
 
 // filename: slugifies the mode label and zero-pads every stamp field.
 // (Date month is 0-based, so 5 -> June.)
@@ -25,6 +25,17 @@ import { exportFileName, exportCanvasDims, MAX_EXPORT_DIM } from "../src/visual/
 		exportFileName("   ", d).startsWith("tag-lens-view-"),
 		"exportFileName falls back to 'view' for an empty mode",
 	);
+}
+
+// svgFileName: same slug/stamp as PNG but a .svg extension (no .png collision).
+{
+	const d = new Date(2026, 5, 8, 9, 3, 7);
+	ok(
+		svgFileName("Icon Gallery", d) === "tag-lens-icon-gallery-20260608-090307.svg",
+		"svgFileName shares the slug/stamp and uses .svg",
+	);
+	ok(svgFileName("euler", d).endsWith(".svg"), "svgFileName ends with .svg (not .png)");
+	ok(svgFileName("   ", d).startsWith("tag-lens-view-"), "svgFileName falls back to 'view'");
 }
 
 // dims: pass straight through when the result fits under the cap.

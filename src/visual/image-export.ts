@@ -9,9 +9,10 @@ function pad2(n: number): string {
 	return n < 10 ? `0${n}` : `${n}`;
 }
 
-// `tag-lens-<mode>-YYYYMMDD-HHmmss.png`. The mode is slugified so a label like
-// "Icon Gallery" becomes "icon-gallery" and can never break a vault path.
-export function exportFileName(mode: string, d: Date): string {
+// `tag-lens-<mode>-YYYYMMDD-HHmmss`. The mode is slugified so a label like
+// "Icon Gallery" becomes "icon-gallery" and can never break a vault path. The
+// extension is added by the callers below.
+function stampedBase(mode: string, d: Date): string {
 	const slug =
 		mode
 			.trim()
@@ -21,7 +22,18 @@ export function exportFileName(mode: string, d: Date): string {
 	const stamp =
 		`${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}` +
 		`-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
-	return `tag-lens-${slug}-${stamp}.png`;
+	return `tag-lens-${slug}-${stamp}`;
+}
+
+// `tag-lens-<mode>-YYYYMMDD-HHmmss.png` (raster export).
+export function exportFileName(mode: string, d: Date): string {
+	return `${stampedBase(mode, d)}.png`;
+}
+
+// `tag-lens-<mode>-YYYYMMDD-HHmmss.svg` (vector export, F3). Distinct extension
+// so SVG and PNG exports of the same view never collide.
+export function svgFileName(mode: string, d: Date): string {
+	return `${stampedBase(mode, d)}.svg`;
 }
 
 // Clamp the requested supersample so neither side exceeds the canvas limit.
