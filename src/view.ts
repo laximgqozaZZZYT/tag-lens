@@ -2782,7 +2782,7 @@ export class MiniGraphView extends ItemView {
 		const pinnedW = clampPinnedWidth(this.settings.noteMenuPinnedWidth, container.width);
 		if (pinned) {
 			// Dock to the RIGHT edge: full height, fixed width, square corners, a
-			// left border only — the canvas reserves `pinnedMenuWidth()` so the
+			// left border only — the canvas reserves `this.pinnedMenuWidth()` so the
 			// figure isn't covered (like a standard docked side panel).
 			panel.setCssStyles({
 				position: "absolute",
