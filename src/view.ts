@@ -377,12 +377,12 @@ export class MiniGraphView extends ItemView {
 	// names (header checkbox checked). Transient — relayout prunes keys
 	// whose node no longer exists.
 	private latticeNamedKeys: Set<string> = new Set();
-	// Heatmap mode: selected cell (tag i × tag j) → detail overlay; hovered
-	// row/col for the crosshair (-1 = none). detailEl = the overlay element.
+	// Heatmap mode: selected cell (tag i × tag j) drawn as an on-canvas
+	// crosshair; hovered row/col (-1 = none). Cell clicks open the closeup
+	// (switchToCloseup), not a DOM overlay.
 	private heatmapSelected: { i: number; j: number } | null = null;
 	private heatmapHoverRow = -1;
 	private heatmapHoverCol = -1;
-	private detailEl: HTMLElement | null = null;
 	// Block indices currently EXPANDED while collapse mode is on.
 	private matrixExpanded = new Set<number>();
 	// Cached display lines (rows + collapsed summaries) — virtualization unit.
@@ -3665,7 +3665,6 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private switchToCloseup(ids: string[]): void {
-		this.closeDetail();
 		// Ensure array is a clean copy so we don't accidentally mutate or retain references.
 		// Guard against undefined ids to prevent "TypeError: ids is not iterable" during E2E coverage.
 		this.settings.focusNodeIds = Array.isArray(ids) ? [...ids] : [];
@@ -3690,13 +3689,6 @@ export class MiniGraphView extends ItemView {
 	private updatePanoramaActionVisibility(): void {
 		if (this.panoramaActionEl) {
 			this.panoramaActionEl.style.display = this.settings.perspective === "closeup" ? "" : "none";
-		}
-	}
-
-	private closeDetail(): void {
-		if (this.detailEl) {
-			this.detailEl.remove();
-			this.detailEl = null;
 		}
 	}
 
@@ -3774,7 +3766,6 @@ export class MiniGraphView extends ItemView {
 		this.heatmapHoverCol = -1;
 		if (this.heatmapSelected) {
 			this.heatmapSelected = null;
-			this.closeDetail();
 		}
 		// Lattice: a relayout re-buckets intersections; selected key may no
 		// longer exist. Clear and close any open list overlay tied to it.
@@ -3789,7 +3780,6 @@ export class MiniGraphView extends ItemView {
 		}
 		if (this.latticeSelectedKey && !latticeKeys.has(this.latticeSelectedKey)) {
 			this.latticeSelectedKey = null;
-			this.closeDetail();
 		}
 	}
 
@@ -4262,7 +4252,6 @@ export class MiniGraphView extends ItemView {
 					this.openHeatmapDetail(cell.i, cell.j, sx, sy);
 				} else {
 					this.heatmapSelected = null;
-					this.closeDetail();
 					this.requestDraw();
 				}
 				return;
@@ -4304,14 +4293,12 @@ export class MiniGraphView extends ItemView {
 				// pokes past the gutter still has a clickable box on screen.
 				if (sx < LATTICE_TIER_GUTTER) {
 					this.latticeSelectedKey = null;
-					this.closeDetail();
 					this.requestDraw();
 					return;
 				}
 				const hitNode = cbHit;
 				if (!hitNode) {
 					this.latticeSelectedKey = null;
-					this.closeDetail();
 					this.requestDraw();
 					return;
 				}
