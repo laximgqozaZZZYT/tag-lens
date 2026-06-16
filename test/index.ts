@@ -29,5 +29,6 @@ import "./spreadsheet-pan.test";
 import "./insight-alerts.test";
 import "./tag-path.test";
 import "./settings-parity.test";
+import "./attribute-propagation.test";
 
 summary();
