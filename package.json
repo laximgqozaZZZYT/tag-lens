@@ -14,7 +14,8 @@
 		"dev": "node esbuild.config.mjs --watch",
 		"test": "node test/run.mjs",
 		"typecheck": "tsc --noEmit",
-		"verify": "tsc --noEmit && node test/run.mjs && node esbuild.config.mjs"
+		"verify": "tsc --noEmit && node test/run.mjs && node esbuild.config.mjs",
+		"deploy": "node esbuild.config.mjs && node deploy.mjs"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.0",

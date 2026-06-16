@@ -34,9 +34,11 @@ full design see **basic-design.md** / **detailed-design.md** in this directory.
 
 ## 2. Deploy (dev vault)
 ```
-cp main.js manifest.json styles.css "/home/ubuntu/obsidian-plugins/開発/.obsidian/plugins/tag-lens/"
+npm run deploy          # builds, then copies main.js/manifest.json/styles.css into the vault
 ```
-Reload Obsidian after copying.
+The target vault is `test/config.mjs`'s `VAULT` (default = the dev vault); override
+without editing files: `TAG_LENS_VAULT=/path/to/vault npm run deploy`. Same env var
+as the E2E harness. Reload Obsidian after deploying.
 
 ## 3. E2E (real Obsidian / CDP)
 - Zero-dependency CDP driver (Node 22 global WebSocket/fetch). Reference: `test/e2e/e2e-display.mjs`, `test/e2e/e2e-closeup.mjs`.
