@@ -115,7 +115,7 @@ import {
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, pinnedMenuWidth } from "./interaction/note-menu-geom";
-import { zoomAroundPointer } from "./interaction/zoom-math";
+import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 
 export const VIEW_TYPE_MINI = "tag-lens-view";
 
@@ -1755,15 +1755,10 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private fitToRect(world: { minX: number; minY: number; maxX: number; maxY: number }): void {
-		const w = this.canvas.clientWidth;
-		const h = this.canvas.clientHeight;
-		const pad = 24;
-		const dw = Math.max(1, world.maxX - world.minX);
-		const dh = Math.max(1, world.maxY - world.minY);
-		const z = Math.min((w - 2 * pad) / dw, (h - 2 * pad) / dh);
-		this.zoom = Math.min(8, Math.max(0.005, z));
-		this.panX = w / 2 - ((world.minX + world.maxX) / 2) * this.zoom;
-		this.panY = h / 2 - ((world.minY + world.maxY) / 2) * this.zoom;
+		const t = fitTransform(world, this.canvas.clientWidth, this.canvas.clientHeight, 24);
+		this.zoom = t.zoom;
+		this.panX = t.panX;
+		this.panY = t.panY;
 		this.cancelHover();
 		this.requestDraw();
 	}
