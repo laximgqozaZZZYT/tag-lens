@@ -1,4 +1,12 @@
 import type { MiniSettings, LensPreset, LensQuerySettings } from "../types";
+import type { EncodingBinding } from "../encoding/types";
+
+// Deep-copy an encoding array so a preset and the live settings never share
+// nested binding/scale references. Encoding is plain config data (no functions),
+// so a JSON round-trip is a safe, total clone.
+function cloneEncoding(enc: EncodingBinding[]): EncodingBinding[] {
+	return JSON.parse(JSON.stringify(enc)) as EncodingBinding[];
+}
 
 /**
  * Extracts the query-related settings from the current application settings
@@ -23,8 +31,18 @@ export function captureLens(settings: MiniSettings): LensQuerySettings {
 }
 
 /**
+ * Captures the full current view — query settings AND the Visual Encoding
+ * snapshot — into a self-contained preset. All arrays/objects are deep-copied.
+ */
+export function capturePreset(settings: MiniSettings, name: string): LensPreset {
+	return { name, query: captureLens(settings), encoding: cloneEncoding(settings.encoding) };
+}
+
+/**
  * Applies a preset's query settings to the target settings object.
- * Arrays are deep-copied to prevent reference sharing.
+ * Arrays are deep-copied to prevent reference sharing. If the preset carries an
+ * encoding snapshot it is applied too; legacy query-only presets leave the
+ * current encoding untouched.
  */
 export function applyLens(settings: MiniSettings, preset: LensPreset): void {
 	const q = preset.query;
@@ -41,6 +59,9 @@ export function applyLens(settings: MiniSettings, preset: LensPreset): void {
 	settings.groupByAuto = q.groupByAuto;
 	settings.havingAuto = q.havingAuto;
 	settings.limitAuto = q.limitAuto;
+	if (Array.isArray(preset.encoding)) {
+		settings.encoding = cloneEncoding(preset.encoding);
+	}
 }
 
 /**
@@ -50,15 +71,15 @@ export function applyLens(settings: MiniSettings, preset: LensPreset): void {
 export function upsertPreset(
 	presets: LensPreset[],
 	name: string,
-	query: LensQuerySettings
+	query: LensQuerySettings,
+	encoding?: EncodingBinding[]
 ): LensPreset[] {
 	const result = [...presets];
+	const entry: LensPreset = { name, query: captureLens({ ...query } as MiniSettings) };
+	if (Array.isArray(encoding)) entry.encoding = cloneEncoding(encoding);
 	const index = result.findIndex((p) => p.name === name);
-	if (index >= 0) {
-		result[index] = { name, query: captureLens({ ...query } as MiniSettings) };
-	} else {
-		result.push({ name, query: captureLens({ ...query } as MiniSettings) });
-	}
+	if (index >= 0) result[index] = entry;
+	else result.push(entry);
 	return result;
 }
 

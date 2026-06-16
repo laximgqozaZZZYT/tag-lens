@@ -1,6 +1,7 @@
 import { ok } from "./assert";
-import { captureLens, applyLens, upsertPreset, removePreset, validatePresetName } from "../src/interaction/lens-presets";
+import { captureLens, applyLens, upsertPreset, removePreset, validatePresetName, capturePreset } from "../src/interaction/lens-presets";
 import { DEFAULT_SETTINGS, MiniSettings } from "../src/types";
+import type { EncodingBinding } from "../src/encoding/types";
 
 // captureLens copies arrays deeply
 {
@@ -74,4 +75,44 @@ import { DEFAULT_SETTINGS, MiniSettings } from "../src/types";
 	ok(validatePresetName("", []) !== null, "Empty is invalid");
 	ok(validatePresetName("   ", []) !== null, "Whitespace is invalid");
 	ok(validatePresetName("Valid", []) === null, "Normal is valid");
+}
+
+// ── F1-2: encoding capture/apply (backward compatible) ──
+const enc = (): EncodingBinding[] => [
+	{ channelId: "color", fieldId: "degree", enabled: true, scale: { kind: "quantitative" } as EncodingBinding["scale"] },
+];
+
+// capturePreset bundles query + a DEEP-COPIED encoding snapshot.
+{
+	const s: MiniSettings = { ...DEFAULT_SETTINGS, viewMode: "lattice", encoding: enc() };
+	const p = capturePreset(s, "Full");
+	ok(p.name === "Full" && p.query.viewMode === "lattice", "query captured");
+	ok(Array.isArray(p.encoding) && p.encoding!.length === 1, "encoding captured");
+	ok(p.encoding !== s.encoding, "encoding array is a new reference");
+	ok(p.encoding![0] !== s.encoding[0], "encoding binding deep-copied");
+	s.encoding[0].enabled = false;
+	ok(p.encoding![0].enabled === true, "captured encoding unaffected by later mutation");
+}
+
+// applyLens APPLIES encoding when the preset carries it.
+{
+	const s: MiniSettings = { ...DEFAULT_SETTINGS, encoding: [] };
+	applyLens(s, { name: "p", query: captureLens(DEFAULT_SETTINGS), encoding: enc() });
+	ok(s.encoding.length === 1 && s.encoding[0].channelId === "color", "encoding applied from preset");
+}
+
+// applyLens LEAVES encoding untouched for legacy query-only presets.
+{
+	const existing = enc();
+	const s: MiniSettings = { ...DEFAULT_SETTINGS, encoding: existing };
+	applyLens(s, { name: "legacy", query: captureLens(DEFAULT_SETTINGS) });
+	ok(s.encoding === existing, "no encoding key → current encoding preserved (same reference)");
+}
+
+// upsertPreset stores a deep-copied encoding when given one; omits it otherwise.
+{
+	const withEnc = upsertPreset([], "E", captureLens(DEFAULT_SETTINGS), enc());
+	ok(Array.isArray(withEnc[0].encoding) && withEnc[0].encoding!.length === 1, "encoding stored");
+	const noEnc = upsertPreset([], "Q", captureLens(DEFAULT_SETTINGS));
+	ok(noEnc[0].encoding === undefined, "no encoding key when not provided (legacy shape)");
 }

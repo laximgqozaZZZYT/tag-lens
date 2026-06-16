@@ -39,6 +39,11 @@ export type LensQuerySettings = Pick<MiniSettings,
 export interface LensPreset {
 	name: string;
 	query: LensQuerySettings;
+	// Optional Visual Encoding snapshot (color/size/opacity/axis bindings). When
+	// present, applyLens restores it too; when absent (legacy query-only presets),
+	// the current encoding is left untouched. Display-only — never changes which
+	// notes appear, so the selection ⊥ encoding invariant still holds.
+	encoding?: EncodingBinding[];
 }
 
 export interface MiniSettings {

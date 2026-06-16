@@ -184,7 +184,7 @@ export function renderFilterBodyTab(host: HTMLElement, deps: FilterBodyDeps): vo
 			}
 		},
 		savePreset: (name) => {
-			deps.settings.lensPresets = upsertPreset(deps.settings.lensPresets, name, captureLens(deps.settings));
+			deps.settings.lensPresets = upsertPreset(deps.settings.lensPresets, name, captureLens(deps.settings), deps.settings.encoding);
 			deps.save();
 			deps.refreshFilterTab();
 			if (deps.syncLensCommands) {
