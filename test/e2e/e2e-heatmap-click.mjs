@@ -64,20 +64,20 @@ const driver = `(async () => {
 
   const h = view.laid.heatmap;
   let errors = [];
-  
+
   for (let i = 0; i < h.n; i++) {
     for (let j = 0; j < h.n; j++) {
       const expectedCount = h.counts[i * h.n + j];
       if (expectedCount === 0) continue;
-      
+
       view.openHeatmapDetail(i, j, 0, 0); // simulate click
       await sleep(10);
-      
+
       const actualIds = view.settings.focusNodeIds;
       if (!actualIds || actualIds.length !== expectedCount) {
         errors.push(\`[\${i},\${j}] expected \${expectedCount} nodes, got \${actualIds ? actualIds.length : 'none'}. Tag1=\${h.tags[i].label}, Tag2=\${h.tags[j].label}\`);
       }
-      
+
       view.switchToPanorama();
     }
   }

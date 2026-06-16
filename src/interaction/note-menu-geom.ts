@@ -37,9 +37,9 @@ export function resolveMenuRect(
 		: seed;
 }
 
-// Docked width when pinned: the configured width, but never below the minimum
-// and never above 80% of the container.
-export function pinnedMenuWidth(settingsWidth: number | undefined, containerWidth: number): number {
+// Clamp the pinned (docked) panel width: the configured width, but never below
+// the minimum and never above 80% of the container.
+export function clampPinnedWidth(settingsWidth: number | undefined, containerWidth: number): number {
 	return Math.min(
 		Math.max(NOTE_MENU_MIN.width, settingsWidth ?? 320),
 		Math.max(NOTE_MENU_MIN.width, Math.floor((containerWidth || 320) * 0.8)),

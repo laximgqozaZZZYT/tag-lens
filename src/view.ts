@@ -114,7 +114,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, pinnedMenuWidth } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { hitMatrixLine, hitMatrixCol, hitHeatmapCell } from "./interaction/hit-modes";
 
@@ -675,8 +675,9 @@ export class MiniGraphView extends ItemView {
 		if (!this.settings.noteMenuPinned || !this.settings.noteMenuVisible) return 0;
 		const cw = this.canvas.clientWidth || this.root.clientWidth || 0;
 		if (cw <= 0) return 0;
-		const w = this.settings.noteMenuPinnedWidth ?? 320;
-		return Math.min(Math.max(180, w), Math.max(180, Math.floor(cw * 0.8)));
+		// Same clamp as the docked panel itself (note-menu-geom). cw > 0 is
+		// guaranteed above, so this matches the old inline Math.min/max exactly.
+		return clampPinnedWidth(this.settings.noteMenuPinnedWidth, cw);
 	}
 
 	async onClose(): Promise<void> {
@@ -2778,7 +2779,7 @@ export class MiniGraphView extends ItemView {
 		this.noteMenuRect = rect;
 		const pinned = !!this.settings.noteMenuPinned;
 		// Docked width when pinned (clamped to ≤80% of the container).
-		const pinnedW = pinnedMenuWidth(this.settings.noteMenuPinnedWidth, container.width);
+		const pinnedW = clampPinnedWidth(this.settings.noteMenuPinnedWidth, container.width);
 		if (pinned) {
 			// Dock to the RIGHT edge: full height, fixed width, square corners, a
 			// left border only — the canvas reserves `pinnedMenuWidth()` so the

@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, pinnedMenuWidth, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -53,11 +53,11 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(r.left === -100 && r.width === 9999 && r.height === 9999, "no clamp when container is 0×0");
 }
 
-// pinnedMenuWidth: configured width, floored to min, ceilinged to 80% of container.
+// clampPinnedWidth: configured width, floored to min, ceilinged to 80% of container.
 {
-	ok(pinnedMenuWidth(320, 1000) === 320, "uses configured width when within 80%");
-	ok(pinnedMenuWidth(900, 1000) === 800, "ceilinged to 80% of container (got " + pinnedMenuWidth(900, 1000) + ")");
-	ok(pinnedMenuWidth(50, 1000) === NOTE_MENU_MIN.width, "floored to min width");
-	ok(pinnedMenuWidth(undefined, 1000) === 320, "default 320 when unset");
-	ok(pinnedMenuWidth(320, 0) === 256, "0 container → 80% of the 320 fallback (got " + pinnedMenuWidth(320, 0) + ")");
+	ok(clampPinnedWidth(320, 1000) === 320, "uses configured width when within 80%");
+	ok(clampPinnedWidth(900, 1000) === 800, "ceilinged to 80% of container (got " + clampPinnedWidth(900, 1000) + ")");
+	ok(clampPinnedWidth(50, 1000) === NOTE_MENU_MIN.width, "floored to min width");
+	ok(clampPinnedWidth(undefined, 1000) === 320, "default 320 when unset");
+	ok(clampPinnedWidth(320, 0) === 256, "0 container → 80% of the 320 fallback (got " + clampPinnedWidth(320, 0) + ")");
 }
