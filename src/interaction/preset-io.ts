@@ -39,6 +39,19 @@ export function presetFileName(d: Date): string {
 	return `tag-lens-presets-${stamp}.json`;
 }
 
+// Merge imported presets into the existing list: an incoming preset with the
+// same name OVERWRITES the existing one (it's the user's own export being
+// re-imported), new names are appended. Returns a new array; inputs untouched.
+export function mergePresets(existing: LensPreset[], incoming: LensPreset[]): LensPreset[] {
+	const result = [...existing];
+	for (const p of incoming) {
+		const i = result.findIndex((e) => e.name === p.name);
+		if (i >= 0) result[i] = p;
+		else result.push(p);
+	}
+	return result;
+}
+
 export interface ParseResult {
 	presets: LensPreset[];
 	errors: string[];

@@ -1,6 +1,6 @@
 // F1-1 — pure preset (de)serialization. Round-trip fidelity + tolerant parsing.
 import { ok } from "./assert";
-import { serializePresets, parsePresets, presetFileName, PRESET_SCHEMA, PRESET_SCHEMA_VERSION } from "../src/interaction/preset-io";
+import { serializePresets, parsePresets, presetFileName, mergePresets, PRESET_SCHEMA, PRESET_SCHEMA_VERSION } from "../src/interaction/preset-io";
 import { captureLens } from "../src/interaction/lens-presets";
 import { DEFAULT_SETTINGS } from "../src/types";
 import type { LensPreset } from "../src/types";
@@ -68,6 +68,23 @@ const sample: LensPreset[] = [
 {
 	const { presets, errors } = parsePresets(JSON.stringify({ foo: 1 }));
 	ok(presets.length === 0 && errors.length === 1, "plain object rejected");
+}
+
+// mergePresets: same-name overwrite, new names appended, inputs untouched.
+{
+	const existing: LensPreset[] = [
+		{ name: "A", query: { ...captureLens(DEFAULT_SETTINGS), viewMode: "euler" } },
+		{ name: "B", query: { ...captureLens(DEFAULT_SETTINGS), viewMode: "matrix" } },
+	];
+	const incoming: LensPreset[] = [
+		{ name: "B", query: { ...captureLens(DEFAULT_SETTINGS), viewMode: "heatmap" } }, // overwrite
+		{ name: "C", query: { ...captureLens(DEFAULT_SETTINGS), viewMode: "lattice" } }, // new
+	];
+	const merged = mergePresets(existing, incoming);
+	ok(merged.length === 3, "A kept, B overwritten, C added (got " + merged.length + ")");
+	ok(merged.find((p) => p.name === "B")!.query.viewMode === "heatmap", "B overwritten by incoming");
+	ok(merged.find((p) => p.name === "A")!.query.viewMode === "euler", "A untouched");
+	ok(existing.length === 2, "existing input not mutated");
 }
 
 // presetFileName: stable padded stamp + .json extension.

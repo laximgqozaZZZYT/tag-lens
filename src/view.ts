@@ -16,7 +16,7 @@ import {
 	type SizedNode,
 	type ClusterRect,
 } from "./layout/layout";
-import type { MiniSettings, GraphNode, GraphData, ViewMode } from "./types";
+import type { MiniSettings, GraphNode, GraphData, ViewMode, LensPreset } from "./types";
 import { CARD_CELL_W, CARD_CELL_H } from "./types";
 import { type LimitRule, applyLimitRules } from "./query/limit";
 import { filterMemberships, filterLabels } from "./query/query-filters";
@@ -116,7 +116,8 @@ import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
-import { serializePresets, presetFileName } from "./interaction/preset-io";
+import { serializePresets, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
+import { mergeBundled } from "./interaction/bundled-presets";
 import { hitMatrixLine, hitMatrixCol, hitHeatmapCell } from "./interaction/hit-modes";
 
 export const VIEW_TYPE_MINI = "tag-lens-view";
@@ -802,26 +803,24 @@ export class MiniGraphView extends ItemView {
 			groupByError: this.groupByError,
 			havingError: this.havingError,
 			limitError: this.limitError,
-			syncLensCommands: (presets) => {
-				interface AppWithPlugins {
-					plugins: {
-						plugins: {
-							"tag-lens"?: { syncLensCommands?: (p: typeof presets) => void };
-						};
-					};
-				}
-				const appExt = this.app as unknown as AppWithPlugins;
-				const plugin = appExt.plugins?.plugins?.["tag-lens"];
-				if (plugin && plugin.syncLensCommands) {
-					plugin.syncLensCommands(presets);
-				}
-			}
+			syncLensCommands: (presets) => this.syncLensCommands(presets),
 		});
 	}
 
-	// Data ▸ JSON tab: import/export Lens presets as JSON (F1). Export here;
-	// import + bundled presets added by F1-6.
-	private renderDataJsonBody(host: HTMLElement): void {
+	// Re-register the per-preset command-palette entries after the preset list
+	// changes (save / import / bundled). Looks up this plugin instance via the
+	// Obsidian app and calls its syncLensCommands if present.
+	private syncLensCommands(presets: LensPreset[]): void {
+		interface AppWithPlugins {
+			plugins?: { plugins?: { "tag-lens"?: { syncLensCommands?: (p: LensPreset[]) => void } } };
+		}
+		const plugin = (this.app as unknown as AppWithPlugins).plugins?.plugins?.["tag-lens"];
+		plugin?.syncLensCommands?.(presets);
+	}
+
+	// Data ▸ JSON tab: import/export Lens presets as JSON (F1). `status` shows the
+	// outcome of the last import / bundled-load (re-rendered after each).
+	private renderDataJsonBody(host: HTMLElement, status?: { msg: string; errors: string[] }): void {
 		host.empty();
 		const title = host.createDiv({ text: "Presets — JSON import / export" });
 		title.setCssStyles({ fontWeight: "600", fontSize: "12px", marginBottom: "6px" });
@@ -835,7 +834,7 @@ export class MiniGraphView extends ItemView {
 		ta.value = json;
 		ta.readOnly = true;
 		ta.setCssStyles({
-			width: "100%", height: "120px", fontFamily: "var(--font-monospace, monospace)",
+			width: "100%", height: "110px", fontFamily: "var(--font-monospace, monospace)",
 			fontSize: "10px", resize: "vertical", boxSizing: "border-box",
 		});
 		ta.addEventListener("mousedown", (ev) => ev.stopPropagation());
@@ -845,6 +844,61 @@ export class MiniGraphView extends ItemView {
 		copyBtn.addEventListener("click", (ev) => { ev.stopPropagation(); void this.copyTextToClipboard(json); });
 		const saveBtn = btnRow.createEl("button", { text: "Save .json to vault" });
 		saveBtn.addEventListener("click", (ev) => { ev.stopPropagation(); void this.savePresetsJson(json); });
+
+		// ── Import ──
+		const impLabel = host.createDiv({ text: "Import" });
+		impLabel.setCssStyles({ fontSize: "11px", fontWeight: "600", margin: "12px 0 2px" });
+		const impTa = host.createEl("textarea");
+		impTa.placeholder = "Paste preset JSON here (bundle or array)…";
+		impTa.setCssStyles({
+			width: "100%", height: "90px", fontFamily: "var(--font-monospace, monospace)",
+			fontSize: "10px", resize: "vertical", boxSizing: "border-box",
+		});
+		impTa.addEventListener("mousedown", (ev) => ev.stopPropagation());
+		const impRow = host.createDiv();
+		impRow.setCssStyles({ display: "flex", gap: "6px", marginTop: "4px" });
+		const importBtn = impRow.createEl("button", { text: "Import" });
+		importBtn.addEventListener("click", (ev) => {
+			ev.stopPropagation();
+			const text = impTa.value.trim();
+			if (!text) { this.renderDataJsonBody(host, { msg: "Nothing to import — paste JSON first.", errors: [] }); return; }
+			const { presets, errors } = parsePresets(text);
+			if (presets.length > 0) {
+				this.settings.lensPresets = mergePresets(this.settings.lensPresets, presets);
+				void this.save();
+				this.syncLensCommands(this.settings.lensPresets);
+				this.refreshFilterTab();
+			}
+			const msg = presets.length > 0
+				? `Imported ${presets.length} preset${presets.length === 1 ? "" : "s"}.`
+				: "No valid presets found.";
+			this.renderDataJsonBody(host, { msg, errors });
+		});
+		const bundledBtn = impRow.createEl("button", { text: "Load bundled presets" });
+		bundledBtn.addEventListener("click", (ev) => {
+			ev.stopPropagation();
+			const before = this.settings.lensPresets.length;
+			this.settings.lensPresets = mergeBundled(this.settings.lensPresets);
+			const added = this.settings.lensPresets.length - before;
+			void this.save();
+			this.syncLensCommands(this.settings.lensPresets);
+			this.refreshFilterTab();
+			this.renderDataJsonBody(host, { msg: `Added ${added} bundled preset${added === 1 ? "" : "s"}.`, errors: [] });
+		});
+
+		// ── Status (last import / bundled-load) ──
+		if (status) {
+			const st = host.createDiv({ text: status.msg });
+			st.setCssStyles({ fontSize: "10.5px", marginTop: "8px", color: status.errors.length ? "var(--text-warning, var(--text-muted))" : "var(--text-muted)" });
+			for (const e of status.errors.slice(0, 20)) {
+				const line = host.createDiv({ text: `• ${e}` });
+				line.setCssStyles({ fontSize: "10px", color: "var(--text-error, var(--text-muted))", paddingLeft: "6px" });
+			}
+			if (status.errors.length > 20) {
+				const more = host.createDiv({ text: `…and ${status.errors.length - 20} more.` });
+				more.setCssStyles({ fontSize: "10px", color: "var(--text-muted)", paddingLeft: "6px" });
+			}
+		}
 	}
 
 	private async copyTextToClipboard(text: string): Promise<void> {
