@@ -1,88 +1,94 @@
-# view.ts split — Phase 2 plan (decomposing the high-risk methods)
+# view.ts split — Phase 2 plan (all-low-risk decomposition)
 
-Continues `docs/0.3.17/refactor-view-split.md`. Tier 1–3 (settings UI/tabs/insight)
-and the first Phase-2 extractions (data-table-view, menu-notes, export-image,
-dead-code removal, src/ reclassification) are done — `view.ts` is **4,532 lines**.
+Continues `docs/0.3.17/refactor-view-split.md`. Tier 1–3 + the first Phase-2 work
+(data-table-view, menu-notes, export-image, dead-code removal, src/ reclassification)
+are done — `view.ts` is **4,532 lines**.
 
-The four remaining giants are high-coupling, so we do NOT extract them wholesale.
-Instead we carve **small, self-contained sub-units** out of each (the proven
-free-function + `deps` pattern), leaving each giant as a thin orchestrator.
+## Principle (revised): extract PURE helpers, not coupled glue
+The four giants (`ensureNoteMenu` 787, `rebuild` 380, `draw` 335, `attachInputs` 346)
+are coupled to `this`. Extracting a whole method (e.g. the ~200-line click handler)
+just relocates a large `deps` bag — that is NOT low-risk and hurts readability (the
+Tier-4 caution). So we extract only the **pure, testable sub-units** they call —
+coordinate/transform math, geometry, rect resolution — each with a **unit test**, and
+leave the action/orchestration glue in view as thin wrappers. Every task below is
+**low-risk** (pure function, no behaviour change, added test coverage).
 
-| Giant method | Range (approx) | Lines |
-|---|---|---|
-| `ensureNoteMenu` | 2801–3587 | 787 |
-| `rebuild` | 895–1274 | 380 |
-| `draw` | 2124–2458 | 335 |
-| `attachInputs` | 4186–4532 | ~346 |
+Investigated `this`-usage: these helpers touch only a small fixed set
+(`laid`, `zoom/panX/panY`, `canvas` size, a couple of selection flags) — i.e. they
+are already pure-over-arguments and just need the arguments passed explicitly.
 
-## Rules (unchanged)
+## Rules
 - Behaviour-preserving. **1 extraction = `npm run verify` green = 1 commit.**
-- Pure helpers get **unit tests** (that is the whole point of pulling them out).
-- Re-anchor with `grep -n` before each edit (line numbers drift); `grep -a` for layout.ts.
-- Confirm in review: encoding/selection separation intact, displayed node set unchanged.
+- Each pure helper ships with a unit test registered in `test/index.ts`.
+- The view method becomes a thin wrapper calling the new free function (or inlines the call).
+- Re-anchor with `grep -n` (line numbers drift); `grep -a` for layout.ts.
+- Review invariant: displayed node set unchanged; selection ⊥ encoding/attributes.
 
 ---
 
-## Phase A — pure helpers (LOWEST risk, unit-testable). Do these first.
+## Low-risk tasks (each = pure helper + test + thin wrapper)
 
-### A1. `draw` → content-bbox / viewport math → `src/draw/viewport.ts`
-- Extract the "Content bbox (= union of card footprints + cluster rects)" + viewport
-  world-coord computation (draw ~offset 203–230) into pure functions:
-  `contentBBox(laid): {minX,minY,maxX,maxY}` and `worldViewport(canvas, zoom, panX, panY)`.
-- Deps: none (pure over `laid` + scalars). **Risk: low.** Test: `test/viewport.test.ts`.
+### L1. `draw` → `src/draw/viewport.ts`
+`contentBBox(laid): {minX,minY,maxX,maxY}` (union of card footprints + cluster rects)
+and `worldViewport(canvasW, canvasH, t): {left,top,right,bottom}` where
+`t = {zoom,panX,panY}`. From draw ~offset 203–230. Test: `test/viewport.test.ts`.
 
-### A2. `ensureNoteMenu` → panel rect resolve + clamp → `src/interaction/note-menu-geom.ts`
-- Extract "Resolve the panel rect … clamp to container" (ensureNoteMenu ~offset 13–66)
-  into `resolveMenuRect({settings, container, savedRect, pinned}): {x,y,w,h}` (pure).
-- Deps: none (settings + container sizes in, rect out). **Risk: low.** Test: `test/note-menu-geom.test.ts`.
+### L2. `ensureNoteMenu` → `src/interaction/note-menu-geom.ts`
+`resolveMenuRect({settings, containerW, containerH, savedRect, pinned}): {x,y,w,h}`
+— the rect priority + clamp-to-container (ensureNoteMenu ~offset 13–66). Pure.
+Test: `test/note-menu-geom.test.ts`.
 
----
+### L3. `attachInputs` wheel → `src/interaction/zoom-math.ts`
+`zoomAroundPointer(t, factor, sx, sy): {zoom,panX,panY}` — keep the cursor anchored
+while zooming (wheel handler ~4504–4527, and reused by `zoomBy`). Pure.
+Test: `test/zoom-math.test.ts`.
 
-## Phase B — self-contained handlers / DOM sub-builders (LOW–MEDIUM risk).
+### L4. `fitToRect`/`fitToView`/`zoomBy` → `src/interaction/zoom-math.ts` (same module)
+`fitTransform(worldRect, canvasW, canvasH, padFrac): {zoom,panX,panY}` — the fit math
+(`fitToRect` body, ~1757). The view methods keep the side effects (assign + requestDraw).
+Pure. Add to `test/zoom-math.test.ts`.
 
-### B1. `attachInputs` → canvas click handler → `src/interaction/canvas-click.ts`
-- The `c.addEventListener("click", …)` body is ~200 lines (≈4280–4481), a clear unit:
-  hit-test → route to openFile / switchToCloseup / openHeatmapDetail / etc.
-- Extract `handleCanvasClick(e, deps)` where deps exposes the handful of callbacks/
-  state it needs (hitTest, screenToWorld, openFile, switchToCloseup, laid, settings…).
-  attachInputs keeps `c.addEventListener("click", (e) => handleCanvasClick(e, deps))`.
-- **Risk: medium** (many deps, but one cohesive block). Biggest single LOC win (~190).
+### L5. `attachInputs`/click → matrix hit math → `src/interaction/hit-modes.ts`
+`matrixColAt(matrix, t, canvasW, sx): number` and
+`matrixLineAt(matrix, matrixLines, t, sy): number` (view methods at ~3796/3806;
+deps: laid.matrix, matrixLines, zoom/pan, canvas). Pure. Test: `test/hit-modes.test.ts`.
 
-### B2. `attachInputs` → wheel-zoom handler → fold into `src/interaction/canvas-zoom.ts`
-- Extract the `wheel` handler's zoom-around-cursor math (≈4504–4527) into
-  `zoomAroundPointer(state, deltaY, sx, sy): {zoom,panX,panY}` (pure) + thin listener.
-- **Risk: low** (pure math). Test: `test/canvas-zoom.test.ts`.
+### L6. click → heatmap hit math → `src/interaction/hit-modes.ts` (same module)
+`heatmapCellAt(heatmap, t, canvasW, canvasH, sel, sx, sy): {i,j}|null` (view ~3817;
+`sel` carries the pinned-column flags it reads). Pure. Add to `test/hit-modes.test.ts`.
 
-### B3. `ensureNoteMenu` → header builder (title row + pin/close) → `src/interaction/note-menu-header.ts`
-- Extract the title-row + pin/close button DOM builder (ensureNoteMenu ~offset 67–98)
-  into `buildMenuHeader(panel, deps)` (deps: togglePin, toggleNoteMenu, title text).
-- **Risk: low–medium** (DOM builder, few deps).
+### L7. hover/tip positioning → `src/interaction/tip-geom.ts`
+`positionTip(canvasRect, marqueeActive, sx, sy, tipSize): {left,top}` and the detail
+overlay clamp (`positionTip` ~4172, `positionDetail`). Pure geometry. Test: `test/tip-geom.test.ts`.
 
----
+### L8. (stretch) `drosteHitTest` pure core → `src/interaction/hit-modes.ts`
+Only if the `drosteHit` cache can be passed in cleanly; else defer (medium). Not required.
 
-## Phase C — pipeline / dispatch blocks (MEDIUM risk).
+## Order & effect
+L1 → L2 → L3 → L4 → L5 → L6 → L7 (L8 optional). Each verify-green + commit.
+LOC out of view.ts: small individually (~20–60 each) but each ADDS unit coverage to
+currently-untested geometry, and shrinks the giant methods' pure surface so the
+remaining glue is obviously just orchestration.
 
-### C1. `rebuild` → encoding step → `src/query/encode-step.ts` (or reuse encoding/)
-- Extract "Visual Encoding: map displayed nodes' attributes → per-node draw params"
-  (rebuild ~offset 184–209): build `EncContext` (nowMs/degreeOf/frontmatterOf) and run
-  `evaluateEncoding`, returning `{encParams, encLegends}`.
-- Deps: degreeMap/inDegreeMap/outDegreeMap, frontmatterOf, settings.encoding.
-- **Risk: medium.** Keeps the encoding pipeline ordering (runs before cardFor).
-
-### C2. `draw` → screen-space mode dispatch → `src/draw/draw-dispatch.ts`
-- The early-return branches for matrix/heatmap/lattice/droste/upset (draw ~offset 38–158)
-  each call a `draw-*` and `return`. Replace the if-chain with a small table
-  `{mode → (ctx, laid, geom) => drawn}`; view keeps the table wiring.
-- **Risk: medium** (touches the central draw path; per-figure draw-* stay separate).
+## Deliberately NOT done (cannot be made low-risk)
+- Extracting the click handler / event listeners wholesale → large deps bag, not low-risk.
+- Converting `draw`'s mode dispatch to a table, or parameterising `rebuild`/`draw` →
+  central-path / giant-deps risk. Keep them as thin orchestrators (Tier-4 stance).
 
 ---
 
-## Phase D — leave as thin orchestrators (do NOT fully extract)
-`rebuild` and `draw` remain in view as orchestrators after A/B/C; per the Tier-4 note,
-parameterising them wholesale would create a giant `deps` bag that hurts readability.
+## Broader backlog — DO NOT LOSE (track alongside this plan)
+See memory `kaizen-backlog-0.3.18`. Beyond R4:
+- **F1** Encoding/Lens preset import/export + bundled presets (acquisition driver).
+- **F2** first-class scatter mode (2D quantitative axes + zoom/pan; builds on axis-layout — the L1/L3/L4 viewport+zoom helpers feed this).
+- **F3** SVG / clipboard-copy export (PNG already shipped).
+- **F4** Encoding channel `shape` + on-canvas legend rendering.
+- **N2** plugin re-enable re-runs `registerView` → "existing view type" warning (`src/main.ts`); low priority, benign.
 
-## Suggested order & expected effect
-A1 → A2 → B2 → B1 → B3 → C1 → C2. Each verify-green + commit.
-Rough LOC moved out of view.ts: A1 ~30, A2 ~50, B2 ~25, B1 ~190, B3 ~40, C1 ~30, C2 ~60
-→ view.ts ≈ 4,532 → ~4,100, with 6 new small, tested modules. Pure helpers (A1/A2/B2)
-add real unit coverage where view.ts currently has none.
+## Design invariants to preserve in EVERY future change
+- **Selection ⊥ encoding/attributes**: encoding/axis bindings and attribute propagation
+  never change WHICH notes appear. closeup `focusNodeIds` is a query-layer (parser.ts) concern.
+- **Per-figure separation is intentional**: do NOT merge per-mode `draw-*`/layout logic for DRY (R5 was rejected on this basis).
+- **`npm run verify` is the merge gate**; tsc is the only type gate (esbuild/test don't type-check).
+- New settings field ⇒ update `MiniSettings` + `DEFAULT_SETTINGS` (guarded by `settings-parity.test`).
+- Layout must propagate `mtime/fmMaturity/ageDays` to every note node (guarded by `attribute-propagation.test`).
