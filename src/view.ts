@@ -114,6 +114,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
+import { NOTE_MENU_MIN, resolveMenuRect, pinnedMenuWidth } from "./interaction/note-menu-geom";
 
 export const VIEW_TYPE_MINI = "tag-lens-view";
 
@@ -2777,32 +2778,12 @@ export class MiniGraphView extends ItemView {
 		//   3. the built-in default (top-left, 270px wide, container-tall).
 		// On every (re)build we clamp the rect to the current container size so a
 		// shrunken view can never strand the panel off-screen.
-		const NOTE_MENU_MIN = { width: 180, height: 120 };
 		const container = { width: this.root.clientWidth || 0, height: this.root.clientHeight || 0 };
-		const defaultRect: MenuRect = {
-			left: 8,
-			top: 8,
-			// Wider default than the old note-only menu so the Settings tab's form
-			// rows (expressions, selects) fit without horizontal scrolling.
-			width: 320,
-			// Default height ≈ "calc(100% - 16px)" of the old maxHeight, but as an
-			// explicit number so the resize handle has something to grow/shrink.
-			height: Math.max(NOTE_MENU_MIN.height, (container.height || 600) - 16),
-		};
-		const seed: MenuRect = this.noteMenuRect
-			?? (this.settings.noteMenuRect ? { ...this.settings.noteMenuRect } : defaultRect);
-		// Only clamp when we know the container size (clientHeight can be 0 before
-		// the first paint); otherwise keep the seed verbatim.
-		const rect: MenuRect = container.width > 0 && container.height > 0
-			? clampRect(seed, container, NOTE_MENU_MIN)
-			: seed;
+		const rect = resolveMenuRect(this.noteMenuRect, this.settings.noteMenuRect, container);
 		this.noteMenuRect = rect;
 		const pinned = !!this.settings.noteMenuPinned;
 		// Docked width when pinned (clamped to ≤80% of the container).
-		const pinnedW = Math.min(
-			Math.max(NOTE_MENU_MIN.width, this.settings.noteMenuPinnedWidth ?? 320),
-			Math.max(NOTE_MENU_MIN.width, Math.floor((container.width || 320) * 0.8)),
-		);
+		const pinnedW = pinnedMenuWidth(this.settings.noteMenuPinnedWidth, container.width);
 		if (pinned) {
 			// Dock to the RIGHT edge: full height, fixed width, square corners, a
 			// left border only — the canvas reserves `pinnedMenuWidth()` so the
