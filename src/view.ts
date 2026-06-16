@@ -2321,51 +2321,12 @@ export class MiniGraphView extends ItemView {
 		const H = this.laid.slotH;
 		const periodX = 360 * W;
 		const periodY = 180 * H;
-		const visW = cw / dpr;
-		const visH = ch / dpr;
-		// Viewport in world coords.
-		const leftWorld = -this.panX / this.zoom;
-		const rightWorld = (visW - this.panX) / this.zoom;
-		const topWorld = -this.panY / this.zoom;
-		const bottomWorld = (visH - this.panY) / this.zoom;
-		// Content bbox (= union of card footprints + cluster rects).
-		// Falls back to a tiny window when there are no nodes.
-		let contentMinX = Infinity,
-			contentMaxX = -Infinity,
-			contentMinY = Infinity,
-			contentMaxY = -Infinity;
-		for (const n of this.laid.nodes) {
-			contentMinX = Math.min(contentMinX, n.x - n.width / 2);
-			contentMaxX = Math.max(contentMaxX, n.x + n.width / 2);
-			contentMinY = Math.min(contentMinY, n.y - n.height / 2);
-			contentMaxY = Math.max(contentMaxY, n.y + n.height / 2);
-		}
-		for (const c of this.laid.clusters) {
-			contentMinX = Math.min(contentMinX, c.x);
-			contentMaxX = Math.max(contentMaxX, c.x + c.width);
-			contentMinY = Math.min(contentMinY, c.y);
-			contentMaxY = Math.max(contentMaxY, c.y + c.height);
-		}
-		if (!isFinite(contentMinX)) {
-			contentMinX = 0;
-			contentMaxX = W;
-			contentMinY = 0;
-			contentMaxY = H;
-		}
 		// Visible range is locked to a single period — the user explicitly
 		// requested "ちょうど一周分" (exactly one revolution) in both lat
 		// and lon. So we draw only the base tile (i=0, j=0); panning past
-		// the content boundary now reveals empty world, not a repeat.
-		// `periodX` / `periodY` / `leftWorld` / `rightWorld` /
-		// `topWorld` / `bottomWorld` / `contentMin*` / `contentMax*` are
-		// kept above for the axis-label and grid code that still needs
-		// them.
-		void leftWorld;
-		void rightWorld;
-		void topWorld;
-		void bottomWorld;
-		void periodX;
-		void periodY;
+		// the content boundary now reveals empty world, not a repeat. The
+		// per-tile loop below is kept as scaffolding (periodX/periodY feed
+		// the offset math) in case multi-revolution tiling returns.
 		const iLo = 0;
 		const iHi = 0;
 		const jLo = 0;
