@@ -355,7 +355,7 @@ export class MiniGraphView extends ItemView {
 	// Which Settings sub-tab is shown: View / Filter / Sort / Display / Layers.
 	// In-memory, preserved across graph rebuilds. Default View.
 	private settingsSubTab: "view" | "display" | "encode" = "view";
-	private dataSubTab: "logic" | "tree" | "table" = "logic";
+	private dataSubTab: "logic" | "tree" | "table" | "json" = "logic";
 	private insightSubTab: "overview" | "alerts" | "suggest" = "overview";
 	// UpSet mode: signature key (= `signature.join("|")`) of the column
 	// currently selected by the user (highlighted in the matrix; drives
@@ -816,6 +816,18 @@ export class MiniGraphView extends ItemView {
 				}
 			}
 		});
+	}
+
+	// Data ▸ JSON tab: import/export Lens presets as JSON (F1). Filled in by
+	// F1-5 (export) and F1-6 (import + bundled). Stub scaffold for now.
+	private renderDataJsonBody(host: HTMLElement): void {
+		host.empty();
+		const title = host.createDiv({ text: "Presets — JSON import / export" });
+		title.setCssStyles({ fontWeight: "600", fontSize: "12px", marginBottom: "4px" });
+		const hint = host.createDiv({
+			text: `${this.settings.lensPresets.length} preset(s) saved. Export/import coming next.`,
+		});
+		hint.setCssStyles({ fontSize: "10.5px", color: "var(--text-muted)" });
 	}
 
 	private refreshFilterTab(): void {
@@ -2861,17 +2873,21 @@ export class MiniGraphView extends ItemView {
 		const tableTab = dataTabWrap.createDiv({ cls: "gim-menu-data-table" });
 		tableTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
 
+		const jsonTab = dataTabWrap.createDiv({ cls: "gim-menu-data-json" });
+		jsonTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
+
 		const settingsTab = bodyWrap.createDiv({ cls: "gim-menu-settings" });
 		settingsTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
 		const insightTab = bodyWrap.createDiv();
 		insightTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
 
 		// -- Data Sub-tabs: Logic | Tree | Table --
-		type DataSubTab = "logic" | "tree" | "table";
+		type DataSubTab = "logic" | "tree" | "table" | "json";
 		const D_SUBS: { key: DataSubTab; label: string }[] = [
 			{ key: "logic", label: "Logic" },
 			{ key: "tree", label: "Tree" },
 			{ key: "table", label: "Table" },
+			{ key: "json", label: "JSON" },
 		];
 		const dSubBtns = new Map<string, HTMLElement>();
 		const styleDSubs = (): void => {
@@ -2893,11 +2909,18 @@ export class MiniGraphView extends ItemView {
 			logicTab.setCssStyles({ display: key === "logic" ? "block" : "none" });
 			treeTab.setCssStyles({ display: key === "tree" ? "flex" : "none" });
 			tableTab.setCssStyles({ display: key === "table" ? "block" : "none" });
+			jsonTab.setCssStyles({ display: key === "json" ? "block" : "none" });
 			if (key === "table") {
 				// Re-render table tab when activated
 				renderDataTableView(tableTab, nodes, { app: this.app, edges: this.laid.edges });
 			} else {
 				tableTab.empty();
+			}
+			if (key === "json") {
+				// Re-render JSON tab (preset import/export) on activation.
+				this.renderDataJsonBody(jsonTab);
+			} else {
+				jsonTab.empty();
 			}
 			styleDSubs();
 		};
