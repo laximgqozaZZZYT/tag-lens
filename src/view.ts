@@ -116,6 +116,7 @@ import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, pinnedMenuWidth } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
+import { hitMatrixLine, hitMatrixCol, hitHeatmapCell } from "./interaction/hit-modes";
 
 export const VIEW_TYPE_MINI = "tag-lens-view";
 
@@ -3732,20 +3733,14 @@ export class MiniGraphView extends ItemView {
 	private matrixLineAt(sy: number): number {
 		const m = this.laid.matrix;
 		if (!m) return -1;
-		const g = matrixGeom(m, this.zoom, this.canvas.clientWidth);
-		if (sy < g.headerH) return -1;
-		const li = Math.floor((sy - this.panY) / g.rowScreenH);
-		return li >= 0 && li < this.matrixLines.length ? li : -1;
+		return hitMatrixLine(m, this.matrixLines.length, this.zoom, this.panY, this.canvas.clientWidth, sy);
 	}
 
 	// Column index under the cursor (-1 = label band / out of range).
 	private matrixColAt(sx: number): number {
 		const m = this.laid.matrix;
 		if (!m) return -1;
-		const g = matrixGeom(m, this.zoom, this.canvas.clientWidth);
-		if (sx < g.labelBand) return -1;
-		const c = Math.floor((sx - this.panX) / g.colScreenW);
-		return c >= 0 && c < m.cols.length ? c : -1;
+		return hitMatrixCol(m, this.zoom, this.panX, this.canvas.clientWidth, sx);
 	}
 
 	// Heatmap cell (row i, col j) under the cursor, or null if over a frozen
@@ -3753,12 +3748,7 @@ export class MiniGraphView extends ItemView {
 	private heatmapCellAt(sx: number, sy: number): { i: number; j: number } | null {
 		const h = this.laid.heatmap;
 		if (!h) return null;
-		const g = heatmapGeom(h, this.zoom, this.canvas.clientWidth);
-		if (sx < g.labelBand || sy < g.headerH) return null;
-		const j = Math.floor((sx - this.panX) / g.cellPx);
-		const i = Math.floor((sy - this.panY) / g.cellPx);
-		if (i < 0 || i >= h.n || j < 0 || j >= h.n) return null;
-		return { i, j };
+		return hitHeatmapCell(h, this.zoom, this.panX, this.panY, this.canvas.clientWidth, sx, sy);
 	}
 
 	// Shared guard: drop a selected column whose set no longer contains it
