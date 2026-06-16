@@ -14,6 +14,7 @@ import { applyLens, captureLens, upsertPreset, removePreset } from "../interacti
 import { displayToggleApplies } from "../visual/display-applicability";
 import type { LensPreset } from "../types";
 import { fieldSourceRegistry } from "../encoding/field-sources";
+import { shapeForKey } from "../encoding/shapes";
 import type { EncodingBinding, ScaleType } from "../encoding/types";
 import type { BindingLegend } from "../encoding/evaluate";
 import { clusterHue } from "../draw/canvas-utils";
@@ -406,6 +407,8 @@ export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): v
 					er.setCssStyles({ display: "inline-flex", alignItems: "center", gap: "4px", marginRight: "8px" });
 					if (channelId === "color") {
 						er.createSpan().setCssStyles({ width: "10px", height: "10px", borderRadius: "2px", background: e.output, display: "inline-block" });
+					} else if (channelId === "shape") {
+						er.createSpan({ text: shapeForKey(e.key) }).setCssStyles({ fontSize: "9px", color: "var(--text-faint)", border: "1px solid var(--background-modifier-border)", borderRadius: "2px", padding: "0 3px" });
 					}
 					er.createSpan({ text: e.key }).setCssStyles({ fontSize: "10px" });
 				}
@@ -418,6 +421,19 @@ export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): v
 	};
 
 	renderBindingControls(section, "color", "Color");
+	renderBindingControls(section, "shape", "Shape");
+
+	// On-canvas legend toggle (paints the colour/shape/size key on the canvas).
+	const legendRow = section.createEl("label", { cls: "gim-toggle-row" });
+	legendRow.setCssStyles({ marginTop: "8px" });
+	const legendCb = legendRow.createEl("input", { type: "checkbox" });
+	legendCb.checked = deps.settings.showLegend;
+	legendCb.addEventListener("change", () => {
+		deps.settings.showLegend = legendCb.checked;
+		deps.save();
+		deps.requestDraw();
+	});
+	legendRow.createSpan({ text: "Show legend on canvas" });
 
 	// ---- Experimental / Legacy Section ----
 	const expDetails = el.createEl("details", { cls: "gim-panel-section gim-experimental-section" });
