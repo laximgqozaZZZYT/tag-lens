@@ -103,7 +103,8 @@ import {
 } from "./panel/settings-tabs";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes, menuLimitedNodes } from "./panel/menu-notes";
-import { copyBlobToClipboard, saveBlobToVault } from "./panel/export-image";
+import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVault } from "./panel/export-image";
+import { SvgRecorderContext } from "./visual/svg-recorder";
 import { findGaps, type TagGap } from "./query/gap-finder";
 import { findBridges, type BridgeCandidate } from "./query/bridge-finder";
 import {
@@ -1769,12 +1770,31 @@ export class MiniGraphView extends ItemView {
 				.setIcon("image-down")
 				.onClick(() => void this.exportImage({ scale: 4, fit: false, target: "vault" })),
 		);
-		menu.addSeparator();
 		menu.addItem((i) =>
 			i
 				.setTitle("Save whole figure as PNG (2×)")
 				.setIcon("maximize")
 				.onClick(() => void this.exportImage({ scale: 2, fit: true, target: "vault" })),
+		);
+		menu.addSeparator();
+		// Vector (SVG) — resolution-independent, reuses the same draw() pipeline.
+		menu.addItem((i) =>
+			i
+				.setTitle("Copy view as SVG")
+				.setIcon("copy")
+				.onClick(() => void this.exportSvg({ fit: false, target: "clipboard" })),
+		);
+		menu.addItem((i) =>
+			i
+				.setTitle("Save view as SVG")
+				.setIcon("file-code")
+				.onClick(() => void this.exportSvg({ fit: false, target: "vault" })),
+		);
+		menu.addItem((i) =>
+			i
+				.setTitle("Save whole figure as SVG")
+				.setIcon("maximize")
+				.onClick(() => void this.exportSvg({ fit: true, target: "vault" })),
 		);
 		menu.showAtMouseEvent(evt);
 	}
@@ -1853,6 +1873,70 @@ export class MiniGraphView extends ItemView {
 			await copyBlobToClipboard(blob, ioDeps);
 		} else {
 			await saveBlobToVault(blob, ioDeps);
+		}
+	}
+
+	// Vector export. Same strategy as exportImage(): swap ctx for an
+	// SvgRecorderContext (a Canvas2D-compatible recorder) and replay the existing
+	// draw() pipeline — no per-mode duplication. The on-DOM canvas/zoom/pan are
+	// restored afterwards (an optional fit-to-figure reframe is undone too).
+	private async exportSvg(opts: { fit: boolean; target: "vault" | "clipboard" }): Promise<void> {
+		if (this.exporting) return;
+
+		const savedZoom = this.zoom;
+		const savedPanX = this.panX;
+		const savedPanY = this.panY;
+		if (opts.fit) this.fitToView();
+
+		const w = this.canvas.width;
+		const h = this.canvas.height;
+		// A real offscreen canvas backs accurate measureText() (font-dependent
+		// widths) AND stands in for this.canvas (ownerDocument, width/height) so
+		// draw() and the per-mode helpers behave exactly as in the PNG path.
+		const off = this.canvas.ownerDocument.createElement("canvas");
+		off.width = w;
+		off.height = h;
+		const measCtx = off.getContext("2d");
+		const measure = (text: string, font: string): number => {
+			if (!measCtx) return text.length * 6;
+			measCtx.font = font;
+			return measCtx.measureText(text).width;
+		};
+		const rec = new SvgRecorderContext(w, h, measure);
+
+		const savedCanvas = this.canvas;
+		const savedCtx = this.ctx;
+		this.exporting = true;
+		this.exportDprMul = 1;
+		this.canvas = off;
+		this.ctx = rec as unknown as CanvasRenderingContext2D;
+		let svg = "";
+		try {
+			this.draw();
+			svg = rec.toSvg();
+		} catch (e) {
+			console.error("[tag-lens] SVG export render failed:", e);
+		} finally {
+			this.canvas = savedCanvas;
+			this.ctx = savedCtx;
+			this.exporting = false;
+			this.exportDprMul = 1;
+			this.zoom = savedZoom;
+			this.panX = savedPanX;
+			this.panY = savedPanY;
+		}
+
+		this.requestDraw();
+		if (!svg) {
+			new Notice("Tag Lens: SVG export failed (render).");
+			return;
+		}
+
+		const ioDeps = { app: this.app, viewMode: this.settings.viewMode };
+		if (opts.target === "clipboard") {
+			await copySvgToClipboard(svg, ioDeps);
+		} else {
+			await saveSvgToVault(svg, ioDeps);
 		}
 	}
 
