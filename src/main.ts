@@ -8,17 +8,16 @@ export default class GraphIslandMiniPlugin extends Plugin {
 	private views: MiniGraphView[] = [];
 
 	onload(): void {
-		void this.init();
-	}
-
-	private async init(): Promise<void> {
-		await this.loadSettings();
-
 		this.registerView(VIEW_TYPE_MINI, (leaf) => {
 			const v = new MiniGraphView(leaf, this.settings, () => this.saveSettings());
 			this.views.push(v);
 			return v;
 		});
+		void this.init();
+	}
+
+	private async init(): Promise<void> {
+		await this.loadSettings();
 
 		this.addRibbonIcon("git-fork", "Tag Lens", () => void this.activateView());
 		this.addCommand({
@@ -61,6 +60,7 @@ export default class GraphIslandMiniPlugin extends Plugin {
 	}
 
 	onunload(): void {
+		this.app.workspace.detachLeavesOfType(VIEW_TYPE_MINI);
 		this.views = [];
 	}
 
