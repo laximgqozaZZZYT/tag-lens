@@ -1,15 +1,13 @@
 # Tag Lens
 
-Tag-membership visualisations for an Obsidian vault — **11 view modes** (per-note
-**Icon Gallery**, intersection lattice, co-occurrence heatmap, UpSet, BubbleSets,
-Sequence Stream, and the experimental region / graph family) driven by a **unified
-control panel** (Filter / Notes / Settings / Insight).
+Tag-membership visualisations for an Obsidian vault with **11 view modes** and a
+**unified control panel** for filtering, navigation, display, and analysis.
 
-On top of the views it adds a **Visual Encoding engine** (bind note attributes →
-visual channels such as colour), an **Insight dashboard** (cognitive-load metric,
-Gap / Bridge finders, tag-classification suggestions), freshness / status / maturity
-overlays, Saved Lenses, Active-Note follow, and PNG export. **Fully local — no
-network requests.**
+The plugin visualises tag-membership structure through multiple perspectives, then
+adds a **Visual Encoding engine** (bind note attributes → visual channels such as
+colour), an **Insight dashboard** (cognitive-load metric, Gap / Bridge finders,
+tag-classification suggestions), freshness / status / maturity overlays, Saved
+Lenses, Active-Note follow, and PNG export. **Fully local — no network requests.**
 
 Designed for vaults where notes are tagged in deeply overlapping ways and a
 single force-directed graph would just hairball. Each view answers a different
@@ -17,19 +15,25 @@ question; encoding and overlays let you read your own dimensions into the figure
 
 ## View modes
 
+Tag Lens currently provides **11 view modes**:
+
 | Mode | What it shows |
 |---|---|
 | **Icon Gallery** | One compact icon per note, tiled in a grid. From the note outward, each icon nests: the note itself, notes that share **all** its tags, groups of notes that share **some** of its tags, and its link / backlink neighborhood. |
 | **Intersection lattice** | Degree-tiered Hasse-style layout of exact tag intersections with subset links; each node auto-switches between overview / density / individual rendering by count and zoom. |
 | **Tag co-occurrence heatmap** | Symmetric tag × tag grid; cell shade = how many notes share two tags (Jaccard by default; raw count on a log/p95 scale). Diagonal = tag size. Click a cell to list the notes in that co-occurrence. |
 | **UpSet plot** | Stack of cards per intersection signature + dot matrix at the bottom — handles ≥ 4-way intersections that diagrams can't draw. |
-| **Sequence Stream** | (Beta) Time-series transposed heatmap. The X-axis represents time bins (e.g. month, week) or sequential fields (e.g. chapters), and the Y-axis represents tags. Shows tag usage flow over time and helps detect dropped threads. |
+| **Connection matrix** | Notes × tags dot grid with seriation for structural scanning. |
+| **Tag graph** | Bipartite notes + tag nodes, with force / concentric / clustered arrangements. |
 | **BubbleSets** | Containment layout drawn as rectangular iso-contour bubbles. |
-| **Experimental (beta)** | **Connection matrix** (notes × tags dot grid, seriated), **Tag graph** (bipartite notes + tag nodes), and the region/containment family — **Nested set diagram / Containment map / Euler**. |
+| **Nested set diagram** | Rectangular containment view in the experimental region family. |
+| **Containment map** | Experimental containment-focused layout for overlapping tag regions. |
+| **Euler** | Experimental rectangle-based overlap view in the Euler family. |
+| **Sequence Stream** | (Beta) Time-series transposed heatmap. The X-axis represents time bins (e.g. month, week) or sequential fields (e.g. chapters), and the Y-axis represents tags. Shows tag usage flow over time and helps detect dropped threads. |
 
 ## Unified Control Panel
 
-The floating settings panel is now a **unified control center** available in every view mode. It is divided into four main tabs to help you filter, navigate, display, and analyze your graph:
+The floating settings panel is a **unified control center** available in every view mode. It is divided into four main tabs to help you filter, navigate, display, and analyze your graph:
 
 ### 1. Filter
 Control exactly what data enters the graph. Switch between modes using the toggle icon at the top right of the tab.
@@ -38,7 +42,7 @@ Control exactly what data enters the graph. Switch between modes using the toggl
   - **GROUP_BY**: Partition by `tag:*` or a frontmatter field.
   - **HAVING**: Drop clusters whose count fails the predicate.
   - **Sort (ORDER_BY / LIMIT)**: Sort criteria and limit tiers for per-cluster top-N display.
-- **DataviewJS Mode (New)**: Bypass the built-in `WHERE` parser and use Obsidian Dataview's JavaScript API (`dv.pages()`). Returns a dynamic list of notes to feed into the graph while still preserving the same layout / encoding / rendering pipeline.
+- **DataviewJS Mode**: Bypass the built-in `WHERE` parser and use Obsidian Dataview's JavaScript API (`dv.pages()`). Returns a dynamic list of notes to feed into the graph while still preserving the same layout / encoding / rendering pipeline.
 
 ### 2. Notes (Note Navigator)
 A list of all notes surviving the filter pipeline.
@@ -52,10 +56,10 @@ A list of all notes surviving the filter pipeline.
 Global graph display configurations and behavior, structured into sub-tabs:
 - **View**: Select your layout algorithms. Enable **Active Note View** to auto-follow the active note in your Obsidian editor and instantly visualize its context (links, backlinks, and shared tags).
 - **Display**: Granular control over graph elements (`Show nodes`, `Show enclosures`, `Show edges`, `Show grid`) and global minimum font size rules.
-- **Encode (New)**: The **Visual Encoding Engine**. Declaratively bind note attributes (e.g., frontmatter `status` or computed `ageDays`) to visual channels (like Color). This operates purely on attribute → appearance mapping; it never changes which notes are displayed.
+- **Encode**: The **Visual Encoding Engine**. Declaratively bind note attributes (e.g., frontmatter `status` or computed `ageDays`) to visual channels (like Color or axis position). This operates purely on attribute → appearance mapping; it never changes which notes are displayed.
 - **Layers**: Per-cluster display overrides. Adjust card sizes (`m × n` cells) and behaviors for specific tag groups.
 
-### 4. Insight (New)
+### 4. Insight
 Analyzes your current graph state to help you manage complexity.
 - **Overview**: Computes a real-time **Cognitive Load Metric** based on visible nodes, edges, and clusters. Provides actionable advice when the graph becomes too complex.
 - **Alerts**: Automatically alerts you to statistical gaps in co-occurrences (**Gap Finder**) and suggests highly similar, unlinked note pairs (**Bridge Finder**) to help you connect isolated knowledge.
@@ -94,7 +98,7 @@ Tag Lens reads the **tags** (frontmatter `tags` and inline `#tag` markers), **no
 
 ## Compatibility
 
-Requires Obsidian **1.5.0** or later. Works on desktop and mobile (the heavy modes — Euler family in the Experimental section — are best on desktop).
+Requires Obsidian **1.5.0** or later. Works on desktop and mobile (the heavier experimental containment/Euler family modes are best on desktop).
 
 ## Architecture & contributing
 
