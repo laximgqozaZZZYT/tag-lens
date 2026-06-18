@@ -3,7 +3,7 @@
 	"name": "Tag Lens",
 	"version": "0.3.18",
 	"minAppVersion": "1.5.0",
-	"description": "Lightweight tag-membership visualisations: Icon Gallery, intersection lattice, co-occurrence heatmap, UpSet, BubbleSets.",
+	"description": "Tag-membership visualisations for Obsidian: Icon Gallery, lattice, heatmap, UpSet, matrix, tag graph, BubbleSets, Euler-family, and Sequence Stream.",
 	"author": "laximgqozaZZZYT",
 	"authorUrl": "https://github.com/laximgqozaZZZYT",
 	"isDesktopOnly": false
