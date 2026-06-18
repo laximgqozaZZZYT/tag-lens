@@ -122,6 +122,9 @@ export interface MiniSettings {
 	// F5: per-mode legend dismissal. A mode whose key is `true` here hides the
 	// on-canvas legend (via the legend's × button) regardless of `showLegend`.
 	legendHiddenModes: Partial<Record<ViewMode, boolean>>;
+	// F5: per-mode dragged legend position (top-left origin, CSS px). Absent ⇒
+	// the mode's default anchor is used.
+	legendPos: Partial<Record<ViewMode, { x: number; y: number }>>;
 	// Per-card visibility. List of node IDs explicitly hidden globally.
 	// Managed via per-layer card toggles in the settings panel.
 	hiddenNodes: string[];
@@ -477,6 +480,7 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	showGrid: true,
 	showLegend: true,
 	legendHiddenModes: {},
+	legendPos: {},
 	hiddenNodes: [],
 	aggregatedLayers: [],
 	inheritFrom: {},

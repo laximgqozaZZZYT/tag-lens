@@ -114,6 +114,8 @@ export type LegendAnchor = "top-left" | "top-right" | "bottom-left" | "bottom-ri
 export interface LegendRender {
 	width: number;
 	height: number;
+	// Whole legend panel in SCREEN px (for drag hit-testing). null when nothing drawn.
+	panelRect: { x: number; y: number; w: number; h: number } | null;
 	closeRect: { x: number; y: number; w: number; h: number } | null;
 }
 
@@ -127,8 +129,9 @@ export function drawLegend(
 	theme: LegendTheme,
 	o?: Partial<LegendLayoutOpts>,
 	showClose = true,
+	origin?: { x: number; y: number },
 ): LegendRender {
-	if (!specs.length) return { width: 0, height: 0, closeRect: null };
+	if (!specs.length) return { width: 0, height: 0, panelRect: null, closeRect: null };
 	const fontPx = o?.fontPx ?? 11;
 	const swatch = o?.swatch ?? 10;
 	const padX = o?.padX ?? 8;
@@ -139,10 +142,16 @@ export function drawLegend(
 		padY: o?.padY, rowGap: o?.rowGap, sectionGap: o?.sectionGap,
 	};
 	const box = buildLegendBox(specs, opts);
-	if (!box.sections.length) return { width: 0, height: 0, closeRect: null };
+	if (!box.sections.length) return { width: 0, height: 0, panelRect: null, closeRect: null };
 
-	const originX = anchor.endsWith("right") ? canvasW - box.width - margin : margin;
-	const originY = anchor.startsWith("bottom") ? canvasH - box.height - margin : margin;
+	// Explicit (dragged) origin wins, clamped so the whole panel stays on-screen;
+	// otherwise fall back to the anchor corner.
+	let originX = anchor.endsWith("right") ? canvasW - box.width - margin : margin;
+	let originY = anchor.startsWith("bottom") ? canvasH - box.height - margin : margin;
+	if (origin) {
+		originX = Math.max(0, Math.min(canvasW - box.width, origin.x));
+		originY = Math.max(0, Math.min(canvasH - box.height, origin.y));
+	}
 
 	// Panel background.
 	ctx.fillStyle = theme.panelBg;
@@ -237,7 +246,12 @@ export function drawLegend(
 		closeRect = cb;
 	}
 
-	return { width: box.width, height: box.height, closeRect };
+	return {
+		width: box.width,
+		height: box.height,
+		panelRect: { x: originX, y: originY, w: box.width, h: box.height },
+		closeRect,
+	};
 }
 
 // Sample a colour ramp (array of CSS colour stops) at t in [0,1] by nearest stop.

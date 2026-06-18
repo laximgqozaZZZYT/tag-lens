@@ -112,3 +112,24 @@ function mockCtx(): CanvasRenderingContext2D {
 	const r = drawLegend(mockCtx(), specs, 800, 600, "top-right", 10, themeStub, undefined, true);
 	ok(r.width > 0 && r.height > 0 && r.closeRect != null, "renders all kinds + close rect");
 }
+
+// panelRect is returned and matches the drawn box; anchor bottom-left places it.
+{
+	const spec: LegendSpec = { title: "T", kind: "categorical", entries: [{ label: "a", color: "#f00" }] };
+	const r = drawLegend(mockCtx(), [spec], 800, 600, "bottom-left", 10, themeStub, undefined, true);
+	ok(r.panelRect != null, "panelRect returned");
+	ok(r.panelRect!.w === r.width && r.panelRect!.h === r.height, "panelRect matches box size");
+	ok(r.panelRect!.x === 10, "bottom-left anchor → x = margin");
+	ok(r.closeRect!.x >= r.panelRect!.x && r.closeRect!.x + r.closeRect!.w <= r.panelRect!.x + r.panelRect!.w, "× sits inside the panel");
+}
+
+// explicit origin wins and is CLAMPED so the whole panel stays on-screen.
+{
+	const spec: LegendSpec = { title: "T", kind: "categorical", entries: [{ label: "abc", color: "#f00" }] };
+	const mid = drawLegend(mockCtx(), [spec], 800, 600, "bottom-left", 10, themeStub, undefined, true, { x: 200, y: 150 });
+	ok(mid.panelRect!.x === 200 && mid.panelRect!.y === 150, "origin honoured when on-screen");
+	const off = drawLegend(mockCtx(), [spec], 800, 600, "bottom-left", 10, themeStub, undefined, true, { x: 100000, y: 100000 });
+	ok(off.panelRect!.x === 800 - off.width && off.panelRect!.y === 600 - off.height, "origin clamped to keep panel on-screen");
+	const neg = drawLegend(mockCtx(), [spec], 800, 600, "bottom-left", 10, themeStub, undefined, true, { x: -50, y: -50 });
+	ok(neg.panelRect!.x === 0 && neg.panelRect!.y === 0, "negative origin clamped to 0");
+}
