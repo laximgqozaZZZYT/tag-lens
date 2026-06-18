@@ -1,7 +1,7 @@
 // Visual Encoding scales: quantitative (linear/log/quantile + clamp/reverse) and
 // categorical (palette override + stable auto colour) + missing handling.
 import { ok, approx } from "./assert";
-import { prepareScale, autoColor } from "../src/encoding/scales";
+import { prepareScale } from "../src/encoding/scales";
 
 // linear: maps [min,max] -> [0,1]
 {
@@ -45,18 +45,45 @@ import { prepareScale, autoColor } from "../src/encoding/scales";
 	ok(s.apply(null).missing === true, "null -> missing");
 	ok(s.apply("x").missing === true, "non-number -> missing");
 }
-// categorical: distinct entries, output is a colour, auto palette is stable
+// categorical: distinct entries, output is a colour, stable per key
 {
 	const s = prepareScale({ type: "categorical" }, ["a", "b", "a", null]);
 	ok(s.legend.kind === "categorical" && s.legend.entries.length === 2, "two distinct categories (null dropped)");
 	ok(s.apply("a").category === "a" && typeof s.apply("a").output === "string", "categorical resolves key+output");
 	ok(s.apply("a").output === s.apply("a").output, "auto colour stable per key");
-	ok(s.apply("a").output === autoColor("a"), "auto colour matches autoColor()");
 	ok(s.apply(null).missing === true, "categorical null -> missing");
 }
-// categorical palette override wins over auto
+// HARD INVARIANT: a displayed node's colour MUST equal its legend swatch. Both
+// resolve through the same per-key map, so apply(key).output === entry.output
+// for every category — otherwise legend and canvas disagree (the reported bug).
+{
+	const s = prepareScale({ type: "categorical" }, ["1", "2", "3", "2", "4", "5", "6", "7"]);
+	for (const e of s.legend.entries) {
+		ok(s.apply(e.key).output === e.output, `node colour for ${e.key} matches its legend swatch`);
+	}
+}
+// DISTINGUISHABILITY: numeric keys "0".."6" used to collapse to near-identical
+// greens (hue 109-139). They must now be visibly distinct colours.
+{
+	const keys = ["0", "1", "2", "3", "4", "5", "6"];
+	const s = prepareScale({ type: "categorical" }, keys);
+	const outs = keys.map((k) => s.apply(k).output);
+	ok(new Set(outs).size === keys.length, "every numeric category gets a unique colour");
+	const hue = (c: string) => Number(/hsl\((\d+)/.exec(c)?.[1] ?? "0");
+	const hues = outs.map(hue);
+	ok(Math.max(...hues) - Math.min(...hues) > 120, `hues are spread across the wheel (got ${hues.join(",")})`);
+}
+// determinism: same input -> same colours.
+{
+	const a = prepareScale({ type: "categorical" }, ["x", "y", "z"]).legend.entries.map((e) => e.output);
+	const b = prepareScale({ type: "categorical" }, ["x", "y", "z"]).legend.entries.map((e) => e.output);
+	ok(a.join("|") === b.join("|"), "categorical palette is deterministic");
+}
+// categorical palette override wins over auto (and still corresponds in legend)
 {
 	const s = prepareScale({ type: "categorical", palette: { done: "#ffffff" } }, ["done", "wip"]);
 	ok(s.apply("done").output === "#ffffff", "palette override applied");
 	ok(s.apply("wip").output !== "#ffffff", "unmapped value falls back to auto");
+	const doneEntry = s.legend.entries.find((e) => e.key === "done");
+	ok(doneEntry?.output === "#ffffff", "legend swatch honours the palette override too");
 }

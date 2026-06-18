@@ -21,9 +21,26 @@ export interface PreparedScale {
 	legend: LegendInfo;
 }
 
-// Stable auto colour for a categorical key (same key -> same colour).
+// Per-key auto colour (same key -> same colour). Kept as a defensive fallback for
+// keys not present when the scale was prepared; reuses clusterHue which is tuned
+// for TAG NAMES and clusters for short/numeric keys — see categoricalColor.
 export function autoColor(key: string): string {
 	return `hsl(${Math.round(clusterHue(key))}, 65%, 55%)`;
+}
+
+const GOLDEN_ANGLE = 137.50776405003785;
+
+// Evenly-distributed, maximally-distinct categorical colour BY INDEX. Successive
+// indices land ~137.5° apart on the hue wheel (golden angle) so neighbours never
+// collapse — unlike autoColor's per-key hash, which maps numeric keys "0".."9" to
+// near-identical greens (hue 109-139). A 3-band lightness cycle keeps even
+// hue-near neighbours (large N) separable. The categorical scale assigns these by
+// the key's position in the distinct-value list, so the legend and the nodes that
+// share that one map always correspond.
+export function categoricalColor(i: number): string {
+	const hue = Math.round(((i * GOLDEN_ANGLE) % 360 + 360) % 360);
+	const light = [56, 48, 64][i % 3];
+	return `hsl(${hue}, 65%, ${light}%)`;
 }
 
 function percentile(sorted: number[], p: number): number {
@@ -84,17 +101,24 @@ export function prepareScale(config: ScaleConfig, rawValues: (string | number | 
 
 	// categorical / ordinal
 	const palette = config.palette ?? {};
-	const outFor = (key: string): string => palette[key] ?? autoColor(key);
 	const seen = new Set<string>();
-	const entries: LegendEntry[] = [];
+	const distinct: string[] = [];
 	for (const v of rawValues) {
 		if (v == null) continue;
 		const key = String(v);
 		if (seen.has(key)) continue;
 		seen.add(key);
-		entries.push({ key, output: outFor(key) });
+		distinct.push(key);
 	}
-	if (config.type === "ordinal") entries.sort((a, b) => a.key.localeCompare(b.key));
+	if (config.type === "ordinal") distinct.sort((a, b) => a.localeCompare(b));
+
+	// Assign a distinct colour to each category BY INDEX (palette overrides win),
+	// then resolve BOTH the legend entries and per-node apply() through this one
+	// map — so a displayed node and its legend swatch can never disagree.
+	const colorByKey = new Map<string, string>();
+	distinct.forEach((key, i) => colorByKey.set(key, palette[key] ?? categoricalColor(i)));
+	const outFor = (key: string): string => colorByKey.get(key) ?? palette[key] ?? autoColor(key);
+	const entries: LegendEntry[] = distinct.map((key) => ({ key, output: outFor(key) }));
 
 	return {
 		apply: (raw) => {
