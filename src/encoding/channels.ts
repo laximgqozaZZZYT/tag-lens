@@ -4,6 +4,7 @@
 // shape/group/axis/label/border later is a registerChannel() call each.
 import type { VisualChannel } from "./types";
 import { shapeForKey } from "./shapes";
+import { sequentialColorRamp } from "../draw/legend-spec";
 
 export const channelRegistry: VisualChannel[] = [];
 
@@ -35,8 +36,7 @@ registerChannel({
 		// Quantitative: map the normalized position to a default sequential ramp.
 		// (Scale owns data->t; channel owns t->visual.)
 		if (scaled.t != null) {
-			const light = Math.round(20 + Math.max(0, Math.min(1, scaled.t)) * 55);
-			params.fillColor = `hsl(210, 70%, ${light}%)`;
+			params.fillColor = sequentialColorRamp(scaled.t);
 		}
 	},
 });
