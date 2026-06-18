@@ -177,6 +177,34 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 	ok(specs[1].entries?.some((e) => e.label.includes("Intersection") && e.color === "#ccaa22"), "intersection color legend");
 	ok(specs[1].entries?.some((e) => e.label.includes("Union") && e.color === "#33bb88"), "union color legend");
 }
+// CLOSEUP: enclosure modes with setLayers render ∪/∩ as addressable rows
+// (own resolved NODE_DISPLAY content), NOT the plain "∩ overlap" descriptive row.
+{
+	const specs = buildModeLegend("bubblesets", {
+		...base,
+		groups: [{ key: "greek", label: "greek (5)", color: "#abc" }],
+		setLayers: [
+			{ key: "__union__", label: "∪ Union 1×1 · 12", color: "#0a0" },
+			{ key: "__intersection__", label: "∩ Intersection 2×2 · 3 ⊞", color: "#cc0" },
+		],
+	});
+	const enc = specs.find((s) => s.title.includes("Group enclosures"));
+	ok(!!enc, "enclosure spec present");
+	ok(enc!.entries!.some((e) => e.label === "∪ Union 1×1 · 12" && e.color === "#0a0"), "union set-layer row");
+	ok(enc!.entries!.some((e) => e.label === "∩ Intersection 2×2 · 3 ⊞" && e.color === "#cc0"), "intersection set-layer row");
+	ok(!enc!.entries!.some((e) => e.label.includes("∩ overlap")), "descriptive overlap row suppressed in closeup");
+}
+// PANORAMA (no setLayers): keeps the plain descriptive overlap row.
+{
+	const specs = buildModeLegend("bubblesets", {
+		...base,
+		groups: [{ key: "greek", label: "greek (5)", color: "#abc" }],
+	});
+	const enc = specs.find((s) => s.title.includes("Group enclosures"));
+	ok(!!enc, "enclosure spec present (panorama)");
+	ok(enc!.entries!.some((e) => e.label === "∩ overlap: note in 2+ groups"), "descriptive overlap row kept in panorama");
+	ok(!enc!.entries!.some((e) => e.label.includes("Union") && e.label.includes("·")), "no addressable union row in panorama");
+}
 // tag overflow "+N more".
 {
 	const many = { ...base, tags: Array.from({ length: 12 }, (_, i) => ({ key: "t" + i, color: "#000" })), maxItems: 8 };

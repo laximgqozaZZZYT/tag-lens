@@ -45,6 +45,9 @@ import {
 	resolveNodeDisplay as resolveNodeDisplayFn,
 	resolveFromCluster as resolveFromClusterFn,
 	visualScale,
+	UNION_LAYER_KEY,
+	INTERSECTION_LAYER_KEY,
+	SET_LAYER_LABEL,
 	type NodeDisplay,
 	type NodeDisplayDeps,
 } from "./visual/node-display";
@@ -754,7 +757,7 @@ export class MiniGraphView extends ItemView {
 						refreshSettingsTab: () => this.refreshSettingsTab(),
 						scheduleRebuild: () => this.scheduleRebuild(),
 						clearCardCache: () => this.cardCache.clear(),
-						resolveFromCluster: (groupKey) => this.resolveFromCluster(groupKey),
+						resolveFromCluster: (groupKey) => this.resolveLayerDisplay(groupKey),
 					});
 					break;
 				case "encode": 
@@ -772,7 +775,7 @@ export class MiniGraphView extends ItemView {
 						tabFilter: this.tabFilter,
 						setTabFilter: (f) => { this.tabFilter = f; },
 						clearCardCache: () => this.cardCache.clear(),
-						resolveFromCluster: (groupKey) => this.resolveFromCluster(groupKey),
+						resolveFromCluster: (groupKey) => this.resolveLayerDisplay(groupKey),
 					});
 					break;
 			}
@@ -960,6 +963,33 @@ export class MiniGraphView extends ItemView {
 	// they're overriding.
 	private resolveFromCluster(groupKey: string): NodeDisplay {
 		return resolveFromClusterFn(groupKey, this.nodeDisplayDeps());
+	}
+
+	// Resolve NODE_DISPLAY for a synthetic ∩/∪ set-layer. Single-tag clusters
+	// are SUPERSETS of these layers, so single-set settings cascade. When the
+	// key is in `layerInheritFull` the layer's OWN overrides are ignored and it
+	// resolves purely via inheritFrom → superset → global (FULL inheritance);
+	// otherwise its own overrides apply where set (PARTIAL override).
+	// Panel-facing resolver: dispatches the synthetic ∩/∪ set-layer keys to
+	// resolveSetLayer (which honours layerInheritFull + superset cascade) and
+	// every real cluster key to the standard chain.
+	private resolveLayerDisplay(groupKey: string): NodeDisplay {
+		if (groupKey === UNION_LAYER_KEY || groupKey === INTERSECTION_LAYER_KEY) {
+			return this.resolveSetLayer(groupKey);
+		}
+		return this.resolveFromCluster(groupKey);
+	}
+
+	private resolveSetLayer(setKey: string): NodeDisplay {
+		const base = this.nodeDisplayDeps();
+		const supers = new Map(base.supersetsOf);
+		// Real single-tag clusters are supersets of the set-layers.
+		supers.set(setKey, (this.laid.clusters ?? []).map((c) => c.groupKey));
+		const full = this.settings.layerInheritFull?.includes(setKey) ?? false;
+		const overrides = full
+			? Object.fromEntries(Object.entries(base.overrides).filter(([k]) => k !== setKey))
+			: base.overrides;
+		return resolveFromClusterFn(setKey, { ...base, overrides, supersetsOf: supers });
 	}
 
 	// Settings that only affect WHAT is painted, not the placement. Toggling
@@ -2857,11 +2887,15 @@ export class MiniGraphView extends ItemView {
 		const encodingSpecs = encodingToSpecs(this.encLegends);
 		const t = theme();
 		const aggSet = new Set(this.settings.aggregatedLayers);
+		// CLOSEUP-ONLY augmentation. In panorama the legend keeps its prior plain
+		// per-mode behaviour (no LAYERS & OVERRIDES suffix, no ∩/∪ layers).
+		const isCloseup = this.settings.perspective === "closeup";
 		// LAYERS & OVERRIDES content per layer: resolved NODE_DISPLAY (R×C) +
 		// visible-node count + aggregate state. `cluster.memberCount` is already
 		// post-hide/post-aggregate (the layout filters hidden nodes), so it IS the
-		// visible count. ` ⊞` flags an aggregated layer.
+		// visible count. ` ⊞` flags an aggregated layer. Empty in panorama.
 		const layerSuffix = (groupKey: string): string => {
+			if (!isCloseup) return "";
 			const cluster = this.laid.clusters?.find((c) => c.groupKey === groupKey);
 			const n = cluster?.memberCount ?? 0;
 			const d = this.resolveFromCluster(groupKey);
@@ -2980,6 +3014,7 @@ export class MiniGraphView extends ItemView {
 			};
 		}
 		let groups: ModeLegendInput["groups"];
+		let setLayers: ModeLegendInput["setLayers"];
 		const enclosureModes = ["euler", "euler-true", "euler-venn", "bubblesets"];
 		if (enclosureModes.includes(this.settings.viewMode) && this.laid.clusters?.length) {
 			groups = this.laid.clusters.map((c) => ({
@@ -2987,11 +3022,34 @@ export class MiniGraphView extends ItemView {
 				label: `${c.label} (${c.memberCount})${layerSuffix(c.groupKey)}`,
 				color: t.swatch(clusterHue(c.groupKey), "tint", 0.32),
 			}));
+			// CLOSEUP only: surface ∪ / ∩ as addressable layers with their own
+			// resolved NODE_DISPLAY (R×C) · visible count · aggregate state.
+			if (isCloseup) {
+				const visible = this.laid.nodes;
+				const unionN = visible.length;
+				const interN = visible.filter((n) => (n.memberships?.length ?? 0) >= 2).length;
+				const aggSuffix = (key: string): string => (aggSet.has(key) ? " ⊞" : "");
+				const u = this.resolveSetLayer(UNION_LAYER_KEY);
+				const i = this.resolveSetLayer(INTERSECTION_LAYER_KEY);
+				setLayers = [
+					{
+						key: UNION_LAYER_KEY,
+						label: `${SET_LAYER_LABEL[UNION_LAYER_KEY]} ${u.nodeRows}×${u.nodeCols} · ${unionN}${aggSuffix(UNION_LAYER_KEY)}`,
+						color: t.swatch(140, "tint", 0.32),
+					},
+					{
+						key: INTERSECTION_LAYER_KEY,
+						label: `${SET_LAYER_LABEL[INTERSECTION_LAYER_KEY]} ${i.nodeRows}×${i.nodeCols} · ${interN}${aggSuffix(INTERSECTION_LAYER_KEY)}`,
+						color: t.swatch(45, "tint", 0.32),
+					},
+				];
+			}
 		}
 		return {
 			encodingSpecs,
 			tags,
 			groups,
+			setLayers,
 			counts: { min: legendMin, max: legendMax },
 			droste: drosteOps,
 			lattice: latticeInput,

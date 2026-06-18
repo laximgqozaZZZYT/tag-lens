@@ -1,5 +1,17 @@
 import type { GraphNode } from "../types";
 
+// Synthetic, addressable layer keys for the CLOSEUP set-operation layers.
+// They are NOT real clusters: they carry their own nodeDisplayOverrides /
+// inheritFrom entries and resolve via the standard chain (own → inheritFrom
+// → strict superset → global). Single-tag clusters are supersets of these.
+export const UNION_LAYER_KEY = "__union__";
+export const INTERSECTION_LAYER_KEY = "__intersection__";
+export const SET_LAYER_KEYS = [UNION_LAYER_KEY, INTERSECTION_LAYER_KEY] as const;
+export const SET_LAYER_LABEL: Record<string, string> = {
+	[UNION_LAYER_KEY]: "∪ Union",
+	[INTERSECTION_LAYER_KEY]: "∩ Intersection",
+};
+
 // Resolved NODE_DISPLAY values for a single node — the renderer reads
 // these instead of touching settings directly so per-cluster overrides
 // resolve consistently across cardFor / measureCard / drawCard.

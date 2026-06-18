@@ -32,7 +32,17 @@ import {
 	toggleArrayMember,
 } from "./panel-sections";
 import type { LaidOut } from "../layout/layout";
-import type { NodeDisplay } from "../visual/node-display";
+import {
+	UNION_LAYER_KEY,
+	INTERSECTION_LAYER_KEY,
+	SET_LAYER_KEYS,
+	SET_LAYER_LABEL,
+	type NodeDisplay,
+} from "../visual/node-display";
+
+// Enclosure modes are the only ones that render ∪/∩ enclosures, so the
+// synthetic set-layers are only meaningful there.
+const ENCLOSURE_MODES = ["euler", "euler-true", "euler-venn", "bubblesets"];
 
 export interface ViewTabDeps {
 	settings: MiniSettings;
@@ -531,8 +541,17 @@ function renderLayersSubSection(el: HTMLElement, deps: EncodeTabDeps): void {
 		hint.setText("No layers in the current graph (set GROUP_BY to create clusters).");
 		return;
 	}
+	// CLOSEUP-only: the synthetic ∪/∩ set-layers are addressable alongside the
+	// real clusters under enclosure modes. Absent in panorama.
+	const showSetLayers =
+		deps.settings.perspective === "closeup" &&
+		ENCLOSURE_MODES.includes(deps.settings.viewMode);
+	const tabKeys = [
+		...clusters.map((c) => c.groupKey),
+		...(showSetLayers ? SET_LAYER_KEYS : []),
+	];
 	// Keep the selected layer valid; default to the first cluster.
-	const validKeys = new Set(clusters.map((c) => c.groupKey));
+	const validKeys = new Set(tabKeys);
 	if (!validKeys.has(deps.activeTab)) deps.setActiveTab(clusters[0].groupKey);
 
 	const tabBar = el.createDiv({ cls: "gim-panel-tabs" });
@@ -557,10 +576,72 @@ function renderLayersSubSection(el: HTMLElement, deps: EncodeTabDeps): void {
 	for (const c of clusters) {
 		renderTabButton(chipsEl, c.groupKey, `${c.label} (${c.memberCount})`, clusterHue(c.groupKey), c.label, deps);
 	}
+	if (showSetLayers) {
+		for (const sk of SET_LAYER_KEYS) {
+			renderTabButton(chipsEl, sk, SET_LAYER_LABEL[sk], null, SET_LAYER_LABEL[sk], deps);
+		}
+	}
 	applyTabFilter(el, deps.tabFilter);
 
 	const content = el.createDiv({ cls: "gim-panel-content" });
-	renderLayerTab(content, deps.activeTab, deps);
+	if (deps.activeTab === UNION_LAYER_KEY || deps.activeTab === INTERSECTION_LAYER_KEY) {
+		renderSetLayerTab(content, deps.activeTab, deps);
+	} else {
+		renderLayerTab(content, deps.activeTab, deps);
+	}
+}
+
+// CLOSEUP set-layer (∪/∩) tab: an addressable layer with its own
+// nodeDisplayOverrides, an explicit "Inherit from" select, and a full/disable
+// toggle backed by `layerInheritFull`. When full inheritance is ON the layer's
+// own overrides are ignored (resolve purely via inheritFrom → superset →
+// global); OFF lets its own overrides apply where set.
+function renderSetLayerTab(el: HTMLElement, setKey: string, deps: EncodeTabDeps): void {
+	const head = el.createDiv({ cls: "gim-panel-section" });
+	head.createEl("h4", { text: SET_LAYER_LABEL[setKey] });
+	head.createEl("div", {
+		text:
+			setKey === UNION_LAYER_KEY
+				? "All notes inside any enclosure (∪). Single-tag layers are supersets, so their settings cascade here."
+				: "Notes shared by 2+ enclosures (∩). Single-tag layers are supersets, so their settings cascade here.",
+	}).setCssStyles({ fontSize: "10px", color: "var(--text-faint)", marginBottom: "8px" });
+
+	const togs = el.createDiv({ cls: "gim-panel-section" });
+	togs.createEl("h4", { text: "Inheritance" });
+
+	// Full inheritance toggle (backed by layerInheritFull).
+	const fullRow = togs.createEl("label", { cls: "gim-toggle-row" });
+	const fullCb = fullRow.createEl("input", { type: "checkbox" });
+	fullCb.checked = deps.settings.layerInheritFull.includes(setKey);
+	fullCb.addEventListener("change", () => {
+		toggleArrayMember(deps.settings, "layerInheritFull", setKey, fullCb.checked);
+		deps.save();
+		deps.refreshSettingsTab();
+		void deps.rebuild();
+	});
+	fullRow.createSpan({ text: "Full inheritance (ignore own overrides)" });
+
+	// Inherit-from picker — choose a real cluster as the parent source.
+	const inhRow = togs.createDiv({ cls: "gim-order-row" });
+	inhRow.createSpan({ text: "Inherit from", cls: "gim-order-field" });
+	const inhSel = inhRow.createEl("select", { cls: "gim-order-dir" });
+	const noneOpt = inhSel.createEl("option", { value: "", text: "(none)" });
+	const current = deps.settings.inheritFrom[setKey] ?? "";
+	if (current === "") noneOpt.selected = true;
+	for (const other of deps.laid.clusters) {
+		const opt = inhSel.createEl("option", { value: other.groupKey, text: other.label });
+		if (other.groupKey === current) opt.selected = true;
+	}
+	inhSel.addEventListener("change", () => {
+		if (inhSel.value === "") delete deps.settings.inheritFrom[setKey];
+		else deps.settings.inheritFrom[setKey] = inhSel.value;
+		deps.save();
+		void deps.rebuild();
+	});
+
+	// Per-layer NODE_DISPLAY override (disabled visually under full inheritance,
+	// where own overrides are ignored anyway).
+	renderNodeDisplaySection(el, deps, { groupKey: setKey });
 }
 
 function applyTabFilter(hostEl: HTMLElement, filterQuery: string): void {

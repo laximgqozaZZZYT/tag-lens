@@ -11,6 +11,10 @@ export interface ModeLegendInput {
 	tags: { key: string; color: string; label?: string }[];
 	// Group enclosures (euler/bubblesets): each cluster + the exact enclosure tint.
 	groups?: { key: string; label: string; color: string }[];
+	// CLOSEUP-only: ∪ / ∩ addressable layers (own NODE_DISPLAY R×C · n · aggregate),
+	// surfaced under enclosure modes as their own legend rows. Empty/absent in
+	// panorama. Each `label` already carries the resolved suffix.
+	setLayers?: { key: string; label: string; color: string }[];
 	counts?: { min: number; max: number };        // for size/gradient ramps
 	heatmap?: { jaccard: boolean; tagMin: number; tagMax: number; coMax: number };
 	droste?: {
@@ -80,7 +84,15 @@ function groupEnclosures(input: ModeLegendInput): LegendSpec {
 		.slice(0, max)
 		.map((g) => ({ label: `∪ ${g.label}`, color: g.color }));
 	if (groups.length > max) entries.push({ label: `+${groups.length - max} more` });
-	entries.push({ label: "∩ overlap: note in 2+ groups" });
+	// CLOSEUP: the ∪ / ∩ are addressable layers (own NODE_DISPLAY · count ·
+	// aggregate) — list them with their resolved content. PANORAMA: keep the
+	// prior plain "∩ overlap" descriptive row.
+	const setLayers = input.setLayers ?? [];
+	if (setLayers.length) {
+		for (const sl of setLayers) entries.push({ label: sl.label, color: sl.color });
+	} else {
+		entries.push({ label: "∩ overlap: note in 2+ groups" });
+	}
 	return { title: "Group enclosures (∪) / overlap (∩)", kind: "categorical", entries };
 }
 

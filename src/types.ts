@@ -131,6 +131,11 @@ export interface MiniSettings {
 	// Cluster keys whose members are replaced on the canvas by a single
 	// 3-card diagonal stack (aggregate display).
 	aggregatedLayers: string[];
+	// Synthetic ∩/∪ layer keys that "inherit fully": when a key is present,
+	// the layer's OWN nodeDisplayOverrides are ignored and it resolves purely
+	// via the inheritFrom → strict-superset → global chain (FULL inheritance).
+	// Absent ⇒ the layer's own overrides apply where set (PARTIAL override).
+	layerInheritFull: string[];
 	// Inheritance map: child layer key → parent (source) layer key. When
 	// set, the child cluster's bbox grows to engulf the parent's bbox so
 	// the parent visually "joins" the child territory.
@@ -483,6 +488,7 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	legendPos: {},
 	hiddenNodes: [],
 	aggregatedLayers: [],
+	layerInheritFull: [],
 	inheritFrom: {},
 	nodeDisplayOverrides: {},
 	panelVisible: false,
