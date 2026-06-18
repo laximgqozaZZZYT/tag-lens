@@ -65,6 +65,31 @@ export interface DrawCardOptions {
 	encShape?: string;
 }
 
+export interface CardFillFlags {
+	highlighted: boolean;
+	isSet: boolean;
+	fillHue?: number;
+	isTint: boolean;
+	tintHue?: number;
+	encFillColor?: string;
+}
+
+// Pure decision for a card's body fill + outline stroke from its mutually
+// exclusive visual states. Extracted so the precedence is unit-testable —
+// the on-canvas legend (F4) advertises the colour ENCODING, so the card fill
+// must follow the same precedence or legend and canvas disagree.
+export function cardFillStyle(f: CardFillFlags): { fill: string; stroke: string } {
+	const t = theme();
+	if (f.highlighted) return { fill: t.warn, stroke: t.warn };
+	if (f.isSet) return { fill: t.swatch(f.fillHue ?? 0, "fill"), stroke: t.swatch(f.fillHue ?? 0, "fillStrong") };
+	// An explicit colour ENCODING (user bound the colour channel) MUST beat the
+	// automatic tag-cluster tint — otherwise the on-canvas legend advertises a
+	// colour→value mapping the note cards never actually show.
+	if (f.encFillColor != null) return { fill: f.encFillColor, stroke: t.accent };
+	if (f.isTint) return { fill: t.swatch(f.tintHue ?? 0, "tint"), stroke: t.swatch(f.tintHue ?? 0, "fill") };
+	return { fill: t.canvasBgAlt, stroke: t.accent };
+}
+
 // Pure card renderer. Receives the already-resolved scale + body lines
 // instead of looking them up by node id, so this function has zero
 // dependence on view state. Bug-fix anchor: when a per-cluster
@@ -98,26 +123,16 @@ export function drawCard(
 		ctx.globalAlpha *= 0.5;
 	}
 
+	const cardStyle = cardFillStyle({ highlighted, isSet, fillHue, isTint, tintHue, encFillColor: opts.encFillColor });
+
 	// Fill first so the stroke below sits cleanly on top.
 	ctx.beginPath();
 	roundedRectPath(ctx, x, y, w, h, r);
-	ctx.fillStyle = highlighted
-		? theme().warn
-		: isSet
-			? theme().swatch(fillHue, "fill")
-			: isTint
-				? theme().swatch(tintHue, "tint")
-				: (opts.encFillColor ?? theme().canvasBgAlt);
+	ctx.fillStyle = cardStyle.fill;
 	ctx.fill();
 
 	ctx.lineWidth = (highlighted ? 1.8 : isSet ? 1.6 : 1) / zoom;
-	ctx.strokeStyle = highlighted
-		? theme().warn
-		: isSet
-			? theme().swatch(fillHue, "fillStrong")
-			: isTint
-				? theme().swatch(tintHue, "fill")
-				: theme().accent;
+	ctx.strokeStyle = cardStyle.stroke;
 	if (n.isPeripheral) {
 		ctx.setLineDash([4 / zoom, 4 / zoom]);
 	}
