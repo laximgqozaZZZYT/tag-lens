@@ -6,7 +6,9 @@ import type { LegendAnchor } from "./legend-layout";
 
 export interface ModeLegendInput {
 	encodingSpecs: LegendSpec[];                 // from encodingToSpecs(encLegends)
-	tags: { key: string; color: string }[];      // distinct tags/clusters present + their hue colour
+	// distinct tags/clusters present + their hue colour. `label` (optional) carries
+	// the LAYERS & OVERRIDES content (size R×C · n visible · aggregate) when set.
+	tags: { key: string; color: string; label?: string }[];
 	// Group enclosures (euler/bubblesets): each cluster + the exact enclosure tint.
 	groups?: { key: string; label: string; color: string }[];
 	counts?: { min: number; max: number };        // for size/gradient ramps
@@ -55,7 +57,7 @@ const fmt = (n: number): string => {
 
 function tagKey(input: ModeLegendInput, title: string): LegendSpec {
 	const max = input.maxItems ?? 8;
-	const shown: { label: string; color?: string }[] = input.tags.slice(0, max).map((t) => ({ label: t.key, color: t.color }));
+	const shown: { label: string; color?: string }[] = input.tags.slice(0, max).map((t) => ({ label: t.label ?? t.key, color: t.color }));
 	if (input.tags.length > shown.length) shown.push({ label: `+${input.tags.length - shown.length} more` });
 	return { title, kind: "categorical", entries: shown };
 }

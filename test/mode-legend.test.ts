@@ -140,6 +140,24 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 	ok(specs[0].entries![0].color === "#a00", "tag colour carried");
 }
 
+// tag entry with explicit label renders that label (LAYERS & OVERRIDES suffix).
+{
+	const withLabel: ModeLegendInput = {
+		encodingSpecs: [],
+		tags: [{ key: "greek", color: "#a00", label: "greek 2×3 · 5 ⊞" }],
+		counts: { min: 1, max: 20 },
+	};
+	const specs = buildModeLegend("matrix", withLabel);
+	ok(specs[0].entries![0].label === "greek 2×3 · 5 ⊞", "tag label renders verbatim");
+	ok(specs[0].entries![0].color === "#a00", "tag colour still carried with label");
+}
+// suffix format: ` R×C · n` (+ ` ⊞` aggregated) is what view.ts builds.
+{
+	const R = 2, C = 3, n = 5;
+	const suffix = ` ${R}×${C} · ${n}`;
+	ok(suffix === " 2×3 · 5", "suffix format R×C · n");
+	ok(`greek${suffix} ⊞` === "greek 2×3 · 5 ⊞", "aggregated suffix appends ⊞");
+}
 // droste keeps intrinsic tag legend (encoding specs do not override).
 {
 	const enc = [{ title: "Color · Out-degree", kind: "categorical" as const, entries: [{ label: "1", color: "#111" }] }];

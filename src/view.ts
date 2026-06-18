@@ -2856,23 +2856,36 @@ export class MiniGraphView extends ItemView {
 	private buildModeLegendInput(): ModeLegendInput {
 		const encodingSpecs = encodingToSpecs(this.encLegends);
 		const t = theme();
+		const aggSet = new Set(this.settings.aggregatedLayers);
+		// LAYERS & OVERRIDES content per layer: resolved NODE_DISPLAY (R×C) +
+		// visible-node count + aggregate state. `cluster.memberCount` is already
+		// post-hide/post-aggregate (the layout filters hidden nodes), so it IS the
+		// visible count. ` ⊞` flags an aggregated layer.
+		const layerSuffix = (groupKey: string): string => {
+			const cluster = this.laid.clusters?.find((c) => c.groupKey === groupKey);
+			const n = cluster?.memberCount ?? 0;
+			const d = this.resolveFromCluster(groupKey);
+			let s = ` ${d.nodeRows}×${d.nodeCols} · ${n}`;
+			if (aggSet.has(groupKey)) s += " ⊞";
+			return s;
+		};
 		const seen = new Set<string>();
-		const tags: { key: string; color: string }[] = [];
+		const tags: { key: string; color: string; label?: string }[] = [];
 		for (const n of this.laid.nodes) {
 			const k = n.memberships?.[0];
 			if (!k || seen.has(k)) continue;
 			seen.add(k);
-			tags.push({ key: k, color: t.swatch(clusterHue(k), "fill") });
+			tags.push({ key: k, color: t.swatch(clusterHue(k), "fill"), label: k + layerSuffix(k) });
 		}
 		if (this.settings.viewMode === "droste" && this.laid.drosteGallery?.cells.length) {
 			const drosteSeen = new Set<string>();
-			const drosteTags: { key: string; color: string }[] = [];
+			const drosteTags: { key: string; color: string; label?: string }[] = [];
 			for (const cell of this.laid.drosteGallery.cells) {
 				const keys = this.laid.drosteGallery.nodeKeys.get(cell.id) ?? [];
 				for (const k of keys) {
 					if (!k || drosteSeen.has(k)) continue;
 					drosteSeen.add(k);
-					drosteTags.push({ key: k, color: t.swatch(clusterHue(k), "fill") });
+					drosteTags.push({ key: k, color: t.swatch(clusterHue(k), "fill"), label: k + layerSuffix(k) });
 				}
 			}
 			tags.splice(0, tags.length, ...drosteTags);
@@ -2971,7 +2984,7 @@ export class MiniGraphView extends ItemView {
 		if (enclosureModes.includes(this.settings.viewMode) && this.laid.clusters?.length) {
 			groups = this.laid.clusters.map((c) => ({
 				key: c.groupKey,
-				label: `${c.label} (${c.memberCount})`,
+				label: `${c.label} (${c.memberCount})${layerSuffix(c.groupKey)}`,
 				color: t.swatch(clusterHue(c.groupKey), "tint", 0.32),
 			}));
 		}
