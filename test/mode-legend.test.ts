@@ -11,10 +11,29 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 }
 // heatmap -> two gradients incl. co-occurrence; jaccard renames it; many stops.
 {
-	const specs = buildModeLegend("heatmap", { ...base, heatmap: { jaccard: true } });
+	const specs = buildModeLegend("heatmap", {
+		...base,
+		heatmap: { jaccard: true, tagMin: 2, tagMax: 11, coMax: 9 },
+	});
 	ok(specs.length === 2 && specs.every((s) => s.kind === "gradient"), "two gradient ramps");
 	ok(specs[1].title.includes("Jaccard"), "jaccard title");
 	ok(specs[0].ramp!.stops.length >= 11, "smooth ramp (>=11 stops)");
+	ok(specs[0].ramp!.stops[0] === "hsl(42, 85%, 28%)", "heatmap diagonal min color matches draw formula");
+	ok(specs[0].ramp!.stops.at(-1) === "hsl(42, 85%, 62%)", "heatmap diagonal max color matches draw formula");
+	ok(specs[1].ramp!.stops[0] === "hsl(210, 72%, 16%)", "heatmap co-occurrence min color matches draw formula");
+	ok(specs[1].ramp!.stops.at(-1) === "hsl(210, 72%, 72%)", "heatmap co-occurrence max color matches draw formula");
+	ok(specs[0].ramp!.minLabel === "2" && specs[0].ramp!.maxLabel === "11", "heatmap tag labels use real min/max");
+	ok(specs[1].ramp!.minLabel === "0" && specs[1].ramp!.maxLabel === "1", "jaccard scale labels 0..1");
+}
+
+// heatmap raw-count legend labels use provided clamp upper bound (p95/max).
+{
+	const specs = buildModeLegend("heatmap", {
+		...base,
+		heatmap: { jaccard: false, tagMin: 3, tagMax: 20, coMax: 17 },
+	});
+	ok(specs[1].title === "Co-occurrence", "raw mode title");
+	ok(specs[1].ramp!.minLabel === "0" && specs[1].ramp!.maxLabel === "17", "raw co-occurrence labels use coMax");
 }
 // stream -> tag key + size key.
 {

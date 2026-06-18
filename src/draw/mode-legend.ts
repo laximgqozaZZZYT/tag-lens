@@ -3,23 +3,35 @@
 import type { ViewMode } from "../types";
 import type { LegendSpec } from "./legend-spec";
 import type { LegendAnchor } from "./legend-layout";
-import { sequentialColorRamp } from "./legend-spec";
 
 export interface ModeLegendInput {
 	encodingSpecs: LegendSpec[];                 // from encodingToSpecs(encLegends)
 	tags: { key: string; color: string }[];      // distinct tags/clusters present + their hue colour
 	counts?: { min: number; max: number };        // for size/gradient ramps
-	heatmap?: { jaccard: boolean };
+	heatmap?: { jaccard: boolean; tagMin: number; tagMax: number; coMax: number };
 	maxItems?: number;
 }
 
-// Amber ramp mirroring the heatmap diagonal (light=small, dark=large tag).
-const amberRamp = (t: number): string => `hsl(42, 85%, ${Math.round(80 - Math.max(0, Math.min(1, t)) * 45)}%)`;
+const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
+
+// Heatmap diagonal in draw-heatmap.ts:
+// t = log(size+1)/log(maxSize+1), light = 28 + t*34, hsl(42,85%,light)
+const heatmapTagRamp = (t: number): string => `hsl(42, 85%, ${Math.round(28 + clamp01(t) * 34)}%)`;
+
+// Heatmap off-diagonal in draw-heatmap.ts:
+// intensity in [0,1], light = 16 + intensity*56, hsl(210,72%,light)
+const heatmapCoRamp = (t: number): string => `hsl(210, 72%, ${Math.round(16 + clamp01(t) * 56)}%)`;
 
 // Many stops so the legend bar reads as a SMOOTH gradient (drawLegend samples
 // nearest-stop; >=11 stops makes banding invisible).
 const rampStops = (f: (t: number) => string): string[] =>
 	Array.from({ length: 11 }, (_, i) => f(i / 10));
+
+const fmt = (n: number): string => {
+	if (!isFinite(n)) return "—";
+	const r = Math.round(n * 100) / 100;
+	return Object.is(r, -0) ? "0" : String(r);
+};
 
 function tagKey(input: ModeLegendInput, title: string): LegendSpec {
 	const max = input.maxItems ?? 8;
@@ -41,9 +53,12 @@ export function buildModeLegend(mode: ViewMode, input: ModeLegendInput): LegendS
 	switch (mode) {
 		case "heatmap": {
 			const co = input.heatmap?.jaccard ? "Co-occurrence (Jaccard)" : "Co-occurrence";
+			const tagMin = input.heatmap?.tagMin ?? 1;
+			const tagMax = input.heatmap?.tagMax ?? 1;
+			const coMax = input.heatmap?.jaccard ? 1 : (input.heatmap?.coMax ?? 1);
 			return [
-				{ title: "Tag size", kind: "gradient", ramp: { stops: rampStops(amberRamp), minLabel: "small", maxLabel: "large" } },
-				{ title: co, kind: "gradient", ramp: { stops: rampStops(sequentialColorRamp), minLabel: "low", maxLabel: "high" } },
+				{ title: "Tag size", kind: "gradient", ramp: { stops: rampStops(heatmapTagRamp), minLabel: fmt(tagMin), maxLabel: fmt(tagMax) } },
+				{ title: co, kind: "gradient", ramp: { stops: rampStops(heatmapCoRamp), minLabel: "0", maxLabel: fmt(coMax) } },
 			];
 		}
 		case "stream":

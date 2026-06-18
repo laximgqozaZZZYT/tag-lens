@@ -2862,7 +2862,26 @@ export class MiniGraphView extends ItemView {
 			if (c > max) max = c;
 		}
 		if (!isFinite(min)) { min = 1; max = 1; }
-		return { encodingSpecs, tags, counts: { min, max }, heatmap: { jaccard: !!this.settings.heatmapJaccard } };
+		const hm = this.laid.heatmap;
+		let hmTagMin = 1;
+		let hmTagMax = 1;
+		let hmCoMax = 1;
+		if (hm && hm.tags.length > 0) {
+			hmTagMin = Math.min(...hm.tags.map((x) => x.size));
+			hmTagMax = Math.max(...hm.tags.map((x) => x.size));
+			hmCoMax = Math.max(1, hm.p95 || hm.maxOff || 1);
+		}
+		return {
+			encodingSpecs,
+			tags,
+			counts: { min, max },
+			heatmap: {
+				jaccard: !!this.settings.heatmapJaccard,
+				tagMin: hmTagMin,
+				tagMax: hmTagMax,
+				coMax: hmCoMax,
+			},
+		};
 	}
 
 	private screenToWorld(sx: number, sy: number): { x: number; y: number } {
