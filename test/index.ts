@@ -18,6 +18,7 @@ import "./draw-shape.test";
 import "./draw-card-fill.test";
 import "./legend-layout.test";
 import "./legend-spec.test";
+import "./mode-legend.test";
 import "./bundled-presets.test";
 import "./freshness.test";
 import "./gap-finder.test";
