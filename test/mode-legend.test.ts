@@ -139,6 +139,26 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 	ok(specs.length === 1 && specs[0].kind === "categorical" && specs[0].title === "Color · Tag", "euler tag key");
 	ok(specs[0].entries![0].color === "#a00", "tag colour carried");
 }
+
+// droste keeps intrinsic tag legend (encoding specs do not override).
+{
+	const enc = [{ title: "Color · Out-degree", kind: "categorical" as const, entries: [{ label: "1", color: "#111" }] }];
+	const specs = buildModeLegend("droste", {
+		...base,
+		encodingSpecs: enc,
+		droste: {
+			focusColor: "#3366ff",
+			intersectionColor: "#ccaa22",
+			unionColor: "#33bb88",
+		},
+	});
+	ok(specs !== enc, "droste ignores encoding override");
+	ok(specs.length === 2, "droste includes tag + set-ops legends");
+	ok(specs[0].kind === "categorical" && specs[0].title === "Color · Tag", "droste tag key");
+	ok(specs[1].title === "Set operations", "droste set-ops title");
+	ok(specs[1].entries?.some((e) => e.label.includes("Intersection") && e.color === "#ccaa22"), "intersection color legend");
+	ok(specs[1].entries?.some((e) => e.label.includes("Union") && e.color === "#33bb88"), "union color legend");
+}
 // tag overflow "+N more".
 {
 	const many = { ...base, tags: Array.from({ length: 12 }, (_, i) => ({ key: "t" + i, color: "#000" })), maxItems: 8 };

@@ -152,6 +152,12 @@ export function drawLegend(
 		originX = Math.max(0, Math.min(canvasW - box.width, origin.x));
 		originY = Math.max(0, Math.min(canvasH - box.height, origin.y));
 	}
+	// Even without an explicit drag-origin, clamp the anchored position so an
+	// oversized panel (box wider/taller than the viewport) never ends up mostly
+	// off-screen. This is especially visible in Icon Gallery where legend labels
+	// can become long.
+	originX = Math.max(0, Math.min(canvasW - box.width, originX));
+	originY = Math.max(0, Math.min(canvasH - box.height, originY));
 
 	// Panel background.
 	ctx.fillStyle = theme.panelBg;

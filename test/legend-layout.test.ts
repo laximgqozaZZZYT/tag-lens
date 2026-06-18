@@ -133,3 +133,12 @@ function mockCtx(): CanvasRenderingContext2D {
 	const neg = drawLegend(mockCtx(), [spec], 800, 600, "bottom-left", 10, themeStub, undefined, true, { x: -50, y: -50 });
 	ok(neg.panelRect!.x === 0 && neg.panelRect!.y === 0, "negative origin clamped to 0");
 }
+
+// anchored placement is also clamped when the panel is larger than viewport.
+{
+	const long = "x".repeat(80);
+	const spec: LegendSpec = { title: long, kind: "categorical", entries: [{ label: long, color: "#f00" }] };
+	const r = drawLegend(mockCtx(), [spec], 180, 120, "bottom-right", 10, themeStub, undefined, true);
+	ok(r.panelRect!.x === 0, "anchored X clamped to left edge when box is wider than viewport");
+	ok(r.panelRect!.y >= 0, "anchored Y stays on-screen");
+}

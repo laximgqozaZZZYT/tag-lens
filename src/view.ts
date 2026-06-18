@@ -2855,6 +2855,19 @@ export class MiniGraphView extends ItemView {
 			seen.add(k);
 			tags.push({ key: k, color: t.swatch(clusterHue(k), "fill") });
 		}
+		if (this.settings.viewMode === "droste" && this.laid.drosteGallery?.cells.length) {
+			const drosteSeen = new Set<string>();
+			const drosteTags: { key: string; color: string }[] = [];
+			for (const cell of this.laid.drosteGallery.cells) {
+				const keys = this.laid.drosteGallery.nodeKeys.get(cell.id) ?? [];
+				for (const k of keys) {
+					if (!k || drosteSeen.has(k)) continue;
+					drosteSeen.add(k);
+					drosteTags.push({ key: k, color: t.swatch(clusterHue(k), "fill") });
+				}
+			}
+			tags.splice(0, tags.length, ...drosteTags);
+		}
 		let min = Infinity, max = -Infinity;
 		for (const n of this.laid.nodes) {
 			const c = (n as { count?: number }).count ?? 1;
@@ -2863,6 +2876,13 @@ export class MiniGraphView extends ItemView {
 		}
 		if (!isFinite(min)) { min = 1; max = 1; }
 		const hm = this.laid.heatmap;
+		const drosteOps = this.settings.viewMode === "droste"
+			? {
+				focusColor: t.accent,
+				intersectionColor: t.swatch(45, "fill"),
+				unionColor: t.success,
+			}
+			: undefined;
 		let hmTagMin = 1;
 		let hmTagMax = 1;
 		let hmCoMax = 1;
@@ -2941,6 +2961,7 @@ export class MiniGraphView extends ItemView {
 			encodingSpecs,
 			tags,
 			counts: { min: legendMin, max: legendMax },
+			droste: drosteOps,
 			lattice: latticeInput,
 			heatmap: {
 				jaccard: !!this.settings.heatmapJaccard,

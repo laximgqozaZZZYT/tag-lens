@@ -1,7 +1,7 @@
 import { buildIcon, type DrosteGallery, type IconDiagram } from "../layout/droste-layout";
 import type { AxisSpec } from "../layout/axis-layout";
-import { theme, colorAlpha } from "./theme";
-import { truncateToWidth } from "./canvas-utils";
+import { theme, colorAlpha, parseColor, relativeLuminance } from "./theme";
+import { truncateToWidth, clusterHue } from "./canvas-utils";
 
 // Containment lens = Icon Gallery (spec 2026-06-01). Every node gets an "icon diagram"
 // (① N ∈ ② sig(N) ∈ ③ direct-superset sets ∈ …), all tiled in a grid and navigated by
@@ -84,8 +84,11 @@ function drawWrapped(ctx: CanvasRenderingContext2D, text: string, cx: number, cy
 const focusRing = () => theme().warn;
 const iconBg = () => theme().overlay(0.02);
 const TWO_HUE = 45; // ② = amber
-// Distinct hue per single tag of T (for ③ node colour-coding + the ③ frame label).
-const TAG_HUES = [130, 265, 200, 25, 175, 310, 95, 330];
+const textOnFill = (fill: string): string => {
+	const rgb = parseColor(fill);
+	if (!rgb) return theme().textNormal;
+	return relativeLuminance(rgb) > 0.42 ? "#10141c" : "#eef3f9";
+};
 
 // Draw T's single tags as "a | b | c" centred at (cx,topY), each tag in its own colour
 // (the same colour used to fill that tag's ③ member cells). Separators are dim.
@@ -112,8 +115,7 @@ function drawTagLabel(ctx: CanvasRenderingContext2D, labels: string[], hues: num
 function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number, scy: number, half: number, o: DrawDrosteOpts): void {
 	const dpr = o.dpr;
 	const tags = icon.tKeys;
-	const tIdx = new Map(tags.map((t, i) => [t, i]));
-	const tagHue = (t: string): number => TAG_HUES[(tIdx.get(t) ?? 0) % TAG_HUES.length];
+	const tagHue = (t: string): number => clusterHue(t);
 
 
 	type Item = { id?: string; label: string; hue: number; agg?: boolean; placeholder?: boolean; spacer?: boolean };
@@ -193,13 +195,15 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 				if (labelOK) { ctx.fillStyle = theme().swatch(it.hue, "label"); ctx.font = `${Math.min(mh * 0.8, 10 * dpr)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(truncateToWidth(ctx, it.label, 1.8 * mh), p.x, p.y); }
 			} else {
 				const hover = it.id != null && it.id === o.hoverId;
-				ctx.fillStyle = theme().swatch(it.hue, "fill", 0.45); ctx.fillRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
+				const fill = theme().swatch(it.hue, "fill");
+				const text = textOnFill(fill);
+				ctx.fillStyle = fill; ctx.fillRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
 				ctx.lineWidth = (hover ? 2.5 : 1.2) * dpr; ctx.strokeStyle = theme().swatch(it.hue, hover ? "fillStrong" : "fill"); ctx.strokeRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
 				if (it.id) push(it.id, p.x, p.y, mh);
 				if (labelOK && mh > 6 * dpr) {
 					// ②⑤ (3×3) wrap long labels to multiple lines; ③ (1×1) is too small → truncate.
-					if (R.isTwo || R.isLink) drawWrapped(ctx, it.label, p.x, p.y, mh, Math.min(mh * 0.42, 11 * dpr), theme().textNormal);
-					else { ctx.fillStyle = theme().textNormal; ctx.font = `${Math.min(mh * 0.7, 10 * dpr)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(truncateToWidth(ctx, it.label, 1.8 * mh), p.x, p.y); }
+					if (R.isTwo || R.isLink) drawWrapped(ctx, it.label, p.x, p.y, mh, Math.min(mh * 0.42, 11 * dpr), text);
+					else { ctx.fillStyle = text; ctx.font = `${Math.min(mh * 0.7, 10 * dpr)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(truncateToWidth(ctx, it.label, 1.8 * mh), p.x, p.y); }
 				}
 			}
 		});
@@ -222,7 +226,9 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 		}
 	}
 	// ① focus node at the centre (on top), 4×4 — note title drawn LARGE inside it.
-	ctx.fillStyle = colorAlpha(theme().accent, 0.5);
+	const focusFill = theme().accent;
+	const focusText = textOnFill(focusFill);
+	ctx.fillStyle = focusFill;
 	ctx.fillRect(scx - s1, scy - s1, 2 * s1, 2 * s1);
 	ctx.lineWidth = (icon.focusId === o.focusId ? 3 : 1.6) * dpr;
 	ctx.strokeStyle = icon.focusId === o.focusId ? focusRing() : theme().accent;
@@ -230,7 +236,7 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 	push(icon.focusId, scx, scy, s1);
 	if (labelOK) {
 		// ① title wraps to multiple lines instead of truncating.
-		drawWrapped(ctx, icon.focusLabel, scx, scy, s1, Math.min(s1 * 0.34, 20 * dpr), icon.focusId === o.focusId ? focusRing() : theme().textNormal, true);
+		drawWrapped(ctx, icon.focusLabel, scx, scy, s1, Math.min(s1 * 0.34, 20 * dpr), icon.focusId === o.focusId ? focusRing() : focusText, true);
 	}
 }
 

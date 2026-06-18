@@ -9,6 +9,11 @@ export interface ModeLegendInput {
 	tags: { key: string; color: string }[];      // distinct tags/clusters present + their hue colour
 	counts?: { min: number; max: number };        // for size/gradient ramps
 	heatmap?: { jaccard: boolean; tagMin: number; tagMax: number; coMax: number };
+	droste?: {
+		focusColor: string;
+		intersectionColor: string;
+		unionColor: string;
+	};
 	lattice?: {
 		lod: "auto" | "overview" | "density" | "individual";
 		effectiveLod?: "overview" | "density" | "individual" | "mixed";
@@ -59,6 +64,16 @@ function sizeKey(title: string, input: ModeLegendInput): LegendSpec {
 		{ label: String(lo), radius: 3 },
 		{ label: String(hi), radius: 7 },
 	] };
+}
+
+function drosteSetOps(input: ModeLegendInput): LegendSpec {
+	const d = input.droste;
+	const entries: { label: string; color?: string }[] = [
+		{ label: "Focus node (N)", color: d?.focusColor },
+		{ label: "Intersection (∩T): exact-T notes", color: d?.intersectionColor },
+		{ label: "Union/subset frame (∪): shared subsets of T", color: d?.unionColor },
+	];
+	return { title: "Set operations", kind: "categorical", entries };
 }
 
 function latticeLegend(input: ModeLegendInput): LegendSpec[] {
@@ -145,7 +160,7 @@ function latticeLegend(input: ModeLegendInput): LegendSpec[] {
 export function buildModeLegend(mode: ViewMode, input: ModeLegendInput): LegendSpec[] {
 	// Heatmap / Lattice have intrinsic scales/structure. Even when encoding
 	// bindings exist globally, these legends must reflect their own view grammar.
-	if (mode !== "heatmap" && mode !== "lattice" && input.encodingSpecs.length) {
+	if (mode !== "heatmap" && mode !== "lattice" && mode !== "droste" && input.encodingSpecs.length) {
 		return input.encodingSpecs;
 	}
 	switch (mode) {
@@ -168,6 +183,7 @@ export function buildModeLegend(mode: ViewMode, input: ModeLegendInput): LegendS
 		case "matrix":
 			return [tagKey(input, "Dot · Tag")];
 		case "droste":
+			return [tagKey(input, "Color · Tag"), drosteSetOps(input)];
 		case "euler":
 		case "euler-true":
 		case "euler-venn":
@@ -189,9 +205,10 @@ export function legendAnchor(mode: ViewMode): LegendAnchor {
 		case "heatmap":
 		case "stream":
 		case "lattice":
-		case "droste":
 		case "upset":
 			return "bottom-right";
+		case "droste":
+			return "bottom-left";
 		default:
 			return "bottom-left";
 	}
