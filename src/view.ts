@@ -2890,14 +2890,39 @@ export class MiniGraphView extends ItemView {
 		// CLOSEUP-ONLY augmentation. In panorama the legend keeps its prior plain
 		// per-mode behaviour (no LAYERS & OVERRIDES suffix, no ∩/∪ layers).
 		const isCloseup = this.settings.perspective === "closeup";
+		// Per-tag VISIBLE COUNT that is correct in every view mode. Euler-family
+		// stores it on `cluster.memberCount`, but node-grid modes
+		// (matrix/upset/stream/bipartite) and droste leave `laid.clusters` empty,
+		// so the count must be derived from each mode's own structure:
+		//   • matrix     → `laid.matrix.cols[].size` (notes carrying that tag)
+		//   • droste     → distinct gallery nodes whose tag-keys include the tag
+		//   • clusters   → `cluster.memberCount` (already post-hide/aggregate)
+		//   • node modes → `laid.nodes` whose memberships include the tag
+		// All sources are post-hide/post-aggregate, so each is the live count.
+		const tagVisibleCount = (tag: string): number => {
+			const cluster = this.laid.clusters?.find((c) => c.groupKey === tag);
+			if (cluster) return cluster.memberCount ?? 0;
+			const mcol = this.laid.matrix?.cols?.find((c) => c.key === tag);
+			if (mcol) return mcol.size ?? 0;
+			const gallery = this.laid.drosteGallery;
+			if (gallery?.cells.length) {
+				const ids = new Set<string>();
+				for (const cell of gallery.cells) {
+					if ((gallery.nodeKeys.get(cell.id) ?? []).includes(tag)) ids.add(cell.id);
+				}
+				if (ids.size) return ids.size;
+			}
+			let n = 0;
+			for (const node of this.laid.nodes) if (node.memberships?.includes(tag)) n++;
+			return n;
+		};
 		// LAYERS & OVERRIDES content per layer: resolved NODE_DISPLAY (R×C) +
-		// visible-node count + aggregate state. `cluster.memberCount` is already
-		// post-hide/post-aggregate (the layout filters hidden nodes), so it IS the
-		// visible count. ` ⊞` flags an aggregated layer. Empty in panorama.
-		const layerSuffix = (groupKey: string): string => {
+		// visible-node count + aggregate state. ` ⊞` flags an aggregated layer.
+		// Empty in panorama. `count` lets callers pass a pre-resolved figure (e.g.
+		// the cluster's own memberCount) instead of re-deriving it.
+		const layerSuffix = (groupKey: string, count?: number): string => {
 			if (!isCloseup) return "";
-			const cluster = this.laid.clusters?.find((c) => c.groupKey === groupKey);
-			const n = cluster?.memberCount ?? 0;
+			const n = count ?? tagVisibleCount(groupKey);
 			const d = this.resolveFromCluster(groupKey);
 			let s = ` ${d.nodeRows}×${d.nodeCols} · ${n}`;
 			if (aggSet.has(groupKey)) s += " ⊞";
@@ -2910,6 +2935,15 @@ export class MiniGraphView extends ItemView {
 			if (!k || seen.has(k)) continue;
 			seen.add(k);
 			tags.push({ key: k, color: t.swatch(clusterHue(k), "fill"), label: k + layerSuffix(k) });
+		}
+		// MATRIX stores its rows in `laid.matrix` and leaves `laid.nodes` empty, so
+		// derive the per-tag legend entries from the matrix COLUMNS (one per tag).
+		if (this.settings.viewMode === "matrix" && this.laid.matrix?.cols?.length && !tags.length) {
+			for (const col of this.laid.matrix.cols) {
+				if (seen.has(col.key)) continue;
+				seen.add(col.key);
+				tags.push({ key: col.key, color: t.swatch(clusterHue(col.key), "fill"), label: col.key + layerSuffix(col.key, col.size) });
+			}
 		}
 		if (this.settings.viewMode === "droste" && this.laid.drosteGallery?.cells.length) {
 			const drosteSeen = new Set<string>();
