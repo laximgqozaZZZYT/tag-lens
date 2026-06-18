@@ -49,7 +49,9 @@ function sizeKey(title: string, input: ModeLegendInput): LegendSpec {
 }
 
 export function buildModeLegend(mode: ViewMode, input: ModeLegendInput): LegendSpec[] {
-	if (input.encodingSpecs.length) return input.encodingSpecs; // bound encoding wins
+	// Heatmap has its own intrinsic scale (Tag size / Co-occurrence). Even when
+	// encoding bindings exist globally, heatmap legend must reflect heatmap cells.
+	if (mode !== "heatmap" && input.encodingSpecs.length) return input.encodingSpecs;
 	switch (mode) {
 		case "heatmap": {
 			const co = input.heatmap?.jaccard ? "Co-occurrence (Jaccard)" : "Co-occurrence";
