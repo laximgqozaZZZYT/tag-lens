@@ -1,17 +1,10 @@
 # Tag Lens
 
-Tag-membership visualisations for an Obsidian vault with **11 view modes** and a
-**unified control panel** for filtering, navigation, display, and analysis.
+Tag Lens is an Obsidian plugin for exploring tag-membership structure through **11 view modes** and a **unified control panel**.
 
-The plugin visualises tag-membership structure through multiple perspectives, then
-adds a **Visual Encoding engine** (bind note attributes → visual channels such as
-colour), an **Insight dashboard** (cognitive-load metric, Gap / Bridge finders,
-tag-classification suggestions), freshness / status / maturity overlays, Saved
-Lenses, Active-Note follow, and PNG export. **Fully local — no network requests.**
+It combines multi-perspective visualisation with **Visual Encoding**, **Insight** tools, freshness/status/maturity overlays, Saved Lenses, Active-Note follow, and PNG export — all fully local, with no network requests.
 
-Designed for vaults where notes are tagged in deeply overlapping ways and a
-single force-directed graph would just hairball. Each view answers a different
-question; encoding and overlays let you read your own dimensions into the figure.
+Designed for vaults where notes are tagged in deeply overlapping ways and a single force-directed graph would just hairball. Each view answers a different question; encoding and overlays let you read your own dimensions into the figure.
 
 ## View modes
 
@@ -30,6 +23,8 @@ Tag Lens currently provides **11 view modes**:
 | **Containment map** | Experimental containment-focused layout for overlapping tag regions. |
 | **Euler** | Experimental rectangle-based overlap view in the Euler family. |
 | **Sequence Stream** | (Beta) Time-series transposed heatmap. The X-axis represents time bins (e.g. month, week) or sequential fields (e.g. chapters), and the Y-axis represents tags. Shows tag usage flow over time and helps detect dropped threads. |
+
+Internally, the experimental containment family corresponds to `euler`, `euler-true`, and `euler-venn`.
 
 ## Unified Control Panel
 
