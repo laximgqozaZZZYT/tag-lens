@@ -49,9 +49,11 @@ function sizeKey(title: string, input: ModeLegendInput): LegendSpec {
 }
 
 export function buildModeLegend(mode: ViewMode, input: ModeLegendInput): LegendSpec[] {
-	// Heatmap has its own intrinsic scale (Tag size / Co-occurrence). Even when
-	// encoding bindings exist globally, heatmap legend must reflect heatmap cells.
-	if (mode !== "heatmap" && input.encodingSpecs.length) return input.encodingSpecs;
+	// Heatmap / Lattice have intrinsic scales/structure. Even when encoding
+	// bindings exist globally, these legends must reflect their own view grammar.
+	if (mode !== "heatmap" && mode !== "lattice" && input.encodingSpecs.length) {
+		return input.encodingSpecs;
+	}
 	switch (mode) {
 		case "heatmap": {
 			const co = input.heatmap?.jaccard ? "Co-occurrence (Jaccard)" : "Co-occurrence";

@@ -2871,10 +2871,17 @@ export class MiniGraphView extends ItemView {
 			hmTagMax = Math.max(...hm.tags.map((x) => x.size));
 			hmCoMax = Math.max(1, hm.p95 || hm.maxOff || 1);
 		}
+		let legendMin = min;
+		let legendMax = max;
+		if (this.settings.viewMode === "lattice" && this.laid.lattice?.nodes.length) {
+			const counts = this.laid.lattice.nodes.map((n) => n.count);
+			legendMin = Math.min(...counts);
+			legendMax = Math.max(...counts);
+		}
 		return {
 			encodingSpecs,
 			tags,
-			counts: { min, max },
+			counts: { min: legendMin, max: legendMax },
 			heatmap: {
 				jaccard: !!this.settings.heatmapJaccard,
 				tagMin: hmTagMin,
