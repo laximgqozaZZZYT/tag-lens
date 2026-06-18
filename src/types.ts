@@ -119,6 +119,9 @@ export interface MiniSettings {
 	showGrid: boolean;
 	// F4: paint the encoding legend (colour/shape/size … key) on the canvas.
 	showLegend: boolean;
+	// F5: per-mode legend dismissal. A mode whose key is `true` here hides the
+	// on-canvas legend (via the legend's × button) regardless of `showLegend`.
+	legendHiddenModes: Partial<Record<ViewMode, boolean>>;
 	// Per-card visibility. List of node IDs explicitly hidden globally.
 	// Managed via per-layer card toggles in the settings panel.
 	hiddenNodes: string[];
@@ -473,6 +476,7 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	showEdges: true,
 	showGrid: true,
 	showLegend: true,
+	legendHiddenModes: {},
 	hiddenNodes: [],
 	aggregatedLayers: [],
 	inheritFrom: {},

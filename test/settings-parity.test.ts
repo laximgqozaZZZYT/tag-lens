@@ -36,7 +36,7 @@ for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) {
 		"having", "havingAuto", "havingMode", "heatmapCriterion", "heatmapJaccard",
 		"heatmapMinTagSize", "heatmapSortDir", "hiddenNodes", "inheritFrom", "latticeDensityCells",
 		"latticeDensityMax", "latticeIndividualMax", "latticeMaxNodesPerTier", "latticeMinNodeSize", "latticeNamedMax",
-		"latticeNodeLOD", "latticeShowSubsetLinks", "latticeSpecificTop", "lensPresets", "limit",
+		"latticeNodeLOD", "latticeShowSubsetLinks", "latticeSpecificTop", "legendHiddenModes", "lensPresets", "limit",
 		"limitAuto", "matrixBlockPriority", "matrixCollapseGroups", "matrixGroupBySignature", "matrixMinColumnSize",
 		"matrixSort", "matrixSortDir", "maxNeighborhoodSize", "minFontPx", "nodeCols",
 		"nodeDisplayOverrides", "nodeOffsets", "nodeRows", "nodeSpacing", "noteMenuVisible",

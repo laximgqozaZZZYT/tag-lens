@@ -73,6 +73,7 @@ import { latticeNodeAt } from "./layout/lattice-layout";
 import { drawCard as drawCardFn } from "./draw/draw-card";
 import { drawLegend } from "./draw/legend-layout";
 import { encodingToSpecs } from "./draw/legend-spec";
+import { buildModeLegend, legendAnchor, type ModeLegendInput } from "./draw/mode-legend";
 import {
 	hitTest as hitTestFn,
 	screenToWorld as screenToWorldFn,
@@ -332,6 +333,9 @@ export class MiniGraphView extends ItemView {
 	// Visual Encoding output (computed per rebuild): per-node draw params + legends.
 	private encParams: Map<string, NodeDrawParams> = new Map();
 	private encLegends: BindingLegend[] = [];
+	// F5: cached screen-space rect of the on-canvas legend's × button, set every
+	// draw so the click handler can hit-test it. Null when no legend / no close.
+	private legendCloseRect: { x: number; y: number; w: number; h: number } | null = null;
 	// Per-direction degree counters used by nodeSizeMode = indegree / outdegree.
 	// Refreshed every rebuild from data.edges.
 	private inDegreeMap: Map<string, number> = new Map();
@@ -2307,17 +2311,24 @@ export class MiniGraphView extends ItemView {
 			drawBadge("Jaccard: ON", "rgba(100, 100, 100, 0.8)");
 		}
 
-		// F4: on-canvas encoding legend (colour / shape / size key). Bottom-left so
-		// it clears the meta badges (top-left) and the toolbar (top-right). Pure
-		// overlay — never affects the figure or selection.
-		if (this.settings.showLegend && this.encLegends.length) {
+		// F5: per-mode on-canvas legend. Pure overlay — never affects figure/selection.
+		const vmode = mode as ViewMode;
+		if (this.settings.showLegend && !this.settings.legendHiddenModes?.[vmode]) {
 			const t = theme();
-			drawLegend(ctx, encodingToSpecs(this.encLegends), cw / dpr, ch / dpr, "bottom-left", 10, {
-				panelBg: colorAlpha(t.panelBg, 0.92),
-				border: t.border,
-				text: t.textNormal,
-				textMuted: t.textMuted,
-			});
+			const specs = buildModeLegend(vmode, this.buildModeLegendInput());
+			if (specs.length) {
+				const render = drawLegend(
+					ctx, specs, cw / dpr, ch / dpr, legendAnchor(vmode), 10,
+					{ panelBg: colorAlpha(t.panelBg, 0.92), border: t.border, text: t.textNormal, textMuted: t.textMuted },
+					undefined,
+					this.exportDprMul === 1, // show the × only when NOT exporting
+				);
+				this.legendCloseRect = render.closeRect;
+			} else {
+				this.legendCloseRect = null;
+			}
+		} else {
+			this.legendCloseRect = null;
 		}
 
 		ctx.restore();
@@ -2828,6 +2839,30 @@ export class MiniGraphView extends ItemView {
 			encBorderColor: this.encParams.get(n.id)?.borderColor,
 			encShape: this.encParams.get(n.id)?.shape,
 		});
+	}
+
+	// F5: gather the per-mode legend input (encoding specs + cluster swatches +
+	// count range + heatmap flag) from the current layout. Pure read — never
+	// mutates state, so the legend stays a display-only overlay.
+	private buildModeLegendInput(): ModeLegendInput {
+		const encodingSpecs = encodingToSpecs(this.encLegends);
+		const t = theme();
+		const seen = new Set<string>();
+		const tags: { key: string; color: string }[] = [];
+		for (const n of this.laid.nodes) {
+			const k = n.memberships?.[0];
+			if (!k || seen.has(k)) continue;
+			seen.add(k);
+			tags.push({ key: k, color: t.swatch(clusterHue(k), "fill") });
+		}
+		let min = Infinity, max = -Infinity;
+		for (const n of this.laid.nodes) {
+			const c = (n as { count?: number }).count ?? 1;
+			if (c < min) min = c;
+			if (c > max) max = c;
+		}
+		if (!isFinite(min)) { min = 1; max = 1; }
+		return { encodingSpecs, tags, counts: { min, max }, heatmap: { jaccard: !!this.settings.heatmapJaccard } };
 	}
 
 	private screenToWorld(sx: number, sy: number): { x: number; y: number } {
@@ -4425,6 +4460,15 @@ export class MiniGraphView extends ItemView {
 			const rect = c.getBoundingClientRect();
 			const sx = e.clientX - rect.left;
 			const sy = e.clientY - rect.top;
+			// F5: the on-canvas legend's × dismisses the legend for the current mode.
+			// Screen-space, checked first so it wins over any canvas content beneath.
+			const cr = this.legendCloseRect;
+			if (cr && sx >= cr.x && sx <= cr.x + cr.w && sy >= cr.y && sy <= cr.y + cr.h) {
+				this.settings.legendHiddenModes = { ...this.settings.legendHiddenModes, [this.settings.viewMode]: true };
+				void this.save();
+				this.draw();
+				return;
+			}
 			if (this.laid.matrix) {
 				const m = this.laid.matrix;
 				const g = matrixGeom(m, this.zoom, this.canvas.clientWidth);
