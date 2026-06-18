@@ -69,7 +69,7 @@ import {
 	latticeNamedRowAt,
 	TIER_GUTTER as LATTICE_TIER_GUTTER,
 } from "./draw/draw-lattice";
-import { latticeNodeAt } from "./layout/lattice-layout";
+import { latticeNodeAt, lodFor } from "./layout/lattice-layout";
 import { drawCard as drawCardFn } from "./draw/draw-card";
 import { drawLegend } from "./draw/legend-layout";
 import { encodingToSpecs } from "./draw/legend-spec";
@@ -2873,15 +2873,50 @@ export class MiniGraphView extends ItemView {
 		}
 		let legendMin = min;
 		let legendMax = max;
+		let latticeInput: ModeLegendInput["lattice"] | undefined;
 		if (this.settings.viewMode === "lattice" && this.laid.lattice?.nodes.length) {
 			const counts = this.laid.lattice.nodes.map((n) => n.count);
 			legendMin = Math.min(...counts);
 			legendMax = Math.max(...counts);
+			const lod = this.settings.latticeNodeLOD;
+			if (lod === "auto") {
+				const mix: NonNullable<ModeLegendInput["lattice"]>["lodMix"] = {
+					overview: 0,
+					density: 0,
+					individual: 0,
+				};
+				for (const c of counts) {
+					let eff = lodFor(c, this.zoom, {
+						latticeNodeLOD: "auto",
+						latticeIndividualMax: this.settings.latticeIndividualMax,
+						latticeDensityMax: this.settings.latticeDensityMax,
+					});
+					if (eff === "individual" && 12 * this.zoom < this.settings.minFontPx * 0.5) {
+						eff = "density";
+					}
+					mix[eff] += 1;
+				}
+				latticeInput = {
+					lod,
+					individualMax: this.settings.latticeIndividualMax,
+					densityMax: this.settings.latticeDensityMax,
+					densityCells: this.settings.latticeDensityCells,
+					lodMix: mix,
+				};
+			} else {
+				latticeInput = {
+					lod,
+					individualMax: this.settings.latticeIndividualMax,
+					densityMax: this.settings.latticeDensityMax,
+					densityCells: this.settings.latticeDensityCells,
+				};
+			}
 		}
 		return {
 			encodingSpecs,
 			tags,
 			counts: { min: legendMin, max: legendMax },
+			lattice: latticeInput,
 			heatmap: {
 				jaccard: !!this.settings.heatmapJaccard,
 				tagMin: hmTagMin,

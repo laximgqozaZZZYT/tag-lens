@@ -9,6 +9,13 @@ export interface ModeLegendInput {
 	tags: { key: string; color: string }[];      // distinct tags/clusters present + their hue colour
 	counts?: { min: number; max: number };        // for size/gradient ramps
 	heatmap?: { jaccard: boolean; tagMin: number; tagMax: number; coMax: number };
+	lattice?: {
+		lod: "auto" | "overview" | "density" | "individual";
+		individualMax: number;
+		densityMax: number;
+		densityCells: number;
+		lodMix?: { overview: number; density: number; individual: number };
+	};
 	maxItems?: number;
 }
 
@@ -48,6 +55,52 @@ function sizeKey(title: string, input: ModeLegendInput): LegendSpec {
 	] };
 }
 
+function latticeLegend(input: ModeLegendInput): LegendSpec[] {
+	const lat = input.lattice;
+	if (!lat) return [sizeKey("Bar ∝ notes", input)];
+	const minC = Math.max(1, input.counts?.min ?? 1);
+	const maxC = Math.max(minC, input.counts?.max ?? minC);
+	const perCellMin = Math.max(1, Math.ceil(minC / Math.max(1, lat.densityCells)));
+	const perCellMax = Math.max(1, Math.ceil(maxC / Math.max(1, lat.densityCells)));
+	const indivCap = Math.max(1, lat.densityCells * 4);
+
+	switch (lat.lod) {
+		case "overview":
+			return [sizeKey("Bar ∝ notes", input)];
+		case "density":
+			return [{
+				title: "Waffle density",
+				kind: "categorical",
+				entries: [
+					{ label: perCellMin === perCellMax ? `1 cell ≈ ${perCellMin} notes` : `1 cell ≈ ${perCellMin}..${perCellMax} notes` },
+					{ label: `Max ${lat.densityCells} cells / node` },
+				],
+			}];
+		case "individual":
+			return [{
+				title: "Cells",
+				kind: "categorical",
+				entries: [
+					{ label: "1 cell = 1 note" },
+					{ label: `Grid cap ${indivCap} cells` },
+					{ label: maxC > indivCap ? "Overflow shown as +N" : "No overflow at current max" },
+				],
+			}];
+		case "auto":
+		default: {
+			const mix = lat.lodMix;
+			const entries: { label: string; color?: string }[] = [
+				{ label: "effective count = count / zoom" },
+				{ label: `≤ ${lat.individualMax}: individual` },
+				{ label: `≤ ${lat.densityMax}: density` },
+				{ label: `> ${lat.densityMax}: overview` },
+			];
+			if (mix) entries.push({ label: `Now I:${mix.individual} D:${mix.density} O:${mix.overview}` });
+			return [{ title: "LOD (auto)", kind: "categorical", entries }];
+		}
+	}
+}
+
 export function buildModeLegend(mode: ViewMode, input: ModeLegendInput): LegendSpec[] {
 	// Heatmap / Lattice have intrinsic scales/structure. Even when encoding
 	// bindings exist globally, these legends must reflect their own view grammar.
@@ -70,7 +123,7 @@ export function buildModeLegend(mode: ViewMode, input: ModeLegendInput): LegendS
 		case "upset":
 			return [tagKey(input, "Dot · in set"), sizeKey("Bar ∝ set size", input)];
 		case "lattice":
-			return [sizeKey("Bar ∝ notes", input)];
+			return latticeLegend(input);
 		case "matrix":
 			return [tagKey(input, "Dot · Tag")];
 		case "droste":

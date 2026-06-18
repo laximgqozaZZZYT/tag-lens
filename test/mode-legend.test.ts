@@ -40,6 +40,74 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 	const specs = buildModeLegend("stream", base);
 	ok(specs[0].kind === "categorical" && specs[1].kind === "size", "tag + size");
 }
+
+// lattice uses intrinsic LOD legend (not encoding override).
+{
+	const enc = [{ title: "Color · Out-degree", kind: "categorical" as const, entries: [{ label: "1", color: "#111" }] }];
+	const specs = buildModeLegend("lattice", {
+		...base,
+		encodingSpecs: enc,
+		lattice: {
+			lod: "overview",
+			individualMax: 60,
+			densityMax: 2000,
+			densityCells: 100,
+		},
+	});
+	ok(specs !== enc, "lattice ignores encoding override");
+	ok(specs[0].title === "Bar ∝ notes" && specs[0].kind === "size", "overview legend is bar-size key");
+}
+
+// lattice density legend explains cell mapping.
+{
+	const specs = buildModeLegend("lattice", {
+		...base,
+		counts: { min: 2, max: 220 },
+		lattice: {
+			lod: "density",
+			individualMax: 60,
+			densityMax: 2000,
+			densityCells: 100,
+		},
+	});
+	ok(specs[0].title === "Waffle density", "density title");
+	ok(specs[0].entries![0].label.includes("1 cell ≈"), "density explains per-cell notes");
+	ok(specs[0].entries![1].label === "Max 100 cells / node", "density cap label");
+}
+
+// lattice individual legend explains 1-cell semantics and overflow.
+{
+	const specs = buildModeLegend("lattice", {
+		...base,
+		counts: { min: 1, max: 520 },
+		lattice: {
+			lod: "individual",
+			individualMax: 60,
+			densityMax: 2000,
+			densityCells: 100,
+		},
+	});
+	ok(specs[0].title === "Cells", "individual title");
+	ok(specs[0].entries![0].label === "1 cell = 1 note", "individual cell meaning");
+	ok(specs[0].entries![2].label === "Overflow shown as +N", "individual overflow semantics");
+}
+
+// lattice auto legend shows thresholds and current mix.
+{
+	const specs = buildModeLegend("lattice", {
+		...base,
+		lattice: {
+			lod: "auto",
+			individualMax: 60,
+			densityMax: 2000,
+			densityCells: 100,
+			lodMix: { individual: 4, density: 12, overview: 8 },
+		},
+	});
+	ok(specs[0].title === "LOD (auto)", "auto title");
+	ok(specs[0].entries![0].label.includes("count / zoom"), "auto formula shown");
+	ok(specs[0].entries!.some((e) => e.label === "Now I:4 D:12 O:8"), "auto current mix shown");
+}
 // card mode with no encoding -> one categorical tag key with the tag colours.
 {
 	const specs = buildModeLegend("euler", base);
