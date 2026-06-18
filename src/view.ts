@@ -336,6 +336,8 @@ export class MiniGraphView extends ItemView {
 	// F5: cached screen-space rect of the on-canvas legend's × button, set every
 	// draw so the click handler can hit-test it. Null when no legend / no close.
 	private legendCloseRect: { x: number; y: number; w: number; h: number } | null = null;
+	private legendPanelRect: { x: number; y: number; w: number; h: number } | null = null;
+	private legendDrag: { dx: number; dy: number } | null = null;
 	// Per-direction degree counters used by nodeSizeMode = indegree / outdegree.
 	// Refreshed every rebuild from data.edges.
 	private inDegreeMap: Map<string, number> = new Map();
@@ -2317,18 +2319,25 @@ export class MiniGraphView extends ItemView {
 			const t = theme();
 			const specs = buildModeLegend(vmode, this.buildModeLegendInput());
 			if (specs.length) {
+				// Reserve a bottom inset so a bottom-anchored legend clears Obsidian's
+				// status bar (≈24px) instead of being clipped off-screen.
+				const usableH = ch / dpr - 24;
 				const render = drawLegend(
-					ctx, specs, cw / dpr, ch / dpr, legendAnchor(vmode), 10,
+					ctx, specs, cw / dpr, usableH, legendAnchor(vmode), 10,
 					{ panelBg: colorAlpha(t.panelBg, 0.92), border: t.border, text: t.textNormal, textMuted: t.textMuted },
 					undefined,
 					this.exportDprMul === 1, // show the × only when NOT exporting
+					this.settings.legendPos?.[vmode], // dragged position (clamped on-screen) if set
 				);
 				this.legendCloseRect = render.closeRect;
+				this.legendPanelRect = render.panelRect;
 			} else {
 				this.legendCloseRect = null;
+				this.legendPanelRect = null;
 			}
 		} else {
 			this.legendCloseRect = null;
+			this.legendPanelRect = null;
 		}
 
 		ctx.restore();
@@ -2957,9 +2966,19 @@ export class MiniGraphView extends ItemView {
 				classColors,
 			};
 		}
+		let groups: ModeLegendInput["groups"];
+		const enclosureModes = ["euler", "euler-true", "euler-venn", "bubblesets"];
+		if (enclosureModes.includes(this.settings.viewMode) && this.laid.clusters?.length) {
+			groups = this.laid.clusters.map((c) => ({
+				key: c.groupKey,
+				label: `${c.label} (${c.memberCount})`,
+				color: t.swatch(clusterHue(c.groupKey), "tint", 0.32),
+			}));
+		}
 		return {
 			encodingSpecs,
 			tags,
+			groups,
 			counts: { min: legendMin, max: legendMax },
 			droste: drosteOps,
 			lattice: latticeInput,
@@ -4472,6 +4491,17 @@ export class MiniGraphView extends ItemView {
 			const rect = c.getBoundingClientRect();
 			const sx = e.clientX - rect.left;
 			const sy = e.clientY - rect.top;
+			// F5: begin dragging the legend panel (but not its × button).
+			{
+				const pr = this.legendPanelRect, cr0 = this.legendCloseRect;
+				const inClose = !!cr0 && sx >= cr0.x && sx <= cr0.x + cr0.w && sy >= cr0.y && sy <= cr0.y + cr0.h;
+				if (pr && !inClose && sx >= pr.x && sx <= pr.x + pr.w && sy >= pr.y && sy <= pr.y + pr.h) {
+					this.legendDrag = { dx: sx - pr.x, dy: sy - pr.y };
+					this.pointerMoved = false;
+					e.preventDefault();
+					return;
+				}
+			}
 			// Footer drag/scroll handlers retired — UpSet matrix is now
 			// integrated with the cards in world space, so the normal
 			// pan handler below moves both together.
@@ -4495,6 +4525,18 @@ export class MiniGraphView extends ItemView {
 				this.marquee.update(e.clientX, e.clientY);
 				return;
 			}
+			// F5: move the legend panel; persists on mouseup.
+			if (this.legendDrag) {
+				const rect = c.getBoundingClientRect();
+				const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+				this.settings.legendPos = {
+					...this.settings.legendPos,
+					[this.settings.viewMode]: { x: sx - this.legendDrag.dx, y: sy - this.legendDrag.dy },
+				};
+				this.pointerMoved = true;
+				this.requestDraw();
+				return;
+			}
 			if (!this.dragging) return;
 			if (
 				Math.abs(e.clientX - this.downX) + Math.abs(e.clientY - this.downY) > 4
@@ -4509,6 +4551,12 @@ export class MiniGraphView extends ItemView {
 		activeWindow.addEventListener("mouseup", (e) => {
 			if (this.marquee.isActive()) {
 				this.marquee.finish(e.clientX, e.clientY);
+				return;
+			}
+			// F5: commit a legend drag.
+			if (this.legendDrag) {
+				this.legendDrag = null;
+				void this.save();
 				return;
 			}
 			this.dragging = false;

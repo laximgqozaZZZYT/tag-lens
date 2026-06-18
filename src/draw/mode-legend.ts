@@ -7,6 +7,8 @@ import type { LegendAnchor } from "./legend-layout";
 export interface ModeLegendInput {
 	encodingSpecs: LegendSpec[];                 // from encodingToSpecs(encLegends)
 	tags: { key: string; color: string }[];      // distinct tags/clusters present + their hue colour
+	// Group enclosures (euler/bubblesets): each cluster + the exact enclosure tint.
+	groups?: { key: string; label: string; color: string }[];
 	counts?: { min: number; max: number };        // for size/gradient ramps
 	heatmap?: { jaccard: boolean; tagMin: number; tagMax: number; coMax: number };
 	droste?: {
@@ -64,6 +66,20 @@ function sizeKey(title: string, input: ModeLegendInput): LegendSpec {
 		{ label: String(lo), radius: 3 },
 		{ label: String(hi), radius: 7 },
 	] };
+}
+
+// Group enclosures: each cluster is the UNION (∪) of its tag's notes, painted as
+// a tinted frame; overlapping frames are the INTERSECTION (∩) of two tags. Mirrors
+// draw-enclosures (swatch tint @0.32). The trailing ∩ row explains the overlap.
+function groupEnclosures(input: ModeLegendInput): LegendSpec {
+	const max = input.maxItems ?? 12;
+	const groups = input.groups ?? [];
+	const entries: { label: string; color?: string }[] = groups
+		.slice(0, max)
+		.map((g) => ({ label: `∪ ${g.label}`, color: g.color }));
+	if (groups.length > max) entries.push({ label: `+${groups.length - max} more` });
+	entries.push({ label: "∩ overlap: note in 2+ groups" });
+	return { title: "Group enclosures (∪) / overlap (∩)", kind: "categorical", entries };
 }
 
 function drosteSetOps(input: ModeLegendInput): LegendSpec {
@@ -160,7 +176,8 @@ function latticeLegend(input: ModeLegendInput): LegendSpec[] {
 export function buildModeLegend(mode: ViewMode, input: ModeLegendInput): LegendSpec[] {
 	// Heatmap / Lattice have intrinsic scales/structure. Even when encoding
 	// bindings exist globally, these legends must reflect their own view grammar.
-	if (mode !== "heatmap" && mode !== "lattice" && mode !== "droste" && input.encodingSpecs.length) {
+	const isEnclosure = mode === "euler" || mode === "euler-true" || mode === "euler-venn" || mode === "bubblesets";
+	if (mode !== "heatmap" && mode !== "lattice" && mode !== "droste" && !isEnclosure && input.encodingSpecs.length) {
 		return input.encodingSpecs;
 	}
 	switch (mode) {
@@ -187,8 +204,15 @@ export function buildModeLegend(mode: ViewMode, input: ModeLegendInput): LegendS
 		case "euler":
 		case "euler-true":
 		case "euler-venn":
+		case "bubblesets": {
+			const out: LegendSpec[] = [];
+			if (input.groups?.length) out.push(groupEnclosures(input));
+			// Node colour key: the bound encoding (what the cards paint) wins, else tags.
+			if (input.encodingSpecs.length) out.push(...input.encodingSpecs);
+			else out.push(tagKey(input, "Color · Tag"));
+			return out;
+		}
 		case "bipartite":
-		case "bubblesets":
 		default:
 			return [tagKey(input, "Color · Tag")];
 	}
