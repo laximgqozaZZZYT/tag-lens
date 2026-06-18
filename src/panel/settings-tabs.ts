@@ -2,7 +2,6 @@ import type { MiniSettings } from "../types";
 import {
 	renderViewModeSection,
 	renderBipartiteSection,
-	renderLatticeSection,
 } from "./settings-sections";
 import {
 	renderOrderBySection,
@@ -46,7 +45,6 @@ export interface ViewTabDeps {
 export function renderSettingsViewTab(el: HTMLElement, deps: ViewTabDeps): void {
 	renderViewModeSection(el, deps);
 	if (deps.settings.viewMode === "bipartite") renderBipartiteSection(el, deps);
-	if (deps.settings.viewMode === "lattice") renderLatticeSection(el, deps);
 }
 
 export interface SortTabDeps {

@@ -92,7 +92,7 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 	ok(specs[0].entries![2].label === "Overflow shown as +N", "individual overflow semantics");
 }
 
-// lattice auto legend shows thresholds and current mix.
+// lattice shows per-class color lists when classColors is provided.
 {
 	const specs = buildModeLegend("lattice", {
 		...base,
@@ -102,11 +102,36 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 			densityMax: 2000,
 			densityCells: 100,
 			lodMix: { individual: 4, density: 12, overview: 8 },
+			classColors: {
+				overview: [{ label: "#root", color: "#111111" }],
+				density: [{ label: "#heat", color: "#222222" }],
+				individual: [{ label: "#act", color: "#333333" }],
+			},
 		},
 	});
-	ok(specs[0].title === "LOD (auto)", "auto title");
-	ok(specs[0].entries![0].label.includes("count / zoom"), "auto formula shown");
-	ok(specs[0].entries!.some((e) => e.label === "Now I:4 D:12 O:8"), "auto current mix shown");
+	ok(specs.length === 3, "one categorical legend per class");
+	ok(specs[0].title === "Overview (bar) · 8 nodes", "overview title + count");
+	ok(specs[1].title === "Density (waffle) · 12 nodes", "density title + count");
+	ok(specs[2].title === "Individual (cells) · 4 nodes", "individual title + count");
+	ok(specs[0].entries![0].color === "#111111", "overview color is preserved");
+}
+
+// lattice falls back to effectiveLod view when classColors is absent.
+{
+	const specs = buildModeLegend("lattice", {
+		...base,
+		counts: { min: 1, max: 220 },
+		lattice: {
+			lod: "auto",
+			effectiveLod: "mixed",
+			individualMax: 60,
+			densityMax: 2000,
+			densityCells: 100,
+			lodMix: { individual: 4, density: 12, overview: 8 },
+		},
+	});
+	ok(specs[0].title === "LOD (current zoom)", "fallback mixed title");
+	ok(specs[0].entries!.some((e) => e.label === "Overview (bar): 8"), "fallback mixed counts");
 }
 // card mode with no encoding -> one categorical tag key with the tag colours.
 {

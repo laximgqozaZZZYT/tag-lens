@@ -1277,7 +1277,7 @@ export class MiniGraphView extends ItemView {
 			matrixSortDir: this.settings.matrixSortDir,
 			bipartiteMaxTags: this.settings.bipartiteMaxTags,
 			bipartiteLayout: this.settings.bipartiteLayout,
-			latticeNodeLOD: this.settings.latticeNodeLOD,
+			latticeNodeLOD: "auto",
 			latticeIndividualMax: this.settings.latticeIndividualMax,
 			latticeDensityMax: this.settings.latticeDensityMax,
 			latticeDensityCells: this.settings.latticeDensityCells,
@@ -2410,7 +2410,7 @@ export class MiniGraphView extends ItemView {
 				dpr,
 				minFontPx: this.settings.minFontPx,
 				settings: {
-					latticeNodeLOD: this.settings.latticeNodeLOD,
+					latticeNodeLOD: "auto",
 					latticeIndividualMax: this.settings.latticeIndividualMax,
 					latticeDensityMax: this.settings.latticeDensityMax,
 					latticeDensityCells: this.settings.latticeDensityCells,
@@ -2875,42 +2875,67 @@ export class MiniGraphView extends ItemView {
 		let legendMax = max;
 		let latticeInput: ModeLegendInput["lattice"] | undefined;
 		if (this.settings.viewMode === "lattice" && this.laid.lattice?.nodes.length) {
-			const counts = this.laid.lattice.nodes.map((n) => n.count);
+			const nodes = this.laid.lattice.nodes;
+			const counts = nodes.map((n) => n.count);
 			legendMin = Math.min(...counts);
 			legendMax = Math.max(...counts);
-			const lod = this.settings.latticeNodeLOD;
-			if (lod === "auto") {
-				const mix: NonNullable<ModeLegendInput["lattice"]>["lodMix"] = {
-					overview: 0,
-					density: 0,
-					individual: 0,
-				};
-				for (const c of counts) {
-					let eff = lodFor(c, this.zoom, {
-						latticeNodeLOD: "auto",
-						latticeIndividualMax: this.settings.latticeIndividualMax,
-						latticeDensityMax: this.settings.latticeDensityMax,
-					});
-					if (eff === "individual" && 12 * this.zoom < this.settings.minFontPx * 0.5) {
-						eff = "density";
-					}
-					mix[eff] += 1;
+			const lod = "auto";
+			const mix: NonNullable<ModeLegendInput["lattice"]>["lodMix"] = {
+				overview: 0,
+				density: 0,
+				individual: 0,
+			};
+			const classColors: NonNullable<ModeLegendInput["lattice"]>["classColors"] = {
+				overview: [],
+				density: [],
+				individual: [],
+			};
+			const seenColors: Record<"overview" | "density" | "individual", Set<string>> = {
+				overview: new Set(),
+				density: new Set(),
+				individual: new Set(),
+			};
+			for (const node of nodes) {
+				let eff = lodFor(node.count, this.zoom, {
+					latticeNodeLOD: lod,
+					latticeIndividualMax: this.settings.latticeIndividualMax,
+					latticeDensityMax: this.settings.latticeDensityMax,
+				});
+				if (eff === "individual" && 12 * this.zoom < this.settings.minFontPx * 0.5) {
+					eff = "density";
 				}
-				latticeInput = {
-					lod,
-					individualMax: this.settings.latticeIndividualMax,
-					densityMax: this.settings.latticeDensityMax,
-					densityCells: this.settings.latticeDensityCells,
-					lodMix: mix,
-				};
-			} else {
-				latticeInput = {
-					lod,
-					individualMax: this.settings.latticeIndividualMax,
-					densityMax: this.settings.latticeDensityMax,
-					densityCells: this.settings.latticeDensityCells,
-				};
+				mix[eff] += 1;
+				const seed = node.isOther
+					? `__other__@${node.degree}`
+					: node.signature.length
+						? node.signature[0]
+						: node.key || "?";
+				const color = eff === "overview"
+					? t.swatch(clusterHue(seed), "fill", 0.95)
+					: eff === "density"
+						? t.swatch(clusterHue(seed), "fill", 0.92)
+						: t.swatch(clusterHue(seed), "fill", 0.90);
+				if (!seenColors[eff].has(color)) {
+					seenColors[eff].add(color);
+					const head = node.displayTags?.[0] ?? node.signature?.[0] ?? node.key;
+					classColors[eff].push({
+						label: node.isOther ? `Other (deg ${node.degree})` : `#${head}`,
+						color,
+					});
+				}
 			}
+			const nonZero = (["overview", "density", "individual"] as const).filter((k) => mix[k] > 0);
+			const effectiveLod: NonNullable<ModeLegendInput["lattice"]>["effectiveLod"] =
+				nonZero.length === 1 ? nonZero[0] : "mixed";
+			latticeInput = {
+				lod,
+				effectiveLod,
+				individualMax: this.settings.latticeIndividualMax,
+				densityMax: this.settings.latticeDensityMax,
+				densityCells: this.settings.latticeDensityCells,
+				lodMix: mix,
+				classColors,
+			};
 		}
 		return {
 			encodingSpecs,
@@ -4658,7 +4683,7 @@ export class MiniGraphView extends ItemView {
 					this.settings.minFontPx,
 					this.zoom,
 					{
-						latticeNodeLOD: this.settings.latticeNodeLOD,
+						latticeNodeLOD: "auto",
 						latticeIndividualMax: this.settings.latticeIndividualMax,
 						latticeDensityMax: this.settings.latticeDensityMax,
 						latticeDensityCells: this.settings.latticeDensityCells,

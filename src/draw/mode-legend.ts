@@ -11,10 +11,16 @@ export interface ModeLegendInput {
 	heatmap?: { jaccard: boolean; tagMin: number; tagMax: number; coMax: number };
 	lattice?: {
 		lod: "auto" | "overview" | "density" | "individual";
+		effectiveLod?: "overview" | "density" | "individual" | "mixed";
 		individualMax: number;
 		densityMax: number;
 		densityCells: number;
 		lodMix?: { overview: number; density: number; individual: number };
+		classColors?: {
+			overview: { label: string; color: string }[];
+			density: { label: string; color: string }[];
+			individual: { label: string; color: string }[];
+		};
 	};
 	maxItems?: number;
 }
@@ -58,13 +64,51 @@ function sizeKey(title: string, input: ModeLegendInput): LegendSpec {
 function latticeLegend(input: ModeLegendInput): LegendSpec[] {
 	const lat = input.lattice;
 	if (!lat) return [sizeKey("Bar ∝ notes", input)];
+	if (lat.classColors) {
+		const max = Math.max(1, input.maxItems ?? 8);
+		const classes: Array<{
+			key: "overview" | "density" | "individual";
+			title: string;
+		}> = [
+			{ key: "overview", title: "Overview (bar)" },
+			{ key: "density", title: "Density (waffle)" },
+			{ key: "individual", title: "Individual (cells)" },
+		];
+		return classes.map(({ key, title }) => {
+			const all = lat.classColors?.[key] ?? [];
+			const shown = all.slice(0, max);
+			const entries: { label: string; color?: string }[] = shown.length
+				? shown.map((e) => ({ label: e.label, color: e.color }))
+				: [{ label: "(none)" }];
+			if (all.length > shown.length) entries.push({ label: `+${all.length - shown.length} more` });
+			const n = lat.lodMix?.[key] ?? all.length;
+			return {
+				title: `${title} · ${n} nodes`,
+				kind: "categorical" as const,
+				entries,
+			};
+		});
+	}
 	const minC = Math.max(1, input.counts?.min ?? 1);
 	const maxC = Math.max(minC, input.counts?.max ?? minC);
 	const perCellMin = Math.max(1, Math.ceil(minC / Math.max(1, lat.densityCells)));
 	const perCellMax = Math.max(1, Math.ceil(maxC / Math.max(1, lat.densityCells)));
 	const indivCap = Math.max(1, lat.densityCells * 4);
+	const eff = lat.effectiveLod ?? lat.lod;
+	if (eff === "mixed") {
+		const mix = lat.lodMix ?? { overview: 0, density: 0, individual: 0 };
+		return [{
+			title: "LOD (current zoom)",
+			kind: "categorical",
+			entries: [
+				{ label: `Overview (bar): ${mix.overview}` },
+				{ label: `Density (waffle): ${mix.density}` },
+				{ label: `Individual (cells): ${mix.individual}` },
+			],
+		}];
+	}
 
-	switch (lat.lod) {
+	switch (eff) {
 		case "overview":
 			return [sizeKey("Bar ∝ notes", input)];
 		case "density":
@@ -86,17 +130,14 @@ function latticeLegend(input: ModeLegendInput): LegendSpec[] {
 					{ label: maxC > indivCap ? "Overflow shown as +N" : "No overflow at current max" },
 				],
 			}];
-		case "auto":
 		default: {
 			const mix = lat.lodMix;
 			const entries: { label: string; color?: string }[] = [
-				{ label: "effective count = count / zoom" },
-				{ label: `≤ ${lat.individualMax}: individual` },
-				{ label: `≤ ${lat.densityMax}: density` },
-				{ label: `> ${lat.densityMax}: overview` },
+				{ label: "1 cell = 1 note" },
+				{ label: `Grid cap ${indivCap} cells` },
 			];
 			if (mix) entries.push({ label: `Now I:${mix.individual} D:${mix.density} O:${mix.overview}` });
-			return [{ title: "LOD (auto)", kind: "categorical", entries }];
+			return [{ title: "Cells", kind: "categorical", entries }];
 		}
 	}
 }
