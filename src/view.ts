@@ -72,6 +72,7 @@ import {
 import { latticeNodeAt } from "./layout/lattice-layout";
 import { drawCard as drawCardFn } from "./draw/draw-card";
 import { drawLegend } from "./draw/legend-layout";
+import { encodingToSpecs } from "./draw/legend-spec";
 import {
 	hitTest as hitTestFn,
 	screenToWorld as screenToWorldFn,
@@ -2311,7 +2312,7 @@ export class MiniGraphView extends ItemView {
 		// overlay — never affects the figure or selection.
 		if (this.settings.showLegend && this.encLegends.length) {
 			const t = theme();
-			drawLegend(ctx, this.encLegends, cw / dpr, ch / dpr, "bottom-left", 10, {
+			drawLegend(ctx, encodingToSpecs(this.encLegends), cw / dpr, ch / dpr, "bottom-left", 10, {
 				panelBg: colorAlpha(t.panelBg, 0.92),
 				border: t.border,
 				text: t.textNormal,

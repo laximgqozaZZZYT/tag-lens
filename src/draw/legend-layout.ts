@@ -1,27 +1,27 @@
-// F4 — pure on-canvas legend layout. Turns the encoding's BindingLegend[] into a
-// positioned box (sizes computed via an injected text measurer) that the renderer
-// paints in screen space. DOM-free + measurer-injected so it unit-tests in Node.
-import type { BindingLegend } from "../encoding/evaluate";
-import { shapeForKey, type NodeShape } from "../encoding/shapes";
+// F5 — pure on-canvas legend layout. Consumes LegendSpec[] (source-agnostic) and
+// produces a positioned box (sizes computed via an injected text measurer) that
+// the renderer paints in screen space. DOM-free + measurer-injected so it
+// unit-tests in Node.
+import type { NodeShape } from "../encoding/shapes";
+import type { LegendKind, LegendSpec } from "./legend-spec";
 import { shapeMarkerPath } from "./draw-shape";
 
 export interface LegendItem {
 	label: string;
 	color?: string;
 	shape?: NodeShape;
+	radius?: number; // size sections: the per-item circle radius (px)
 	// Absolute offset from the box's top-left (px). Marker centre is at
-	// (x + swatch/2, y + swatch/2).
+	// (x + swatch/2, y + swatch/2) for swatch/shape items.
 	x: number;
 	y: number;
 }
 export interface LegendSection {
 	title: string;
-	kind: "categorical" | "quantitative";
+	kind: LegendKind;
 	items: LegendItem[];
-	min?: number;
-	max?: number;
-	gradient?: boolean;
 	titleY: number;
+	ramp?: { stops: string[]; minLabel: string; maxLabel: string };
 }
 export interface LegendBox {
 	width: number;
@@ -37,64 +37,53 @@ export interface LegendLayoutOpts {
 	padY?: number;
 	rowGap?: number;
 	sectionGap?: number;
-	maxItemsPerSection?: number;
 }
 
-const fmtNum = (n: number): string => {
-	if (!isFinite(n)) return "—";
-	const r = Math.round(n * 100) / 100;
-	return Object.is(r, -0) ? "0" : String(r);
-};
-
-// Channels that paint a shape glyph instead of a colour swatch in the legend.
-const SHAPE_CHANNELS = new Set(["shape"]);
-
-export function buildLegendBox(legends: BindingLegend[], opts: LegendLayoutOpts): LegendBox {
+export function buildLegendBox(specs: LegendSpec[], opts: LegendLayoutOpts): LegendBox {
 	const fontPx = opts.fontPx ?? 11;
 	const swatch = opts.swatch ?? 10;
 	const padX = opts.padX ?? 8;
 	const padY = opts.padY ?? 6;
 	const rowGap = opts.rowGap ?? 4;
 	const sectionGap = opts.sectionGap ?? 6;
-	const maxItems = opts.maxItemsPerSection ?? 8;
-	const lineH = Math.max(fontPx, swatch);
 
 	const sections: LegendSection[] = [];
 	let y = padY;
 	let maxContentW = 0;
 
-	for (const lg of legends) {
-		const isShape = SHAPE_CHANNELS.has(lg.channelId);
-		const title = `${capitalize(lg.channelId)} · ${lg.fieldLabel}`;
+	for (const spec of specs) {
 		const titleY = y;
-		maxContentW = Math.max(maxContentW, opts.measure(title));
+		maxContentW = Math.max(maxContentW, opts.measure(spec.title));
 		y += fontPx + rowGap;
 
-		const section: LegendSection = { title, kind: lg.legend.kind === "quantitative" ? "quantitative" : "categorical", items: [], titleY };
+		const section: LegendSection = { title: spec.title, kind: spec.kind, items: [], titleY };
 
-		if (lg.legend.kind === "quantitative") {
-			section.min = lg.legend.min;
-			section.max = lg.legend.max;
-			section.gradient = true;
-			const label = `${fmtNum(lg.legend.min ?? 0)} … ${fmtNum(lg.legend.max ?? 0)}`;
-			section.items.push({ label, x: 0, y, color: undefined, shape: undefined });
+		if (spec.kind === "gradient") {
+			const ramp = spec.ramp ?? { stops: [], minLabel: "", maxLabel: "" };
+			section.ramp = ramp;
+			const lineH = Math.max(fontPx, swatch);
+			const label = `${ramp.minLabel} … ${ramp.maxLabel}`;
+			section.items.push({ label, x: 0, y });
 			maxContentW = Math.max(maxContentW, swatch * 4 + 6 + opts.measure(label));
 			y += lineH + rowGap;
-		} else {
-			const entries = lg.legend.entries ?? [];
-			const shown = entries.slice(0, maxItems);
-			for (const e of shown) {
-				const item: LegendItem = { label: e.key, x: 0, y };
-				if (isShape) item.shape = shapeForKey(e.key);
-				else item.color = e.output;
-				section.items.push(item);
-				maxContentW = Math.max(maxContentW, swatch + 6 + opts.measure(e.key));
+		} else if (spec.kind === "size") {
+			const sizes = spec.sizes ?? [];
+			const maxR = sizes.reduce((m, s) => Math.max(m, s.radius), 0);
+			for (const s of sizes) {
+				section.items.push({ label: s.label, x: 0, y, radius: s.radius, color: s.color });
+				const lineH = Math.max(fontPx, 2 * maxR);
+				maxContentW = Math.max(maxContentW, 2 * maxR + 6 + opts.measure(s.label));
 				y += lineH + rowGap;
 			}
-			if (entries.length > shown.length) {
-				const more = `+${entries.length - shown.length} more`;
-				section.items.push({ label: more, x: 0, y });
-				maxContentW = Math.max(maxContentW, swatch + 6 + opts.measure(more));
+		} else {
+			const entries = spec.entries ?? [];
+			const lineH = Math.max(fontPx, swatch);
+			for (const e of entries) {
+				const item: LegendItem = { label: e.label, x: 0, y };
+				if (e.shape) item.shape = e.shape;
+				if (e.color) item.color = e.color;
+				section.items.push(item);
+				maxContentW = Math.max(maxContentW, swatch + 6 + opts.measure(e.label));
 				y += lineH + rowGap;
 			}
 		}
@@ -107,10 +96,6 @@ export function buildLegendBox(legends: BindingLegend[], opts: LegendLayoutOpts)
 	const width = Math.ceil(maxContentW + padX * 2);
 	const height = Math.ceil(y + padY);
 	return { width, height, sections };
-}
-
-function capitalize(s: string): string {
-	return s.length ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
 // ── on-canvas renderer ──────────────────────────────────────────────────────
@@ -126,17 +111,24 @@ export interface LegendTheme {
 
 export type LegendAnchor = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
+export interface LegendRender {
+	width: number;
+	height: number;
+	closeRect: { x: number; y: number; w: number; h: number } | null;
+}
+
 export function drawLegend(
 	ctx: CanvasRenderingContext2D,
-	legends: BindingLegend[],
+	specs: LegendSpec[],
 	canvasW: number,
 	canvasH: number,
 	anchor: LegendAnchor,
 	margin: number,
 	theme: LegendTheme,
 	o?: Partial<LegendLayoutOpts>,
-): { width: number; height: number } {
-	if (!legends.length) return { width: 0, height: 0 };
+	showClose = true,
+): LegendRender {
+	if (!specs.length) return { width: 0, height: 0, closeRect: null };
 	const fontPx = o?.fontPx ?? 11;
 	const swatch = o?.swatch ?? 10;
 	const padX = o?.padX ?? 8;
@@ -144,10 +136,10 @@ export function drawLegend(
 	const opts: LegendLayoutOpts = {
 		measure: (t) => ctx.measureText(t).width,
 		fontPx, swatch, padX,
-		padY: o?.padY, rowGap: o?.rowGap, sectionGap: o?.sectionGap, maxItemsPerSection: o?.maxItemsPerSection,
+		padY: o?.padY, rowGap: o?.rowGap, sectionGap: o?.sectionGap,
 	};
-	const box = buildLegendBox(legends, opts);
-	if (!box.sections.length) return { width: 0, height: 0 };
+	const box = buildLegendBox(specs, opts);
+	if (!box.sections.length) return { width: 0, height: 0, closeRect: null };
 
 	const originX = anchor.endsWith("right") ? canvasW - box.width - margin : margin;
 	const originY = anchor.startsWith("bottom") ? canvasH - box.height - margin : margin;
@@ -172,17 +164,36 @@ export function drawLegend(
 		for (const it of sec.items) {
 			const sx = originX + padX;
 			const sy = originY + it.y;
-			if (sec.gradient) {
-				// A small left-to-right value ramp (light → strong) for quantitative.
+			if (sec.kind === "gradient") {
+				const ramp = sec.ramp ?? { stops: [], minLabel: "", maxLabel: "" };
 				const barW = sw * 4;
+				const stops = ramp.stops;
 				for (let i = 0; i < barW; i++) {
-					const t = i / barW;
-					ctx.fillStyle = `hsl(210, 70%, ${Math.round(75 - t * 55)}%)`;
+					const t = barW > 1 ? i / (barW - 1) : 0;
+					ctx.fillStyle = rampColorAt(stops, t, theme.textMuted);
 					ctx.fillRect(sx + i, sy, 1, sw);
 				}
 				ctx.fillStyle = theme.text;
+				ctx.font = `${fontPx}px sans-serif`;
 				ctx.textBaseline = "middle";
 				ctx.fillText(it.label, sx + barW + 6, sy + sw / 2);
+				ctx.textBaseline = "alphabetic";
+			} else if (sec.kind === "size") {
+				const r = it.radius ?? sw / 2;
+				const maxR = sec.items.reduce((m, p) => Math.max(m, p.radius ?? 0), 0);
+				const cx = sx + maxR;
+				const cy = sy + maxR;
+				ctx.beginPath();
+				ctx.arc(cx, cy, r, 0, Math.PI * 2);
+				ctx.fillStyle = it.color ?? theme.textMuted;
+				ctx.fill();
+				ctx.strokeStyle = theme.border;
+				ctx.lineWidth = 1;
+				ctx.stroke();
+				ctx.fillStyle = theme.text;
+				ctx.font = `${fontPx}px sans-serif`;
+				ctx.textBaseline = "middle";
+				ctx.fillText(it.label, sx + 2 * maxR + 6, cy);
 				ctx.textBaseline = "alphabetic";
 			} else if (it.shape) {
 				shapeMarkerPath(ctx, it.shape, sx + sw / 2, sy + sw / 2, sw / 2);
@@ -197,7 +208,7 @@ export function drawLegend(
 				ctx.fillText(it.label, sx + sw + 6, sy + sw / 2);
 				ctx.textBaseline = "alphabetic";
 			} else {
-				// Colour swatch (or a muted box for the "+N more" overflow row).
+				// Colour swatch (or a muted box for the "+N more"/no-colour overflow row).
 				ctx.fillStyle = it.color ?? theme.textMuted;
 				ctx.fillRect(sx, sy, sw, sw);
 				ctx.strokeStyle = theme.border;
@@ -211,5 +222,30 @@ export function drawLegend(
 			}
 		}
 	}
-	return { width: box.width, height: box.height };
+
+	let closeRect: LegendRender["closeRect"] = null;
+	if (showClose) {
+		const cb = { x: originX + box.width - 12 - 4, y: originY + 4, w: 12, h: 12 };
+		ctx.strokeStyle = theme.text;
+		ctx.lineWidth = 1.5;
+		ctx.beginPath();
+		ctx.moveTo(cb.x + 2, cb.y + 2);
+		ctx.lineTo(cb.x + cb.w - 2, cb.y + cb.h - 2);
+		ctx.moveTo(cb.x + cb.w - 2, cb.y + 2);
+		ctx.lineTo(cb.x + 2, cb.y + cb.h - 2);
+		ctx.stroke();
+		closeRect = cb;
+	}
+
+	return { width: box.width, height: box.height, closeRect };
+}
+
+// Sample a colour ramp (array of CSS colour stops) at t in [0,1] by nearest stop.
+// Keeps drawLegend DOM-free; stops are pre-resolved CSS colour strings.
+function rampColorAt(stops: string[], t: number, fallback: string): string {
+	if (!stops.length) return fallback;
+	if (stops.length === 1) return stops[0];
+	const c = Math.max(0, Math.min(1, t));
+	const idx = Math.round(c * (stops.length - 1));
+	return stops[idx];
 }
