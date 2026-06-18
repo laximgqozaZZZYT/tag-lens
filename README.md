@@ -19,15 +19,13 @@ question; encoding and overlays let you read your own dimensions into the figure
 
 | Mode | What it shows |
 |---|---|
-| **Icon Gallery** | One compact icon per note, tiled in a grid. From the note outward, each icon nests: the note itself, notes that share **all** its tags, groups of notes that share **some** of its tags (colour-coded per tag), and the note's **links / backlinks**. Pan/zoom to browse; an always-on search + folder-tree panel jumps to any note; hover for the file tip, click to open. |
+| **Icon Gallery** | One compact icon per note, tiled in a grid. From the note outward, each icon nests: the note itself, notes that share **all** its tags, groups of notes that share **some** of its tags, and its link / backlink neighborhood. |
 | **Intersection lattice** | Degree-tiered Hasse-style layout of exact tag intersections with subset links; each node auto-switches between overview / density / individual rendering by count and zoom. |
-| **Tag co-occurrence heatmap** | Symmetric tag × tag grid; cell shade = how many notes share two tags (Jaccard by default; raw count on a log/p95 scale). Diagonal = tag size. Click a cell to list the notes shared by that tag pair. |
-| **Gap Finder** | Statistical analysis overlay that identifies missing connections. Highlights "empty" intersections between tags that should theoretically have content, ideal for uncovering unexplored character pairings or research blind spots. |
-| **Bridge Finder** | Discovers and draws "ghost edges" between notes that have a high Jaccard similarity in their tags but no actual links. Provides a "Link candidates" alert in the Insight panel to help you connect isolated knowledge. |
+| **Tag co-occurrence heatmap** | Symmetric tag × tag grid; cell shade = how many notes share two tags (Jaccard by default; raw count on a log/p95 scale). Diagonal = tag size. Click a cell to list the notes in that co-occurrence. |
 | **UpSet plot** | Stack of cards per intersection signature + dot matrix at the bottom — handles ≥ 4-way intersections that diagrams can't draw. |
-| **Sequence Stream** | (Beta) Time-series transposed heatmap. The X-axis represents time bins (e.g. month, week) or sequential fields (e.g. chapters), and the Y-axis represents tags. Shows tag usage over time and highlights "dropped threads" with markers where a tag suddenly stops appearing. |
+| **Sequence Stream** | (Beta) Time-series transposed heatmap. The X-axis represents time bins (e.g. month, week) or sequential fields (e.g. chapters), and the Y-axis represents tags. Shows tag usage flow over time and helps detect dropped threads. |
 | **BubbleSets** | Containment layout drawn as rectangular iso-contour bubbles. |
-| Experimental (beta) | **Connection matrix** (notes × tags dot grid, seriated), **Tag graph** (bipartite notes + tag nodes), and the region/containment family — **Nested set diagram / Containment map / Euler diagram** — kept selectable but with known scaling caveats on giant-tag, hierarchy-less vaults. |
+| **Experimental (beta)** | **Connection matrix** (notes × tags dot grid, seriated), **Tag graph** (bipartite notes + tag nodes), and the region/containment family — **Nested set diagram / Containment map / Euler**. |
 
 ## Unified Control Panel
 
@@ -40,7 +38,7 @@ Control exactly what data enters the graph. Switch between modes using the toggl
   - **GROUP_BY**: Partition by `tag:*` or a frontmatter field.
   - **HAVING**: Drop clusters whose count fails the predicate.
   - **Sort (ORDER_BY / LIMIT)**: Sort criteria and limit tiers for per-cluster top-N display.
-- **DataviewJS Mode (New)**: Bypass the built-in `WHERE` parser and use Obsidian Dataview's JavaScript API (`dv.pages()`). Returns a dynamic list of notes to feed into the graph while still perfectly respecting the `GROUP_BY` and `HAVING` layout structures.
+- **DataviewJS Mode (New)**: Bypass the built-in `WHERE` parser and use Obsidian Dataview's JavaScript API (`dv.pages()`). Returns a dynamic list of notes to feed into the graph while still preserving the same layout / encoding / rendering pipeline.
 
 ### 2. Notes (Note Navigator)
 A list of all notes surviving the filter pipeline.
@@ -54,14 +52,14 @@ A list of all notes surviving the filter pipeline.
 Global graph display configurations and behavior, structured into sub-tabs:
 - **View**: Select your layout algorithms. Enable **Active Note View** to auto-follow the active note in your Obsidian editor and instantly visualize its context (links, backlinks, and shared tags).
 - **Display**: Granular control over graph elements (`Show nodes`, `Show enclosures`, `Show edges`, `Show grid`) and global minimum font size rules.
-- **Encode (New)**: The **Visual Encoding Engine**. Declaratively bind note attributes (e.g., frontmatter `status` or computed `ageDays`) to visual channels (like Color). This operates purely on aesthetics and never interferes with your data filters.
+- **Encode (New)**: The **Visual Encoding Engine**. Declaratively bind note attributes (e.g., frontmatter `status` or computed `ageDays`) to visual channels (like Color). This operates purely on attribute → appearance mapping; it never changes which notes are displayed.
 - **Layers**: Per-cluster display overrides. Adjust card sizes (`m × n` cells) and behaviors for specific tag groups.
 
 ### 4. Insight (New)
 Analyzes your current graph state to help you manage complexity.
 - **Overview**: Computes a real-time **Cognitive Load Metric** based on visible nodes, edges, and clusters. Provides actionable advice when the graph becomes too complex.
 - **Alerts**: Automatically alerts you to statistical gaps in co-occurrences (**Gap Finder**) and suggests highly similar, unlinked note pairs (**Bridge Finder**) to help you connect isolated knowledge.
-- **Suggest**: Provides tag categorization suggestions based on Golder & Huberman's functional classification (e.g., identifying tags as Roles, Types, Properties, Contexts, or Statuses) for effective batch-refactoring.
+- **Suggest**: Provides tag categorization suggestions based on Golder & Huberman's functional classification (e.g., identifying tags as Roles, Types, Properties, Contexts, or Statuses) for effective tag refactoring.
 
 ## Install
 
@@ -92,7 +90,7 @@ npm run build
 
 ## Privacy & data access
 
-Tag Lens reads the **tags** (frontmatter `tags` and inline `#tag` markers), **note links** (inline `[[…]]` and frontmatter links), and basic metadata (path, basename, frontmatter fields used by WHERE / GROUP_BY / ORDER_BY) of **every Markdown note in the current vault** so it can build the visualisations. This is required for the plugin's core purpose. The reads happen entirely **locally** — the plugin makes **no network requests** and sends nothing to any server.
+Tag Lens reads the **tags** (frontmatter `tags` and inline `#tag` markers), **note links** (inline `[[…]]` and frontmatter links), and basic metadata (path, basename, frontmatter fields used by your current view/filter/encoding, modification time). It runs fully locally inside Obsidian and does not make network requests.
 
 ## Compatibility
 
@@ -103,7 +101,7 @@ Requires Obsidian **1.5.0** or later. Works on desktop and mobile (the heavy mod
 Design docs and the agent/contributor guide live under [`docs/0.3.18/`](docs/0.3.18/):
 **basic-design** (architecture), **detailed-design** (module reference) and **AGENTS.md**
 (verification gate, gotchas, E2E/deploy workflow). Run `npm run verify`
-(`tsc --noEmit && test && build`) before committing — `tsc` is the only type gate
+(`tsc --noEmit && node test/run.mjs && node esbuild.config.mjs`) before committing — `tsc` is the only type gate
 (esbuild ignores types). Older, superseded notes are archived in `docs/old/`.
 
 ## Licence
