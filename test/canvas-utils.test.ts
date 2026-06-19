@@ -3,6 +3,7 @@ import {
 	createStripePattern,
 	createStripeGradient,
 	stripeGradientStops,
+	stripeGradientRenderStops,
 	stripeHuesForExtent,
 	resolveNodeStripe,
 	clusterHue,
@@ -215,7 +216,11 @@ setTheme(defaultTheme());
 			"∩ vertical → gradient along X (x→x+w, y constant)",
 		);
 		const offs = calls[0].stops.map((s) => s.offset);
-		ok(JSON.stringify(offs) === JSON.stringify([0, 0.5, 0.5, 1]), "2 hues → equal hard stops 0,.5,.5,1");
+		// Render stops separate the coincident boundary by a sub-pixel epsilon so
+		// adjacent bands never collapse in the rasteriser: band0 ends at .5, band1
+		// STARTS a hair after .5. Widths stay ~equal (1/2) and order is preserved.
+		ok(offs.length === 4 && offs[0] === 0 && offs[1] === 0.5 && offs[2] > 0.5 && offs[2] < 0.5001 + 1e-9 && offs[3] === 1,
+			"2 hues → bands 0..0.5 and ~0.5..1, boundary separated by epsilon");
 		// Bands alternate swatch ROLE (even=fill / odd=fillStrong) so two
 		// near-identical-luma hues still read as distinct bands (stripeBandColor).
 		// Hues are still applied in order: band 0 → hue[0], band 1 → hue[1].
@@ -240,6 +245,109 @@ setTheme(defaultTheme());
 			"alpha forwarded to swatch",
 		);
 	}
+
+	// === REGRESSION: 3+ colours must keep ALL bands (the "3色以上→2色" bug) ===
+	// A 3-tag (∩) node feeds 3 distinct hues. The gradient must emit a stop per
+	// boundary AND every band must keep a strictly-positive width — no interior
+	// band may collapse, otherwise the node reads as 2 colours / the 3rd band
+	// disappears. We assert: 6 stops, each hue used once per band IN ORDER, the
+	// boundary offsets are monotonically NON-decreasing with the duplicated
+	// start nudged strictly past the previous end, and band widths stay ~1/3.
+	{
+		const { ctx, calls } = mkCtx();
+		createStripeGradient(ctx as any, 0, 0, 30, 30, [10, 120, 250], /*isVertical=*/ true);
+		const stops = calls[0].stops;
+		ok(stops.length === 6, "3 hues → 6 render stops (2 per band)");
+		// band starts = stops[0],[2],[4]; band ends = stops[1],[3],[5]
+		const starts = [stops[0].offset, stops[2].offset, stops[4].offset];
+		const ends = [stops[1].offset, stops[3].offset, stops[5].offset];
+		ok(starts[0] === 0 && ends[2] === 1, "first band starts at 0, last ends at 1");
+		// Every band has strictly-positive, near-1/3 width (no collapse).
+		for (let i = 0; i < 3; i++) {
+			const wdt = ends[i] - starts[i];
+			ok(wdt > 0, `band ${i} has positive width (not collapsed)`);
+			ok(Math.abs(wdt - 1 / 3) < 1e-3, `band ${i} width ~1/3`);
+		}
+		// Interior band STARTS are nudged strictly past the previous band's END,
+		// so no two consecutive stops share an identical offset (the canvas
+		// duplicate-offset fragility that drops interior bands for N>=3).
+		ok(starts[1] > ends[0] && starts[2] > ends[1], "interior band starts separated from previous end");
+		// Hues applied in order, alternating fill/fillStrong role per band index.
+		ok(
+			stops[0].color === theme().swatch(10, "fill") &&
+				stops[2].color === theme().swatch(120, "fillStrong") &&
+				stops[4].color === theme().swatch(250, "fill"),
+			"3 bands → hues 10/120/250 in order with fill/fillStrong/fill roles",
+		);
+	}
+
+	// 4 colours: same invariants — 8 stops, 4 non-collapsed ~1/4 bands.
+	{
+		const { ctx, calls } = mkCtx();
+		createStripeGradient(ctx as any, 0, 0, 40, 40, [10, 90, 170, 250], /*isVertical=*/ false);
+		const stops = calls[0].stops;
+		ok(stops.length === 8, "4 hues → 8 render stops");
+		for (let i = 0; i < 4; i++) {
+			const wdt = stops[i * 2 + 1].offset - stops[i * 2].offset;
+			ok(wdt > 0 && Math.abs(wdt - 1 / 4) < 1e-3, `4-colour band ${i} ~1/4 wide, not collapsed`);
+		}
+	}
+}
+
+// === stripeGradientRenderStops: EPS-separated boundaries (pure) =============
+// The ideal stop list (stripeGradientStops) has duplicate boundary offsets;
+// the RENDER list must separate every coincident boundary so adjacent bands
+// never collapse in the canvas rasteriser, while keeping offsets in [0,1],
+// monotonically non-decreasing, and band widths ~1/N.
+{
+	// 0 / 1 colour degenerate cases pass through unchanged.
+	ok(stripeGradientRenderStops(0).length === 0, "0 colours → no render stops");
+	const one = stripeGradientRenderStops(1);
+	ok(one.length === 2 && one[0].offset === 0 && one[1].offset === 1, "1 colour → [0,1]");
+
+	for (const n of [2, 3, 4, 5]) {
+		const rs = stripeGradientRenderStops(n);
+		ok(rs.length === 2 * n, `${n} colours → ${2 * n} render stops`);
+		// Offsets clamped to [0,1] and non-decreasing.
+		let prev = -1;
+		let okMono = true;
+		for (const s of rs) {
+			if (s.offset < 0 || s.offset > 1 || s.offset < prev) okMono = false;
+			prev = s.offset;
+		}
+		ok(okMono, `${n} colours → offsets in [0,1], non-decreasing`);
+		// Each band keeps positive width and the index sequence is 0,0,1,1,...
+		for (let i = 0; i < n; i++) {
+			ok(rs[i * 2].index === i && rs[i * 2 + 1].index === i, `${n}: band ${i} uses index ${i}`);
+			ok(rs[i * 2 + 1].offset - rs[i * 2].offset > 0, `${n}: band ${i} positive width`);
+		}
+		// First band starts at 0, last band ends at 1 (full coverage).
+		ok(rs[0].offset === 0 && rs[rs.length - 1].offset === 1, `${n}: covers full [0,1]`);
+	}
+}
+
+// === membershipStripeHues: DISTINCT hues (colliding tags don't dupe a band) ==
+// Two different tag keys can hash to the SAME clusterHue; the stripe must list
+// each hue once so the band COUNT equals the visible colour count (a 3-tag node
+// whose two tags collide shows 2 bands, never a phantom duplicate that reads as
+// "fewer colours than expected" / a smeared band).
+{
+	// Construct two keys that genuinely collide on clusterHue, if findable in a
+	// small search; otherwise assert the de-dup contract structurally.
+	let a = "", b = "";
+	outer: for (let i = 0; i < 200; i++) {
+		for (let j = i + 1; j < 200; j++) {
+			if (clusterHue("k" + i) === clusterHue("k" + j)) { a = "k" + i; b = "k" + j; break outer; }
+		}
+	}
+	if (a && b) {
+		const hues = membershipStripeHues([a, b]);
+		ok(hues.length === 1, "two colliding-hue tags → a single distinct band (no phantom dupe)");
+	}
+	// Three DISTINCT-hue tags stay three bands, in order (the common case).
+	const three = membershipStripeHues(["aa", "bb", "cc"]);
+	const distinct = new Set(three);
+	ok(three.length === distinct.size, "distinct tags → no duplicate hues collapsed");
 }
 
 // === stripeHuesForExtent: minimum-band-width degrade =====================

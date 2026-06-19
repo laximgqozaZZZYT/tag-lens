@@ -15,7 +15,21 @@ import { NONE_BUCKET } from "../types";
 export function membershipStripeHues(memberships: string[] | undefined): number[] {
 	if (!memberships) return [];
 	const tags = memberships.filter((m) => m !== NONE_BUCKET);
-	return tags.map((m) => clusterHue(m));
+	// DISTINCT-order hue list (per the contract above): two different tag keys
+	// can hash to the SAME `clusterHue`, which would emit two identical bands —
+	// reading as one fewer colour than the node truly has (e.g. a 3-tag node
+	// whose 1st and 3rd tag collide shows only 2 visible bands). Drop hues that
+	// repeat a hue already in the list so every band is a genuinely distinct
+	// colour and the band COUNT matches the visible colour count.
+	const seen = new Set<number>();
+	const hues: number[] = [];
+	for (const m of tags) {
+		const h = clusterHue(m);
+		if (seen.has(h)) continue;
+		seen.add(h);
+		hues.push(h);
+	}
+	return hues;
 }
 
 // Which set-operation a striped node depicts, and therefore its stripe
@@ -334,6 +348,41 @@ export function stripeHuesForExtent(
 	return hues.slice(0, 1); // can't fit even 2 bands → single-hue (solid)
 }
 
+// Smallest offset separation between two consecutive colour stops. A one-cycle
+// stripe is built from DUPLICATE-offset hard stops (band i ends and band i+1
+// starts at the SAME `i/N`). Canvas implementations resolve coincident offsets
+// by treating later stops as "infinitesimally further along", which is fine for
+// ONE interior boundary (N=2) but is fragile with MULTIPLE back-to-back
+// boundaries (N>=3): the thin interior band(s) can collapse / smear so only the
+// first and last colour survive — the "3 colours show only 2" bug. Nudging the
+// START of each band a hair past the previous band's END guarantees every band
+// keeps a strictly-positive, near-equal width, so all N bands render crisply.
+// EPS is far below one device pixel for any realistic node, so band widths stay
+// visually equal (1/N) while no two stops share an identical offset.
+const STRIPE_STOP_EPS = 1e-4;
+
+// Build the actual `addColorStop` offsets for the one-cycle gradient, separating
+// every coincident boundary by STRIPE_STOP_EPS so adjacent bands never collapse
+// in the rasteriser. Pure + DOM-free so the N>=3 separation is unit-testable.
+// Each band i still spans ~[i/N, (i+1)/N]; only the duplicated boundary offset
+// of the FOLLOWING band's start is bumped, leaving band starts monotonically
+// increasing and widths equal to within EPS.
+export function stripeGradientRenderStops(
+	n: number,
+): Array<{ offset: number; index: number }> {
+	const stops = stripeGradientStops(n);
+	let prev = -1;
+	for (const s of stops) {
+		// `addColorStop` requires offsets in [0,1] and (in practice) strictly
+		// increasing to keep every band visible; clamp the nudge so the final
+		// stop never exceeds 1.
+		const bumped = s.offset <= prev ? prev + STRIPE_STOP_EPS : s.offset;
+		s.offset = Math.min(1, bumped);
+		prev = s.offset;
+	}
+	return stops;
+}
+
 export function createStripeGradient(
 	ctx: CanvasRenderingContext2D,
 	x: number,
@@ -353,7 +402,8 @@ export function createStripeGradient(
 	const grad = isVertical
 		? ctx.createLinearGradient(x, y, x + w, y)
 		: ctx.createLinearGradient(x, y, x, y + h);
-	for (const s of stripeGradientStops(hues.length)) {
+	// Use EPS-separated stops so N>=3 bands never collapse to 2 in the rasteriser.
+	for (const s of stripeGradientRenderStops(hues.length)) {
 		grad.addColorStop(s.offset, stripeBandColor(hues[s.index], s.index, alpha));
 	}
 	return grad;
