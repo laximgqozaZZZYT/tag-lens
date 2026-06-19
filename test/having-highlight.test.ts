@@ -27,7 +27,7 @@ const rawRows = ["count >= 2"];
 
 // #a = 3, #b = 1, #c = 2, #d = 1
 // dropped should be #b and #d because they have count < 2
-const { dropped, errors } = computeDroppedClusters(nodes, rawRows, false);
+const { dropped, errors } = computeDroppedClusters(nodes, rawRows, false, { _noteCount: 4 });
 
 ok(errors.length === 0, "No parse errors");
 ok(dropped.size === 2, "2 clusters should be dropped");

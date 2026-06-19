@@ -43,35 +43,15 @@ export function resolveEffectiveQuery(settings: MiniSettings): EffectiveQuery {
 	return { effGroupBy, effWhere, filterMode: "sql" };
 }
 
-// AUTO HAVING thresholds scale with the size of the produced data set.
-// n>10 floors clusters to sqrt(n)/3; n>30 also caps any single cluster at
-// 20% of total so a mega-cluster doesn't drown out the rest.
+// AUTO HAVING thresholds previously used a dynamic SQRT/20% formula.
+// Now they use a formulaic expression that leverages the `_noteCount`
+// variable (total notes in vault), providing more stable results as the
+// graph complexity varies while remaining relative to the vault size.
 //
-// These are emitted as CONCRETE, grammar-valid HAVING rows ("count >= N",
-// "count <= M") — the HAVING grammar (query-filters.parseHaving) accepts
-// only `count <op> <literal-number>`, with no variable (`nodeCount`) or
-// arithmetic support. So the dynamic thresholds must be resolved to literal
-// numbers HERE, against the current node count. The resolved rows are both:
-//   • surfaced as editable INITIAL VALUES in the Data > Logic > HAVING field
-//     (seeded by seedAutoHavingRows when the field is empty & havingAuto is on),
-//     so "what you see is what's applied", and
-//   • applied — once seeded — as ordinary HAVING rows via settings.having.
-// Because the seeded rows live in settings.having, resolveEffectiveHaving no
-// longer re-injects them (that would double-apply). The havingAuto FLAG keeps
-// driving the two grammar-inexpressible behaviours (TOP_K long-tail cap +
-// NONE_BUCKET suppression) inside computeDroppedClusters — those can't be
-// written as `count <op> N` rows, so they stay automatic.
-export function computeAutoHavingRows(nodeCount: number): string[] {
-	const rows: string[] = [];
-	if (nodeCount > 10) {
-		const floor = Math.max(2, Math.floor(Math.sqrt(nodeCount) / 3));
-		rows.push(`count >= ${floor}`);
-	}
-	if (nodeCount > 30) {
-		const ceiling = Math.floor(nodeCount * 0.2);
-		rows.push(`count <= ${ceiling}`);
-	}
-	return rows;
+// This returns the default formulaic row(s) to be seeded into the HAVING
+// field when it's empty and havingAuto is on.
+export function computeAutoHavingRows(_nodeCount: number): string[] {
+	return ["(count >= _noteCount * 0.05) AND (count < _noteCount * 0.6)"];
 }
 
 // Seed the HAVING field's INITIAL VALUE. When havingAuto is on and the user

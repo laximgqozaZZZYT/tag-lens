@@ -1174,6 +1174,9 @@ export class MiniGraphView extends ItemView {
 			this.settings.viewMode === "droste"
 				? false
 				: this.settings.havingAuto;
+
+		const _noteCount = this.app.vault.getMarkdownFiles().length;
+
 		// Seed the HAVING field's initial value: when auto is on and the user
 		// has no manual rows, populate settings.having with the concrete auto
 		// rows resolved against this build's node count, so they show up in the
@@ -1197,6 +1200,7 @@ export class MiniGraphView extends ItemView {
 			data.nodes,
 			effHaving,
 			effHavingAuto,
+			{ _noteCount },
 		);
 		if (havingErrors.length > 0) this.havingError = havingErrors.join("; ");
 		else this.havingError = "";
@@ -1739,11 +1743,13 @@ export class MiniGraphView extends ItemView {
 		// degree ≤ 2). Falls back to settings.havingAuto for every other
 		// mode, preserving prior behaviour.
 		havingAutoOverride?: boolean,
+		context?: { _noteCount: number },
 	): { dropped: Map<string, number>; errors: string[] } {
 		const { dropped, errors } = computeDroppedClustersFn(
 			nodes,
 			rawRows,
 			havingAutoOverride ?? this.settings.havingAuto,
+			context ?? { _noteCount: this.app.vault.getMarkdownFiles().length },
 		);
 		this.havingError = errors.length > 0 ? errors.join("; ") : "";
 		return { dropped, errors };

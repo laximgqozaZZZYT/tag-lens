@@ -32,19 +32,54 @@ export function filterLabels(
 }
 
 // Parse a single HAVING row into a predicate on cluster member count.
-// Grammar: <aggregate> <op> <number>
+// Grammar: <aggregate> <op> <expression>
 // where <aggregate> is `count` (only supported aggregate today) and <op>
-// is one of >= <= == != > <.
-export function parseHaving(s: string): (count: number) => boolean {
-	const m = s.match(
-		/^\s*([A-Za-z_]+)\s*(>=|<=|==|!=|>|<)\s*(-?\d+(?:\.\d+)?)\s*$/,
+// is one of >= <= == != > <. Supports _noteCount variable and basic multiplication.
+export function parseHaving(
+	s: string,
+	context: { _noteCount: number },
+): (count: number) => boolean {
+	const normalized = s.trim();
+
+	// Handle AND-combined clauses (e.g. "(A) AND (B)")
+	if (/\bAND\b/i.test(normalized)) {
+		const parts = normalized.split(/\bAND\b/i);
+		const predicates = parts.map((p) => parseHaving(p.trim(), context));
+		return (count) => predicates.every((pred) => pred(count));
+	}
+
+	// Strip surrounding parentheses if any
+	const inner = normalized.replace(/^\((.*)\)$/, "$1").trim();
+
+	const m = inner.match(
+		/^\s*([A-Za-z_]+)\s*(>=|<=|==|!=|>|<)\s*(.+)\s*$/,
 	);
-	if (!m) throw new Error(`expected "count <op> <number>", got: "${s}"`);
+	if (!m) throw new Error(`expected "count <op> <value>", got: "${inner}"`);
 	const agg = m[1].toLowerCase();
 	if (agg !== "count")
 		throw new Error(`unknown aggregate "${agg}" (only "count" supported)`);
 	const op = m[2];
-	const n = Number(m[3]);
+	const expr = m[3].trim();
+
+	// Evaluate RHS expression. Supports literal numbers and _noteCount [ * factor ]
+	let n: number;
+	if (/^-?\d+(?:\.\d+)?$/.test(expr)) {
+		n = Number(expr);
+	} else {
+		// Replace _noteCount and evaluate simple multiplication
+		const substituted = expr.replace(/_noteCount/g, String(context._noteCount));
+		const multMatch = substituted.match(
+			/^\s*(\d+(?:\.\d+)?)\s*\*\s*(\d+(?:\.\d+)?)\s*$/,
+		);
+		if (multMatch) {
+			n = Number(multMatch[1]) * Number(multMatch[2]);
+		} else if (/^\d+(?:\.\d+)?$/.test(substituted)) {
+			n = Number(substituted);
+		} else {
+			throw new Error(`unsupported expression in HAVING: "${expr}"`);
+		}
+	}
+
 	switch (op) {
 		case ">=":
 			return (c) => c >= n;

@@ -101,6 +101,7 @@ export function computeDroppedClusters(
 	nodes: GraphNode[],
 	rawRows: string[],
 	havingAuto: boolean,
+	context: { _noteCount: number },
 ): { dropped: Map<string, number>; errors: string[] } {
 	const errors: string[] = [];
 	const dropped = new Map<string, number>();
@@ -130,7 +131,7 @@ export function computeDroppedClusters(
 		const tests: ((count: number) => boolean)[] = [];
 		for (const r of rows) {
 			try {
-				tests.push(parseHaving(r));
+				tests.push(parseHaving(r, context));
 			} catch (e) {
 				errors.push(e instanceof Error ? e.message : String(e));
 			}

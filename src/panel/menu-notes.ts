@@ -81,6 +81,7 @@ export function menuLimitedNodes(
 	const { app, settings, tiers } = deps;
 	// 1. HAVING — using the user's real havingAuto (mode-independent).
 	let graph: GraphData = { nodes: source.nodes.slice(), edges: source.edges.slice() };
+	const _noteCount = app.vault.getMarkdownFiles().length;
 	const eff = resolveEffectiveHaving(
 		settings.having,
 		settings.havingAuto,
@@ -90,6 +91,7 @@ export function menuLimitedNodes(
 		graph.nodes,
 		eff,
 		settings.havingAuto,
+		{ _noteCount },
 	);
 	if (settings.havingMode !== "highlight" && dropped.size > 0) {
 		const droppedSet = new Set(dropped.keys());
