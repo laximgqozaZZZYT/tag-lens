@@ -144,19 +144,23 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 {
 	const withLabel: ModeLegendInput = {
 		encodingSpecs: [],
-		tags: [{ key: "greek", color: "#a00", label: "greek 2×3 · 5 ⊞" }],
+		tags: [{ key: "greek", color: "#a00", label: "greek — Size 2×3 · 5 nodes · Aggregate (3-card stack)" }],
 		counts: { min: 1, max: 20 },
 	};
 	const specs = buildModeLegend("matrix", withLabel);
-	ok(specs[0].entries![0].label === "greek 2×3 · 5 ⊞", "tag label renders verbatim");
+	ok(specs[0].entries![0].label === "greek — Size 2×3 · 5 nodes · Aggregate (3-card stack)", "tag label renders verbatim");
 	ok(specs[0].entries![0].color === "#a00", "tag colour still carried with label");
 }
-// suffix format: ` R×C · n` (+ ` ⊞` aggregated) is what view.ts builds.
+// suffix format mirrors the Settings ▸ "Layers & Overrides" panel vocabulary:
+// ` — Size R×C · N nodes [· Aggregate (3-card stack)] [· Inherit from X]`.
+// view.ts builds these labels; mode-legend renders them verbatim (above).
 {
 	const R = 2, C = 3, n = 5;
-	const suffix = ` ${R}×${C} · ${n}`;
-	ok(suffix === " 2×3 · 5", "suffix format R×C · n");
-	ok(`greek${suffix} ⊞` === "greek 2×3 · 5 ⊞", "aggregated suffix appends ⊞");
+	const base = ` — Size ${R}×${C} · ${n} nodes`;
+	ok(base === " — Size 2×3 · 5 nodes", "suffix uses panel terms: Size R×C · N nodes");
+	ok(`greek${base} · Aggregate (3-card stack)` === "greek — Size 2×3 · 5 nodes · Aggregate (3-card stack)", "aggregate part matches panel label");
+	ok(`greek${base} · Inherit from latin` === "greek — Size 2×3 · 5 nodes · Inherit from latin", "inherit part matches panel 'Inherit from'");
+	ok(` — Size ${R}×${C} · 1 node` === " — Size 2×3 · 1 node", "singular 'node' for count 1");
 }
 // droste keeps intrinsic tag legend (encoding specs do not override).
 {
@@ -184,14 +188,14 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 		...base,
 		groups: [{ key: "greek", label: "greek (5)", color: "#abc" }],
 		setLayers: [
-			{ key: "__union__", label: "∪ Union 1×1 · 12", color: "#0a0" },
-			{ key: "__intersection__", label: "∩ Intersection 2×2 · 3 ⊞", color: "#cc0" },
+			{ key: "__union__", label: "∪ Union — Size 1×1 · 12 nodes", color: "#0a0" },
+			{ key: "__intersection__", label: "∩ Intersection — Size 2×2 · 3 nodes · Aggregate (3-card stack)", color: "#cc0" },
 		],
 	});
 	const enc = specs.find((s) => s.title.includes("Groups & overlap"));
 	ok(!!enc, "enclosure spec present");
-	ok(enc!.entries!.some((e) => e.label === "∪ Union 1×1 · 12" && e.color === "#0a0"), "union set-layer row");
-	ok(enc!.entries!.some((e) => e.label === "∩ Intersection 2×2 · 3 ⊞" && e.color === "#cc0"), "intersection set-layer row");
+	ok(enc!.entries!.some((e) => e.label === "∪ Union — Size 1×1 · 12 nodes" && e.color === "#0a0"), "union set-layer row");
+	ok(enc!.entries!.some((e) => e.label === "∩ Intersection — Size 2×2 · 3 nodes · Aggregate (3-card stack)" && e.color === "#cc0"), "intersection set-layer row");
 	ok(!enc!.entries!.some((e) => e.label.includes("Overlap:")), "descriptive overlap row suppressed in closeup");
 }
 // PANORAMA (no setLayers): keeps the plain descriptive overlap row.
@@ -211,8 +215,8 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 // set-layers are an ADDED, unified spec — never folded into another legend.
 {
 	const setLayers = [
-		{ key: "__union__", label: "∪ Union 1×1 · 12", color: "#0a0" },
-		{ key: "__intersection__", label: "∩ Intersection 2×2 · 3 ⊞", color: "#cc0" },
+		{ key: "__union__", label: "∪ Union — Size 1×1 · 12 nodes", color: "#0a0" },
+		{ key: "__intersection__", label: "∩ Intersection — Size 2×2 · 3 nodes · Aggregate (3-card stack)", color: "#cc0" },
 	];
 	for (const mode of ["matrix", "stream", "upset", "droste", "lattice", "bipartite"] as const) {
 		const input: ModeLegendInput = {
@@ -225,8 +229,8 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 		const withoutSet = buildModeLegend(mode, { ...input, setLayers: undefined });
 		const sl = withSet.find((s) => s.title.includes("Union / Intersection layers"));
 		ok(!!sl, `${mode}: set-layers spec appended`);
-		ok(sl!.entries!.some((e) => e.label === "∪ Union 1×1 · 12" && e.color === "#0a0"), `${mode}: union row`);
-		ok(sl!.entries!.some((e) => e.label === "∩ Intersection 2×2 · 3 ⊞" && e.color === "#cc0"), `${mode}: intersection row`);
+		ok(sl!.entries!.some((e) => e.label === "∪ Union — Size 1×1 · 12 nodes" && e.color === "#0a0"), `${mode}: union row`);
+		ok(sl!.entries!.some((e) => e.label === "∩ Intersection — Size 2×2 · 3 nodes · Aggregate (3-card stack)" && e.color === "#cc0"), `${mode}: intersection row`);
 		// Intrinsic specs are unchanged: removing setLayers leaves exactly the
 		// same intrinsic specs (the set-layers spec is purely additive).
 		ok(withSet.length === withoutSet.length + 1, `${mode}: set-layers is the only added spec`);
@@ -242,11 +246,11 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 	const specs = buildModeLegend("bubblesets", {
 		...base,
 		groups: [{ key: "greek", label: "greek (5)", color: "#abc" }],
-		setLayers: [{ key: "__union__", label: "∪ Union 1×1 · 12", color: "#0a0" }],
+		setLayers: [{ key: "__union__", label: "∪ Union — Size 1×1 · 12 nodes", color: "#0a0" }],
 	});
 	ok(!specs.some((s) => s.title.includes("Union / Intersection layers")), "enclosure mode does not add a separate Set layers spec");
 	const enc = specs.find((s) => s.title.includes("Groups & overlap"));
-	ok(enc!.entries!.some((e) => e.label === "∪ Union 1×1 · 12"), "enclosure mode folds set-layers into enclosures");
+	ok(enc!.entries!.some((e) => e.label === "∪ Union — Size 1×1 · 12 nodes"), "enclosure mode folds set-layers into enclosures");
 }
 // No setLayers anywhere -> no Set layers spec leaks into any mode.
 {

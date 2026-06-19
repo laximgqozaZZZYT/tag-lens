@@ -2922,18 +2922,45 @@ export class MiniGraphView extends ItemView {
 			for (const node of this.laid.nodes) if (node.memberships?.includes(tag)) n++;
 			return n;
 		};
-		// LAYERS & OVERRIDES content per layer: resolved NODE_DISPLAY (R×C) +
-		// visible-node count + aggregate state. ` ⊞` flags an aggregated layer.
-		// Shown in EVERY view mode + perspective. `count` lets callers pass a
-		// pre-resolved figure (e.g. the cluster's own memberCount) instead of
-		// re-deriving it; when no count is derivable the figure is safely omitted.
+		// LAYERS & OVERRIDES content per layer, expressed with the SAME terms the
+		// Settings ▸ Encode ▸ "Layers & Overrides" UI uses, so the legend faithfully
+		// mirrors the panel:
+		//   • Node display "Size (m × n)"        → `Size R×C`
+		//   • header meta "N nodes"              → `N nodes`
+		//   • Display "Aggregate (3-card stack)" → `Aggregate (3-card stack)`
+		//   • "Inherit from" / "Full inheritance"→ `Inherit from <parent>` /
+		//                                           `Full inheritance`
+		// Parts are joined with " · " to match the panel's stacked fields. Shown in
+		// EVERY view mode + perspective. `count` lets callers pass a pre-resolved
+		// figure (e.g. the cluster's own memberCount) instead of re-deriving it;
+		// when no count is derivable the count part is safely omitted.
+		const clusterLabelFor = (groupKey: string): string =>
+			this.laid.clusters?.find((c) => c.groupKey === groupKey)?.label ?? groupKey;
+		// Inheritance descriptor matching the panel's "Inherit from" picker and the
+		// set-layer "Full inheritance (ignore own overrides)" toggle.
+		const inheritPart = (groupKey: string): string | null => {
+			const isSetLayer = groupKey === UNION_LAYER_KEY || groupKey === INTERSECTION_LAYER_KEY;
+			const parent = this.settings.inheritFrom?.[groupKey];
+			const full = isSetLayer && (this.settings.layerInheritFull?.includes(groupKey) ?? false);
+			if (full) {
+				return parent
+					? `Full inheritance from ${clusterLabelFor(parent)}`
+					: "Full inheritance";
+			}
+			if (parent) return `Inherit from ${clusterLabelFor(parent)}`;
+			return null;
+		};
+		// Build the " · "-joined "Size R×C · N nodes · …" suffix from the resolved
+		// NODE_DISPLAY (= the value the renderer + panel placeholder both use).
 		const layerSuffix = (groupKey: string, count?: number): string => {
 			const n = count ?? tagVisibleCount(groupKey);
-			const d = this.resolveFromCluster(groupKey);
-			const sizeLabel = `${d.nodeRows}×${d.nodeCols} card`;
-			let s = Number.isFinite(n) ? ` — ${sizeLabel}, ${n} note${n === 1 ? "" : "s"}` : ` — ${sizeLabel}`;
-			if (aggSet.has(groupKey)) s += " (aggregated)";
-			return s;
+			const d = this.resolveLayerDisplay(groupKey);
+			const parts: string[] = [`Size ${d.nodeRows}×${d.nodeCols}`];
+			if (Number.isFinite(n)) parts.push(`${n} node${n === 1 ? "" : "s"}`);
+			if (aggSet.has(groupKey)) parts.push("Aggregate (3-card stack)");
+			const inh = inheritPart(groupKey);
+			if (inh) parts.push(inh);
+			return ` — ${parts.join(" · ")}`;
 		};
 		const seen = new Set<string>();
 		const tags: { key: string; color: string; label?: string }[] = [];
@@ -3060,9 +3087,13 @@ export class MiniGraphView extends ItemView {
 		// `groups` (the cluster enclosure swatches) stay INTRINSIC to enclosure
 		// modes — leaving the per-mode element policy unchanged.
 		if (enclosureModes.includes(this.settings.viewMode) && this.laid.clusters?.length) {
+			// `layerSuffix` already carries "· N nodes" (faithful to the panel's
+			// "N nodes" header meta), so the bare leading "(memberCount)" is dropped
+			// to avoid showing the count twice. `groupEnclosures` adds the "Group: "
+			// prefix that mirrors the panel's per-cluster tab.
 			groups = this.laid.clusters.map((c) => ({
 				key: c.groupKey,
-				label: `${c.label} (${c.memberCount})${layerSuffix(c.groupKey)}`,
+				label: `${c.label}${layerSuffix(c.groupKey, c.memberCount)}`,
 				color: t.swatch(clusterHue(c.groupKey), "tint", 0.32),
 			}));
 		}
@@ -3117,19 +3148,19 @@ export class MiniGraphView extends ItemView {
 		const setCounts = setMembershipCounts();
 		if (setCounts) {
 			const { unionN, interN } = setCounts;
-			const aggSuffix = (key: string): string => (aggSet.has(key) ? " (aggregated)" : "");
-			const u = this.resolveSetLayer(UNION_LAYER_KEY);
-			const i = this.resolveSetLayer(INTERSECTION_LAYER_KEY);
-			const noteWord = (n: number): string => `${n} note${n === 1 ? "" : "s"}`;
+			// Reuse `layerSuffix` (resolveSetLayer-backed via resolveLayerDisplay) so
+			// the ∪/∩ rows carry the SAME "Size R×C · N nodes · Aggregate · Inherit"
+			// vocabulary as the single-tag layers and the Settings panel. Labels lead
+			// with SET_LAYER_LABEL, exactly matching the panel's set-layer tab title.
 			setLayers = [
 				{
 					key: UNION_LAYER_KEY,
-					label: `${SET_LAYER_LABEL[UNION_LAYER_KEY]} — ${u.nodeRows}×${u.nodeCols} card, ${noteWord(unionN)}${aggSuffix(UNION_LAYER_KEY)}`,
+					label: `${SET_LAYER_LABEL[UNION_LAYER_KEY]}${layerSuffix(UNION_LAYER_KEY, unionN)}`,
 					color: t.swatch(140, "tint", 0.32),
 				},
 				{
 					key: INTERSECTION_LAYER_KEY,
-					label: `${SET_LAYER_LABEL[INTERSECTION_LAYER_KEY]} — ${i.nodeRows}×${i.nodeCols} card, ${noteWord(interN)}${aggSuffix(INTERSECTION_LAYER_KEY)}`,
+					label: `${SET_LAYER_LABEL[INTERSECTION_LAYER_KEY]}${layerSuffix(INTERSECTION_LAYER_KEY, interN)}`,
 					color: t.swatch(45, "tint", 0.32),
 				},
 			];
