@@ -173,7 +173,7 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 	ok(specs !== enc, "droste ignores encoding override");
 	ok(specs.length === 2, "droste includes tag + set-ops legends");
 	ok(specs[0].kind === "categorical" && specs[0].title === "Color · Tag", "droste tag key");
-	ok(specs[1].title === "Set operations", "droste set-ops title");
+	ok(specs[1].title === "Gallery key", "droste set-ops title");
 	ok(specs[1].entries?.some((e) => e.label.includes("Intersection") && e.color === "#ccaa22"), "intersection color legend");
 	ok(specs[1].entries?.some((e) => e.label.includes("Union") && e.color === "#33bb88"), "union color legend");
 }
@@ -188,11 +188,11 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 			{ key: "__intersection__", label: "∩ Intersection 2×2 · 3 ⊞", color: "#cc0" },
 		],
 	});
-	const enc = specs.find((s) => s.title.includes("Group enclosures"));
+	const enc = specs.find((s) => s.title.includes("Groups & overlap"));
 	ok(!!enc, "enclosure spec present");
 	ok(enc!.entries!.some((e) => e.label === "∪ Union 1×1 · 12" && e.color === "#0a0"), "union set-layer row");
 	ok(enc!.entries!.some((e) => e.label === "∩ Intersection 2×2 · 3 ⊞" && e.color === "#cc0"), "intersection set-layer row");
-	ok(!enc!.entries!.some((e) => e.label.includes("∩ overlap")), "descriptive overlap row suppressed in closeup");
+	ok(!enc!.entries!.some((e) => e.label.includes("Overlap:")), "descriptive overlap row suppressed in closeup");
 }
 // PANORAMA (no setLayers): keeps the plain descriptive overlap row.
 {
@@ -200,10 +200,60 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 		...base,
 		groups: [{ key: "greek", label: "greek (5)", color: "#abc" }],
 	});
-	const enc = specs.find((s) => s.title.includes("Group enclosures"));
+	const enc = specs.find((s) => s.title.includes("Groups & overlap"));
 	ok(!!enc, "enclosure spec present (panorama)");
-	ok(enc!.entries!.some((e) => e.label === "∩ overlap: note in 2+ groups"), "descriptive overlap row kept in panorama");
+	ok(enc!.entries!.some((e) => e.label === "Overlap: note shared by 2+ groups"), "descriptive overlap row kept in panorama");
 	ok(!enc!.entries!.some((e) => e.label.includes("Union") && e.label.includes("·")), "no addressable union row in panorama");
+}
+// ALL VIEW MODES: setLayers render as their own ∪/∩ legend spec even when the
+// mode is NOT an enclosure mode (matrix/stream/upset/droste/lattice/bipartite).
+// "表示する要素の方針は変えず": the mode's intrinsic specs stay intact and the
+// set-layers are an ADDED, unified spec — never folded into another legend.
+{
+	const setLayers = [
+		{ key: "__union__", label: "∪ Union 1×1 · 12", color: "#0a0" },
+		{ key: "__intersection__", label: "∩ Intersection 2×2 · 3 ⊞", color: "#cc0" },
+	];
+	for (const mode of ["matrix", "stream", "upset", "droste", "lattice", "bipartite"] as const) {
+		const input: ModeLegendInput = {
+			...base,
+			setLayers,
+			droste: { focusColor: "#1", intersectionColor: "#2", unionColor: "#3" },
+			lattice: { lod: "overview", individualMax: 60, densityMax: 2000, densityCells: 100 },
+		};
+		const withSet = buildModeLegend(mode, input);
+		const withoutSet = buildModeLegend(mode, { ...input, setLayers: undefined });
+		const sl = withSet.find((s) => s.title.includes("Union / Intersection layers"));
+		ok(!!sl, `${mode}: set-layers spec appended`);
+		ok(sl!.entries!.some((e) => e.label === "∪ Union 1×1 · 12" && e.color === "#0a0"), `${mode}: union row`);
+		ok(sl!.entries!.some((e) => e.label === "∩ Intersection 2×2 · 3 ⊞" && e.color === "#cc0"), `${mode}: intersection row`);
+		// Intrinsic specs are unchanged: removing setLayers leaves exactly the
+		// same intrinsic specs (the set-layers spec is purely additive).
+		ok(withSet.length === withoutSet.length + 1, `${mode}: set-layers is the only added spec`);
+		ok(
+			JSON.stringify(withSet.slice(0, withoutSet.length)) === JSON.stringify(withoutSet),
+			`${mode}: intrinsic specs preserved verbatim`,
+		);
+	}
+}
+// Enclosure modes keep folding setLayers into the Group enclosures spec (NOT a
+// separate "Set layers" spec) — the prior behaviour is unchanged.
+{
+	const specs = buildModeLegend("bubblesets", {
+		...base,
+		groups: [{ key: "greek", label: "greek (5)", color: "#abc" }],
+		setLayers: [{ key: "__union__", label: "∪ Union 1×1 · 12", color: "#0a0" }],
+	});
+	ok(!specs.some((s) => s.title.includes("Union / Intersection layers")), "enclosure mode does not add a separate Set layers spec");
+	const enc = specs.find((s) => s.title.includes("Groups & overlap"));
+	ok(enc!.entries!.some((e) => e.label === "∪ Union 1×1 · 12"), "enclosure mode folds set-layers into enclosures");
+}
+// No setLayers anywhere -> no Set layers spec leaks into any mode.
+{
+	for (const mode of ["matrix", "stream", "upset", "bipartite"] as const) {
+		const specs = buildModeLegend(mode, base);
+		ok(!specs.some((s) => s.title.includes("Union / Intersection layers")), `${mode}: no set-layers spec without input`);
+	}
 }
 // tag overflow "+N more".
 {

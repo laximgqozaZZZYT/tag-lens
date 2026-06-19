@@ -1,6 +1,7 @@
 import { approx, ok } from "./assert";
-import { layoutDroste, drosteRoles, drosteUV, drosteInvSource } from "../src/layout/droste-layout";
+import { layoutDroste, drosteRoles, drosteUV, drosteInvSource, buildGallery } from "../src/layout/droste-layout";
 import type { GraphData } from "../src/types";
+import { NONE_BUCKET } from "../src/types";
 
 // Fixture for the T-based containment order. N = n0 with tags {A,B} ⇒ T={A,B}.
 //   exact-T (==T): n0, n1            ② (n2 has only {A} ⇒ partial, excluded)
@@ -63,3 +64,35 @@ ok(!roles.some((r2) => r2.ids.includes("z")), "unrelated superset z is not in an
 
 // Empty vault → empty plane, no crash.
 ok(layoutDroste({ nodes: [], edges: [] }).shapes.length === 0, "empty vault → 0 shapes");
+
+// nodeKeys: untagged notes fall back to [NONE_BUCKET]; the legend ∪ count must
+// derive degree from REAL tags only (view.ts setMembershipCounts droste branch),
+// so an untagged note must NOT count toward ∪. Tagged notes keep their real keys.
+{
+	const galleryData: GraphData = {
+		nodes: [
+			{ id: "tagged1", label: "tagged1", memberships: ["A"] },
+			{ id: "tagged2", label: "tagged2", memberships: ["A", "B"] },
+			{ id: "untagged", label: "untagged", memberships: [NONE_BUCKET] },
+		],
+		edges: [],
+	};
+	const g = buildGallery(galleryData);
+	// keysOf() fallback: untagged → [NONE_BUCKET] (length 1, not 0).
+	ok(
+		(g.nodeKeys.get("untagged") ?? []).length === 1 &&
+			(g.nodeKeys.get("untagged") ?? [])[0] === NONE_BUCKET,
+		"untagged note's nodeKeys = [NONE_BUCKET] (raw fallback)",
+	);
+	// Replicate the view.ts degree calc: filter out NONE_BUCKET before counting.
+	const realDeg = (id: string) => (g.nodeKeys.get(id) ?? []).filter((k) => k !== NONE_BUCKET).length;
+	let unionN = 0, interN = 0;
+	for (const cell of g.cells) {
+		const deg = realDeg(cell.id);
+		if (deg >= 1) unionN++;
+		if (deg >= 2) interN++;
+	}
+	ok(realDeg("untagged") === 0, "untagged note has real-tag degree 0 (NONE excluded)");
+	ok(unionN === 2, "∪ count excludes the untagged note (2 tagged, not 3)");
+	ok(interN === 1, "∩ count = the single 2-tag note");
+}
