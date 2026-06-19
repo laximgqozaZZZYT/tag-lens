@@ -13,10 +13,9 @@ import type { BindingLegend } from "../src/encoding/evaluate";
 {
 	const entries = Array.from({ length: 10 }, (_, i) => ({ key: String(i), output: `c${i}` }));
 	const lg: BindingLegend = { channelId: "color", fieldId: "tag", fieldLabel: "Tag", legend: { kind: "categorical", entries } };
-	const specs = encodingToSpecs([lg], 8);
+	const specs = encodingToSpecs([lg]);
 	ok(specs.length === 1 && specs[0].kind === "categorical", "one categorical spec");
-	ok(specs[0].entries!.length === 9, "8 shown + 1 overflow row");
-	ok(specs[0].entries![8].label === "+2 more", "overflow label");
+	ok(specs[0].entries!.length === 10, "10 items shown, no overflow logic");
 	ok(specs[0].entries![0].color === "c0", "swatch colour carried");
 }
 // quantitative encoding -> gradient spec with 5 stops + min/max labels.

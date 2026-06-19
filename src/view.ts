@@ -169,6 +169,7 @@ export class MiniGraphView extends ItemView {
 	private downY = 0;
 	private pointerMoved = false;
 	private rafId = 0;
+	private sessionHiddenLegends = new Set<ViewMode>();
 	// High-frequency vault/metadata events (metadataCache "resolved" bursts at
 	// startup, plus Sync-driven create/modify/delete/rename floods) must not
 	// each trigger a full rebuild() — its synchronous prefix (buildGraph scans
@@ -341,6 +342,9 @@ export class MiniGraphView extends ItemView {
 	private legendCloseRect: { x: number; y: number; w: number; h: number } | null = null;
 	private legendPanelRect: { x: number; y: number; w: number; h: number } | null = null;
 	private legendDrag: { dx: number; dy: number } | null = null;
+	private legendScrollDrag: { startY: number; startScrollY: number } | null = null;
+	private legendScrollY: Partial<Record<ViewMode, number>> = {};
+	private legendMaxScrollY = 0;
 	// Per-direction degree counters used by nodeSizeMode = indegree / outdegree.
 	// Refreshed every rebuild from data.edges.
 	private inDegreeMap: Map<string, number> = new Map();
@@ -2350,7 +2354,7 @@ export class MiniGraphView extends ItemView {
 
 		// F5: per-mode on-canvas legend. Pure overlay — never affects figure/selection.
 		const vmode = mode as ViewMode;
-		if (this.settings.showLegend && !this.settings.legendHiddenModes?.[vmode]) {
+		if (this.settings.showLegend && !this.sessionHiddenLegends.has(vmode)) {
 			const t = theme();
 			const specs = buildModeLegend(vmode, this.buildModeLegendInput());
 			if (specs.length) {
@@ -2360,15 +2364,17 @@ export class MiniGraphView extends ItemView {
 				const render = drawLegend(
 					ctx, specs, cw / dpr, usableH, legendAnchor(vmode), 10,
 					{ panelBg: colorAlpha(t.panelBg, 0.92), border: t.border, text: t.textNormal, textMuted: t.textMuted },
-					undefined,
+					{ scrollY: this.legendScrollY[vmode] ?? 0, maxH: Math.min(350, usableH) },
 					this.exportDprMul === 1, // show the × only when NOT exporting
 					this.settings.legendPos?.[vmode], // dragged position (clamped on-screen) if set
 				);
 				this.legendCloseRect = render.closeRect;
 				this.legendPanelRect = render.panelRect;
+				this.legendMaxScrollY = render.maxScrollY;
 			} else {
 				this.legendCloseRect = null;
 				this.legendPanelRect = null;
+				this.legendMaxScrollY = 0;
 			}
 		} else {
 			this.legendCloseRect = null;
@@ -2918,6 +2924,14 @@ export class MiniGraphView extends ItemView {
 				}
 				if (ids.size) return ids.size;
 			}
+			const latNodes = this.laid.lattice?.nodes;
+			if (latNodes?.length) {
+				let sum = 0;
+				for (const node of latNodes) {
+					if (node.signature?.includes(tag)) sum += node.count ?? 0;
+				}
+				if (sum > 0) return sum;
+			}
 			let n = 0;
 			for (const node of this.laid.nodes) if (node.memberships?.includes(tag)) n++;
 			return n;
@@ -2963,12 +2977,14 @@ export class MiniGraphView extends ItemView {
 			return ` — ${parts.join(" · ")}`;
 		};
 		const seen = new Set<string>();
+		const cleanLabel = (k: string) => k.startsWith("tag=") || k.startsWith("tag:") ? k.slice(4) : k;
+
 		const tags: { key: string; color: string; label?: string }[] = [];
 		for (const n of this.laid.nodes) {
 			const k = n.memberships?.[0];
 			if (!k || seen.has(k)) continue;
 			seen.add(k);
-			tags.push({ key: k, color: t.swatch(clusterHue(k), "fill"), label: k + layerSuffix(k) });
+			tags.push({ key: k, color: t.swatch(clusterHue(k), "fill"), label: cleanLabel(k) + layerSuffix(k) });
 		}
 		// MATRIX stores its rows in `laid.matrix` and leaves `laid.nodes` empty, so
 		// derive the per-tag legend entries from the matrix COLUMNS (one per tag).
@@ -2976,7 +2992,7 @@ export class MiniGraphView extends ItemView {
 			for (const col of this.laid.matrix.cols) {
 				if (seen.has(col.key)) continue;
 				seen.add(col.key);
-				tags.push({ key: col.key, color: t.swatch(clusterHue(col.key), "fill"), label: col.key + layerSuffix(col.key, col.size) });
+				tags.push({ key: col.key, color: t.swatch(clusterHue(col.key), "fill"), label: cleanLabel(col.key) + layerSuffix(col.key, col.size) });
 			}
 		}
 		if (this.settings.viewMode === "droste" && this.laid.drosteGallery?.cells.length) {
@@ -2987,7 +3003,7 @@ export class MiniGraphView extends ItemView {
 				for (const k of keys) {
 					if (!k || drosteSeen.has(k)) continue;
 					drosteSeen.add(k);
-					drosteTags.push({ key: k, color: t.swatch(clusterHue(k), "fill"), label: k + layerSuffix(k) });
+					drosteTags.push({ key: k, color: t.swatch(clusterHue(k), "fill"), label: cleanLabel(k) + layerSuffix(k) });
 				}
 			}
 			tags.splice(0, tags.length, ...drosteTags);
@@ -3094,8 +3110,17 @@ export class MiniGraphView extends ItemView {
 			groups = this.laid.clusters.map((c) => ({
 				key: c.groupKey,
 				label: `${c.label}${layerSuffix(c.groupKey, c.memberCount)}`,
-				color: t.swatch(clusterHue(c.groupKey), "tint", 0.32),
+				color: t.swatch(clusterHue(c.groupKey), "fill"),
 			}));
+		} else if (this.settings.viewMode === "lattice") {
+			groups = [];
+			for (const k of this.clusterLabels.keys()) {
+				groups.push({
+					key: k,
+					label: `${cleanLabel(this.clusterLabels.get(k) ?? k)}${layerSuffix(k, tagVisibleCount(k))}`,
+					color: t.swatch(clusterHue(k), "fill"),
+				});
+			}
 		}
 		// ∪ / ∩ are addressable layers DISTINCT from the single-tag clusters and are
 		// surfaced in EVERY view mode. `unionN` = distinct visible notes, `interN` =
@@ -3107,63 +3132,111 @@ export class MiniGraphView extends ItemView {
 		//   • droste     → `laid.drosteGallery.nodeKeys` (cell id → tag keys)
 		// resolveSetLayer applies the single-tag superset cascade (full/partial
 		// inheritance) so single-set settings influence ∪/∩.
-		const setMembershipCounts = (): { unionN: number; interN: number } | null => {
+		const setMembershipCounts = (): { unionN: number; interN: number; pairwise: { t1: string; t2: string; interN: number; unionN: number }[] } | null => {
+			let nodeTags: string[][] = [];
+			const tagCounts = new Map<string, number>();
+
 			if (this.laid.nodes.length) {
-				const visible = this.laid.nodes;
-				return {
-					unionN: visible.length,
-					interN: visible.filter((n) => (n.memberships?.length ?? 0) >= 2).length,
-				};
-			}
-			const m = this.laid.matrix;
-			if (m?.bits?.length) {
-				let unionN = 0, interN = 0;
-				for (const row of m.bits) {
-					let deg = 0;
-					for (let c = 0; c < row.length; c++) if (row[c]) deg++;
-					if (deg >= 1) unionN++;
-					if (deg >= 2) interN++;
+				for (const n of this.laid.nodes) {
+					const tags = n.memberships ?? [];
+					nodeTags.push(tags);
+					for (const t of tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
 				}
-				return { unionN, interN };
-			}
-			const gallery = this.laid.drosteGallery;
-			if (gallery?.cells.length) {
-				let unionN = 0, interN = 0;
+			} else if (this.laid.matrix?.bits?.length) {
+				const m = this.laid.matrix;
+				for (const row of m.bits) {
+					const tags: string[] = [];
+					for (let c = 0; c < row.length; c++) {
+						if (row[c]) {
+							const t = m.cols[c].key;
+							tags.push(t);
+							tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+						}
+					}
+					nodeTags.push(tags);
+				}
+			} else if (this.laid.drosteGallery?.cells.length) {
+				const gallery = this.laid.drosteGallery;
 				const counted = new Set<string>();
 				for (const cell of gallery.cells) {
 					if (counted.has(cell.id)) continue;
 					counted.add(cell.id);
-					// keysOf() in droste-layout falls back to `[NONE_BUCKET]` for
-					// untagged notes, so count only REAL tag keys for the membership
-					// degree (mirrors matrix.bits / nodes.memberships — neither carries
-					// NONE_BUCKET). Otherwise untagged notes inflate the ∪ count.
-					const deg = (gallery.nodeKeys.get(cell.id) ?? []).filter((k) => k !== NONE_BUCKET).length;
-					if (deg >= 1) unionN++;
-					if (deg >= 2) interN++;
+					const tags = (gallery.nodeKeys.get(cell.id) ?? []).filter((k) => k !== NONE_BUCKET);
+					nodeTags.push(tags);
+					for (const t of tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
 				}
-				return { unionN, interN };
+			} else {
+				return null;
 			}
-			return null;
+
+			let unionN = 0, interN = 0;
+			const pairInter = new Map<string, number>();
+
+			for (const tags of nodeTags) {
+				if (tags.length >= 1) unionN++;
+				if (tags.length >= 2) interN++;
+				const sortedTags = [...tags].sort();
+				for (let i = 0; i < sortedTags.length; i++) {
+					for (let j = i + 1; j < sortedTags.length; j++) {
+						const t1 = sortedTags[i], t2 = sortedTags[j];
+						const key = `${t1}\t${t2}`;
+						pairInter.set(key, (pairInter.get(key) ?? 0) + 1);
+					}
+				}
+			}
+
+			const pairwise: { t1: string; t2: string; interN: number; unionN: number }[] = [];
+			for (const [key, pInterN] of pairInter.entries()) {
+				const [t1, t2] = key.split("\t");
+				const c1 = tagCounts.get(t1) ?? 0;
+				const c2 = tagCounts.get(t2) ?? 0;
+				const pUnionN = c1 + c2 - pInterN;
+				pairwise.push({ t1, t2, interN: pInterN, unionN: pUnionN });
+			}
+			pairwise.sort((a, b) => b.interN - a.interN || a.t1.localeCompare(b.t1) || a.t2.localeCompare(b.t2));
+
+			return { unionN, interN, pairwise };
 		};
 		const setCounts = setMembershipCounts();
 		if (setCounts) {
-			const { unionN, interN } = setCounts;
-			// Reuse `layerSuffix` (resolveSetLayer-backed via resolveLayerDisplay) so
-			// the ∪/∩ rows carry the SAME "Size R×C · N nodes · Aggregate · Inherit"
-			// vocabulary as the single-tag layers and the Settings panel. Labels lead
-			// with SET_LAYER_LABEL, exactly matching the panel's set-layer tab title.
-			setLayers = [
-				{
+			const { unionN, interN, pairwise } = setCounts;
+			setLayers = [];
+			
+			for (const p of pairwise) {
+				const l1 = cleanLabel(this.clusterLabels.get(p.t1) ?? p.t1);
+				const l2 = cleanLabel(this.clusterLabels.get(p.t2) ?? p.t2);
+
+				const h1 = clusterHue(p.t1);
+				const h2 = clusterHue(p.t2);
+				let diff = h2 - h1;
+				if (diff > 180) diff -= 360;
+				if (diff < -180) diff += 360;
+				const avgHue = (h1 + diff / 2 + 360) % 360;
+
+				setLayers.push({
+					key: `__union__${p.t1}_${p.t2}`,
+					label: `${l1} ∪ ${l2}${layerSuffix(UNION_LAYER_KEY, p.unionN)}`,
+					color: t.swatch(avgHue, "fill"),
+				});
+				setLayers.push({
+					key: `__inter__${p.t1}_${p.t2}`,
+					label: `${l1} ∩ ${l2}${layerSuffix(INTERSECTION_LAYER_KEY, p.interN)}`,
+					color: t.swatch(avgHue, "fill"),
+				});
+			}
+
+			if (!pairwise.length && unionN > 0) {
+				setLayers.push({
 					key: UNION_LAYER_KEY,
 					label: `${SET_LAYER_LABEL[UNION_LAYER_KEY]}${layerSuffix(UNION_LAYER_KEY, unionN)}`,
-					color: t.swatch(140, "tint", 0.32),
-				},
-				{
+					color: t.swatch(140, "fill"),
+				});
+				setLayers.push({
 					key: INTERSECTION_LAYER_KEY,
 					label: `${SET_LAYER_LABEL[INTERSECTION_LAYER_KEY]}${layerSuffix(INTERSECTION_LAYER_KEY, interN)}`,
-					color: t.swatch(45, "tint", 0.32),
-				},
-			];
+					color: t.swatch(45, "fill"),
+				});
+			}
 		}
 		return {
 			encodingSpecs,
@@ -4693,6 +4766,41 @@ export class MiniGraphView extends ItemView {
 				const pr = this.legendPanelRect, cr0 = this.legendCloseRect;
 				const inClose = !!cr0 && sx >= cr0.x && sx <= cr0.x + cr0.w && sy >= cr0.y && sy <= cr0.y + cr0.h;
 				if (pr && !inClose && sx >= pr.x && sx <= pr.x + pr.w && sy >= pr.y && sy <= pr.y + pr.h) {
+					// Detect scrollbar drag
+					if (this.legendMaxScrollY > 0 && sx >= pr.x + pr.w - 12) {
+						// Calculate absolute scroll position based on click Y coordinate
+						const trackTop = this.exportDprMul === 1 ? 20 : 4;
+						const trackH = pr.h - trackTop - 4;
+						const thumbMinH = 20;
+						const boxH = pr.h + this.legendMaxScrollY;
+						const thumbH = Math.max(thumbMinH, trackH * (pr.h / boxH));
+						const maxThumbY = trackH - thumbH;
+						
+						// Thumb's current physical position
+						const curScrollY = this.legendScrollY[this.settings.viewMode as ViewMode] ?? 0;
+						const curThumbY = pr.y + trackTop + (maxThumbY > 0 ? (curScrollY / this.legendMaxScrollY) * maxThumbY : 0);
+						
+						// If clicking directly on the thumb, do relative drag
+						if (sy >= curThumbY && sy <= curThumbY + thumbH) {
+							this.legendScrollDrag = { startY: sy, startScrollY: curScrollY };
+						} else {
+							// Clicking on the track outside the thumb: jump to position
+							// Center the thumb at the clicked Y coordinate
+							let targetThumbY = (sy - pr.y - trackTop) - thumbH / 2;
+							targetThumbY = Math.max(0, Math.min(maxThumbY, targetThumbY));
+							const newScrollY = maxThumbY > 0 ? (targetThumbY / maxThumbY) * this.legendMaxScrollY : 0;
+							
+							const vmode = this.settings.viewMode as ViewMode;
+							this.legendScrollY[vmode] = newScrollY;
+							this.requestDraw();
+							
+							// Allow dragging to continue from the new jumped position
+							this.legendScrollDrag = { startY: sy, startScrollY: newScrollY };
+						}
+						
+						e.preventDefault();
+						return;
+					}
 					this.legendDrag = { dx: sx - pr.x, dy: sy - pr.y };
 					this.pointerMoved = false;
 					e.preventDefault();
@@ -4722,6 +4830,24 @@ export class MiniGraphView extends ItemView {
 				this.marquee.update(e.clientX, e.clientY);
 				return;
 			}
+			// Drag the legend scrollbar
+			if (this.legendScrollDrag) {
+				const rect = c.getBoundingClientRect();
+				const sy = e.clientY - rect.top;
+				const dy = sy - this.legendScrollDrag.startY;
+				const pr = this.legendPanelRect!;
+				const trackTop = this.exportDprMul === 1 ? 20 : 4;
+				const trackH = pr.h - trackTop - 4;
+				const thumbMinH = 20;
+				const boxH = pr.h + this.legendMaxScrollY;
+				const thumbH = Math.max(thumbMinH, trackH * (pr.h / boxH));
+				const maxThumbY = trackH - thumbH;
+				const scrollDelta = maxThumbY > 0 ? (dy / maxThumbY) * this.legendMaxScrollY : 0;
+				const vmode = this.settings.viewMode as ViewMode;
+				this.legendScrollY[vmode] = Math.max(0, Math.min(this.legendMaxScrollY, this.legendScrollDrag.startScrollY + scrollDelta));
+				this.requestDraw();
+				return;
+			}
 			// F5: move the legend panel; persists on mouseup.
 			if (this.legendDrag) {
 				const rect = c.getBoundingClientRect();
@@ -4748,6 +4874,11 @@ export class MiniGraphView extends ItemView {
 		activeWindow.addEventListener("mouseup", (e) => {
 			if (this.marquee.isActive()) {
 				this.marquee.finish(e.clientX, e.clientY);
+				return;
+			}
+			// Commit a legend scroll drag.
+			if (this.legendScrollDrag) {
+				this.legendScrollDrag = null;
 				return;
 			}
 			// F5: commit a legend drag.
@@ -4816,8 +4947,7 @@ export class MiniGraphView extends ItemView {
 			// Screen-space, checked first so it wins over any canvas content beneath.
 			const cr = this.legendCloseRect;
 			if (cr && sx >= cr.x && sx <= cr.x + cr.w && sy >= cr.y && sy <= cr.y + cr.h) {
-				this.settings.legendHiddenModes = { ...this.settings.legendHiddenModes, [this.settings.viewMode]: true };
-				void this.save();
+				this.sessionHiddenLegends.add(this.settings.viewMode as ViewMode);
 				this.draw();
 				return;
 			}
@@ -5037,6 +5167,23 @@ export class MiniGraphView extends ItemView {
 		c.addEventListener("wheel", (e) => {
 			e.preventDefault();
 			this.cancelHover();
+			const rect = c.getBoundingClientRect();
+			const sx = e.clientX - rect.left;
+			const sy = e.clientY - rect.top;
+
+			const lr = this.legendPanelRect;
+			if (lr && sx >= lr.x && sx <= lr.x + lr.w && sy >= lr.y && sy <= lr.y + lr.h) {
+				if (this.legendMaxScrollY > 0) {
+					const vmode = this.settings.viewMode as ViewMode;
+					const cur = this.legendScrollY[vmode] ?? 0;
+					const dy = e.deltaMode === 1 ? e.deltaY * 20 : (e.deltaMode === 2 ? e.deltaY * 300 : e.deltaY);
+					this.legendScrollY[vmode] = Math.max(0, Math.min(this.legendMaxScrollY, cur + dy));
+					this.requestDraw();
+				}
+				e.stopPropagation();
+				return;
+			}
+
 			// Connection matrix: wheel scrolls the rows vertically (fixed row
 			// height); the existing drag-pan also scrolls. No zoom here.
 			if (this.laid.matrix) {
@@ -5044,9 +5191,7 @@ export class MiniGraphView extends ItemView {
 				this.requestDraw();
 				return;
 			}
-			const rect = c.getBoundingClientRect();
-			const sx = e.clientX - rect.left;
-			const sy = e.clientY - rect.top;
+
 			// UpSet footer scroll path retired — the matrix is in world
 			// space now, so the normal zoom-on-wheel below applies.
 			const factor = Math.exp(-e.deltaY * 0.0015);

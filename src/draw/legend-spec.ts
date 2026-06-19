@@ -33,7 +33,7 @@ const capitalize = (s: string): string => (s.length ? s[0].toUpperCase() + s.sli
 
 // Convert F4 encoding legends to specs. Categorical -> categorical; quantitative
 // -> a 5-stop gradient built from the SAME ramp the colour channel paints.
-export function encodingToSpecs(legends: BindingLegend[], maxItems = 8): LegendSpec[] {
+export function encodingToSpecs(legends: BindingLegend[]): LegendSpec[] {
 	const out: LegendSpec[] = [];
 	for (const lg of legends) {
 		const title = `${capitalize(lg.channelId)} · ${lg.fieldLabel}`;
@@ -43,10 +43,8 @@ export function encodingToSpecs(legends: BindingLegend[], maxItems = 8): LegendS
 			out.push({ title, kind: "gradient", ramp: { stops, minLabel: fmtNum(lg.legend.min ?? 0), maxLabel: fmtNum(lg.legend.max ?? 0) } });
 		} else {
 			const all = lg.legend.entries ?? [];
-			const shown = all.slice(0, maxItems);
-			const entries: { label: string; color?: string; shape?: NodeShape }[] = shown.map((e) =>
+			const entries: { label: string; color?: string; shape?: NodeShape }[] = all.map((e) =>
 				isShape ? { label: e.key, shape: shapeForKey(e.key) } : { label: e.key, color: e.output });
-			if (all.length > shown.length) entries.push({ label: `+${all.length - shown.length} more` });
 			out.push({ title, kind: "categorical", entries });
 		}
 	}

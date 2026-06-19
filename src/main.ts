@@ -243,6 +243,7 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		if (typeof merged.showGrid !== "boolean") merged.showGrid = true;
 		if (!Array.isArray(merged.hiddenNodes)) merged.hiddenNodes = [];
 		if (!Array.isArray(merged.aggregatedLayers)) merged.aggregatedLayers = [];
+		merged.legendHiddenModes = {}; // Never restore hidden legends from disk; keep it session-only
 		delete merged.inheritedLayers; // retired
 		if (
 			merged.inheritFrom === null ||

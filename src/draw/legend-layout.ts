@@ -117,6 +117,7 @@ export interface LegendRender {
 	// Whole legend panel in SCREEN px (for drag hit-testing). null when nothing drawn.
 	panelRect: { x: number; y: number; w: number; h: number } | null;
 	closeRect: { x: number; y: number; w: number; h: number } | null;
+	maxScrollY: number;
 }
 
 export function drawLegend(
@@ -127,11 +128,11 @@ export function drawLegend(
 	anchor: LegendAnchor,
 	margin: number,
 	theme: LegendTheme,
-	o?: Partial<LegendLayoutOpts>,
+	o?: Partial<LegendLayoutOpts> & { scrollY?: number; maxH?: number },
 	showClose = true,
 	origin?: { x: number; y: number },
 ): LegendRender {
-	if (!specs.length) return { width: 0, height: 0, panelRect: null, closeRect: null };
+	if (!specs.length) return { width: 0, height: 0, panelRect: null, closeRect: null, maxScrollY: 0 };
 	const fontPx = o?.fontPx ?? 11;
 	const swatch = o?.swatch ?? 10;
 	const padX = o?.padX ?? 8;
@@ -142,31 +143,43 @@ export function drawLegend(
 		padY: o?.padY, rowGap: o?.rowGap, sectionGap: o?.sectionGap,
 	};
 	const box = buildLegendBox(specs, opts);
-	if (!box.sections.length) return { width: 0, height: 0, panelRect: null, closeRect: null };
+	if (!box.sections.length) return { width: 0, height: 0, panelRect: null, closeRect: null, maxScrollY: 0 };
+
+	const maxAllowedHeight = o?.maxH ?? (canvasH - margin * 2);
+	const drawHeight = Math.min(box.height, maxAllowedHeight);
+	const maxScrollY = Math.max(0, box.height - drawHeight);
+	const scrollY = Math.max(0, Math.min(maxScrollY, o?.scrollY ?? 0));
+	const hasScroll = maxScrollY > 0;
+	const drawWidth = box.width + (hasScroll ? 10 : 0);
 
 	// Explicit (dragged) origin wins, clamped so the whole panel stays on-screen;
 	// otherwise fall back to the anchor corner.
-	let originX = anchor.endsWith("right") ? canvasW - box.width - margin : margin;
-	let originY = anchor.startsWith("bottom") ? canvasH - box.height - margin : margin;
+	let originX = anchor.endsWith("right") ? canvasW - drawWidth - margin : margin;
+	let originY = anchor.startsWith("bottom") ? canvasH - drawHeight - margin : margin;
 	if (origin) {
-		originX = Math.max(0, Math.min(canvasW - box.width, origin.x));
-		originY = Math.max(0, Math.min(canvasH - box.height, origin.y));
+		originX = Math.max(0, Math.min(canvasW - drawWidth, origin.x));
+		originY = Math.max(0, Math.min(canvasH - drawHeight, origin.y));
 	}
 	// Even without an explicit drag-origin, clamp the anchored position so an
 	// oversized panel (box wider/taller than the viewport) never ends up mostly
 	// off-screen. This is especially visible in Icon Gallery where legend labels
 	// can become long.
-	originX = Math.max(0, Math.min(canvasW - box.width, originX));
-	originY = Math.max(0, Math.min(canvasH - box.height, originY));
+	originX = Math.max(0, Math.min(canvasW - drawWidth, originX));
+	originY = Math.max(0, Math.min(canvasH - drawHeight, originY));
 
 	// Panel background.
 	ctx.fillStyle = theme.panelBg;
 	ctx.strokeStyle = theme.border;
 	ctx.lineWidth = 1;
 	ctx.beginPath();
-	ctx.rect(originX, originY, box.width, box.height);
+	ctx.rect(originX, originY, drawWidth, drawHeight);
 	ctx.fill();
 	ctx.stroke();
+
+	ctx.save();
+	ctx.beginPath();
+	ctx.rect(originX, originY, drawWidth, drawHeight);
+	ctx.clip();
 
 	const sw = swatch;
 	for (const sec of box.sections) {
@@ -174,11 +187,11 @@ export function drawLegend(
 		ctx.fillStyle = theme.textMuted;
 		ctx.textAlign = "start";
 		ctx.textBaseline = "alphabetic";
-		ctx.fillText(sec.title, originX + padX, originY + sec.titleY + fontPx);
+		ctx.fillText(sec.title, originX + padX, originY - scrollY + sec.titleY + fontPx);
 
 		for (const it of sec.items) {
 			const sx = originX + padX;
-			const sy = originY + it.y;
+			const sy = originY - scrollY + it.y;
 			if (sec.kind === "gradient") {
 				const ramp = sec.ramp ?? { stops: [], minLabel: "", maxLabel: "" };
 				const barW = sw * 4;
@@ -238,9 +251,24 @@ export function drawLegend(
 		}
 	}
 
+	ctx.restore();
+
+	if (hasScroll) {
+		const thumbMinH = 20;
+		const trackTop = showClose ? 20 : 4;
+		const trackBottom = drawHeight - 4;
+		const trackH = trackBottom - trackTop;
+		const thumbH = Math.max(thumbMinH, trackH * (drawHeight / box.height));
+		const thumbY = originY + trackTop + (scrollY / maxScrollY) * (trackH - thumbH);
+		ctx.fillStyle = theme.textMuted;
+		ctx.beginPath();
+		ctx.roundRect(originX + drawWidth - 8, thumbY, 4, thumbH, 2);
+		ctx.fill();
+	}
+
 	let closeRect: LegendRender["closeRect"] = null;
 	if (showClose) {
-		const cb = { x: originX + box.width - 12 - 4, y: originY + 4, w: 12, h: 12 };
+		const cb = { x: originX + drawWidth - 12 - 4, y: originY + 4, w: 12, h: 12 };
 		ctx.strokeStyle = theme.text;
 		ctx.lineWidth = 1.5;
 		ctx.beginPath();
@@ -253,10 +281,11 @@ export function drawLegend(
 	}
 
 	return {
-		width: box.width,
-		height: box.height,
-		panelRect: { x: originX, y: originY, w: box.width, h: box.height },
+		width: drawWidth,
+		height: drawHeight,
+		panelRect: { x: originX, y: originY, w: drawWidth, h: drawHeight },
 		closeRect,
+		maxScrollY,
 	};
 }
 

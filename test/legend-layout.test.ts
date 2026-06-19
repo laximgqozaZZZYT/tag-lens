@@ -27,6 +27,8 @@ function mockCtx(): CanvasRenderingContext2D {
 		arc() {},
 		closePath() {},
 		rect() {},
+		roundRect() {},
+		clip() {},
 		fill() {},
 		stroke() {},
 		fillRect() {},

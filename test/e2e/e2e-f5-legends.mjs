@@ -123,7 +123,7 @@ const driver = `(async () => {
     // base config: NO encoding bound, legend ON, nothing hidden.
     view.settings.encoding = [];
     view.settings.showLegend = true;
-    view.settings.legendHiddenModes = {};
+    view.sessionHiddenLegends.clear();
 
     // ── 1) all 11 modes paint a legend with a × button ─────────────────────────
     for (const m of MODES) {
@@ -153,7 +153,7 @@ const driver = `(async () => {
         captured = null;
         view.settings.encoding = [];
         view.settings.showLegend = true;
-        view.settings.legendHiddenModes = {};
+        view.sessionHiddenLegends.clear();
         view.settings.viewMode = m;
         await view.rebuild();
         view.draw();
@@ -179,7 +179,7 @@ const driver = `(async () => {
       // ── 4) export excludes × but KEEPS legend (euler, legend shown) ───────────
       // (run before step 3 mutates legendHiddenModes; svgForMode resets it anyway)
       try {
-        view.settings.legendHiddenModes = {};
+        view.sessionHiddenLegends.clear();
         view.settings.showLegend = true;
         view.settings.viewMode = "euler";
         view.settings.encoding = [];
@@ -196,11 +196,12 @@ const driver = `(async () => {
       if (stubbed) Object.defineProperty(navigator.clipboard, "write", { value: origWrite, configurable: true, writable: true });
     }
 
-    // ── 3) × dismiss is PER-MODE (legendHiddenModes={heatmap:true}) ────────────
+    // ── 3) × dismiss is PER-MODE (sessionHiddenLegends.has("heatmap")) ────────────
     try {
       view.settings.encoding = [];
       view.settings.showLegend = true;
-      view.settings.legendHiddenModes = { heatmap: true };
+      view.sessionHiddenLegends.clear();
+      view.sessionHiddenLegends.add("heatmap");
 
       view.settings.viewMode = "heatmap";
       await view.rebuild();
