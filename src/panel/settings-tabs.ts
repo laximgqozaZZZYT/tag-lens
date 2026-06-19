@@ -340,114 +340,12 @@ export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): v
 	const section = el.createDiv({ cls: "gim-panel-section" });
 	section.createEl("h4", { text: "Visual Encoding" });
 	section.createEl("div", {
-		text: "タグ・年齢・フロントマターなどの属性を色・形などの視覚表現に割り当てます。フィルターとは独立しており、表示されるノートの数は変わりません。",
-	}).setCssStyles({ fontSize: "10px", color: "var(--text-faint)", marginBottom: "6px" });
-
-	const renderBindingControls = (
-		parent: HTMLElement,
-		channelId: string,
-		label: string,
-	) => {
-		const cur = (deps.settings.encoding ?? []).find((b) => b.channelId === channelId);
-		const curIsFm = !!cur && cur.fieldId.startsWith("frontmatter:");
-
-		const row = parent.createDiv({ cls: "gim-setting-row" });
-		row.setCssStyles({ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px", marginTop: "8px", paddingBottom: "8px", borderBottom: "1px solid var(--background-modifier-border)" });
-		
-		row.createSpan({ text: label }).setCssStyles({ minWidth: "70px", fontWeight: "600", fontSize: "12px" });
-		const attrLabel = row.createDiv();
-		attrLabel.setCssStyles({ width: "100%", fontSize: "10px", color: "var(--text-faint)", marginBottom: "2px" });
-		attrLabel.setText("割り当てる属性:");
-
-		const selRow = row.createDiv();
-		selRow.setCssStyles({ width: "100%", display: "flex", alignItems: "center", paddingLeft: "8px" });
-		const sel = selRow.createEl("select");
-		sel.add(new Option("(none)", ""));
-		for (const f of fieldSourceRegistry) sel.add(new Option(f.label, f.id));
-		sel.add(new Option("フロントマターキー指定…", "frontmatter:"));
-		sel.value = curIsFm ? "frontmatter:" : (cur?.fieldId ?? "");
-
-		const fmContainer = row.createDiv();
-		fmContainer.setCssStyles({ width: "100%", display: "flex", alignItems: "center", gap: "4px", paddingLeft: "8px" });
-		fmContainer.createSpan({ text: "フロントマターキー:" });
-		const fmIn = fmContainer.createEl("input", { type: "text", cls: "gim-text-input" });
-		fmIn.setCssStyles({ width: "120px" });
-		fmIn.value = curIsFm ? cur?.fieldId.slice("frontmatter:".length) ?? "" : "";
-		fmContainer.setCssStyles({ display: sel.value === "frontmatter:" ? "" : "none" });
-
-		const scaleRow = row.createDiv();
-		scaleRow.setCssStyles({ width: "100%", display: "flex", alignItems: "center", gap: "4px", paddingLeft: "8px" });
-		scaleRow.createSpan({ text: "Scale:" });
-		const scSel = scaleRow.createEl("select");
-		scSel.add(new Option("categorical（カテゴリ別・色分け）", "categorical"));
-		scSel.add(new Option("linear（数値・線形）", "linear"));
-		scSel.add(new Option("log（数値・対数）", "log"));
-		scSel.add(new Option("quantile（数値・分位）", "quantile"));
-		scSel.value = cur?.scale?.type ?? "categorical";
-		
-		const revRow = row.createDiv();
-		revRow.setCssStyles({ width: "100%", paddingLeft: "8px" });
-		const revLabel = revRow.createEl("label", { cls: "gim-toggle-row" });
-		revLabel.setCssStyles({ margin: "0" });
-		const revCb = revLabel.createEl("input", { type: "checkbox" });
-		revCb.checked = !!cur?.scale?.reverse;
-		revLabel.createSpan({ text: "順序を逆にする" });
-
-		const apply = (): void => {
-			const fmKey = fmIn.value.trim();
-			const fieldId = sel.value === "frontmatter:"
-				? (fmKey ? `frontmatter:${fmKey}` : "")
-				: sel.value;
-			const others = (deps.settings.encoding ?? []).filter((b) => b.channelId !== channelId);
-			if (!fieldId) {
-				deps.settings.encoding = others;
-			} else {
-				const binding: EncodingBinding = {
-					channelId,
-					fieldId,
-					enabled: true,
-					scale: { type: scSel.value as ScaleType, reverse: revCb.checked },
-				};
-				deps.settings.encoding = [...others, binding];
-			}
-			deps.save();
-			void deps.rebuild().then(() => deps.refreshSettingsTab());
-		};
-		sel.addEventListener("change", () => {
-			fmContainer.setCssStyles({ display: sel.value === "frontmatter:" ? "" : "none" });
-			apply();
-		});
-		fmIn.addEventListener("change", apply);
-		scSel.addEventListener("change", apply);
-		revCb.addEventListener("change", apply);
-
-		// Auto-legend from the last evaluated encoding.
-		const legItem = deps.encLegends.find((l) => l.channelId === channelId);
-		if (legItem) {
-			const leg = row.createDiv();
-			leg.setCssStyles({ width: "100%", marginTop: "4px" });
-			leg.createEl("div", { text: `Legend — ${legItem.fieldLabel}` }).setCssStyles({ fontSize: "11px", fontWeight: "600", marginBottom: "2px" });
-			if (legItem.legend.kind === "categorical") {
-				for (const e of legItem.legend.entries ?? []) {
-					const er = leg.createSpan();
-					er.setCssStyles({ display: "inline-flex", alignItems: "center", gap: "4px", marginRight: "8px" });
-					if (channelId === "color") {
-						er.createSpan().setCssStyles({ width: "10px", height: "10px", borderRadius: "2px", background: e.output, display: "inline-block" });
-					} else if (channelId === "shape") {
-						er.createSpan({ text: shapeForKey(e.key) }).setCssStyles({ fontSize: "9px", color: "var(--text-faint)", border: "1px solid var(--background-modifier-border)", borderRadius: "2px", padding: "0 3px" });
-					}
-					er.createSpan({ text: e.key }).setCssStyles({ fontSize: "10px" });
-				}
-			} else if (legItem.legend.kind === "quantitative") {
-				leg.createDiv({
-					text: `${(legItem.legend.min ?? 0).toFixed(1)} … ${(legItem.legend.max ?? 0).toFixed(1)}${legItem.legend.reversed ? " (reversed)" : ""}`,
-				}).setCssStyles({ fontSize: "10px", color: "var(--text-muted)" });
-			}
-		}
-	};
-
-	renderBindingControls(section, "color", "Color（色）");
-	renderBindingControls(section, "shape", "Shape（形）");
+		text: "(Content cleared for cleanup)",
+	}).setCssStyles({ 
+		fontSize: "10px", 
+		color: "var(--text-faint)", 
+		marginTop: "8px" 
+	});
 
 	// On-canvas legend toggle (paints the colour/shape/size key on the canvas).
 	const legendRow = section.createEl("label", { cls: "gim-toggle-row" });
@@ -463,74 +361,6 @@ export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): v
 		deps.requestDraw();
 	});
 	legendRow.createSpan({ text: "Show legend on canvas" });
-
-	// ---- Experimental / Legacy Section ----
-	const expDetails = el.createEl("details", { cls: "gim-panel-section gim-experimental-section" });
-	expDetails.setCssStyles({ marginTop: "16px", paddingTop: "8px", borderTop: "1px solid var(--background-modifier-border)" });
-	const expSummary = expDetails.createEl("summary");
-	expSummary.createSpan({ text: "Experimental (beta)" }).setCssStyles({ fontWeight: "600", cursor: "pointer" });
-	expSummary.setCssStyles({ outline: "none", marginBottom: "8px" });
-
-	const expContent = expDetails.createDiv();
-
-	expContent.createEl("div", {
-		text: "特定のビューモードでのみ機能する実験的チャンネルです。Position X/Y は Icon Gallery・BubbleSets などのカードレイアウトモードで軸位置に作用します。",
-	}).setCssStyles({ fontSize: "10px", color: "var(--text-faint)", marginBottom: "12px" });
-
-	renderBindingControls(expContent, "axisX", "Position X（横軸）");
-	renderBindingControls(expContent, "axisY", "Position Y（縦軸）");
-
-	// Legacy Bindings
-	const legacySection = expContent.createDiv({ cls: "gim-panel-subsection" });
-	legacySection.setCssStyles({ marginTop: "12px", paddingTop: "8px", borderTop: "1px dashed var(--background-modifier-border)" });
-	legacySection.createEl("h5", { text: "その他の表示設定" }).setCssStyles({ margin: "0 0 6px 0", fontSize: "12px" });
-
-	// Stale days (used by Opacity encoding and Insight alerts)
-		const staleRow = legacySection.createDiv({ cls: "gim-setting-row" });
-		staleRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", paddingLeft: "24px" });
-		staleRow.createSpan({ text: "鮮度の基準日数:" });
-		const staleInput = staleRow.createEl("input", { type: "number", cls: "gim-number-input" });
-		staleInput.setCssStyles({ width: "60px" });
-		staleInput.value = deps.settings.staleDays.toString();
-		staleInput.addEventListener("change", () => {
-			const v = parseInt(staleInput.value, 10);
-			if (!isNaN(v) && v > 0) {
-				deps.settings.staleDays = v;
-				deps.save();
-				deps.requestDraw();
-			} else {
-				staleInput.value = deps.settings.staleDays.toString();
-			}
-		});
-	legacySection.createEl("div", {
-		text: "この日数を超えたノートを「古い」と判定します（Opacity チャンネルや Insight アラートで使用）",
-	}).setCssStyles({ fontSize: "10px", color: "var(--text-faint)", paddingLeft: "24px" });
-
-	// Note maturity badge
-	if (displayToggleApplies(deps.settings.viewMode, "showMaturity")) {
-		const maturityRow = legacySection.createEl("label", { cls: "gim-toggle-row" });
-		maturityRow.setCssStyles({ marginTop: "12px" });
-		const maturityCb = maturityRow.createEl("input", { type: "checkbox" });
-		maturityCb.checked = deps.settings.showMaturity;
-		maturityCb.addEventListener("change", () => {
-			deps.settings.showMaturity = maturityCb.checked;
-			deps.save();
-			deps.requestDraw();
-		});
-		maturityRow.createSpan({ text: "成熟度バッジを表示（fleeting / literature / permanent）" });
-	}
-
-
-
-	// ---- Layers & Overrides Section ----
-	const layerContainer = el.createDiv({ cls: "gim-panel-section" });
-	layerContainer.setCssStyles({ marginTop: "16px", paddingTop: "8px", borderTop: "1px solid var(--background-modifier-border)" });
-	layerContainer.createEl("h4", { text: "Layers & Overrides" });
-	layerContainer.createEl("div", {
-		text: "Structural manipulations and manual display overrides for specific layers (clusters) generated by GROUP BY.",
-	}).setCssStyles({ fontSize: "10px", color: "var(--text-faint)", marginBottom: "8px" });
-	
-	renderLayersSubSection(layerContainer, deps);
 }
 
 function renderLayersSubSection(el: HTMLElement, deps: EncodeTabDeps): void {

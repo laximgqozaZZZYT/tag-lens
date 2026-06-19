@@ -714,21 +714,21 @@ function drawDensity(
 	const xOffset = Math.max(0, Math.floor((bodyW - m.bodyW) / 2));
 	const yOffset = 0;
 	const { perCell, filled } = densityBins(node.count, densityCells);
-	let lit: string | CanvasGradient = theme().swatch(hue, "fill", 0.92);
-	if (node.signature.length > 1) {
-		const hues = node.signature.map(s => clusterHue(s));
-		// One cycle across the WHOLE waffle so every lit cell samples its slice
-		// of the same left→right band run (no per-cell repeat).
-		lit = createStripeGradient(
-			ctx, bodyLeft + xOffset, bodyTop + yOffset, m.bodyW, m.bodyH, hues, true, 0.92,
-		);
-	}
 	const dim = theme().swatch(hue, "dim", 0.32);
+	const hasStripes = node.signature.length > 1;
+	const hues = hasStripes ? node.signature.map(s => clusterHue(s)) : [];
+
 	for (let r = 0, drawn = 0; r < m.rows && drawn < densityCells; r++) {
 		for (let c = 0; c < m.cols && drawn < densityCells; c++, drawn++) {
 			const cx = bodyLeft + xOffset + c * (cellSize + cellGap);
 			const cy = bodyTop + yOffset + r * (cellSize + cellGap);
-			ctx.fillStyle = drawn < filled ? lit : dim;
+			if (drawn < filled) {
+				ctx.fillStyle = hasStripes
+					? createStripeGradient(ctx, cx, cy, cellSize, cellSize, hues, true, 0.92)
+					: theme().swatch(hue, "fill", 0.92);
+			} else {
+				ctx.fillStyle = dim;
+			}
 			ctx.fillRect(cx, cy, cellSize, cellSize);
 		}
 	}
@@ -777,16 +777,9 @@ function drawIndividual(
 	const fits = m.rows * m.cols;
 	const drawnMax = Math.min(node.count, fits);
 	const xOffset = Math.max(0, Math.floor((bodyW - m.bodyW) / 2));
-	if (node.signature.length > 1) {
-		const hues = node.signature.map(s => clusterHue(s));
-		// One cycle across the WHOLE cell grid so the per-note cells read as
-		// slices of a single left→right band run.
-		ctx.fillStyle = createStripeGradient(
-			ctx, bodyLeft + xOffset, bodyTop, m.bodyW, m.bodyH, hues, true, 0.90,
-		);
-	} else {
-		ctx.fillStyle = theme().swatch(hue, "fill", 0.90);
-	}
+	const hasStripes = node.signature.length > 1;
+	const hues = hasStripes ? node.signature.map(s => clusterHue(s)) : [];
+
 	for (let r = 0, drawn = 0; r < m.rows && drawn < drawnMax; r++) {
 		for (let c = 0; c < m.cols && drawn < drawnMax; c++, drawn++) {
 			const cx = bodyLeft + xOffset + c * (cellSize + cellGap);
@@ -795,6 +788,10 @@ function drawIndividual(
 			// only the cells that overlap the screen matter.
 			if (cx + cellSize < wLeft || cx > wRight || cy + cellSize < wTop || cy > wBottom)
 				continue;
+			
+			ctx.fillStyle = hasStripes
+				? createStripeGradient(ctx, cx, cy, cellSize, cellSize, hues, true, 0.90)
+				: theme().swatch(hue, "fill", 0.90);
 			ctx.fillRect(cx, cy, cellSize, cellSize);
 		}
 	}
