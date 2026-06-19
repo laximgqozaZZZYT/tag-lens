@@ -510,4 +510,6 @@
 .gim-panel-tabs-tree .gim-panel-tab.tree-row.active {
 	opacity: 1;
 	font-weight: 600;
+	background: var(--background-modifier-border);
+	color: var(--text-normal);
 }
