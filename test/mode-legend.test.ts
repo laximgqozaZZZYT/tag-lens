@@ -317,6 +317,44 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 		ok(!grp!.entries!.some((e) => e.label.includes("Overlap:")), `${mode}: no overlap descriptive row`);
 	}
 }
+// REGRESSION (bubblesets legend "doesn't show"): a closeup enclosure view whose
+// notes are NOT clustered (empty `groups`) but DOES have ∪/∩ set-layers must
+// still surface a non-empty legend. Before the fix, `groupEnclosures` was only
+// emitted when `groups` existed, so the ∪/∩ rows were dropped and the legend
+// degenerated to an empty "Color · Tag" key (read by users as "no legend").
+{
+	const specs = buildModeLegend("bubblesets", {
+		encodingSpecs: [],
+		tags: [],
+		closeup: true,
+		counts: { min: 1, max: 1 },
+		setLayers: [
+			{ key: "__union__", label: "a ∪ b — Size 1×1 · 12 nodes", color: "#0a0" },
+			{ key: "__intersection__", label: "a ∩ b — Size 1×1 · 3 nodes", color: "#cc0" },
+		],
+	});
+	const grp = specs.find((s) => s.title.includes("Groups & overlap"));
+	ok(!!grp, "bubblesets w/ setLayers but no groups still emits a Groups & overlap spec");
+	ok(grp!.entries!.some((e) => e.label.includes("∪")) && grp!.entries!.some((e) => e.label.includes("∩")), "∪/∩ rows present even with empty groups");
+	// The whole legend must carry visible content (not just an empty tag key).
+	const totalEntries = specs.reduce((n, s) => n + (s.entries?.length ?? 0), 0);
+	ok(totalEntries >= 2, "bubblesets closeup legend has visible content (regression: was 0)");
+}
+// And for the whole enclosure family.
+{
+	for (const mode of ["euler", "euler-true", "euler-venn", "bubblesets"] as const) {
+		const specs = buildModeLegend(mode, {
+			encodingSpecs: [],
+			tags: [],
+			closeup: true,
+			counts: { min: 1, max: 1 },
+			setLayers: [{ key: "__union__", label: "a ∪ b — Size 1×1 · 12 nodes", color: "#0a0" }],
+		});
+		const grp = specs.find((s) => s.title.includes("Groups & overlap"));
+		ok(!!grp && grp.entries!.some((e) => e.label.includes("∪")), `${mode}: ∪/∩ surface with empty groups`);
+	}
+}
+
 // No setLayers anywhere -> no Set layers spec leaks into any mode.
 {
 	for (const mode of ["matrix", "stream", "upset", "bipartite"] as const) {

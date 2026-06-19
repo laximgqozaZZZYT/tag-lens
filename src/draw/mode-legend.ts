@@ -259,7 +259,12 @@ function buildModeLegendBody(mode: ViewMode, input: ModeLegendInput): LegendSpec
 		case "euler-venn":
 		case "bubblesets": {
 			const out: LegendSpec[] = [];
-			if (input.groups?.length) out.push(groupEnclosures(input));
+			// Emit the "Groups & overlap" spec when there are single-tag cluster
+			// frames OR addressable ∪/∩ set-layers to fold in. Without the
+			// `setLayers` clause, a closeup enclosure view whose notes are NOT
+			// clustered (empty `groups`) drops the ∪/∩ rows entirely — the legend
+			// then shows only an empty "Color · Tag" key and reads as "no legend".
+			if (input.groups?.length || input.setLayers?.length) out.push(groupEnclosures(input));
 			// Node colour key: the bound encoding (what the cards paint) wins, else tags.
 			if (input.encodingSpecs.length) out.push(...input.encodingSpecs);
 			else out.push(tagKey(input, "Color · Tag"));
