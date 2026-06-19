@@ -74,7 +74,10 @@ export interface MiniSettings {
 	groupBy: string[];
 	// SQL-like aggregate post-filter. Each row is "count <op> <number>"; rows
 	// are AND-combined. Failing clusters keep their nodes visible but their
-	// enclosure (outline + label) is suppressed.
+	// enclosure (outline + label) is suppressed. When `havingAuto` is on and
+	// this is empty, it is auto-seeded with concrete count thresholds resolved
+	// from the current node count (see seedAutoHavingRows) so the conditions
+	// are visible and editable rather than injected silently.
 	having: string[];
 	// HAVING application mode: "filter" drops failing clusters' enclosures;
 	// "highlight" keeps everything but visually flags the failing clusters.
@@ -94,6 +97,11 @@ export interface MiniSettings {
 	// additions.
 	whereAuto: boolean;
 	groupByAuto: boolean;
+	// havingAuto drives two things: (1) seeding the HAVING field with concrete
+	// count thresholds when it's empty (seedAutoHavingRows), and (2) the
+	// grammar-inexpressible TOP_K long-tail cap + NONE_BUCKET suppression inside
+	// computeDroppedClusters. The count thresholds, once seeded, live in
+	// `having` as ordinary editable rows.
 	havingAuto: boolean;
 	limitAuto: boolean;
 	// Whether to expand the filtered "core" set to include 1-hop links/backlinks.

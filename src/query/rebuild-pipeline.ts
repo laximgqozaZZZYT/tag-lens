@@ -43,26 +43,69 @@ export function resolveEffectiveQuery(settings: MiniSettings): EffectiveQuery {
 	return { effGroupBy, effWhere, filterMode: "sql" };
 }
 
-// AUTO HAVING runs AFTER WHERE/GROUP_BY because its thresholds scale
-// with the size of the produced data set. n>10 floors clusters to
-// sqrt(n)/3; n>30 also caps any single cluster at 20% of total so a
-// mega-cluster doesn't drown out the rest.
-export function resolveEffectiveHaving(
-	manual: string[],
-	havingAuto: boolean,
-	nodeCount: number,
-): string[] {
-	const eff = [...manual];
-	if (!havingAuto) return eff;
+// AUTO HAVING thresholds scale with the size of the produced data set.
+// n>10 floors clusters to sqrt(n)/3; n>30 also caps any single cluster at
+// 20% of total so a mega-cluster doesn't drown out the rest.
+//
+// These are emitted as CONCRETE, grammar-valid HAVING rows ("count >= N",
+// "count <= M") — the HAVING grammar (query-filters.parseHaving) accepts
+// only `count <op> <literal-number>`, with no variable (`nodeCount`) or
+// arithmetic support. So the dynamic thresholds must be resolved to literal
+// numbers HERE, against the current node count. The resolved rows are both:
+//   • surfaced as editable INITIAL VALUES in the Data > Logic > HAVING field
+//     (seeded by seedAutoHavingRows when the field is empty & havingAuto is on),
+//     so "what you see is what's applied", and
+//   • applied — once seeded — as ordinary HAVING rows via settings.having.
+// Because the seeded rows live in settings.having, resolveEffectiveHaving no
+// longer re-injects them (that would double-apply). The havingAuto FLAG keeps
+// driving the two grammar-inexpressible behaviours (TOP_K long-tail cap +
+// NONE_BUCKET suppression) inside computeDroppedClusters — those can't be
+// written as `count <op> N` rows, so they stay automatic.
+export function computeAutoHavingRows(nodeCount: number): string[] {
+	const rows: string[] = [];
 	if (nodeCount > 10) {
 		const floor = Math.max(2, Math.floor(Math.sqrt(nodeCount) / 3));
-		eff.push(`count >= ${floor}`);
+		rows.push(`count >= ${floor}`);
 	}
 	if (nodeCount > 30) {
 		const ceiling = Math.floor(nodeCount * 0.2);
-		eff.push(`count <= ${ceiling}`);
+		rows.push(`count <= ${ceiling}`);
 	}
-	return eff;
+	return rows;
+}
+
+// Seed the HAVING field's INITIAL VALUE. When havingAuto is on and the user
+// has authored NO manual HAVING rows (the new/unset state), fill the field
+// with the concrete auto rows resolved against the current node count, so the
+// user can SEE and EDIT the conditions that were previously injected silently.
+// Once any non-empty row exists, the user owns the field — we never overwrite.
+// Returns the rows to display/apply (the seeded set, or the untouched manual
+// rows). `mutateInto` receives the seeded value so the caller can persist it.
+export function seedAutoHavingRows(
+	manual: string[],
+	havingAuto: boolean,
+	nodeCount: number,
+	mutateInto?: (seeded: string[]) => void,
+): string[] {
+	const hasManual = manual.some((r) => r.trim().length > 0);
+	if (!havingAuto || hasManual) return manual;
+	const seeded = computeAutoHavingRows(nodeCount);
+	if (seeded.length === 0) return manual;
+	mutateInto?.(seeded);
+	return seeded;
+}
+
+// Resolve the HAVING rows actually applied by computeDroppedClusters. Manual
+// (and any auto-seeded) rows live in `manual`; this is now an identity pass —
+// the auto count thresholds are NOT re-appended here because they have already
+// been seeded into settings.having (see seedAutoHavingRows). havingAuto is
+// retained as a parameter for call-site stability and future use.
+export function resolveEffectiveHaving(
+	manual: string[],
+	_havingAuto: boolean,
+	_nodeCount: number,
+): string[] {
+	return [...manual];
 }
 
 // ────────────────────────────────────────────────────────────────────

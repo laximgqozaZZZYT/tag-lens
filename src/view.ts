@@ -88,6 +88,7 @@ import {
 import {
 	resolveEffectiveQuery,
 	resolveEffectiveHaving,
+	seedAutoHavingRows,
 	computeDegreeMaps,
 	filterEdgesByAlive,
 	filterLayoutData,
@@ -1173,6 +1174,20 @@ export class MiniGraphView extends ItemView {
 			this.settings.viewMode === "droste"
 				? false
 				: this.settings.havingAuto;
+		// Seed the HAVING field's initial value: when auto is on and the user
+		// has no manual rows, populate settings.having with the concrete auto
+		// rows resolved against this build's node count, so they show up in the
+		// Data > Logic > HAVING field and stay editable. Persisted so the field
+		// retains them and never re-seeds over the user's edits.
+		seedAutoHavingRows(
+			this.settings.having,
+			effHavingAuto,
+			data.nodes.length,
+			(seeded) => {
+				this.settings.having = seeded;
+				void this.save();
+			},
+		);
 		const effHaving = resolveEffectiveHaving(
 			this.settings.having,
 			effHavingAuto,
