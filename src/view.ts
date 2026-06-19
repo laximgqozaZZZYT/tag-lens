@@ -2692,8 +2692,7 @@ export class MiniGraphView extends ItemView {
 			dpr * this.panX,
 			dpr * this.panY,
 		);
-		// BubbleSets: clean figure — suppress cluster labels. Tag info is removed.
-		if (this.settings.showEnclosures && this.settings.viewMode !== "bubblesets") {
+		if (this.settings.showEnclosures) {
 			this.drawClusterLabels(ctx);
 		}
 
@@ -2850,8 +2849,7 @@ export class MiniGraphView extends ItemView {
 		// whenever the whole diagram is in view — independent of the Graph-
 		// display toggles, and separate from the on-grid title bars. Not in
 		// UpSet mode.
-		// BubbleSets: clean figure — suppress cluster labels.
-		if (this.overviewActive && !this.laid.upset && this.settings.viewMode !== "bubblesets") {
+		if (this.overviewActive && !this.laid.upset) {
 			drawOverviewLabelsFn(ctx, this.laid, this.zoom, this.settings.havingMode === "highlight" ? this.highlightedHavingClusters : undefined);
 		}
 	}
@@ -2925,7 +2923,6 @@ export class MiniGraphView extends ItemView {
 		cardH: number,
 		highlighted = false,
 	): void {
-		const isBubbles = this.settings.viewMode === "bubblesets";
 		drawJunihitoeStackFn(
 			ctx,
 			group,
@@ -2934,7 +2931,6 @@ export class MiniGraphView extends ItemView {
 			this.zoom,
 			highlighted,
 			this.settings.minFontPx,
-			isBubbles,
 		);
 	}
 
@@ -3004,7 +3000,7 @@ export class MiniGraphView extends ItemView {
 			// Clustered LOD: the tag-centre label has a LOWER threshold than note
 			// titles, so when zooming out the note names drop to markers first and
 			// the island's tag label is the last to disappear.
-			titleLodPx: isBubbles ? 999999 : (clustered ? (isSet ? 26 : 48) : undefined),
+			titleLodPx: (clustered ? (isSet ? 26 : 48) : undefined),
 			fmMaturity: n.fmMaturity,
 			showMaturity: this.settings.showMaturity,
 			encFillColor: this.encParams.get(n.id)?.fillColor,
