@@ -850,10 +850,15 @@ export class MiniGraphView extends ItemView {
 		const expLabel = host.createDiv({ text: `Export View State (${nodeCount} node${nodeCount === 1 ? "" : "s"}, ${presetCount} preset${presetCount === 1 ? "" : "s"})` });
 		expLabel.setCssStyles({ fontSize: "11px", fontWeight: "600", margin: "4px 0 2px" });
 
+		const exportNodes = (this.laid?.nodes || []).map((n) => {
+			const { ageDays, mtime, ...rest } = n;
+			return rest;
+		});
+
 		const exportData = {
 			schema: "tag-lens/presets",
 			version: 1,
-			nodes: this.laid?.nodes || [],
+			nodes: exportNodes,
 			settings: settingsWithoutPresets,
 			presets: lensPresets,
 		};
