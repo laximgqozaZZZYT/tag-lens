@@ -334,6 +334,8 @@ export interface EncodeTabDeps {
 	setTabFilter: (filter: string) => void;
 	clearCardCache: () => void;
 	resolveFromCluster: (groupKey: string) => NodeDisplay;
+	expandedLayers: Set<string>;
+	toggleLayerExpanded: (key: string) => void;
 }
 
 export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): void {
@@ -401,6 +403,15 @@ function renderLayersSubSection(el: HTMLElement, deps: EncodeTabDeps): void {
 	}
 	individualSets.sort((a, b) => b.count - a.count);
 
+	const tagToPairs = new Map<string, typeof individualSets>();
+	for (const s of individualSets) {
+		const [t1, t2] = s.key.split("__").pop()!.split("_");
+		if (!tagToPairs.has(t1)) tagToPairs.set(t1, []);
+		tagToPairs.get(t1)!.push(s);
+		if (!tagToPairs.has(t2)) tagToPairs.set(t2, []);
+		tagToPairs.get(t2)!.push(s);
+	}
+
 	const tabKeys = [
 		...clusters.map((c) => c.groupKey),
 		...SET_LAYER_KEYS,
@@ -433,17 +444,39 @@ function renderLayersSubSection(el: HTMLElement, deps: EncodeTabDeps): void {
 			}
 		});
 	}
-	const chipsEl = tabBar.createDiv({ cls: "gim-panel-tabs-chips" });
-	for (const c of clusters) {
-		renderTabButton(chipsEl, c.groupKey, `${c.label} (${c.memberCount})`, clusterHue(c.groupKey), c.label, deps);
-	}
+
+	const treeEl = tabBar.createDiv({ cls: "gim-panel-tabs-tree" });
+	treeEl.setCssStyles({ display: "flex", flexDirection: "column", maxHeight: "250px", overflowY: "auto", gap: "1px", border: "1px solid var(--background-modifier-border)", borderRadius: "4px", padding: "4px" });
+
+	// 1. Broad layers
+	const broadHead = treeEl.createDiv({ text: "Global", cls: "gim-panel-section-header" });
+	broadHead.setCssStyles({ padding: "4px 8px", fontSize: "10px", textTransform: "uppercase", color: "var(--text-faint)", marginTop: "4px" });
 	for (const sk of SET_LAYER_KEYS) {
-		renderTabButton(chipsEl, sk, SET_LAYER_LABEL[sk], null, SET_LAYER_LABEL[sk], deps);
+		renderTreeTabButton(treeEl, sk, SET_LAYER_LABEL[sk], null, SET_LAYER_LABEL[sk], 0, deps);
 	}
-	for (const s of individualSets) {
-		const isInter = s.key.startsWith("__inter__");
-		renderTabButton(chipsEl, s.key, `${s.label} (${s.count})`, null, s.label, deps);
+
+	// 2. Tag layers (Folders)
+	const tagHead = treeEl.createDiv({ text: "Tags & Overlap", cls: "gim-panel-section-header" });
+	tagHead.setCssStyles({ padding: "4px 8px", fontSize: "10px", textTransform: "uppercase", color: "var(--text-faint)", marginTop: "8px" });
+	
+	for (const c of clusters) {
+		const pairs = tagToPairs.get(c.groupKey) || [];
+		const isExpanded = deps.expandedLayers.has(c.groupKey);
+		
+		renderTreeTabButton(treeEl, c.groupKey, `${c.label} (${c.memberCount})`, clusterHue(c.groupKey), c.label, 0, deps, pairs.length > 0, isExpanded);
+
+		if (pairs.length > 0 && isExpanded) {
+			const kids = treeEl.createDiv();
+			for (const s of pairs) {
+				const [tk1, tk2] = s.key.split("__").pop()!.split("_");
+				const h1 = clusterHue(tk1);
+				const h2 = clusterHue(tk2);
+				const isInter = s.key.startsWith("__inter__");
+				renderTreeTabButton(kids, s.key, `${s.label} (${s.count})`, [h1, h2], s.label, 1, deps, false, false, isInter);
+			}
+		}
 	}
+
 	applyTabFilter(el, deps.tabFilter);
 
 	const content = el.createDiv({ cls: "gim-panel-content" });
@@ -455,6 +488,77 @@ function renderLayersSubSection(el: HTMLElement, deps: EncodeTabDeps): void {
 	} else {
 		renderLayerTab(content, deps.activeTab, deps);
 	}
+}
+
+function renderTreeTabButton(
+	bar: HTMLElement,
+	key: string,
+	label: string,
+	hue: number | number[] | null,
+	filterText: string | null,
+	depth: number,
+	deps: EncodeTabDeps,
+	isFolder = false,
+	isExpanded = false,
+	isVerticalInter = false
+): void {
+	const btn = bar.createDiv({ cls: "gim-panel-tab tree-row" });
+	if (deps.activeTab === key) btn.addClass("active");
+	
+	btn.setCssStyles({ 
+		display: "flex", 
+		alignItems: "center", 
+		width: "100%",
+		padding: "4px 8px",
+		paddingLeft: `${8 + depth * 14}px`,
+		cursor: "pointer",
+		borderRadius: "4px",
+		border: "none",
+		background: "transparent",
+		justifyContent: "flex-start",
+		textAlign: "left",
+		gap: "6px"
+	});
+
+	if (isFolder) {
+		const chevron = btn.createSpan({ text: isExpanded ? "▾" : "▸", cls: "gim-tree-chevron" });
+		chevron.setCssStyles({ width: "10px", flexShrink: "0", fontSize: "10px" });
+		chevron.addEventListener("click", (e) => {
+			e.stopPropagation();
+			deps.toggleLayerExpanded(key);
+			deps.refreshSettingsTab();
+		});
+	} else {
+		btn.createSpan().setCssStyles({ width: "10px", flexShrink: "0" });
+	}
+	
+	if (hue !== null) {
+		const sw = btn.createSpan({ cls: "gim-panel-tab-swatch" });
+		const t = theme();
+		if (Array.isArray(hue)) {
+			const c1 = t.swatch(hue[0], "fill");
+			const c2 = t.swatch(hue[1], "fillStrong");
+			const angle = isVerticalInter ? "90deg" : "0deg";
+			sw.setCssStyles({ background: `linear-gradient(${angle}, ${c1} 50%, ${c2} 50%)` });
+		} else {
+			sw.setCssStyles({ background: t.swatch(hue, "fill") });
+		}
+	}
+	
+	const lblEl = btn.createSpan({ text: label });
+	lblEl.setCssStyles({ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
+
+	// filterText = null ⇒ pinned (never filtered, e.g. the 全体 tab).
+	if (filterText === null) {
+		btn.dataset.alwaysVisible = "1";
+	} else {
+		btn.dataset.filterText = filterText.toLowerCase();
+	}
+	
+	btn.addEventListener("click", () => {
+		deps.setActiveTab(key);
+		deps.refreshSettingsTab();
+	});
 }
 
 // CLOSEUP set-layer (∪/∩) tab: an addressable layer with its own
@@ -547,15 +651,26 @@ function renderTabButton(
 	bar: HTMLElement,
 	key: string,
 	label: string,
-	hue: number | null,
+	hue: number | number[] | null,
 	filterText: string | null,
-	deps: EncodeTabDeps
+	deps: EncodeTabDeps,
+	isVertical = false
 ): void {
 	const btn = bar.createEl("button", { cls: "gim-panel-tab" });
 	if (deps.activeTab === key) btn.addClass("active");
+	
 	if (hue !== null) {
 		const sw = btn.createSpan({ cls: "gim-panel-tab-swatch" });
-		sw.setCssStyles({ background: theme().swatch(hue, "fill") });
+		const t = theme();
+		if (Array.isArray(hue)) {
+			// Stripe-like gradient for pairwise sets
+			const c1 = t.swatch(hue[0], "fill");
+			const c2 = t.swatch(hue[1], "fillStrong");
+			const angle = isVertical ? "90deg" : "0deg";
+			sw.setCssStyles({ background: `linear-gradient(${angle}, ${c1} 50%, ${c2} 50%)` });
+		} else {
+			sw.setCssStyles({ background: t.swatch(hue, "fill") });
+		}
 	}
 	btn.createSpan({ text: label });
 	// filterText = null ⇒ pinned (never filtered, e.g. the 全体 tab).

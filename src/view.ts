@@ -237,6 +237,7 @@ export class MiniGraphView extends ItemView {
 	// the search box + tree body are hidden and the panel collapses to header
 	// height; `noteMenuRestoreHeight` remembers the body height to restore to.
 	private noteMenuMinimized = false;
+	private settingsLayerExpanded: Set<string> = new Set();
 	// The panel height (px) to restore to when un-minimizing. Captured at the
 	// moment of minimizing so a double-click round-trips back to the prior size.
 	private noteMenuRestoreHeight: number | null = null;
@@ -789,6 +790,11 @@ export class MiniGraphView extends ItemView {
 						setTabFilter: (f) => { this.tabFilter = f; },
 						clearCardCache: () => this.cardCache.clear(),
 						resolveFromCluster: (groupKey) => this.resolveLayerDisplay(groupKey),
+						expandedLayers: this.settingsLayerExpanded,
+						toggleLayerExpanded: (k) => {
+							if (this.settingsLayerExpanded.has(k)) this.settingsLayerExpanded.delete(k);
+							else this.settingsLayerExpanded.add(k);
+						}
 					});
 					break;
 			}

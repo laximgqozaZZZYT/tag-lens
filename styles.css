@@ -482,3 +482,17 @@
 	background-color: var(--text-on-accent, #ffffff);
 	transform: none;
 }
+
+/* Encode tab tree layout */
+.gim-panel-tabs-tree .gim-panel-tab.tree-row {
+	border-radius: 4px;
+	border: none;
+	margin: 1px 0;
+	transition: background 0.1s;
+}
+
+.gim-tree-chevron:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-border);
+	border-radius: 2px;
+}
