@@ -15,6 +15,13 @@ export interface ModeLegendInput {
 	// surfaced under enclosure modes as their own legend rows. Empty/absent in
 	// panorama. Each `label` already carries the resolved suffix.
 	setLayers?: { key: string; label: string; color: string }[];
+	// CLOSEUP perspective flag. In closeup the ∪/∩ set-layers are surfaced as a
+	// DISPLAY-INDEPENDENT section (their own spec) in EVERY mode — including the
+	// enclosure family — instead of being folded into the single-tag "Groups &
+	// overlap" spec. This is purely a DISPLAY-UNIT split: the labels/values are
+	// still the resolveSetLayer()-backed suffixes built in view.ts, so single-set
+	// settings keep cascading into ∪/∩. Panorama keeps the prior folded layout.
+	closeup?: boolean;
 	counts?: { min: number; max: number };        // for size/gradient ramps
 	heatmap?: { jaccard: boolean; tagMin: number; tagMax: number; coMax: number };
 	droste?: {
@@ -78,8 +85,14 @@ function sizeKey(title: string, input: ModeLegendInput): LegendSpec {
 // (a "group"); overlapping frames mark notes that carry two tags at once (the
 // "overlap"). Mirrors draw-enclosures (swatch tint @0.32). Labelled in plain
 // words instead of bare ∪/∩ glyphs so the row is legible without a legend-for-
-// the-legend; the trailing row explains the overlap when no addressable
-// Union/Intersection layer is present.
+// the-legend.
+//
+// DISPLAY-UNIT split (closeup): single-tag clusters are the ONLY thing this spec
+// represents in closeup — the ∪/∩ set-layers are surfaced as their own
+// independent section by `setLayersLegend`, so this spec must NOT also fold them
+// in (no duplicate ∪/∩ rows, no "Overlap" row that doubles for ∩). The trailing
+// overlap/∪∩ rows are therefore ONLY emitted in panorama, where there is no
+// separate addressable set-layer section.
 function groupEnclosures(input: ModeLegendInput): LegendSpec {
 	const max = input.maxItems ?? 12;
 	const groups = input.groups ?? [];
@@ -87,10 +100,15 @@ function groupEnclosures(input: ModeLegendInput): LegendSpec {
 		.slice(0, max)
 		.map((g) => ({ label: `Group: ${g.label}`, color: g.color }));
 	if (groups.length > max) entries.push({ label: `+${groups.length - max} more` });
-	// CLOSEUP: Union/Intersection are addressable layers (their own resolved
-	// card size + note count + aggregate state) — list them with that content.
-	// PANORAMA: keep the prior plain descriptive row (no addressable layer to
-	// show details for).
+	// CLOSEUP: ∪/∩ live in their OWN section (setLayersLegend) — keep this spec a
+	// pure single-tag-cluster legend so the display units are independent and not
+	// double-listed. Single-set group frames stay exactly as before.
+	if (input.closeup) {
+		return { title: "Groups & overlap", kind: "categorical", entries };
+	}
+	// PANORAMA: no separate addressable set-layer section, so describe ∪/∩ here.
+	// When addressable set-layers happen to be present (legacy panorama paths),
+	// list them with their content; otherwise the plain descriptive overlap row.
 	const setLayers = input.setLayers ?? [];
 	if (setLayers.length) {
 		for (const sl of setLayers) entries.push({ label: sl.label, color: sl.color });
@@ -100,12 +118,19 @@ function groupEnclosures(input: ModeLegendInput): LegendSpec {
 	return { title: "Groups & overlap", kind: "categorical", entries };
 }
 
-// ALL VIEW MODES: Union/Intersection are addressable layers distinct from the
-// single-tag clusters. Enclosure modes fold them into `groupEnclosures`, but
-// every other mode surfaces them as their own unified "Union / Intersection"
-// spec so the LAYERS & OVERRIDES content (resolved card size + note count +
-// aggregate state) is visible regardless of view mode. Purely additive — the
-// mode's intrinsic specs are never altered.
+// Union/Intersection are addressable layers DISTINCT from the single-tag
+// clusters, surfaced as their own unified "Union / Intersection layers" spec so
+// the LAYERS & OVERRIDES content (resolved card size + note count + aggregate
+// state) is visible as an INDEPENDENT display unit. Their values are the
+// resolveSetLayer()-backed labels view.ts already built — this only changes the
+// DISPLAY UNIT (a dedicated row), never the resolution/settings cascade.
+//
+// Emission policy (see buildModeLegend):
+//   • non-enclosure modes: always (the long-standing additive behaviour).
+//   • enclosure modes: ONLY in closeup — there the fold into "Groups & overlap"
+//     is suppressed and ∪/∩ get this independent section instead. In panorama
+//     enclosure modes keep the folded layout (no separate spec).
+// Purely additive — the mode's intrinsic specs are never altered.
 function setLayersLegend(input: ModeLegendInput): LegendSpec | null {
 	const setLayers = input.setLayers ?? [];
 	if (!setLayers.length) return null;
@@ -208,12 +233,16 @@ export function buildModeLegend(mode: ViewMode, input: ModeLegendInput): LegendS
 	// Heatmap / Lattice have intrinsic scales/structure. Even when encoding
 	// bindings exist globally, these legends must reflect their own view grammar.
 	const isEnclosure = mode === "euler" || mode === "euler-true" || mode === "euler-venn" || mode === "bubblesets";
-	// Enclosure modes fold the ∪/∩ set-layers into their Group enclosures spec;
-	// every other mode appends them as a separate unified "Set layers" spec so
-	// they show in ALL view modes. Computed once, appended after the intrinsic
-	// specs (including the bound-encoding early return) so nothing intrinsic
-	// changes — the set-layers row is strictly additive.
-	const extraSetLayers = isEnclosure ? null : setLayersLegend(input);
+	// ∪/∩ set-layers are surfaced as a DISPLAY-INDEPENDENT "Union / Intersection
+	// layers" spec, appended after the intrinsic specs (incl. the bound-encoding
+	// early return) so nothing intrinsic changes — strictly additive.
+	//   • non-enclosure modes: always append the separate spec (long-standing).
+	//   • enclosure modes in CLOSEUP: also append it (the fold into "Groups &
+	//     overlap" is suppressed in groupEnclosures, so no duplication). This is
+	//     the requirement — ∪/∩ shown as their own display unit in closeup.
+	//   • enclosure modes in PANORAMA: keep the folded layout (no separate spec).
+	const wantSeparateSetLayers = !isEnclosure || !!input.closeup;
+	const extraSetLayers = wantSeparateSetLayers ? setLayersLegend(input) : null;
 	const withSetLayers = (specs: LegendSpec[]): LegendSpec[] =>
 		extraSetLayers ? [...specs, extraSetLayers] : specs;
 	if (mode !== "heatmap" && mode !== "lattice" && mode !== "droste" && !isEnclosure && input.encodingSpecs.length) {

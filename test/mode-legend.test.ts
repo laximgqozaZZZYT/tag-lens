@@ -181,33 +181,71 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 	ok(specs[1].entries?.some((e) => e.label.includes("Intersection") && e.color === "#ccaa22"), "intersection color legend");
 	ok(specs[1].entries?.some((e) => e.label.includes("Union") && e.color === "#33bb88"), "union color legend");
 }
-// CLOSEUP: enclosure modes with setLayers render ∪/∩ as addressable rows
-// (own resolved NODE_DISPLAY content), NOT the plain "∩ overlap" descriptive row.
+// CLOSEUP enclosure mode: ∪/∩ are a DISPLAY-INDEPENDENT section (their own
+// "Union / Intersection layers" spec), the single-tag "Groups & overlap" spec
+// stays a pure cluster legend (no folded ∪/∩, no descriptive overlap row), and
+// the two display units never duplicate the ∪/∩ rows.
 {
 	const specs = buildModeLegend("bubblesets", {
 		...base,
-		groups: [{ key: "greek", label: "greek (5)", color: "#abc" }],
+		closeup: true,
+		groups: [{ key: "greek", label: "Group: greek — Size 1×1 · 5 nodes", color: "#abc" }],
 		setLayers: [
 			{ key: "__union__", label: "∪ Union — Size 1×1 · 12 nodes", color: "#0a0" },
 			{ key: "__intersection__", label: "∩ Intersection — Size 2×2 · 3 nodes · Aggregate (3-card stack)", color: "#cc0" },
 		],
 	});
-	const enc = specs.find((s) => s.title.includes("Groups & overlap"));
-	ok(!!enc, "enclosure spec present");
-	ok(enc!.entries!.some((e) => e.label === "∪ Union — Size 1×1 · 12 nodes" && e.color === "#0a0"), "union set-layer row");
-	ok(enc!.entries!.some((e) => e.label === "∩ Intersection — Size 2×2 · 3 nodes · Aggregate (3-card stack)" && e.color === "#cc0"), "intersection set-layer row");
-	ok(!enc!.entries!.some((e) => e.label.includes("Overlap:")), "descriptive overlap row suppressed in closeup");
+	// ∪/∩ live in their OWN section, independent of the cluster groups spec.
+	const sl = specs.find((s) => s.title.includes("Union / Intersection layers"));
+	ok(!!sl, "closeup enclosure: independent set-layers section present");
+	ok(sl!.entries!.some((e) => e.label === "∪ Union — Size 1×1 · 12 nodes" && e.color === "#0a0"), "union set-layer row in own section");
+	ok(sl!.entries!.some((e) => e.label === "∩ Intersection — Size 2×2 · 3 nodes · Aggregate (3-card stack)" && e.color === "#cc0"), "intersection set-layer row in own section");
+	// Single-tag cluster frames stay in "Groups & overlap" as before.
+	const grp = specs.find((s) => s.title.includes("Groups & overlap"));
+	ok(!!grp, "single-tag groups spec still present in closeup");
+	ok(grp!.entries!.some((e) => e.label.includes("greek")), "single-set group frame kept");
+	// No duplication: ∪/∩ rows must NOT appear inside the groups spec, and the
+	// descriptive overlap row (which doubled for ∩) is suppressed.
+	ok(!grp!.entries!.some((e) => e.label.includes("Union")), "no folded union row in groups spec (no duplicate)");
+	ok(!grp!.entries!.some((e) => e.label.includes("Intersection")), "no folded intersection row in groups spec (no duplicate)");
+	ok(!grp!.entries!.some((e) => e.label.includes("Overlap:")), "descriptive overlap row suppressed in closeup");
+	// Exactly one occurrence of each ∪/∩ row across ALL specs (display-unit unique).
+	const allLabels = specs.flatMap((s) => s.entries?.map((e) => e.label) ?? []);
+	ok(allLabels.filter((l) => l.includes("∪ Union")).length === 1, "∪ row appears exactly once");
+	ok(allLabels.filter((l) => l.includes("∩ Intersection")).length === 1, "∩ row appears exactly once");
 }
-// PANORAMA (no setLayers): keeps the plain descriptive overlap row.
+// PANORAMA enclosure (no closeup, no setLayers): keeps the plain folded layout
+// with the descriptive overlap row; no separate set-layers section.
 {
 	const specs = buildModeLegend("bubblesets", {
 		...base,
 		groups: [{ key: "greek", label: "greek (5)", color: "#abc" }],
 	});
+	ok(!specs.some((s) => s.title.includes("Union / Intersection layers")), "panorama enclosure: no separate set-layers section");
 	const enc = specs.find((s) => s.title.includes("Groups & overlap"));
 	ok(!!enc, "enclosure spec present (panorama)");
 	ok(enc!.entries!.some((e) => e.label === "Overlap: note shared by 2+ groups"), "descriptive overlap row kept in panorama");
 	ok(!enc!.entries!.some((e) => e.label.includes("Union") && e.label.includes("·")), "no addressable union row in panorama");
+}
+// INTRINSIC PRESERVATION (closeup enclosure): toggling the display-unit split
+// only ADDS the set-layers section; the single-tag groups spec + node-colour key
+// stay byte-identical to the panorama-folded run with the same groups and no ∪/∩.
+{
+	const groups = [{ key: "greek", label: "Group: greek — Size 1×1 · 5 nodes", color: "#abc" }];
+	const closeup = buildModeLegend("bubblesets", {
+		...base,
+		closeup: true,
+		groups,
+		setLayers: [{ key: "__union__", label: "∪ Union — Size 1×1 · 12 nodes", color: "#0a0" }],
+	});
+	// A closeup run with NO ∪/∩ at all: pure intrinsic specs (groups + colour key).
+	const intrinsic = buildModeLegend("bubblesets", { ...base, closeup: true, groups });
+	// The set-layers section is the ONLY added spec; everything else is verbatim.
+	ok(closeup.length === intrinsic.length + 1, "closeup enclosure: set-layers is the only added spec");
+	ok(
+		JSON.stringify(closeup.filter((s) => !s.title.includes("Union / Intersection layers"))) === JSON.stringify(intrinsic),
+		"closeup enclosure: intrinsic specs (groups + colour key) preserved verbatim",
+	);
 }
 // ALL VIEW MODES: setLayers render as their own ∪/∩ legend spec even when the
 // mode is NOT an enclosure mode (matrix/stream/upset/droste/lattice/bipartite).
@@ -240,17 +278,38 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 		);
 	}
 }
-// Enclosure modes keep folding setLayers into the Group enclosures spec (NOT a
-// separate "Set layers" spec) — the prior behaviour is unchanged.
+// PANORAMA enclosure modes (closeup falsy) keep folding setLayers into the Group
+// enclosures spec (NOT a separate spec) — the prior panorama behaviour is
+// unchanged. In closeup the split is independent (covered above).
 {
 	const specs = buildModeLegend("bubblesets", {
 		...base,
 		groups: [{ key: "greek", label: "greek (5)", color: "#abc" }],
 		setLayers: [{ key: "__union__", label: "∪ Union — Size 1×1 · 12 nodes", color: "#0a0" }],
 	});
-	ok(!specs.some((s) => s.title.includes("Union / Intersection layers")), "enclosure mode does not add a separate Set layers spec");
+	ok(!specs.some((s) => s.title.includes("Union / Intersection layers")), "panorama enclosure mode does not add a separate Set layers spec");
 	const enc = specs.find((s) => s.title.includes("Groups & overlap"));
-	ok(enc!.entries!.some((e) => e.label === "∪ Union — Size 1×1 · 12 nodes"), "enclosure mode folds set-layers into enclosures");
+	ok(enc!.entries!.some((e) => e.label === "∪ Union — Size 1×1 · 12 nodes"), "panorama enclosure mode folds set-layers into enclosures");
+}
+// CLOSEUP applies to the whole enclosure family (euler / euler-true / euler-venn
+// / bubblesets): each gets the independent ∪/∩ section with no folded duplication.
+{
+	for (const mode of ["euler", "euler-true", "euler-venn", "bubblesets"] as const) {
+		const specs = buildModeLegend(mode, {
+			...base,
+			closeup: true,
+			groups: [{ key: "greek", label: "Group: greek", color: "#abc" }],
+			setLayers: [
+				{ key: "__union__", label: "∪ Union — Size 1×1 · 12 nodes", color: "#0a0" },
+				{ key: "__intersection__", label: "∩ Intersection — Size 2×2 · 3 nodes", color: "#cc0" },
+			],
+		});
+		const sl = specs.find((s) => s.title.includes("Union / Intersection layers"));
+		ok(!!sl, `${mode}: closeup independent set-layers section`);
+		ok(sl!.entries!.length === 2, `${mode}: both ∪ and ∩ rows in own section`);
+		const grp = specs.find((s) => s.title.includes("Groups & overlap"));
+		ok(!grp!.entries!.some((e) => e.label.includes("Union") || e.label.includes("Intersection") || e.label.includes("Overlap:")), `${mode}: no ∪/∩ duplication in groups spec`);
+	}
 }
 // No setLayers anywhere -> no Set layers spec leaks into any mode.
 {

@@ -3170,6 +3170,12 @@ export class MiniGraphView extends ItemView {
 			tags,
 			groups,
 			setLayers,
+			// DISPLAY-UNIT flag only: in closeup ∪/∩ are shown as an independent
+			// legend section (incl. enclosure modes) instead of being folded into
+			// the single-tag "Groups & overlap" spec. The ∪/∩ VALUES above are still
+			// the resolveSetLayer()-backed labels, so single-set settings keep
+			// cascading into ∪/∩ — only the display unit is split out.
+			closeup: isCloseup,
 			counts: { min: legendMin, max: legendMax },
 			droste: drosteOps,
 			lattice: latticeInput,
