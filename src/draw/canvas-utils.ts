@@ -1,6 +1,42 @@
 // Canvas drawing helpers and small string utilities used by the renderer.
 import { theme } from "./theme";
 
+// Which set-operation a striped node depicts, and therefore its stripe
+// ORIENTATION. The renderer maps:
+//   • intersection (∩) → VERTICAL bars  (a node sitting in the OVERLAP of ≥2
+//     clusters — the well-defined per-node intersection case)
+//   • union (∪)        → HORIZONTAL bars (a node that stands for the WHOLE of
+//     one-or-more sets, i.e. a tag-core / set node that is the union of its
+//     members)
+// This keeps the node fills consistent with the closeup legend, where ∪ layers
+// already draw horizontal and ∩ layers vertical.
+export type SetKind = "intersection" | "union";
+
+export interface NodeStripe {
+	hues: number[];
+	isVertical: boolean; // true → ∩ vertical · false → ∪ horizontal
+}
+
+// Decide a SET node's stripe ORIENTATION + hue list purely from its
+// memberships and whether it is a set-core (union) or an overlap node
+// (intersection). Pure + DOM-free so the orientation/colour decision is
+// unit-testable independently of the CanvasPattern rasterisation.
+//
+//   • set-core node (isUnionCore) → UNION  → horizontal (isVertical=false)
+//   • multi-membership node       → INTERSECTION → vertical (isVertical=true)
+//
+// The hue list is the node's distinct cluster hues. Callers feed the result
+// straight into createStripePattern(hues, isVertical); a single hue collapses
+// to a solid fill there (no visible stripe), so a plain single-tag node is
+// untouched.
+export function resolveNodeStripe(
+	memberships: string[],
+	isUnionCore: boolean,
+): NodeStripe {
+	const hues = memberships.map((m) => clusterHue(m));
+	return { hues, isVertical: !isUnionCore };
+}
+
 // Excel-style column header letters: 0 → "A", 25 → "Z", 26 → "AA",
 // 27 → "AB", ...
 export function colLetters(c: number): string {

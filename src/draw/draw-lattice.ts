@@ -404,6 +404,10 @@ function drawNode(
 	ctx.fill();
 	if (isSelected || isHover) {
 		const bgHue = isSelected ? 0.30 : 0.18;
+		// A multi-tag concept-lattice node's `signature` lists the tags ALL of its
+		// members share → it depicts a set INTERSECTION (∩) → VERTICAL stripes
+		// (isVertical=true), matching the closeup ∩ legend orientation. Every
+		// lattice stripe below follows the same intersection=vertical rule.
 		if (node.signature.length > 1) {
 			const hues = node.signature.map(s => clusterHue(s));
 			ctx.fillStyle = createStripePattern(hues, true, bgHue);

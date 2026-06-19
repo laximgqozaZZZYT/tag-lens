@@ -25,7 +25,7 @@ import {
 	getSortKey as getSortKeyFn,
 	computeDroppedClusters as computeDroppedClustersFn,
 } from "./query/query-pipeline";
-import { clusterHue, createStripePattern } from "./draw/canvas-utils";
+import { clusterHue, createStripePattern, resolveNodeStripe } from "./draw/canvas-utils";
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
 import { runAggregateSnap } from "./layout/aggregate-snap";
@@ -2876,7 +2876,18 @@ export class MiniGraphView extends ItemView {
 			zoom: this.zoom,
 			minFontPx: this.settings.minFontPx,
 			fillHue: isSet ? clusterHue(n.memberships[0] ?? n.id) : undefined,
-			fillPattern: (isSet && n.memberships.length > 1) ? createStripePattern(n.memberships.map((m) => clusterHue(m)), true) : undefined,
+			// A SET node that spans MULTIPLE clusters is a tag-core standing for
+			// the WHOLE of those sets → it depicts a UNION → horizontal stripes
+			// (isVertical=false). The per-node INTERSECTION (overlap) case is the
+			// concept-lattice node whose `signature` lists ≥2 tags — that path is
+			// drawn in draw-lattice.ts with vertical stripes. Single-membership
+			// set nodes collapse to a solid fill inside createStripePattern.
+			fillPattern: (isSet && n.memberships.length > 1)
+				? (() => {
+						const s = resolveNodeStripe(n.memberships, /*isUnionCore=*/ true);
+						return createStripePattern(s.hues, s.isVertical);
+					})()
+				: undefined,
 			// Clustered notes carry their island's main-tag in hueKey → muted tint.
 			tintHue: !isSet && n.hueKey ? clusterHue(n.hueKey) : undefined,
 			// Clustered LOD: the tag-centre label has a LOWER threshold than note
