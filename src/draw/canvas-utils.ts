@@ -231,3 +231,63 @@ export function createStripePattern(
 	}
 	return ctx.createPattern(canvas, "repeat") ?? fallback();
 }
+
+// === ONE-CYCLE stripe gradient ==========================================
+// A `createStripePattern` builds a SMALL repeating tile, so a large fill
+// shows the stripe set many times over. For a GROUP ENCLOSURE (or any node
+// whose bounding box is known) the user wants the parent-set colours to read
+// as ONE equal-width pass across the whole shape — exactly like the nodes —
+// instead of a fine repeat. `createStripeGradient` paints that single cycle:
+// each of N hues occupies an equal `[i/N, (i+1)/N]` band of the box, with
+// HARD stops at every boundary so the bands stay crisp (no blended gradient).
+//
+//   • isVertical = true  → ∩ intersection → bands run LEFT→RIGHT (vertical
+//     stripes), gradient laid out along X (x → x+w).
+//   • isVertical = false → ∪ union        → bands run TOP→BOTTOM (horizontal
+//     stripes), gradient laid out along Y (y → y+h).
+//
+// Orientation matches createStripePattern / resolveNodeStripe and the closeup
+// legend so nodes, enclosures, and legend all agree.
+
+// Pure stop-list builder: for N colours return the ordered colour-stop pairs
+// {offset 0..1, index} that produce N equal HARD-edged bands. Each band i is
+// emitted TWICE — once at its start `i/n`, once at its end `(i+1)/n` — so the
+// colour holds flat across the band and flips abruptly at the boundary.
+// DOM-free + deterministic so the equal-band / orientation maths is unit-
+// testable without a canvas.
+export function stripeGradientStops(
+	n: number,
+): Array<{ offset: number; index: number }> {
+	if (n <= 0) return [];
+	const stops: Array<{ offset: number; index: number }> = [];
+	for (let i = 0; i < n; i++) {
+		stops.push({ offset: i / n, index: i });
+		stops.push({ offset: (i + 1) / n, index: i });
+	}
+	return stops;
+}
+
+export function createStripeGradient(
+	ctx: CanvasRenderingContext2D,
+	x: number,
+	y: number,
+	w: number,
+	h: number,
+	hues: number[],
+	isVertical: boolean,
+	alpha?: number,
+): CanvasGradient | string {
+	if (hues.length === 0) return "gray";
+	const fallback = (): string => theme().swatch(hues[0], "fill", alpha);
+	// A single hue (or a degenerate box) has no stripe to draw — collapse to a
+	// solid swatch, matching createStripePattern's single-hue behaviour.
+	if (hues.length === 1 || w <= 0 || h <= 0) return fallback();
+	// ∩ vertical → bands along X; ∪ horizontal → bands along Y.
+	const grad = isVertical
+		? ctx.createLinearGradient(x, y, x + w, y)
+		: ctx.createLinearGradient(x, y, x, y + h);
+	for (const s of stripeGradientStops(hues.length)) {
+		grad.addColorStop(s.offset, theme().swatch(hues[s.index], "fill", alpha));
+	}
+	return grad;
+}

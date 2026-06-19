@@ -38,7 +38,7 @@ export interface DrawCardOptions {
 	// reads as a coloured set node rather than a plain dark note card.
 	fillHue?: number;
 	// When set, fill the card with this canvas pattern (for set intersections).
-	fillPattern?: CanvasPattern | string;
+	fillPattern?: CanvasPattern | CanvasGradient | string;
 	// When set (and not a SET node), fill the card with a MUTED tint of this hue
 	// — used by the clustered bipartite layout so each island's notes read as
 	// one calm coloured mass rather than blue-grey dots.
@@ -71,7 +71,7 @@ export interface CardFillFlags {
 	highlighted: boolean;
 	isSet: boolean;
 	fillHue?: number;
-	fillPattern?: CanvasPattern | string;
+	fillPattern?: CanvasPattern | CanvasGradient | string;
 	isTint: boolean;
 	tintHue?: number;
 	encFillColor?: string | CanvasPattern;
@@ -81,7 +81,7 @@ export interface CardFillFlags {
 // exclusive visual states. Extracted so the precedence is unit-testable —
 // the on-canvas legend (F4) advertises the colour ENCODING, so the card fill
 // must follow the same precedence or legend and canvas disagree.
-export function cardFillStyle(f: CardFillFlags): { fill: string | CanvasPattern; stroke: string } {
+export function cardFillStyle(f: CardFillFlags): { fill: string | CanvasPattern | CanvasGradient; stroke: string } {
 	const t = theme();
 	if (f.highlighted) return { fill: t.warn, stroke: t.warn };
 	if (f.isSet) return { fill: f.fillPattern ?? t.swatch(f.fillHue ?? 0, "fill"), stroke: t.swatch(f.fillHue ?? 0, "fillStrong") };

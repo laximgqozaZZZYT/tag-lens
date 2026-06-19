@@ -25,7 +25,7 @@ import {
 	getSortKey as getSortKeyFn,
 	computeDroppedClusters as computeDroppedClustersFn,
 } from "./query/query-pipeline";
-import { clusterHue, createStripePattern, resolveNodeStripe } from "./draw/canvas-utils";
+import { clusterHue, createStripePattern, createStripeGradient, resolveNodeStripe } from "./draw/canvas-utils";
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
 import { runAggregateSnap } from "./layout/aggregate-snap";
@@ -2885,7 +2885,18 @@ export class MiniGraphView extends ItemView {
 			fillPattern: (isSet && n.memberships.length > 1)
 				? (() => {
 						const s = resolveNodeStripe(n.memberships, /*isUnionCore=*/ true);
-						return createStripePattern(s.hues, s.isVertical);
+						// One-cycle gradient across the card bbox (not a 16px repeat) so
+						// the union bands read once across the whole node, matching
+						// enclosures and lattice nodes.
+						return createStripeGradient(
+							ctx,
+							n.x - n.width / 2,
+							n.y - n.height / 2,
+							n.width,
+							n.height,
+							s.hues,
+							s.isVertical,
+						);
 					})()
 				: undefined,
 			// Clustered notes carry their island's main-tag in hueKey → muted tint.

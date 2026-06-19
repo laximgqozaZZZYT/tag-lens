@@ -1,7 +1,7 @@
 import { buildIcon, type DrosteGallery, type IconDiagram } from "../layout/droste-layout";
 import type { AxisSpec } from "../layout/axis-layout";
 import { theme, colorAlpha, parseColor, relativeLuminance } from "./theme";
-import { truncateToWidth, clusterHue } from "./canvas-utils";
+import { truncateToWidth, clusterHue, createStripeGradient } from "./canvas-utils";
 
 // Containment lens = Icon Gallery (spec 2026-06-01). Every node gets an "icon diagram"
 // (① N ∈ ② sig(N) ∈ ③ direct-superset sets ∈ …), all tiled in a grid and navigated by
@@ -118,17 +118,25 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 	const tagHue = (t: string): number => clusterHue(t);
 
 
-	type Item = { id?: string; label: string; hue: number; agg?: boolean; placeholder?: boolean; spacer?: boolean };
+	type Item = { id?: string; label: string; hue: number; hues?: number[]; agg?: boolean; placeholder?: boolean; spacer?: boolean };
 	const buildItems = (lvl: IconDiagram["levels"][number]): Item[] => {
 		const out: Item[] = [];
 		lvl.sets.forEach((set, si) => {
 			// colour: explicit set.hue (⑤ link/backlink) wins; else ② amber; ③ by the
 			// single tag the set shares (its first key).
 			const hue = set.hue !== undefined ? set.hue : (lvl.n === 2 ? TWO_HUE : tagHue(set.keys[0] ?? tags[0] ?? ""));
+			// A ③ set whose signature joins ≥2 tags IS an intersection (∩): its
+			// member cells are striped with one equal band per constituent tag
+			// (∩ → VERTICAL), matching the lattice / enclosure look. ② amber and
+			// ⑤ link/backlink sets keep their single hue (set.hue defined / n===2).
+			const hues =
+				set.hue === undefined && lvl.n !== 2 && set.keys.length > 1
+					? set.keys.map((k) => tagHue(k))
+					: undefined;
 			if (si > 0) out.push({ label: "", hue, spacer: true }); // gap between incomparable sets
-			for (const m of set.members) out.push({ id: m.id, label: m.label, hue });
+			for (const m of set.members) out.push({ id: m.id, label: m.label, hue, hues });
 			if (set.overflow > 0) out.push({ label: `+${set.overflow}`, hue, agg: true });
-			if (set.members.length === 0 && set.overflow === 0) out.push({ label: set.label, hue, placeholder: true });
+			if (set.members.length === 0 && set.overflow === 0) out.push({ label: set.label, hue, hues, placeholder: true });
 		});
 		return out;
 	};
@@ -197,7 +205,12 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 				const hover = it.id != null && it.id === o.hoverId;
 				const fill = theme().swatch(it.hue, "fill");
 				const text = textOnFill(fill);
-				ctx.fillStyle = fill; ctx.fillRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
+				// ∩ intersection member → one-cycle VERTICAL stripe across the cell
+				// (one band per constituent tag); single-tag sets keep the solid hue.
+				ctx.fillStyle = it.hues && it.hues.length > 1
+					? createStripeGradient(ctx, p.x - mh, p.y - mh, 2 * mh, 2 * mh, it.hues, /*isVertical=*/ true)
+					: fill;
+				ctx.fillRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
 				ctx.lineWidth = (hover ? 2.5 : 1.2) * dpr; ctx.strokeStyle = theme().swatch(it.hue, hover ? "fillStrong" : "fill"); ctx.strokeRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
 				if (it.id) push(it.id, p.x, p.y, mh);
 				if (labelOK && mh > 6 * dpr) {

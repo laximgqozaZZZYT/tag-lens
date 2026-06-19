@@ -1,6 +1,6 @@
 import { theme, colorAlpha } from "./theme";
 import type { ClusterRect } from "../layout/layout";
-import { clusterHue } from "./canvas-utils";
+import { clusterHue, createStripeGradient } from "./canvas-utils";
 
 // Render cluster enclosures.
 //
@@ -71,8 +71,19 @@ export function drawEnclosures(
 			// from the single-set box that contains them — even on hover.
 			for (const p of c.pieces) {
 				if (p.kind !== "sub") continue;
-				const sh = clusterHue(p.hueKey ?? c.groupKey);
-				ctx.fillStyle = theme().swatch(sh, "fill", 0.42);
+				// An intersection (積集合) sub-box spanning >=2 tags is striped
+				// with one equal band per parent-set colour — ∩ => VERTICAL bars, one
+				// cycle across the box (matching the node / lattice look) — instead of
+				// a single blended hue. Single-tag exclaves keep their solid swatch.
+				if (p.hueKeys && p.hueKeys.length > 1) {
+					const hues = p.hueKeys.map((k) => clusterHue(k));
+					ctx.fillStyle = createStripeGradient(
+						ctx, p.x, p.y, p.w, p.h, hues, /*isVertical=*/ true, 0.42,
+					);
+				} else {
+					const sh = clusterHue(p.hueKey ?? c.groupKey);
+					ctx.fillStyle = theme().swatch(sh, "fill", 0.42);
+				}
 				ctx.beginPath();
 				ctx.rect(p.x, p.y, p.w, p.h);
 				ctx.fill();
