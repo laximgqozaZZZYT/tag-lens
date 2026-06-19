@@ -456,6 +456,9 @@ export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): v
 	legendCb.checked = deps.settings.showLegend;
 	legendCb.addEventListener("change", () => {
 		deps.settings.showLegend = legendCb.checked;
+		if (legendCb.checked) {
+			deps.settings.legendHiddenModes = {};
+		}
 		deps.save();
 		deps.requestDraw();
 	});
