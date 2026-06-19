@@ -284,6 +284,7 @@ export class MiniGraphView extends ItemView {
 	// panel's `panelEl` as the host that `applyTabFilter`/`renderTabButton` query).
 	private settingsHostEl: HTMLElement | null = null;
 	private dataHostEl: HTMLElement | null = null;
+	private jsonHostEl: HTMLElement | null = null;
 
 	// The last note "located" on canvas via the navigator (non-droste modes),
 	// used to highlight its row in the menu.
@@ -837,6 +838,7 @@ export class MiniGraphView extends ItemView {
 	// Data ▸ JSON tab: import/export Lens presets as JSON (F1). `status` shows the
 	// outcome of the last import / bundled-load (re-rendered after each).
 	private renderDataJsonBody(host: HTMLElement, status?: { msg: string; errors: string[] }): void {
+		this.jsonHostEl = host;
 		host.empty();
 		const title = host.createDiv({ text: "Presets — JSON import / export" });
 		title.setCssStyles({ fontWeight: "600", fontSize: "12px", marginBottom: "6px" });
@@ -962,6 +964,12 @@ export class MiniGraphView extends ItemView {
 		}
 	}
 
+	private refreshJsonTab(): void {
+		if (this.noteMenu && this.activeMenuTab === "data" && this.dataSubTab === "json" && this.jsonHostEl) {
+			this.renderDataJsonBody(this.jsonHostEl);
+		}
+	}
+
 
 	private toggleArrayMember(
 		field: "hiddenNodes" | "aggregatedLayers",
@@ -1051,6 +1059,7 @@ export class MiniGraphView extends ItemView {
 			// repainting (no-op when there's no matrix).
 			this.rebuildMatrixDisplay();
 			this.requestDraw();
+			this.refreshJsonTab();
 		}
 	}
 
@@ -1445,6 +1454,7 @@ export class MiniGraphView extends ItemView {
 		this.updatePanoramaActionVisibility();
 		this.requestDraw();
 		this.refreshSettingsTab();
+		this.refreshJsonTab();
 	}
 	private applyAxisLayout(effEnc: EncodingBinding[], encCtx: EncContext): void {
 		const bindingX = effEnc.find((b) => b.channelId === "axisX");
