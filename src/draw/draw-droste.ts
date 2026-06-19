@@ -1,7 +1,7 @@
 import { buildIcon, type DrosteGallery, type IconDiagram } from "../layout/droste-layout";
 import type { AxisSpec } from "../layout/axis-layout";
 import { theme, colorAlpha, parseColor, relativeLuminance } from "./theme";
-import { truncateToWidth, clusterHue, createStripeGradient } from "./canvas-utils";
+import { truncateToWidth, clusterHue, createStripeGradient, stripeHuesForExtent } from "./canvas-utils";
 
 // Containment lens = Icon Gallery (spec 2026-06-01). Every node gets an "icon diagram"
 // (① N ∈ ② sig(N) ∈ ③ direct-superset sets ∈ …), all tiled in a grid and navigated by
@@ -84,6 +84,13 @@ function drawWrapped(ctx: CanvasRenderingContext2D, text: string, cx: number, cy
 const focusRing = () => theme().warn;
 const iconBg = () => theme().overlay(0.02);
 const TWO_HUE = 45; // ② = amber
+// Minimum CSS-px width a single stripe band must keep to stay perceptible in a
+// ③ intersection cell. Below this each band smears into the next and the cell
+// reads as a flat solid, so the renderer drops bands (stripeHuesForExtent)
+// until the survivors clear this floor. ~2.5px is the smallest band that still
+// reads as a stripe at normal browsing zoom (the Lattice never needs this — its
+// cell size is floored by latticeBodyMetrics).
+const STRIPE_MIN_BAND_PX = 2.5;
 const textOnFill = (fill: string): string => {
 	const rgb = parseColor(fill);
 	if (!rgb) return theme().textNormal;
@@ -207,9 +214,17 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 				const text = textOnFill(fill);
 				// ∩ intersection member → one-cycle VERTICAL stripe across the cell
 				// (one band per constituent tag); single-tag sets keep the solid hue.
-				ctx.fillStyle = it.hues && it.hues.length > 1
-					? createStripeGradient(ctx, p.x - mh, p.y - mh, 2 * mh, 2 * mh, it.hues, /*isVertical=*/ true)
-					: fill;
+				// A ③ cell can shrink to a few device px (cell pitch `u` has no
+					// floor like the Lattice does), at which point N bands smear into a
+					// solid colour. Degrade the visible hue count so each band stays
+					// >= STRIPE_MIN_BAND_PX wide — keeping the cell readably striped
+					// instead of falsely solid. Vertical stripe extent = cell width (2*mh).
+					const cellHues = it.hues && it.hues.length > 1
+						? stripeHuesForExtent(it.hues, 2 * mh, STRIPE_MIN_BAND_PX * dpr)
+						: it.hues;
+					ctx.fillStyle = cellHues && cellHues.length > 1
+						? createStripeGradient(ctx, p.x - mh, p.y - mh, 2 * mh, 2 * mh, cellHues, /*isVertical=*/ true)
+						: fill;
 				ctx.fillRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
 				ctx.lineWidth = (hover ? 2.5 : 1.2) * dpr; ctx.strokeStyle = theme().swatch(it.hue, hover ? "fillStrong" : "fill"); ctx.strokeRect(p.x - mh, p.y - mh, 2 * mh, 2 * mh);
 				if (it.id) push(it.id, p.x, p.y, mh);

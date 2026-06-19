@@ -3,6 +3,7 @@ import {
 	createStripePattern,
 	createStripeGradient,
 	stripeGradientStops,
+	stripeHuesForExtent,
 	resolveNodeStripe,
 	clusterHue,
 } from "../src/draw/canvas-utils";
@@ -183,10 +184,13 @@ setTheme(defaultTheme());
 		);
 		const offs = calls[0].stops.map((s) => s.offset);
 		ok(JSON.stringify(offs) === JSON.stringify([0, 0.5, 0.5, 1]), "2 hues → equal hard stops 0,.5,.5,1");
+		// Bands alternate swatch ROLE (even=fill / odd=fillStrong) so two
+		// near-identical-luma hues still read as distinct bands (stripeBandColor).
+		// Hues are still applied in order: band 0 → hue[0], band 1 → hue[1].
 		ok(
 			calls[0].stops[0].color === theme().swatch(10, "fill") &&
-				calls[0].stops[3].color === theme().swatch(200, "fill"),
-			"stops use the hues in order (first band hue[0], last band hue[1])",
+				calls[0].stops[3].color === theme().swatch(200, "fillStrong"),
+			"stops use the hues in order with alternating fill/fillStrong roles",
 		);
 	}
 
@@ -204,4 +208,42 @@ setTheme(defaultTheme());
 			"alpha forwarded to swatch",
 		);
 	}
+}
+
+// === stripeHuesForExtent: minimum-band-width degrade =====================
+// Icon Gallery ③ cells have no cell-size floor, so a multi-tag stripe can
+// shrink until each band is sub-pixel and smears into a solid. This rule keeps
+// each surviving band >= minBandPx wide, dropping trailing hues as needed, but
+// never below 2 bands while 2 still fit (so a multi-tag cell stays striped),
+// and only collapsing to a single hue (solid) when even 2 bands can't fit.
+{
+	// All bands already wide enough → full list, order preserved.
+	ok(
+		JSON.stringify(stripeHuesForExtent([10, 200, 300], 30, 2.5)) ===
+			JSON.stringify([10, 200, 300]),
+		"wide cell → all hues kept (each band 10px >= 2.5px)",
+	);
+	// Single / empty hue lists pass through untouched (no stripe to degrade).
+	ok(JSON.stringify(stripeHuesForExtent([42], 1, 2.5)) === JSON.stringify([42]), "single hue → unchanged");
+	ok(JSON.stringify(stripeHuesForExtent([], 1, 2.5)) === JSON.stringify([]), "empty → unchanged");
+	// 3 hues across 6px @ minBand 2.5 → only 2 bands of >=2.5px fit → keep prefix of 2.
+	ok(
+		JSON.stringify(stripeHuesForExtent([10, 200, 300], 6, 2.5)) === JSON.stringify([10, 200]),
+		"medium cell → widest visible prefix (2 bands), still striped",
+	);
+	// 4px @ minBand 2.5 → only 1 band fits → can't show even 2 bands → single hue (solid).
+	ok(
+		JSON.stringify(stripeHuesForExtent([10, 200, 300], 4, 2.5)) === JSON.stringify([10]),
+		"tiny cell → single hue (caller draws solid, no smeared stripe)",
+	);
+	// Exactly enough for 2 bands → keep 2 (boundary case).
+	ok(
+		stripeHuesForExtent([10, 200, 300], 5, 2.5).length === 2,
+		"5px @2.5 → exactly 2 bands fit → keep 2",
+	);
+	// Degenerate extent / threshold → no degrade (avoid div-by-zero / negatives).
+	ok(
+		JSON.stringify(stripeHuesForExtent([10, 200], 0, 2.5)) === JSON.stringify([10, 200]),
+		"zero extent → pass through (degrade decided elsewhere)",
+	);
 }

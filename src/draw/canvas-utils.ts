@@ -186,6 +186,23 @@ export function floorScreenFontPx(
 	return Math.max(intendedScreenPx, minScreenPx);
 }
 
+// Two cluster hues can land arbitrarily close together on the wheel (or even
+// collide) since `clusterHue` only spreads them by hash, not by a minimum-
+// separation guarantee. `theme().swatch` also gives every hue the SAME
+// lightness for a given role, so a close-hue pair stripes at near-identical
+// luma — at small swatch/tile sizes (legend rows, Icon Gallery / BubbleSets
+// cells) that reads as a single smudged solid instead of visible bands, even
+// though two distinct colours are genuinely painted. Alternating the swatch
+// ROLE per band (fill / fillStrong) adds a fixed lightness offset between
+// consecutive bands on top of whatever hue gap exists, so the stripe stays
+// perceptible even in same-hue-family collisions, without touching colour
+// IDENTITY (hue) or orientation. `stripeBandColor` is the single place both
+// rasterisers (pattern tile + gradient stops) resolve a band's colour so the
+// two stay visually consistent.
+function stripeBandColor(hue: number, index: number, alpha?: number): string {
+	return theme().swatch(hue, index % 2 === 0 ? "fill" : "fillStrong", alpha);
+}
+
 // Build a repeating stripe pattern from a list of cluster hues so a node /
 // legend swatch that belongs to MULTIPLE sets reads as a striped blend rather
 // than a single averaged hue. `isVertical` chooses the stripe orientation —
@@ -219,13 +236,13 @@ export function createStripePattern(
 	if (isVertical) {
 		const stripeW = w / hues.length;
 		for (let i = 0; i < hues.length; i++) {
-			ctx.fillStyle = theme().swatch(hues[i], "fill", alpha);
+			ctx.fillStyle = stripeBandColor(hues[i], i, alpha);
 			ctx.fillRect(i * stripeW, 0, stripeW, h);
 		}
 	} else {
 		const stripeH = h / hues.length;
 		for (let i = 0; i < hues.length; i++) {
-			ctx.fillStyle = theme().swatch(hues[i], "fill", alpha);
+			ctx.fillStyle = stripeBandColor(hues[i], i, alpha);
 			ctx.fillRect(0, i * stripeH, w, stripeH);
 		}
 	}
@@ -267,6 +284,39 @@ export function stripeGradientStops(
 	return stops;
 }
 
+// === Minimum-band-width degrade =========================================
+// A one-cycle stripe lays N hues across a fixed extent, so each band is
+// `extent / N` wide. In the Icon Gallery a ③ intersection cell can shrink to
+// only a few device px at normal browsing zoom (cell pitch `u = half/totalC`
+// has no floor, unlike the Lattice's `latticeBodyMetrics` cell size), at which
+// point `extent / N` collapses below ~1px and the bands smear into a single
+// solid colour — the stripe is "there" but invisible. The Lattice never hits
+// this because its cell size is floored.
+//
+// `stripeHuesForExtent` is the pure degrade rule: keep as many leading hues as
+// fit at `minBandPx` each, but ALWAYS keep at least 2 when the extent can hold
+// 2 bands, so a multi-tag cell still reads as striped (≥2 colours) rather than
+// degrading straight to a flat solid. Returns:
+//   • the full list           when every band already clears the threshold
+//   • a 2..N truncated prefix  when only some bands fit (still visibly striped)
+//   • a single-hue list        only when even 2 bands can't reach minBandPx
+//     (extent too tiny for any perceptible stripe → caller draws solid)
+// Truncating (vs. merging) preserves the leading hues' identity and band
+// order, matching how the legend / other cells read the same signature.
+export function stripeHuesForExtent(
+	hues: number[],
+	extentPx: number,
+	minBandPx: number,
+): number[] {
+	if (hues.length <= 1) return hues;
+	if (extentPx <= 0 || minBandPx <= 0) return hues;
+	// How many equal bands of >= minBandPx fit across the extent.
+	const fit = Math.floor(extentPx / minBandPx);
+	if (fit >= hues.length) return hues; // all bands already wide enough
+	if (fit >= 2) return hues.slice(0, fit); // keep the widest visible prefix
+	return hues.slice(0, 1); // can't fit even 2 bands → single-hue (solid)
+}
+
 export function createStripeGradient(
 	ctx: CanvasRenderingContext2D,
 	x: number,
@@ -287,7 +337,7 @@ export function createStripeGradient(
 		? ctx.createLinearGradient(x, y, x + w, y)
 		: ctx.createLinearGradient(x, y, x, y + h);
 	for (const s of stripeGradientStops(hues.length)) {
-		grad.addColorStop(s.offset, theme().swatch(hues[s.index], "fill", alpha));
+		grad.addColorStop(s.offset, stripeBandColor(hues[s.index], s.index, alpha));
 	}
 	return grad;
 }
