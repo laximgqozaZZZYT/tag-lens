@@ -1,4 +1,5 @@
 import type { EncodingBinding } from "./encoding/types";
+import type { AggregationConfig } from "./aggregation/types";
 
 export interface GraphNode {
 	id: string;
@@ -154,6 +155,12 @@ export interface MiniSettings {
 			nodeCols?: number;
 		}
 	>;
+	// Global attribute used for node aggregation (e.g., "status", "maturity").
+	// When unset or "", aggregation is globally disabled.
+	globalAggregationAttribute: string;
+	// Per-set aggregation configuration.
+	// Key = cluster groupKey or synthetic layer key (UNION_LAYER_KEY, INTERSECTION_LAYER_KEY).
+	aggregationSettings: Record<string, AggregationConfig>;
 	panelVisible: boolean;
 	clusterOffsets: Record<string, Offset>;
 	nodeOffsets: Record<string, Offset>;
@@ -491,6 +498,8 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	layerInheritFull: [],
 	inheritFrom: {},
 	nodeDisplayOverrides: {},
+	globalAggregationAttribute: "",
+	aggregationSettings: {},
 	panelVisible: false,
 	clusterOffsets: {},
 	nodeOffsets: {},

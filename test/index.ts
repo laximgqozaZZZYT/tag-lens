@@ -44,5 +44,7 @@ import "./hit-modes.test";
 import "./settings-parity.test";
 import "./attribute-propagation.test";
 import "./euler-true-stripes.test";
+import "./aggregation-compute.test";
+import "./aggregation-properties.test";
 
 summary();

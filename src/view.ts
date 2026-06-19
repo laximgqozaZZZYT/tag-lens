@@ -842,10 +842,20 @@ export class MiniGraphView extends ItemView {
 		title.setCssStyles({ fontWeight: "600", fontSize: "12px", marginBottom: "6px" });
 
 		// ── Export ──
-		const count = this.settings.lensPresets.length;
-		const expLabel = host.createDiv({ text: `Export (${count} preset${count === 1 ? "" : "s"})` });
+		const { lensPresets, ...settingsWithoutPresets } = this.settings;
+		const presetCount = lensPresets.length;
+		const nodeCount = this.laid?.nodes?.length || 0;
+		const expLabel = host.createDiv({ text: `Export View State (${nodeCount} node${nodeCount === 1 ? "" : "s"}, ${presetCount} preset${presetCount === 1 ? "" : "s"})` });
 		expLabel.setCssStyles({ fontSize: "11px", fontWeight: "600", margin: "4px 0 2px" });
-		const json = serializePresets(this.settings.lensPresets);
+
+		const exportData = {
+			schema: "tag-lens/presets",
+			version: 1,
+			nodes: this.laid?.nodes || [],
+			settings: settingsWithoutPresets,
+			presets: lensPresets,
+		};
+		const json = JSON.stringify(exportData, null, 2);
 		const ta = host.createEl("textarea");
 		ta.value = json;
 		ta.readOnly = true;

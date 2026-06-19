@@ -29,10 +29,10 @@ for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) {
 //    setting, update this list in the same change — the diff makes it reviewable.
 {
 	const EXPECTED_KEYS = [
-		"W_link", "W_tag", "aggregatedLayers", "anchorPlacement", "autoFollowActiveNote",
+		"W_link", "W_tag", "aggregatedLayers", "aggregationSettings", "anchorPlacement", "autoFollowActiveNote",
 		"bipartiteLayout", "bipartiteMaxTags", "cardMaxChars", "closeupMode", "clusterOffsets",
 		"clusterSpacing", "drosteFocus", "dvjsFilter", "encoding", "expandNeighborhood",
-		"filterMode", "gapFinder", "ghostEdgeMinJaccard", "groupBy", "groupByAuto",
+		"filterMode", "gapFinder", "ghostEdgeMinJaccard", "globalAggregationAttribute", "groupBy", "groupByAuto",
 		"having", "havingAuto", "havingMode", "heatmapCriterion", "heatmapJaccard",
 		"heatmapMinTagSize", "heatmapSortDir", "hiddenNodes", "inheritFrom", "latticeDensityCells",
 		"latticeDensityMax", "latticeIndividualMax", "latticeMaxNodesPerTier", "latticeMinNodeSize", "latticeNamedMax",
