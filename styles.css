@@ -500,7 +500,9 @@
 /* Improve readability of tree rows */
 .gim-panel-tabs-tree .gim-panel-tab.tree-row {
 	color: var(--text-normal);
-	height: 24px;
+	min-height: 26px;
+	height: auto;
+	line-height: 1.2;
 }
 
 .gim-panel-tabs-tree .gim-panel-tab.tree-row:not(.active) {

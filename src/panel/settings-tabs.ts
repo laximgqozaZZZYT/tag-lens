@@ -446,7 +446,17 @@ function renderLayersSubSection(el: HTMLElement, deps: EncodeTabDeps): void {
 	}
 
 	const treeEl = tabBar.createDiv({ cls: "gim-panel-tabs-tree" });
-	treeEl.setCssStyles({ display: "flex", flexDirection: "column", maxHeight: "250px", overflowY: "auto", gap: "1px", border: "1px solid var(--background-modifier-border)", borderRadius: "4px", padding: "4px" });
+	treeEl.setCssStyles({ 
+		display: "flex", 
+		flexDirection: "column", 
+		maxHeight: "350px", 
+		overflowY: "auto", 
+		gap: "1px", 
+		border: "1px solid var(--background-modifier-border)", 
+		borderRadius: "4px", 
+		padding: "4px",
+		background: "var(--background-primary)"
+	});
 
 	// 1. Broad layers
 	const broadHead = treeEl.createDiv({ text: "Global", cls: "gim-panel-section-header" });
