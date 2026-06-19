@@ -122,7 +122,7 @@ if (res.result?.subtype === "error" || res.exceptionDetails) {
   console.error("FAIL: driver threw", JSON.stringify(res.exceptionDetails || res.result, null, 2));
   process.exit(1);
 }
-const out = res.result.value;
+const out = res.result.result.value;
 console.log(JSON.stringify(out, null, 2));
 if (consoleErrors.length) console.log("renderer errors:", consoleErrors);
 
