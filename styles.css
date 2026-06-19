@@ -496,3 +496,18 @@
 	background: var(--background-modifier-border);
 	border-radius: 2px;
 }
+
+/* Improve readability of tree rows */
+.gim-panel-tabs-tree .gim-panel-tab.tree-row {
+	color: var(--text-normal);
+	height: 24px;
+}
+
+.gim-panel-tabs-tree .gim-panel-tab.tree-row:not(.active) {
+	opacity: 0.8;
+}
+
+.gim-panel-tabs-tree .gim-panel-tab.tree-row.active {
+	opacity: 1;
+	font-weight: 600;
+}

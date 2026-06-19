@@ -509,31 +509,33 @@ function renderTreeTabButton(
 		display: "flex", 
 		alignItems: "center", 
 		width: "100%",
-		padding: "4px 8px",
-		paddingLeft: `${8 + depth * 14}px`,
+		padding: "3px 6px",
+		paddingLeft: `${6 + depth * 10}px`,
 		cursor: "pointer",
 		borderRadius: "4px",
 		border: "none",
 		background: "transparent",
 		justifyContent: "flex-start",
 		textAlign: "left",
-		gap: "6px"
+		gap: "4px"
 	});
 
 	if (isFolder) {
 		const chevron = btn.createSpan({ text: isExpanded ? "▾" : "▸", cls: "gim-tree-chevron" });
-		chevron.setCssStyles({ width: "10px", flexShrink: "0", fontSize: "10px" });
+		chevron.setCssStyles({ width: "12px", flexShrink: "0", fontSize: "10px", textAlign: "center" });
 		chevron.addEventListener("click", (e) => {
 			e.stopPropagation();
 			deps.toggleLayerExpanded(key);
 			deps.refreshSettingsTab();
 		});
 	} else {
-		btn.createSpan().setCssStyles({ width: "10px", flexShrink: "0" });
+		// Non-folders (leaves) get a spacer to align with the labels of folders
+		btn.createSpan().setCssStyles({ width: "12px", flexShrink: "0" });
 	}
 	
 	if (hue !== null) {
 		const sw = btn.createSpan({ cls: "gim-panel-tab-swatch" });
+		sw.setCssStyles({ flexShrink: "0" });
 		const t = theme();
 		if (Array.isArray(hue)) {
 			const c1 = t.swatch(hue[0], "fill");
@@ -546,7 +548,7 @@ function renderTreeTabButton(
 	}
 	
 	const lblEl = btn.createSpan({ text: label });
-	lblEl.setCssStyles({ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
+	lblEl.setCssStyles({ flex: "1 1 auto", minWidth: "0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px" });
 
 	// filterText = null ⇒ pinned (never filtered, e.g. the 全体 tab).
 	if (filterText === null) {
