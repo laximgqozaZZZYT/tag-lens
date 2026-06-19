@@ -43,11 +43,14 @@ export function computeAggregationGroups(
 		const membership = node.memberships[0];
 
 		// Check if aggregation is enabled for this membership.
-		// We support three levels:
+		// We support four levels:
 		// 1. Specific tag aggregation (e.g. membership is "#work")
-		// 2. Category-wide aggregation ("__TAGS__", "__UNIONS__", "__INTERSECTIONS__")
-		const isUnion = membership === UNION_LAYER_KEY;
-		const isIntersection = membership === INTERSECTION_LAYER_KEY;
+		// 2. Pairwise union/inter aggregation (e.g. "__union__A_B")
+		// 3. Category-wide aggregation ("__TAGS__", "__UNIONS__", "__INTERSECTIONS__")
+		const isUnion = membership.startsWith("__union__") || membership === UNION_LAYER_KEY;
+		const isIntersection = membership.startsWith("__inter__") || membership === INTERSECTION_LAYER_KEY;
+		const isBroadUnion = membership === UNION_LAYER_KEY;
+		const isBroadInter = membership === INTERSECTION_LAYER_KEY;
 		const isTag = !isUnion && !isIntersection;
 
 		let enabled = false;
@@ -55,9 +58,9 @@ export function computeAggregationGroups(
 		if (isTag) {
 			enabled = agg.includes("__TAGS__") || agg.includes(membership);
 		} else if (isUnion) {
-			enabled = agg.includes("__UNIONS__");
+			enabled = agg.includes("__UNIONS__") || agg.includes(membership);
 		} else if (isIntersection) {
-			enabled = agg.includes("__INTERSECTIONS__");
+			enabled = agg.includes("__INTERSECTIONS__") || agg.includes(membership);
 		}
 
 		if (!enabled) continue;
