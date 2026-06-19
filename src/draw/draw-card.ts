@@ -13,6 +13,7 @@ import {
 	roundedRectPath,
 	truncateToWidth,
 	floorWorldFontPx,
+	drawTextWithHalo,
 } from "./canvas-utils";
 import { shapeMarkerPath } from "./draw-shape";
 import type { NodeShape } from "../encoding/shapes";
@@ -252,13 +253,19 @@ export function drawCard(
 	// title is shown, truncated with "…" when long (full text on hover).
 	const showTitle = opts.titleLodPx == null || w * zoom >= opts.titleLodPx;
 	if (showTitle) {
-		ctx.font = `600 ${titleFontPx}px sans-serif`;
-		ctx.fillStyle = highlighted ? "#1d1100" : theme().textNormal;
 		const titleFitted = truncateToWidth(ctx, n.label, innerW);
-		// Title-only cards: centre the title vertically so the enlarged glyphs
-		// sit flush in the node. (Body preview was retired.)
-		ctx.textBaseline = "middle";
-		ctx.fillText(titleFitted, innerLeft, y + h / 2);
+		const fillStyle = highlighted ? "#1d1100" : theme().textNormal;
+		
+		// Use a subtle halo to keep the title legible even when it sits 
+		// exactly on a high-contrast stripe boundary.
+		drawTextWithHalo(ctx, titleFitted, innerLeft, y + h / 2, {
+			font: `600 ${titleFontPx}px sans-serif`,
+			fillStyle,
+			haloStyle: theme().canvasBg, // Use background color as halo
+			haloWidth: Math.max(1.5, titleFontPx * 0.08),
+			textAlign: "start",
+			textBaseline: "middle",
+		});
 	}
 
 	ctx.textBaseline = "top";

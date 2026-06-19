@@ -1,7 +1,7 @@
 import { theme, colorAlpha } from "./theme";
 import type { LaidOut, ClusterRect } from "../layout/layout";
 import type { AggregationGroup } from "../aggregation/types";
-import { clusterHue, roundedRectPath, truncateToWidth } from "./canvas-utils";
+import { clusterHue, roundedRectPath, truncateToWidth, drawTextWithHalo } from "./canvas-utils";
 import {
 	CARD_TITLE_FONT_PX,
 	CARD_BODY_FONT_PX,
@@ -544,10 +544,16 @@ export function drawClusterLabels(
 		// Opaque tab inside the cell so the label reads cleanly over the grid.
 		ctx.fillStyle = labelBg;
 		ctx.fillRect(x1, cy - fontPx * 0.62, cw, fontPx * 1.24);
-		// Centred coloured label.
-		ctx.fillStyle = theme().swatch(clusterHue(cell.key), "fill", 1);
-		ctx.textAlign = "center";
-		ctx.fillText(fitted, cx, cy);
+
+		// Coloured label with halo for extra legibility over stripes/backgrounds.
+		drawTextWithHalo(ctx, fitted, cx, cy, {
+			font: `700 ${fontPx}px sans-serif`,
+			fillStyle: theme().swatch(clusterHue(cell.key), "fill", 1),
+			haloStyle: labelBg,
+			haloWidth: Math.max(2, fontPx * 0.1),
+			textAlign: "center",
+			textBaseline: "middle",
+		});
 		boxes.push({ key: cell.key, x1, x2, top, bot, text, anchorX: cx, anchorY: cy });
 	}
 	ctx.textAlign = "start";

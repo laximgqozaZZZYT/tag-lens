@@ -180,7 +180,7 @@ export function truncateToWidth(
 	maxWidth: number,
 ): string {
 	if (ctx.measureText(text).width <= maxWidth) return text;
-	const ell = "…";
+	const ell = "...";
 	let lo = 0,
 		hi = text.length;
 	while (lo < hi) {
@@ -189,6 +189,52 @@ export function truncateToWidth(
 		else hi = mid - 1;
 	}
 	return lo === 0 ? ell : text.slice(0, lo) + ell;
+}
+
+/**
+ * Draw text with a contrasting outline (halo) to ensure legibility over 
+ * complex backgrounds like stripes or overlapping shapes.
+ * Uses a single fill pass + a thick stroke pass behind it.
+ */
+export function drawTextWithHalo(
+	ctx: CanvasRenderingContext2D,
+	text: string,
+	x: number,
+	y: number,
+	options: {
+		font?: string;
+		fillStyle?: string;
+		haloStyle?: string;
+		haloWidth?: number;
+		textAlign?: CanvasTextAlign;
+		textBaseline?: CanvasTextBaseline;
+	} = {},
+): void {
+	const {
+		font,
+		fillStyle = "#000000",
+		haloStyle = "#ffffff",
+		haloWidth = 4,
+		textAlign = "center",
+		textBaseline = "middle",
+	} = options;
+
+	ctx.save();
+	if (font) ctx.font = font;
+	ctx.textAlign = textAlign;
+	ctx.textBaseline = textBaseline;
+
+	// Draw halo first (stroke)
+	ctx.strokeStyle = haloStyle;
+	ctx.lineWidth = haloWidth;
+	ctx.lineJoin = "round";
+	ctx.miterLimit = 2;
+	ctx.strokeText(text, x, y);
+
+	// Draw main text (fill)
+	ctx.fillStyle = fillStyle;
+	ctx.fillText(text, x, y);
+	ctx.restore();
 }
 
 // === Font-floor helpers ============================================
