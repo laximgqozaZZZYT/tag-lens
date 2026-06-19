@@ -2,13 +2,17 @@
 
 All notable changes to Tag Lens are documented here.
 
-## 0.3.18
+## 0.3.19
 
 ### Added — Dynamic HAVING Expressions
 - **Variable Support**: Introduced `_noteCount` variable representing total vault notes in HAVING expressions (e.g., `count >= _noteCount * 0.05`).
 - **Complex Logic**: Added support for `AND` operator, arithmetic multiplication (`*`), and parentheses `()` in HAVING grammar.
 - **Improved Defaults**: `AUTO HAVING` now seeds the HAVING field with a formulaic expression relative to vault size for better stability across different vaults.
 - **Transparency**: Auto-thresholds are now visible and editable in the Data > Logic > HAVING field when active.
+
+## 0.3.18
+
+Same as 0.3.17 (re-released as 0.3.19 to fix versioning conflict).
 
 ## 0.3.17
 
