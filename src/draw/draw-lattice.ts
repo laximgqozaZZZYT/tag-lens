@@ -13,6 +13,7 @@ import {
 	truncateToWidth,
 	roundedRectPath,
 	floorWorldFontPx,
+	createStripePattern,
 } from "./canvas-utils";
 import {
 	densityBins,
@@ -402,9 +403,13 @@ function drawNode(
 	ctx.fillStyle = theme().canvasBgAlt;
 	ctx.fill();
 	if (isSelected || isHover) {
-		ctx.fillStyle = isSelected
-			? theme().swatch(hue, "tint", 0.30)
-			: theme().swatch(hue, "tint", 0.18);
+		const bgHue = isSelected ? 0.30 : 0.18;
+		if (node.signature.length > 1) {
+			const hues = node.signature.map(s => clusterHue(s));
+			ctx.fillStyle = createStripePattern(hues, true, bgHue);
+		} else {
+			ctx.fillStyle = theme().swatch(hue, "tint", bgHue);
+		}
 		ctx.beginPath();
 		roundedRectPath(ctx, node.x, node.y, node.w, node.h, NODE_RADIUS / z);
 		ctx.fill();
@@ -539,7 +544,12 @@ function drawHeader(
 	ctx.beginPath();
 	ctx.rect(node.x, node.y, node.w, headerH);
 	ctx.clip();
-	ctx.fillStyle = theme().swatch(hue, "fill", 0.85);
+	if (node.signature.length > 1) {
+		const hues = node.signature.map(s => clusterHue(s));
+		ctx.fillStyle = createStripePattern(hues, true, 0.85);
+	} else {
+		ctx.fillStyle = theme().swatch(hue, "fill", 0.85);
+	}
 	ctx.fillRect(node.x, node.y, node.w, headerH);
 
 	// Title font intent → world units after the min-font floor. We use the
@@ -644,7 +654,12 @@ function drawOverview(
 	ctx.fillStyle = theme().overlay(0.06);
 	ctx.fillRect(bodyLeft, barY, bodyW, barH);
 	// Filled portion.
-	ctx.fillStyle = theme().swatch(hue, "fill", 0.95);
+	if (node.signature.length > 1) {
+		const hues = node.signature.map(s => clusterHue(s));
+		ctx.fillStyle = createStripePattern(hues, true, 0.95);
+	} else {
+		ctx.fillStyle = theme().swatch(hue, "fill", 0.95);
+	}
 	ctx.fillRect(bodyLeft, barY, Math.max(2, bodyW * frac), barH);
 	// Right-anchored "N 件" badge for redundancy with the header count — kept
 	// small (FOOTER font) so it disappears gracefully when font floors hit it.
@@ -687,7 +702,11 @@ function drawDensity(
 	const xOffset = Math.max(0, Math.floor((bodyW - m.bodyW) / 2));
 	const yOffset = 0;
 	const { perCell, filled } = densityBins(node.count, densityCells);
-	const lit = theme().swatch(hue, "fill", 0.92);
+	let lit: string | CanvasPattern = theme().swatch(hue, "fill", 0.92);
+	if (node.signature.length > 1) {
+		const hues = node.signature.map(s => clusterHue(s));
+		lit = createStripePattern(hues, true, 0.92);
+	}
 	const dim = theme().swatch(hue, "dim", 0.32);
 	for (let r = 0, drawn = 0; r < m.rows && drawn < densityCells; r++) {
 		for (let c = 0; c < m.cols && drawn < densityCells; c++, drawn++) {
@@ -742,7 +761,12 @@ function drawIndividual(
 	const fits = m.rows * m.cols;
 	const drawnMax = Math.min(node.count, fits);
 	const xOffset = Math.max(0, Math.floor((bodyW - m.bodyW) / 2));
-	ctx.fillStyle = theme().swatch(hue, "fill", 0.90);
+	if (node.signature.length > 1) {
+		const hues = node.signature.map(s => clusterHue(s));
+		ctx.fillStyle = createStripePattern(hues, true, 0.90);
+	} else {
+		ctx.fillStyle = theme().swatch(hue, "fill", 0.90);
+	}
 	for (let r = 0, drawn = 0; r < m.rows && drawn < drawnMax; r++) {
 		for (let c = 0; c < m.cols && drawn < drawnMax; c++, drawn++) {
 			const cx = bodyLeft + xOffset + c * (cellSize + cellGap);

@@ -1,4 +1,5 @@
 // Canvas drawing helpers and small string utilities used by the renderer.
+import { theme } from "./theme";
 
 // Excel-style column header letters: 0 → "A", 25 → "Z", 26 → "AA",
 // 27 → "AB", ...
@@ -147,4 +148,50 @@ export function floorScreenFontPx(
 	minScreenPx: number,
 ): number {
 	return Math.max(intendedScreenPx, minScreenPx);
+}
+
+// Build a repeating stripe pattern from a list of cluster hues so a node /
+// legend swatch that belongs to MULTIPLE sets reads as a striped blend rather
+// than a single averaged hue. `isVertical` chooses the stripe orientation —
+// the renderer maps intersection (∩) → vertical bars, union (∪) → horizontal.
+//
+// Degenerate cases collapse to a flat colour string:
+//   • no hues   → "gray"
+//   • one hue   → that hue's solid fill swatch
+//   • non-DOM   → first hue's swatch (tests run in plain Node with no
+//                 `document`; the SSR/test path must never throw).
+// A `CanvasPattern` is only returned when a real 2D context is available.
+export function createStripePattern(
+	hues: number[],
+	isVertical: boolean,
+	alpha?: number,
+): CanvasPattern | string {
+	if (hues.length === 0) return "gray";
+	const fallback = (): string => theme().swatch(hues[0], "fill", alpha);
+	if (hues.length === 1) return fallback();
+	// No DOM (unit-test/SSR) → flat fallback so callers never crash.
+	if (typeof document === "undefined") return fallback();
+
+	const canvas = document.createElement("canvas");
+	canvas.width = 16;
+	canvas.height = 16;
+	const ctx = canvas.getContext("2d");
+	if (!ctx) return fallback();
+
+	const w = canvas.width;
+	const h = canvas.height;
+	if (isVertical) {
+		const stripeW = w / hues.length;
+		for (let i = 0; i < hues.length; i++) {
+			ctx.fillStyle = theme().swatch(hues[i], "fill", alpha);
+			ctx.fillRect(i * stripeW, 0, stripeW, h);
+		}
+	} else {
+		const stripeH = h / hues.length;
+		for (let i = 0; i < hues.length; i++) {
+			ctx.fillStyle = theme().swatch(hues[i], "fill", alpha);
+			ctx.fillRect(0, i * stripeH, w, stripeH);
+		}
+	}
+	return ctx.createPattern(canvas, "repeat") ?? fallback();
 }

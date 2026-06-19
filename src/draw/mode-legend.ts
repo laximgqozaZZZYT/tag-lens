@@ -14,7 +14,7 @@ export interface ModeLegendInput {
 	// CLOSEUP-only: ∪ / ∩ addressable layers (own NODE_DISPLAY R×C · n · aggregate),
 	// surfaced under enclosure modes as their own legend rows. Empty/absent in
 	// panorama. Each `label` already carries the resolved suffix.
-	setLayers?: { key: string; label: string; color: string }[];
+	setLayers?: { key: string; label: string; color: string | CanvasPattern }[];
 	// CLOSEUP perspective flag. In closeup the ∪/∩ set-layers are surfaced as a
 	// DISPLAY-INDEPENDENT section (their own spec) in EVERY mode — including the
 	// enclosure family — instead of being folded into the single-tag "Groups &
@@ -93,7 +93,7 @@ function sizeKey(title: string, input: ModeLegendInput): LegendSpec {
 // separate addressable set-layer section.
 function groupEnclosures(input: ModeLegendInput): LegendSpec {
 	const groups = input.groups ?? [];
-	const entries: { label: string; color?: string }[] = groups
+	const entries: { label: string; color?: string | CanvasPattern }[] = groups
 		.map((g) => ({ label: g.label, color: g.color }));
 	// No separate addressable set-layer section for enclosure modes, so describe ∪/∩ here.
 	// List them with their content alongside single sets.
@@ -117,7 +117,7 @@ function groupEnclosures(input: ModeLegendInput): LegendSpec {
 function setLayersLegend(input: ModeLegendInput): LegendSpec | null {
 	const setLayers = input.setLayers ?? [];
 	if (!setLayers.length) return null;
-	const entries: { label: string; color?: string }[] = setLayers.map((sl) => ({ label: sl.label, color: sl.color }));
+	const entries: { label: string; color?: string | CanvasPattern }[] = setLayers.map((sl) => ({ label: sl.label, color: sl.color }));
 	return { title: "Union / Intersection layers", kind: "categorical", entries };
 }
 

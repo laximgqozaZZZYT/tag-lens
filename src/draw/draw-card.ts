@@ -37,6 +37,8 @@ export interface DrawCardOptions {
 	// When set, fill the card with this hue (bipartite SET / tag nodes) so it
 	// reads as a coloured set node rather than a plain dark note card.
 	fillHue?: number;
+	// When set, fill the card with this canvas pattern (for set intersections).
+	fillPattern?: CanvasPattern | string;
 	// When set (and not a SET node), fill the card with a MUTED tint of this hue
 	// — used by the clustered bipartite layout so each island's notes read as
 	// one calm coloured mass rather than blue-grey dots.
@@ -69,19 +71,20 @@ export interface CardFillFlags {
 	highlighted: boolean;
 	isSet: boolean;
 	fillHue?: number;
+	fillPattern?: CanvasPattern | string;
 	isTint: boolean;
 	tintHue?: number;
-	encFillColor?: string;
+	encFillColor?: string | CanvasPattern;
 }
 
 // Pure decision for a card's body fill + outline stroke from its mutually
 // exclusive visual states. Extracted so the precedence is unit-testable —
 // the on-canvas legend (F4) advertises the colour ENCODING, so the card fill
 // must follow the same precedence or legend and canvas disagree.
-export function cardFillStyle(f: CardFillFlags): { fill: string; stroke: string } {
+export function cardFillStyle(f: CardFillFlags): { fill: string | CanvasPattern; stroke: string } {
 	const t = theme();
 	if (f.highlighted) return { fill: t.warn, stroke: t.warn };
-	if (f.isSet) return { fill: t.swatch(f.fillHue ?? 0, "fill"), stroke: t.swatch(f.fillHue ?? 0, "fillStrong") };
+	if (f.isSet) return { fill: f.fillPattern ?? t.swatch(f.fillHue ?? 0, "fill"), stroke: t.swatch(f.fillHue ?? 0, "fillStrong") };
 	// An explicit colour ENCODING (user bound the colour channel) MUST beat the
 	// automatic tag-cluster tint — otherwise the on-canvas legend advertises a
 	// colour→value mapping the note cards never actually show.
@@ -106,8 +109,8 @@ export function drawCard(
 	n: PositionedNode,
 	opts: DrawCardOptions,
 ): void {
-	const { scale, bodyLines, showBody, highlighted, zoom, minFontPx, fillHue, tintHue } = opts;
-	const isSet = fillHue != null;
+	const { scale, bodyLines, showBody, highlighted, zoom, minFontPx, fillHue, fillPattern, tintHue } = opts;
+	const isSet = fillHue != null || fillPattern != null;
 	const isTint = !isSet && tintHue != null;
 	const x = n.x - n.width / 2;
 	const y = n.y - n.height / 2;
@@ -123,7 +126,7 @@ export function drawCard(
 		ctx.globalAlpha *= 0.5;
 	}
 
-	const cardStyle = cardFillStyle({ highlighted, isSet, fillHue, isTint, tintHue, encFillColor: opts.encFillColor });
+	const cardStyle = cardFillStyle({ highlighted, isSet, fillHue, fillPattern, isTint, tintHue, encFillColor: opts.encFillColor });
 
 	// Fill first so the stroke below sits cleanly on top.
 	ctx.beginPath();

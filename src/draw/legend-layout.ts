@@ -8,7 +8,7 @@ import { shapeMarkerPath } from "./draw-shape";
 
 export interface LegendItem {
 	label: string;
-	color?: string;
+	color?: string | CanvasPattern;
 	shape?: NodeShape;
 	radius?: number; // size sections: the per-item circle radius (px)
 	// Absolute offset from the box's top-left (px). Marker centre is at

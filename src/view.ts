@@ -25,7 +25,7 @@ import {
 	getSortKey as getSortKeyFn,
 	computeDroppedClusters as computeDroppedClustersFn,
 } from "./query/query-pipeline";
-import { clusterHue } from "./draw/canvas-utils";
+import { clusterHue, createStripePattern } from "./draw/canvas-utils";
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
 import { runAggregateSnap } from "./layout/aggregate-snap";
@@ -2876,6 +2876,7 @@ export class MiniGraphView extends ItemView {
 			zoom: this.zoom,
 			minFontPx: this.settings.minFontPx,
 			fillHue: isSet ? clusterHue(n.memberships[0] ?? n.id) : undefined,
+			fillPattern: (isSet && n.memberships.length > 1) ? createStripePattern(n.memberships.map((m) => clusterHue(m)), true) : undefined,
 			// Clustered notes carry their island's main-tag in hueKey → muted tint.
 			tintHue: !isSet && n.hueKey ? clusterHue(n.hueKey) : undefined,
 			// Clustered LOD: the tag-centre label has a LOWER threshold than note
@@ -3208,20 +3209,16 @@ export class MiniGraphView extends ItemView {
 
 				const h1 = clusterHue(p.t1);
 				const h2 = clusterHue(p.t2);
-				let diff = h2 - h1;
-				if (diff > 180) diff -= 360;
-				if (diff < -180) diff += 360;
-				const avgHue = (h1 + diff / 2 + 360) % 360;
-
+				// Striped pattern for union (horizontal) and intersection (vertical)
 				setLayers.push({
 					key: `__union__${p.t1}_${p.t2}`,
 					label: `${l1} ∪ ${l2}${layerSuffix(UNION_LAYER_KEY, p.unionN)}`,
-					color: t.swatch(avgHue, "fill"),
+					color: createStripePattern([h1, h2], false),
 				});
 				setLayers.push({
 					key: `__inter__${p.t1}_${p.t2}`,
 					label: `${l1} ∩ ${l2}${layerSuffix(INTERSECTION_LAYER_KEY, p.interN)}`,
-					color: t.swatch(avgHue, "fill"),
+					color: createStripePattern([h1, h2], true),
 				});
 			}
 

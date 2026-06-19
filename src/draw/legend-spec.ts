@@ -10,9 +10,9 @@ export type LegendKind = "categorical" | "gradient" | "size";
 export interface LegendSpec {
 	title: string;
 	kind: LegendKind;
-	entries?: { label: string; color?: string; shape?: NodeShape }[];
+	entries?: { label: string; color?: string | CanvasPattern; shape?: NodeShape }[];
 	ramp?: { stops: string[]; minLabel: string; maxLabel: string };
-	sizes?: { label: string; radius: number; color?: string }[];
+	sizes?: { label: string; radius: number; color?: string | CanvasPattern }[];
 }
 
 // Sequential colour ramp shared by the colour channel AND the legend gradient so

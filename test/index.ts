@@ -15,6 +15,7 @@ import "./preset-io.test";
 import "./svg-recorder.test";
 import "./shape-channel.test";
 import "./draw-shape.test";
+import "./canvas-utils.test";
 import "./draw-card-fill.test";
 import "./legend-layout.test";
 import "./legend-spec.test";
