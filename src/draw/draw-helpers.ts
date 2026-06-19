@@ -1,5 +1,6 @@
 import { theme, colorAlpha } from "./theme";
 import type { LaidOut, ClusterRect } from "../layout/layout";
+import type { AggregationGroup } from "../aggregation/types";
 import { clusterHue, roundedRectPath, truncateToWidth } from "./canvas-utils";
 import {
 	CARD_TITLE_FONT_PX,
@@ -624,6 +625,97 @@ export function drawAggregateStack(
 				`${count} cards`,
 				x + CARD_PAD_X,
 				y + CARD_PAD_Y + CARD_LINE_HEIGHT_PX + CARD_TITLE_BODY_GAP,
+			);
+		}
+	}
+}
+
+/**
+ * Draw a "Junihitoe" stack for aggregated nodes.
+ * 
+ * Renders a 5-layer cascading stack of card-like shapes with a traditional
+ * color palette for the "hems" (borders).
+ */
+export function drawJunihitoeStack(
+	ctx: CanvasRenderingContext2D,
+	group: AggregationGroup,
+	cardW: number,
+	cardH: number,
+	zoom: number,
+	highlighted = false,
+	minFontPx = 0,
+): void {
+	const cx = group.x;
+	const cy = group.y;
+	
+	const STACK_INSET = 0.05;
+	const SUB_SCALE = 0.85;
+	const innerW = cardW * (1 - 2 * STACK_INSET);
+	const innerH = cardH * (1 - 2 * STACK_INSET);
+	const subW = innerW * SUB_SCALE;
+	const subH = innerH * SUB_SCALE;
+	
+	// Offsets for the cascading effect
+	const vStep = 2.0; 
+	const hStep = 2.0; 
+	
+	const r = Math.min(CARD_RADIUS_PX, subW / 2, subH / 2);
+	
+	// Junihitoe-inspired palette (traditional layered hem look)
+	const colors = [
+		"#6d1d2b", // 1. Deep Red (Kurenai)
+		"#c05c30", // 2. Orange-red (Akane)
+		"#e9b844", // 3. Golden Yellow (Ki)
+		"#4f7239", // 4. Green (Moeghi)
+		theme().accent, // 5. Top (Theme Accent)
+	];
+
+	for (let i = 0; i < 5; i++) {
+		const isFront = i === 4;
+		
+		// Each layer is offset slightly to show the one beneath
+		const ox = (i - 4) * hStep;
+		const oy = (i - 4) * vStep;
+		
+		const x = cx + ox - subW / 2;
+		const y = cy + oy - subH / 2;
+		
+		ctx.beginPath();
+		roundedRectPath(ctx, x, y, subW, subH, isFront ? r : r * 0.8);
+		
+		// Fill: Front is theme card background, others are hem colors
+		ctx.fillStyle = isFront ? theme().cardBg : colors[i];
+		ctx.fill();
+		
+		// Stroke
+		ctx.lineWidth = (isFront ? (highlighted ? 2.2 : 1.2) : 0.8) / zoom;
+		ctx.strokeStyle = isFront ? (highlighted ? theme().accent : theme().cardBorder) : colorAlpha(colors[i], 0.6);
+		ctx.stroke();
+		
+		if (isFront) {
+			ctx.textAlign = "start";
+			ctx.textBaseline = "top";
+			
+			const titleFontPx = Math.max(CARD_TITLE_FONT_PX * 0.85, minFontPx / Math.max(0.01, zoom));
+			const bodyFontPx = Math.max(CARD_BODY_FONT_PX * 0.85, minFontPx / Math.max(0.01, zoom));
+			
+			// Label: Attribute Value
+			ctx.font = `600 ${titleFontPx}px sans-serif`;
+			ctx.fillStyle = highlighted ? theme().accent : theme().textNormal;
+			const title = truncateToWidth(
+				ctx,
+				group.attributeValue,
+				subW - 2 * CARD_PAD_X,
+			);
+			ctx.fillText(title, x + CARD_PAD_X, y + CARD_PAD_Y);
+			
+			// Count: N nodes
+			ctx.font = `${bodyFontPx}px sans-serif`;
+			ctx.fillStyle = highlighted ? theme().accent : theme().textMuted;
+			ctx.fillText(
+				`${group.nodeIds.length} items`,
+				x + CARD_PAD_X,
+				y + CARD_PAD_Y + CARD_LINE_HEIGHT_PX * 0.85 + CARD_TITLE_BODY_GAP,
 			);
 		}
 	}

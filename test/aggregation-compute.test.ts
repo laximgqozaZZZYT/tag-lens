@@ -30,16 +30,18 @@ function mockNode(
 // Helper to create minimal settings with aggregation config
 function mockSettings(
 	globalAttr: string,
-	enabledSets: string[]
+	enabledSets: string[],
+	layerAggregation: { tags: boolean; unions: boolean; intersections: boolean } = { tags: true, unions: true, intersections: true }
 ): MiniSettings {
-	const aggregationSettings: Record<string, { enabled: boolean }> = {};
-	for (const set of enabledSets) {
-		aggregationSettings[set] = { enabled: true };
-	}
+	const aggregatedLayers: string[] = [...enabledSets];
+	if (layerAggregation.tags) aggregatedLayers.push("__TAGS__");
+	if (layerAggregation.unions) aggregatedLayers.push("__UNIONS__");
+	if (layerAggregation.intersections) aggregatedLayers.push("__INTERSECTIONS__");
 
 	return {
 		globalAggregationAttribute: globalAttr,
-		aggregationSettings,
+		aggregatedLayers,
+		layerAggregation,
 	} as MiniSettings;
 }
 
@@ -67,13 +69,13 @@ function mockSettings(
 	ok(result.aggregatedNodeIds.size === 0, "No global attribute produces no aggregated IDs");
 }
 
-// Test: Aggregation disabled for set
+// Test: Aggregation disabled for category
 {
 	const nodes = [
 		mockNode("1", ["tag/project"], 0, 0, { fmStatus: "active" }),
 		mockNode("2", ["tag/project"], 0, 0, { fmStatus: "active" }),
 	];
-	const settings = mockSettings("status", []); // No enabled sets
+	const settings = mockSettings("status", [], { tags: false, unions: true, intersections: true });
 	const result = computeAggregationGroups(nodes, settings, "euler");
 
 	ok(result.groups.size === 0, "Disabled aggregation produces no groups");

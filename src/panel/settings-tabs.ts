@@ -339,13 +339,6 @@ export interface EncodeTabDeps {
 export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): void {
 	const section = el.createDiv({ cls: "gim-panel-section" });
 	section.createEl("h4", { text: "Visual Encoding" });
-	section.createEl("div", {
-		text: "(Content cleared for cleanup)",
-	}).setCssStyles({ 
-		fontSize: "10px", 
-		color: "var(--text-faint)", 
-		marginTop: "8px" 
-	});
 
 	// On-canvas legend toggle (paints the colour/shape/size key on the canvas).
 	const legendRow = section.createEl("label", { cls: "gim-toggle-row" });
@@ -361,31 +354,69 @@ export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): v
 		deps.requestDraw();
 	});
 	legendRow.createSpan({ text: "Show legend on canvas" });
+
+	renderLayersSubSection(el, deps);
 }
 
 function renderLayersSubSection(el: HTMLElement, deps: EncodeTabDeps): void {
 	const clusters = deps.laid.clusters;
-	// The synthetic ∪/∩ set-layers are addressable layers in EVERY view mode and
-	// perspective — distinct from the single-tag clusters, with their own
-	// NODE_DISPLAY overrides + inheritance (the single-tag clusters are their
-	// supersets, so single-set settings still cascade into ∪/∩). Because ∪/∩ are
-	// always present, even when the layout has no real clusters (non-enclosure
-	// modes: matrix / droste / heatmap, or an empty enclosure graph) the ∪/∩ tabs
-	// remain editable — so there is no empty-hint fallback.
+	const nodes = deps.laid.nodes;
+
+	// Calculate pairwise individual sets (Unions and Intersections)
+	const pairInter = new Map<string, number>();
+	const tagCounts = new Map<string, number>();
+	const clusterLabels = new Map(clusters.map(c => [c.groupKey, c.label]));
+
+	for (const n of nodes) {
+		const tags = n.memberships || [];
+		for (const t of tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+		if (tags.length < 2) continue;
+		const sorted = [...tags].sort();
+		for (let i = 0; i < sorted.length; i++) {
+			for (let j = i + 1; j < sorted.length; j++) {
+				const key = `${sorted[i]}\t${sorted[j]}`;
+				pairInter.set(key, (pairInter.get(key) ?? 0) + 1);
+			}
+		}
+	}
+
+	const individualSets: Array<{ key: string; label: string; count: number }> = [];
+	for (const [key, interN] of pairInter.entries()) {
+		const [t1, t2] = key.split("\t");
+		const l1 = (clusterLabels.get(t1) ?? t1).replace(/^#/, "");
+		const l2 = (clusterLabels.get(t2) ?? t2).replace(/^#/, "");
+		const c1 = tagCounts.get(t1) ?? 0;
+		const c2 = tagCounts.get(t2) ?? 0;
+
+		individualSets.push({
+			key: `__union__${t1}_${t2}`,
+			label: `${l1} ∪ ${l2}`,
+			count: c1 + c2 - interN
+		});
+		individualSets.push({
+			key: `__inter__${t1}_${t2}`,
+			label: `${l1} ∩ ${l2}`,
+			count: interN
+		});
+	}
+	individualSets.sort((a, b) => b.count - a.count);
+
 	const tabKeys = [
 		...clusters.map((c) => c.groupKey),
 		...SET_LAYER_KEYS,
+		...individualSets.map(s => s.key)
 	];
 	// Keep the selected layer valid; default to the first cluster, or the first
 	// set-layer when there are no real clusters.
 	const validKeys = new Set(tabKeys);
-	if (!validKeys.has(deps.activeTab)) {
+	const activeExists = validKeys.has(deps.activeTab);
+	if (!activeExists) {
 		const fallback = clusters.length > 0 ? clusters[0].groupKey : tabKeys[0];
 		deps.setActiveTab(fallback);
 	}
 
 	const tabBar = el.createDiv({ cls: "gim-panel-tabs" });
-	if (clusters.length > 1) {
+	if (clusters.length > 1 || individualSets.length > 1) {
 		const filterInput = tabBar.createEl("input", { cls: "gim-panel-tab-filter", type: "search" });
 		filterInput.setAttribute("placeholder", "Filter layers… (type to search)");
 		filterInput.value = deps.tabFilter;
@@ -409,11 +440,18 @@ function renderLayersSubSection(el: HTMLElement, deps: EncodeTabDeps): void {
 	for (const sk of SET_LAYER_KEYS) {
 		renderTabButton(chipsEl, sk, SET_LAYER_LABEL[sk], null, SET_LAYER_LABEL[sk], deps);
 	}
+	for (const s of individualSets) {
+		const isInter = s.key.startsWith("__inter__");
+		renderTabButton(chipsEl, s.key, `${s.label} (${s.count})`, null, s.label, deps);
+	}
 	applyTabFilter(el, deps.tabFilter);
 
 	const content = el.createDiv({ cls: "gim-panel-content" });
-	if (deps.activeTab === UNION_LAYER_KEY || deps.activeTab === INTERSECTION_LAYER_KEY) {
-		renderSetLayerTab(content, deps.activeTab, deps);
+	const isIndividual = deps.activeTab.startsWith("__union__") || deps.activeTab.startsWith("__inter__");
+	if (deps.activeTab === UNION_LAYER_KEY || deps.activeTab === INTERSECTION_LAYER_KEY || isIndividual) {
+		// Pass the individual set label if it's an individual tab
+		const label = isIndividual ? individualSets.find(s => s.key === deps.activeTab)?.label : undefined;
+		renderSetLayerTab(content, deps.activeTab, deps, label);
 	} else {
 		renderLayerTab(content, deps.activeTab, deps);
 	}
@@ -424,14 +462,18 @@ function renderLayersSubSection(el: HTMLElement, deps: EncodeTabDeps): void {
 // toggle backed by `layerInheritFull`. When full inheritance is ON the layer's
 // own overrides are ignored (resolve purely via inheritFrom → superset →
 // global); OFF lets its own overrides apply where set.
-function renderSetLayerTab(el: HTMLElement, setKey: string, deps: EncodeTabDeps): void {
+function renderSetLayerTab(el: HTMLElement, setKey: string, deps: EncodeTabDeps, overrideLabel?: string): void {
 	const head = el.createDiv({ cls: "gim-panel-section" });
-	head.createEl("h4", { text: SET_LAYER_LABEL[setKey] });
+	head.createEl("h4", { text: overrideLabel || SET_LAYER_LABEL[setKey] });
+
+	let desc = "";
+	if (setKey === UNION_LAYER_KEY) desc = "All notes inside any enclosure (∪). Single-tag layers are supersets, so their settings cascade here.";
+	else if (setKey === INTERSECTION_LAYER_KEY) desc = "Notes shared by 2+ enclosures (∩). Single-tag layers are supersets, so their settings cascade here.";
+	else if (setKey.startsWith("__union__")) desc = "Pairwise union (∪) of two tags. Single-tag layers are supersets.";
+	else if (setKey.startsWith("__inter__")) desc = "Pairwise intersection (∩) of two tags. Single-tag layers are supersets.";
+
 	head.createEl("div", {
-		text:
-			setKey === UNION_LAYER_KEY
-				? "All notes inside any enclosure (∪). Single-tag layers are supersets, so their settings cascade here."
-				: "Notes shared by 2+ enclosures (∩). Single-tag layers are supersets, so their settings cascade here.",
+		text: desc,
 	}).setCssStyles({ fontSize: "10px", color: "var(--text-faint)", marginBottom: "8px" });
 
 	const togs = el.createDiv({ cls: "gim-panel-section" });
@@ -466,6 +508,22 @@ function renderSetLayerTab(el: HTMLElement, setKey: string, deps: EncodeTabDeps)
 		deps.save();
 		void deps.rebuild();
 	});
+
+	// Per-layer aggregation toggle
+	let aggId = setKey;
+	if (setKey === UNION_LAYER_KEY) aggId = "__UNIONS__";
+	else if (setKey === INTERSECTION_LAYER_KEY) aggId = "__INTERSECTIONS__";
+
+	renderLayerToggle(
+		togs,
+		"aggregatedLayers",
+		aggId,
+		"Aggregate (Junihitoe stack)",
+		() => {
+			void deps.rebuild();
+		},
+		deps
+	);
 
 	// Per-layer NODE_DISPLAY override (disabled visually under full inheritance,
 	// where own overrides are ignored anyway).
@@ -549,6 +607,7 @@ function renderLayerTab(el: HTMLElement, groupKey: string, deps: EncodeTabDeps):
 		},
 		deps
 	);
+	
 	// Inheritance source picker — choose another cluster as the parent.
 	// The child cluster's bbox will grow to engulf the parent's bbox so
 	// the two visually merge into one nested region.

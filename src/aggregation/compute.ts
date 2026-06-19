@@ -2,6 +2,11 @@ import type { MiniSettings, ViewMode } from "../types";
 import type { PositionedNode } from "../layout/layout";
 import type { AggregationState, AggregationGroup } from "./types";
 
+import {
+	UNION_LAYER_KEY,
+	INTERSECTION_LAYER_KEY,
+} from "../visual/node-display";
+
 /**
  * Compute aggregation groups from positioned nodes.
  * 
@@ -37,14 +42,30 @@ export function computeAggregationGroups(
 
 		const membership = node.memberships[0];
 
-		// Skip if aggregation disabled for this set
-		const config = settings.aggregationSettings[membership];
-		if (!config?.enabled) continue;
+		// Check if aggregation is enabled for this membership.
+		// We support three levels:
+		// 1. Specific tag aggregation (e.g. membership is "#work")
+		// 2. Category-wide aggregation ("__TAGS__", "__UNIONS__", "__INTERSECTIONS__")
+		const isUnion = membership === UNION_LAYER_KEY;
+		const isIntersection = membership === INTERSECTION_LAYER_KEY;
+		const isTag = !isUnion && !isIntersection;
+
+		let enabled = false;
+		const agg = settings.aggregatedLayers || [];
+		if (isTag) {
+			enabled = agg.includes("__TAGS__") || agg.includes(membership);
+		} else if (isUnion) {
+			enabled = agg.includes("__UNIONS__");
+		} else if (isIntersection) {
+			enabled = agg.includes("__INTERSECTIONS__");
+		}
+
+		if (!enabled) continue;
 
 		// Extract attribute value
 		const attrValue = getAttributeValue(
 			node,
-			settings.globalAggregationAttribute
+			settings.globalAggregationAttribute || "status"
 		);
 
 		// Skip nodes with null/undefined attributes

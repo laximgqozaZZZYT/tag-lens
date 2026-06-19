@@ -37,6 +37,9 @@ export interface ThemeTokens {
 	danger: string;
 	warn: string;
 	success: string;
+	// Node card chrome
+	cardBg: string;
+	cardBorder: string;
 	// categorical identity colour: hue preserved, lightness anchored to baseLum
 	swatch(hue: number, role: SwatchRole, alpha?: number): string;
 	// subtle contrast overlay (hairlines, hover washes): white on a dark base,
@@ -185,6 +188,8 @@ export function defaultTheme(): ThemeTokens {
 		danger: FALLBACK.danger,
 		warn: FALLBACK.warn,
 		success: FALLBACK.success,
+		cardBg: FALLBACK.canvasBg,
+		cardBorder: "#444444",
 		swatch: makeSwatch(baseLum),
 		overlay: makeOverlay(baseLum),
 	};
@@ -235,6 +240,8 @@ export function resolveTheme(el: HTMLElement): ThemeTokens {
 		danger: read("--color-red", FALLBACK.danger),
 		warn: read("--color-yellow", FALLBACK.warn),
 		success: read("--color-green", FALLBACK.success),
+		cardBg: read("--background-primary", FALLBACK.canvasBg),
+		cardBorder: read("--background-modifier-border", shade(baseRGB, borderShade)),
 		swatch: makeSwatch(baseLum),
 		overlay: makeOverlay(baseLum),
 	};

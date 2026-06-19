@@ -31,8 +31,8 @@ function arbAttributeValue(attrName: string): fc.Arbitrary<string> {
 // Generate a valid set key (membership)
 const arbSetKey = fc.oneof(
 	fc.string({ minLength: 1, maxLength: 20 }).map(s => `tag/${s}`),
-	fc.constant("UNION_LAYER"),
-	fc.constant("INTERSECTION_LAYER")
+	fc.constant("__union__"),
+	fc.constant("__intersection__")
 );
 
 // Generate a positioned node with optional attributes
@@ -50,15 +50,32 @@ const arbPositionedNode = fc.record({
 	ageDays: fc.option(fc.integer({ min: 0, max: 500 }), { nil: undefined }),
 }) as fc.Arbitrary<PositionedNode>;
 
+// Helper to get attribute value from node for test assertions
+function getAttrValue(node: PositionedNode, attr: string): string | null {
+	if (attr === "status") return node.fmStatus ?? null;
+	if (attr === "maturity") return node.fmMaturity ?? null;
+	if (attr === "age") {
+		if (node.ageDays == null) return null;
+		if (node.ageDays < 1) return "today";
+		if (node.ageDays < 7) return "this-week";
+		if (node.ageDays < 30) return "this-month";
+		if (node.ageDays < 90) return "recent";
+		if (node.ageDays < 365) return "this-year";
+		return "old";
+	}
+	return null;
+}
+
 // Generate minimal settings with aggregation config
 function arbMiniSettings(): fc.Arbitrary<MiniSettings> {
 	return fc.record({
 		globalAggregationAttribute: fc.option(arbAttributeName, { nil: "" }),
-		aggregationSettings: fc.dictionary(
-			arbSetKey,
-			fc.record({ enabled: fc.boolean() }),
-			{ minKeys: 0, maxKeys: 5 }
-		),
+		aggregatedLayers: fc.array(fc.string()),
+		layerAggregation: fc.record({
+			tags: fc.boolean(),
+			unions: fc.boolean(),
+			intersections: fc.boolean(),
+		}),
 	}) as fc.Arbitrary<MiniSettings>;
 }
 
@@ -100,10 +117,22 @@ function arbMiniSettings(): fc.Arbitrary<MiniSettings> {
 						// Skip if different primary memberships
 						if (m1 !== m2) continue;
 
-						// Skip if aggregation disabled for this set
-						const config = settings.aggregationSettings[m1];
-						if (!config || !config.enabled) continue;
+						// Check if aggregation is enabled for this category
+                                                const isUnion = m1 === "__union__";
+                                                const isIntersection = m1 === "__intersection__";
+                                                const isTag = !isUnion && !isIntersection;
 
+                                                const agg = settings.aggregatedLayers || [];
+                                                let enabled = false;
+                                                if (isTag) {
+                                                    enabled = agg.includes("__TAGS__") || agg.includes(m1);
+                                                } else if (isUnion) {
+                                                    enabled = agg.includes("__UNIONS__");
+                                                } else if (isIntersection) {
+                                                    enabled = agg.includes("__INTERSECTIONS__");
+                                                }
+
+                                                if (!enabled) continue;
 						// Get attribute values
 						const attr1 = getAttrValue(n1, settings.globalAggregationAttribute);
 						const attr2 = getAttrValue(n2, settings.globalAggregationAttribute);
@@ -116,26 +145,27 @@ function arbMiniSettings(): fc.Arbitrary<MiniSettings> {
 							const group1 = result.nodeToGroup.get(n1.id);
 							const group2 = result.nodeToGroup.get(n2.id);
 
-							// Both should be in a group (not singleton)
-							if (group1 === undefined || group2 === undefined) {
-								// This can happen if they're the only two with this combination
-								// and somehow filtered out - but they should be grouped together
-								// Only acceptable if there are exactly 2 nodes with this combo
-								const matchingNodes = nodes.filter(n =>
-									n.memberships[0] === m1 &&
-									getAttrValue(n, settings.globalAggregationAttribute) === attr1
-								);
-								if (matchingNodes.length >= 2) {
-									// They should both be in a group
-									if (group1 === undefined || group2 === undefined) {
-										return false;
-									}
-								}
-							}
+							// If they exist and are the same combined key, they should be grouped together if there are >= 2 of them
+							const matchingNodes = nodes.filter(n =>
+								n.memberships[0] === m1 &&
+								getAttrValue(n, settings.globalAggregationAttribute) === attr1
+							);
 
-							// If both are in groups, they must be in the SAME group
-							if (group1 !== undefined && group2 !== undefined && group1 !== group2) {
-								return false;
+							if (matchingNodes.length >= 2) {
+								if (group1 === undefined || group2 === undefined) {
+									console.log(`FAIL: Nodes not grouped. m1=${m1}, attr1=${attr1}, matching=${matchingNodes.length}`);
+									return false;
+								}
+								if (group1 !== group2) {
+									console.log(`FAIL: Nodes in different groups. g1=${group1}, g2=${group2}`);
+									return false;
+								}
+							} else {
+								// Should NOT be grouped
+								if (group1 !== undefined || group2 !== undefined) {
+									console.log(`FAIL: Node should not be grouped. g1=${group1}, g2=${group2}`);
+									return false;
+								}
 							}
 						}
 					}
@@ -143,30 +173,8 @@ function arbMiniSettings(): fc.Arbitrary<MiniSettings> {
 
 				return true;
 			}
-		),
-		{ numRuns: 100 }
+		)
 	);
 
-	ok(true, "Property 1: Attribute-based grouping consistency holds across 100 random inputs");
-}
-
-// Helper function to extract attribute value (mirrors the implementation)
-function getAttrValue(node: PositionedNode, attribute: string): string | null {
-	switch (attribute) {
-		case "status":
-			return node.fmStatus ?? null;
-		case "maturity":
-			return node.fmMaturity ?? null;
-		case "age":
-			if (node.ageDays == null) return null;
-			// Age bucketing logic
-			if (node.ageDays === 0) return "today";
-			if (node.ageDays <= 7) return "this-week";
-			if (node.ageDays <= 30) return "this-month";
-			if (node.ageDays <= 90) return "recent";
-			if (node.ageDays <= 365) return "this-year";
-			return "old";
-		default:
-			return null;
-	}
+	ok(true, "Property 1: Attribute-based grouping consistency holds across random inputs");
 }

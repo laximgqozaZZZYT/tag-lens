@@ -161,6 +161,12 @@ export interface MiniSettings {
 	// Per-set aggregation configuration.
 	// Key = cluster groupKey or synthetic layer key (UNION_LAYER_KEY, INTERSECTION_LAYER_KEY).
 	aggregationSettings: Record<string, AggregationConfig>;
+	// Per-layer category (Single, Union, Intersection) aggregation toggles.
+	layerAggregation: {
+		tags: boolean;
+		unions: boolean;
+		intersections: boolean;
+	};
 	panelVisible: boolean;
 	clusterOffsets: Record<string, Offset>;
 	nodeOffsets: Record<string, Offset>;
@@ -498,8 +504,13 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	layerInheritFull: [],
 	inheritFrom: {},
 	nodeDisplayOverrides: {},
-	globalAggregationAttribute: "",
+	globalAggregationAttribute: "status",
 	aggregationSettings: {},
+	layerAggregation: {
+		tags: false,
+		unions: false,
+		intersections: false,
+	},
 	panelVisible: false,
 	clusterOffsets: {},
 	nodeOffsets: {},

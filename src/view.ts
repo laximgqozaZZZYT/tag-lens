@@ -34,12 +34,15 @@ import {
 	drawGridHeaders as drawGridHeadersFn,
 	drawClusterLabels as drawClusterLabelsFn,
 	drawAggregateStack as drawAggregateStackFn,
+	drawJunihitoeStack as drawJunihitoeStackFn,
 	drawOverviewLabels as drawOverviewLabelsFn,
 } from "./draw/draw-helpers";
 import {
 	computeMemberSets,
 	computeStrictSupersets,
 } from "./layout/cluster-relations";
+import { computeAggregationGroups } from "./aggregation/compute";
+import type { AggregationState, AggregationGroup } from "./aggregation/types";
 
 import {
 	resolveNodeDisplay as resolveNodeDisplayFn,
@@ -198,6 +201,11 @@ export class MiniGraphView extends ItemView {
 	// hovered node's memberships PLUS every connected node's memberships,
 	// so aggregate stacks for connected-but-collapsed cards light up too.
 	private highlightedClusters: Set<string> = new Set();
+	private aggregationState: AggregationState = {
+		groups: new Map(),
+		nodeToGroup: new Map(),
+		aggregatedNodeIds: new Set(),
+	};
 	private highlightedHavingClusters: Map<string, number> = new Map();
 	// The primary hovered node id (NOT the set of connected ones). Used to
 	// pick outgoing vs incoming edge colours: edge.source === hoveredNodeId
@@ -1366,6 +1374,13 @@ export class MiniGraphView extends ItemView {
 			heatmapSortDir: this.settings.heatmapSortDir,
 			ghostBridges: this.settings.showGhostEdges ? this.currentBridges : undefined,
 		});
+
+		// Node Aggregation by Attribute (Junihitoe)
+		this.aggregationState = computeAggregationGroups(
+			this.laid.nodes,
+			this.settings,
+			this.settings.viewMode
+		);
 
 		this.currentGaps = [];
 		if (this.settings.gapFinder && this.settings.viewMode === "heatmap" && this.laid.heatmap) {
@@ -2758,7 +2773,22 @@ export class MiniGraphView extends ItemView {
 			for (const n of this.laid.nodes) {
 				if (this.highlightedNodes.has(n.id)) continue;
 				if (skipNode(n.id)) continue;
+				if (this.aggregationState.aggregatedNodeIds.has(n.id)) continue;
 				this.drawCard(ctx, n, false);
+			}
+		}
+
+		// Node Aggregation: Junihitoe Stacks
+		if (
+			this.settings.showNodes &&
+			this.aggregationState.groups.size > 0 &&
+			this.laid.nodes.length > 0
+		) {
+			const cardW = this.laid.nodes[0].width;
+			const cardH = this.laid.nodes[0].height;
+			for (const group of this.aggregationState.groups.values()) {
+				const isHigh = group.nodeIds.some(id => this.highlightedNodes.has(id));
+				this.drawJunihitoeStack(ctx, group, cardW, cardH, isHigh);
 			}
 		}
 
@@ -2792,6 +2822,7 @@ export class MiniGraphView extends ItemView {
 			for (const n of this.laid.nodes) {
 				if (!this.highlightedNodes.has(n.id)) continue;
 				if (skipNode(n.id)) continue;
+				if (this.aggregationState.aggregatedNodeIds.has(n.id)) continue;
 				this.drawCard(ctx, n, true);
 			}
 		}
@@ -2861,6 +2892,24 @@ export class MiniGraphView extends ItemView {
 			cardW,
 			cardH,
 			count,
+			this.zoom,
+			highlighted,
+			this.settings.minFontPx,
+		);
+	}
+
+	private drawJunihitoeStack(
+		ctx: CanvasRenderingContext2D,
+		group: AggregationGroup,
+		cardW: number,
+		cardH: number,
+		highlighted = false,
+	): void {
+		drawJunihitoeStackFn(
+			ctx,
+			group,
+			cardW,
+			cardH,
 			this.zoom,
 			highlighted,
 			this.settings.minFontPx,
@@ -3310,6 +3359,25 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private hitTest(wx: number, wy: number): HoverTarget {
+		// 1. Check node aggregation groups (Junihitoe stacks) first
+		if (this.aggregationState.groups.size > 0 && this.laid.nodes.length > 0) {
+			const slackPx = 1 / this.zoom;
+			// Stacks are roughly the same size as cards (subW/subH in drawJunihitoeStack)
+			const cardW = this.laid.nodes[0].width;
+			const cardH = this.laid.nodes[0].height;
+			
+			for (const group of this.aggregationState.groups.values()) {
+				const left = group.x - cardW / 2 - slackPx;
+				const right = group.x + cardW / 2 + slackPx;
+				const top = group.y - cardH / 2 - slackPx;
+				const bottom = group.y + cardH / 2 + slackPx;
+				
+				if (wx >= left && wx <= right && wy >= top && wy <= bottom) {
+					return { kind: "aggregationGroup", groupKey: group.key, nodeIds: group.nodeIds };
+				}
+			}
+		}
+
 		return hitTestFn(
 			wx, 
 			wy, 
@@ -4772,11 +4840,14 @@ export class MiniGraphView extends ItemView {
 			tip.createSpan({ cls: "gim-tip-sub", text: file.parent?.path ?? "" });
 			// Body preview removed — the tip shows the file name + folder only.
 			if (gen !== this.hoverGen) return;
-		} else {
+		} else if (target.kind === "cluster") {
 			const cl = this.laid.clusters.find((c) => c.groupKey === target.group);
 			if (!cl) return;
 			tip.createSpan({ cls: "gim-tip-title", text: cl.label });
 			tip.createSpan({ cls: "gim-tip-sub", text: cl.memberCount + " items" });
+		} else if (target.kind === "aggregationGroup") {
+			tip.createSpan({ cls: "gim-tip-title", text: target.groupKey.split(":")[1] });
+			tip.createSpan({ cls: "gim-tip-sub", text: target.nodeIds.length + " notes" });
 		}
 
 		this.root.appendChild(tip);

@@ -11,6 +11,8 @@ export type HoverTarget =
 	| { kind: "matrixCol"; col: number }
 	| { kind: "heatmapCell"; i: number; j: number }
 	| { kind: "streamCell"; r: number; c: number }
+	// Node aggregation group
+	| { kind: "aggregationGroup"; groupKey: string; nodeIds: string[] }
 	// Bridge finder ghost edge under the cursor
 	| { kind: "ghostEdge"; bridge: import("../query/bridge-finder").BridgeCandidate }
 	| null;

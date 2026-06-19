@@ -23,6 +23,7 @@ export function sameTarget(a: HoverTarget, b: HoverTarget): boolean {
 	if (a.kind === "matrixCol" && b.kind === "matrixCol") return a.col === b.col;
 	if (a.kind === "heatmapCell" && b.kind === "heatmapCell") return a.i === b.i && a.j === b.j;
 	if (a.kind === "streamCell" && b.kind === "streamCell") return a.r === b.r && a.c === b.c;
+	if (a.kind === "aggregationGroup" && b.kind === "aggregationGroup") return a.groupKey === b.groupKey;
 	if (a.kind === "ghostEdge" && b.kind === "ghostEdge") {
 		return a.bridge.a === b.bridge.a && a.bridge.b === b.bridge.b;
 	}
@@ -67,16 +68,45 @@ export function computeHighlight(
 	adjacency: Map<string, number[]>,
 ): HighlightState {
 	const state = emptyHighlight();
-	if (!target || target.kind !== "node") return state;
+	if (!target) return state;
+
+	// Build an id → node index ONCE so the membership lookup for each
+	// node stays O(1) instead of O(|nodes|).
+	const idIndex = new Map<string, PositionedNode>();
+	for (const n of nodes) idIndex.set(n.id, n);
+
+	if (target.kind === "aggregationGroup") {
+		// Aggregation group: highlight every node in the group and their
+		// combined neighborhood.
+		for (const id of target.nodeIds) {
+			state.highlightedNodes.add(id);
+			const node = idIndex.get(id);
+			if (node) {
+				for (const m of node.memberships) state.highlightedClusters.add(m);
+			}
+			const adj = adjacency.get(id);
+			if (adj) {
+				for (const i of adj) {
+					state.highlightedEdgeIdx.add(i);
+					const edge = edges[i];
+					if (!edge) continue;
+					const otherId = edge.source === id ? edge.target : edge.source;
+					state.highlightedNodes.add(otherId);
+					const otherNode = idIndex.get(otherId);
+					if (otherNode) {
+						for (const m of otherNode.memberships) state.highlightedClusters.add(m);
+					}
+				}
+			}
+		}
+		return state;
+	}
+
+	if (target.kind !== "node") return state;
 
 	const id = target.nodeId;
 	state.hoveredNodeId = id;
 	state.highlightedNodes.add(id);
-
-	// Build an id → node index ONCE so the membership lookup for each
-	// adjacent node stays O(1) instead of O(|nodes|).
-	const idIndex = new Map<string, PositionedNode>();
-	for (const n of nodes) idIndex.set(n.id, n);
 
 	const targetNode = idIndex.get(id);
 	if (targetNode) {

@@ -56,6 +56,7 @@ export function resolveNodeDisplay(
 	const lookup = <K extends keyof NodeDisplayOverride>(
 		field: K,
 	): NodeDisplayOverride[K] | undefined => {
+		// 1. Specific memberships (Tags)
 		for (const m of n.memberships) {
 			const own = overrides[m]?.[field];
 			if (own !== undefined) return own;
@@ -70,6 +71,46 @@ export function resolveNodeDisplay(
 				if (v !== undefined) return v;
 			}
 		}
+
+		// 2. Pairwise Intersections (e.g. __inter__#tag1_#tag2)
+		const sorted = [...n.memberships].sort();
+		if (sorted.length >= 2) {
+			for (let i = 0; i < sorted.length; i++) {
+				for (let j = i + 1; j < sorted.length; j++) {
+					const ik = `__inter__${sorted[i]}_${sorted[j]}`;
+					const v = overrides[ik]?.[field];
+					if (v !== undefined) return v;
+				}
+			}
+		}
+
+		// 3. BROAD Intersection (priority over Broad Union)
+		if (n.memberships.length >= 2) {
+			const v = overrides[INTERSECTION_LAYER_KEY]?.[field];
+			if (v !== undefined) return v;
+		}
+
+		// 4. Pairwise Unions (e.g. __union__#tag1_#tag2)
+		// Note: Every node in tag1 is in union(tag1, tag2).
+		// We only apply this if NO tag-level or intersection-level override hit.
+		if (sorted.length >= 1) {
+			for (const m of n.memberships) {
+				// We don't know the other part of the union from the node itself,
+				// but we can check if any override exists for unions involving this membership.
+				// However, that's expensive to search through `overrides` keys.
+				// For now, only support specific pair matches if they were defined.
+			}
+			// Actually, if we have individual tabs, the user expects them to work.
+			// But a node belongs to MANY unions. We'll skip pairwise unions in the resolver
+			// for now until we have a better priority rule, or just support the broad one.
+		}
+
+		// 5. BROAD Union
+		if (n.memberships.length >= 1) {
+			const v = overrides[UNION_LAYER_KEY]?.[field];
+			if (v !== undefined) return v;
+		}
+
 		return undefined;
 	};
 	return {
