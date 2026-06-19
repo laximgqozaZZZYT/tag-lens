@@ -39,6 +39,13 @@ export interface DrawCardOptions {
 	fillHue?: number;
 	// When set, fill the card with this canvas pattern (for set intersections).
 	fillPattern?: CanvasPattern | CanvasGradient | string;
+	// When set (NOTE cards), the card belongs to MULTIPLE tags → fill it with
+	// this ∩ vertical stripe of its tag colours. Takes precedence over the
+	// `encFillColor` tag-colour ENCODING (a multi-tag note's single-colour
+	// encoding would be a lie — the legend says ∩=striped), but NOT over a SET
+	// fill or the highlight state. Only populated when the colour channel is
+	// tag/cluster-based, so a non-tag colour encoding is never overwritten.
+	multiTagStripe?: CanvasPattern | CanvasGradient | string;
 	// When set (and not a SET node), fill the card with a MUTED tint of this hue
 	// — used by the clustered bipartite layout so each island's notes read as
 	// one calm coloured mass rather than blue-grey dots.
@@ -75,6 +82,7 @@ export interface CardFillFlags {
 	isTint: boolean;
 	tintHue?: number;
 	encFillColor?: string | CanvasPattern;
+	multiTagStripe?: CanvasPattern | CanvasGradient | string;
 }
 
 // Pure decision for a card's body fill + outline stroke from its mutually
@@ -85,6 +93,13 @@ export function cardFillStyle(f: CardFillFlags): { fill: string | CanvasPattern 
 	const t = theme();
 	if (f.highlighted) return { fill: t.warn, stroke: t.warn };
 	if (f.isSet) return { fill: f.fillPattern ?? t.swatch(f.fillHue ?? 0, "fill"), stroke: t.swatch(f.fillHue ?? 0, "fillStrong") };
+	// A NOTE that belongs to MULTIPLE tags is an ∩ node → it must read as the
+	// stripe of its tag colours, NOT the single colour of its first tag. This
+	// beats the (tag-based) encFillColor below: when colour IS the tag, a solid
+	// fill on a multi-tag note contradicts the ∩=striped legend. The caller only
+	// populates `multiTagStripe` when the colour channel is tag/cluster-based,
+	// so a genuine non-tag colour encoding is never striped over.
+	if (f.multiTagStripe != null) return { fill: f.multiTagStripe, stroke: t.accent };
 	// An explicit colour ENCODING (user bound the colour channel) MUST beat the
 	// automatic tag-cluster tint — otherwise the on-canvas legend advertises a
 	// colour→value mapping the note cards never actually show.
@@ -126,7 +141,10 @@ export function drawCard(
 		ctx.globalAlpha *= 0.5;
 	}
 
-	const cardStyle = cardFillStyle({ highlighted, isSet, fillHue, fillPattern, isTint, tintHue, encFillColor: opts.encFillColor });
+	// A multi-tag NOTE stripe only applies to NOTE cards — a SET node already
+	// owns the fillPattern/fillHue path above, so guard with `!isSet`.
+	const multiTagStripe = !isSet ? opts.multiTagStripe : undefined;
+	const cardStyle = cardFillStyle({ highlighted, isSet, fillHue, fillPattern, isTint, tintHue, encFillColor: opts.encFillColor, multiTagStripe });
 
 	// Fill first so the stroke below sits cleanly on top.
 	ctx.beginPath();

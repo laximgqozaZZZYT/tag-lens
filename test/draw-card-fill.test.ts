@@ -55,3 +55,31 @@ const ENC = "hsl(118, 65%, 55%)"; // a resolved colour-encoding output (e.g. out
 	const cs = cardFillStyle({ highlighted: false, isSet: false, isTint: false, encFillColor: ENC });
 	ok(cs.fill === ENC && cs.stroke === "ACCENT", "encoded note: fill=enc, stroke=accent");
 }
+
+const STRIPE = "STRIPE_PATTERN"; // stand-in for a multi-tag ∩ stripe gradient
+
+// 7) A multi-tag NOTE stripe beats the (tag-based) encFillColor — a solid fill on
+//    a multi-tag note would contradict the ∩=striped legend.
+{
+	const cs = cardFillStyle({ highlighted: false, isSet: false, isTint: false, encFillColor: ENC, multiTagStripe: STRIPE });
+	ok(cs.fill === STRIPE, `multi-tag stripe beats encFillColor (got ${cs.fill})`);
+}
+
+// 8) ...but SET fill still wins over a (note-only) stripe, and...
+{
+	const cs = cardFillStyle({ highlighted: false, isSet: true, fillHue: 30, isTint: false, multiTagStripe: STRIPE });
+	ok(cs.fill === "swatch:30:fill", `SET fill wins over note stripe (got ${cs.fill})`);
+}
+
+// 9) ...highlight still wins over the stripe.
+{
+	const cs = cardFillStyle({ highlighted: true, isSet: false, isTint: false, multiTagStripe: STRIPE });
+	ok(cs.fill === "WARN" && cs.stroke === "WARN", "highlight wins over note stripe");
+}
+
+// 10) Single-tag note (caller passes no stripe) keeps the encoding/tint/default
+//     precedence unchanged — the stripe field is simply absent.
+{
+	const cs = cardFillStyle({ highlighted: false, isSet: false, isTint: true, tintHue: 200, encFillColor: ENC });
+	ok(cs.fill === ENC, "single-tag note: no stripe → encoding still wins over tint");
+}

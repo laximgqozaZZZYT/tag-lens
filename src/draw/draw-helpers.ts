@@ -644,6 +644,7 @@ export function drawJunihitoeStack(
 	zoom: number,
 	highlighted = false,
 	minFontPx = 0,
+	noLabel = false,
 ): void {
 	const cx = group.x;
 	const cy = group.y;
@@ -692,7 +693,7 @@ export function drawJunihitoeStack(
 		ctx.strokeStyle = isFront ? (highlighted ? theme().accent : theme().cardBorder) : colorAlpha(colors[i], 0.6);
 		ctx.stroke();
 		
-		if (isFront) {
+		if (isFront && !noLabel) {
 			ctx.textAlign = "start";
 			ctx.textBaseline = "top";
 			

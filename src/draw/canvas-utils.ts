@@ -1,5 +1,22 @@
 // Canvas drawing helpers and small string utilities used by the renderer.
 import { theme } from "./theme";
+import { NONE_BUCKET } from "../types";
+
+// A note that belongs to MULTIPLE tags sits in the INTERSECTION (∩) of those
+// tag sets, so its card / icon must read as a VERTICAL stripe of each tag's
+// colour (matching the closeup ∩ legend + the lattice intersection nodes),
+// not as the single colour of its first membership. This is the single source
+// of truth for "which hues stripe a multi-tag NODE":
+//   • drop NONE_BUCKET so an untagged note is never treated as multi-tag
+//   • map each surviving membership to its cluster hue (same hue the legend
+//     and every other mode assign that tag)
+// Returns the distinct-order hue list; a 0- or 1-length result means the node
+// is single-tag (or untagged) → callers draw a SOLID fill, never a stripe.
+export function membershipStripeHues(memberships: string[] | undefined): number[] {
+	if (!memberships) return [];
+	const tags = memberships.filter((m) => m !== NONE_BUCKET);
+	return tags.map((m) => clusterHue(m));
+}
 
 // Which set-operation a striped node depicts, and therefore its stripe
 // ORIENTATION. The renderer maps:

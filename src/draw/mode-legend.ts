@@ -254,10 +254,16 @@ function buildModeLegendBody(mode: ViewMode, input: ModeLegendInput): LegendSpec
 			return [tagKey(input, "Dot · Tag")];
 		case "droste":
 			return [tagKey(input, "Color · Tag"), drosteSetOps(input)];
+		case "bubblesets": {
+			const out: LegendSpec[] = [];
+			// BubbleSets: "clean" legend — only Cluster colors/names (Groups & overlap),
+			// suppressing Shape/Tag encodings both here and in the figure.
+			if (input.groups?.length || input.setLayers?.length) out.push(groupEnclosures(input));
+			return out;
+		}
 		case "euler":
 		case "euler-true":
-		case "euler-venn":
-		case "bubblesets": {
+		case "euler-venn": {
 			const out: LegendSpec[] = [];
 			// Emit the "Groups & overlap" spec when there are single-tag cluster
 			// frames OR addressable ∪/∩ set-layers to fold in. Without the

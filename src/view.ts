@@ -25,7 +25,7 @@ import {
 	getSortKey as getSortKeyFn,
 	computeDroppedClusters as computeDroppedClustersFn,
 } from "./query/query-pipeline";
-import { clusterHue, createStripePattern, createStripeGradient, resolveNodeStripe } from "./draw/canvas-utils";
+import { clusterHue, createStripePattern, createStripeGradient, resolveNodeStripe, membershipStripeHues } from "./draw/canvas-utils";
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
 import { runAggregateSnap } from "./layout/aggregate-snap";
@@ -347,6 +347,11 @@ export class MiniGraphView extends ItemView {
 	// Visual Encoding output (computed per rebuild): per-node draw params + legends.
 	private encParams: Map<string, NodeDrawParams> = new Map();
 	private encLegends: BindingLegend[] = [];
+	// True when the colour channel is unbound OR bound to the tag/cluster field.
+	// Only then may a multi-tag NOTE be striped with its tag colours — otherwise
+	// the colour channel encodes some OTHER attribute and a tag-coloured stripe
+	// would contradict it. Recomputed each rebuild from the effective encoding.
+	private colorIsTagBased = true;
 	// F5: cached screen-space rect of the on-canvas legend's × button, set every
 	// draw so the click handler can hit-test it. Null when no legend / no close.
 	private legendCloseRect: { x: number; y: number; w: number; h: number } | null = null;
@@ -1297,6 +1302,13 @@ export class MiniGraphView extends ItemView {
 		const encRes = evaluateEncoding(layoutData.nodes, effEnc, encCtx, this.settings.viewMode);
 		this.encParams = encRes.params;
 		this.encLegends = encRes.legends;
+		// A multi-tag note may be striped with its tag colours only when the
+		// colour channel does NOT encode some other attribute. An enabled colour
+		// binding to anything but the tag field claims the fill, so the stripe
+		// stands down (the legend would otherwise lie). No colour binding (or a
+		// `color`→`tag` binding) ⇒ tag-based ⇒ stripe is the natural fill.
+		const colorBinding = effEnc.find((b) => b.enabled && b.channelId === "color");
+		this.colorIsTagBased = !colorBinding || colorBinding.fieldId === "tag";
 
 		// Card sizes derive from the user-configured row × column span
 		// times the canonical CARD_CELL_W × CARD_CELL_H lattice step, with
@@ -2680,7 +2692,8 @@ export class MiniGraphView extends ItemView {
 			dpr * this.panX,
 			dpr * this.panY,
 		);
-		if (this.settings.showEnclosures) {
+		// BubbleSets: clean figure — suppress cluster labels. Tag info is removed.
+		if (this.settings.showEnclosures && this.settings.viewMode !== "bubblesets") {
 			this.drawClusterLabels(ctx);
 		}
 
@@ -2837,7 +2850,8 @@ export class MiniGraphView extends ItemView {
 		// whenever the whole diagram is in view — independent of the Graph-
 		// display toggles, and separate from the on-grid title bars. Not in
 		// UpSet mode.
-		if (this.overviewActive && !this.laid.upset) {
+		// BubbleSets: clean figure — suppress cluster labels.
+		if (this.overviewActive && !this.laid.upset && this.settings.viewMode !== "bubblesets") {
 			drawOverviewLabelsFn(ctx, this.laid, this.zoom, this.settings.havingMode === "highlight" ? this.highlightedHavingClusters : undefined);
 		}
 	}
@@ -2911,6 +2925,7 @@ export class MiniGraphView extends ItemView {
 		cardH: number,
 		highlighted = false,
 	): void {
+		const isBubbles = this.settings.viewMode === "bubblesets";
 		drawJunihitoeStackFn(
 			ctx,
 			group,
@@ -2919,6 +2934,7 @@ export class MiniGraphView extends ItemView {
 			this.zoom,
 			highlighted,
 			this.settings.minFontPx,
+			isBubbles,
 		);
 	}
 
@@ -2948,6 +2964,10 @@ export class MiniGraphView extends ItemView {
 		const clustered =
 			this.settings.viewMode === "bipartite" &&
 			this.settings.bipartiteLayout === "clustered";
+
+		// BubbleSets: clean figure — suppress Shape and Tag (title) rendering.
+		const isBubbles = this.settings.viewMode === "bubblesets";
+
 		drawCardFn(ctx, n, {
 			scale,
 			bodyLines: [],
@@ -2984,21 +3004,57 @@ export class MiniGraphView extends ItemView {
 			// Clustered LOD: the tag-centre label has a LOWER threshold than note
 			// titles, so when zooming out the note names drop to markers first and
 			// the island's tag label is the last to disappear.
-			titleLodPx: clustered ? (isSet ? 26 : 48) : undefined,
+			titleLodPx: isBubbles ? 999999 : (clustered ? (isSet ? 26 : 48) : undefined),
 			fmMaturity: n.fmMaturity,
 			showMaturity: this.settings.showMaturity,
 			encFillColor: this.encParams.get(n.id)?.fillColor,
+			// A NOTE that belongs to MULTIPLE tags sits in their ∩, so it must read
+			// as the VERTICAL stripe of its tag colours — NOT the single colour of
+			// its first tag (the old field-source[0] behaviour) and NOT the solid
+			// encFillColor (which the legend says is striped for ∩). Mirrors the
+			// lattice intersection-node rule. Applies to ALL note cards (no `isSet`
+			// gate) so BubbleSets/Euler/UpSet individual cards stripe too. Guarded
+			// by `colorIsTagBased` so a non-tag colour encoding keeps its solid fill.
+			multiTagStripe: this.multiTagStripeFor(ctx, n, isSet),
 			encOpacity: this.encParams.get(n.id)?.opacity,
 			encBorderColor: this.encParams.get(n.id)?.borderColor,
-			encShape: this.encParams.get(n.id)?.shape,
+			encShape: isBubbles ? undefined : this.encParams.get(n.id)?.shape,
 		});
+	}
+
+	// Build the ∩ vertical stripe for a NOTE card that belongs to MULTIPLE tags,
+	// or `undefined` when the card must stay SOLID. Returns undefined when:
+	//   • the node is a SET node (it owns the fillPattern/fillHue union path), or
+	//   • the colour channel encodes a non-tag attribute (`colorIsTagBased` false
+	//     ⇒ the encFillColor stands, so the stripe would contradict the legend), or
+	//   • the node has ≤1 real tag (NONE_BUCKET dropped) ⇒ single-tag → solid.
+	// Otherwise it paints a one-cycle vertical gradient across the card bbox —
+	// one equal band per tag colour — identical to the lattice intersection node.
+	private multiTagStripeFor(
+		ctx: CanvasRenderingContext2D,
+		n: PositionedNode,
+		isSet: boolean,
+	): CanvasGradient | string | undefined {
+		if (isSet || !this.colorIsTagBased) return undefined;
+		const hues = membershipStripeHues(n.memberships);
+		if (hues.length <= 1) return undefined; // single-tag / untagged → solid
+		return createStripeGradient(
+			ctx,
+			n.x - n.width / 2,
+			n.y - n.height / 2,
+			n.width,
+			n.height,
+			hues,
+			/*isVertical=*/ true, // ∩ intersection → vertical bands
+		);
 	}
 
 	// F5: gather the per-mode legend input (encoding specs + cluster swatches +
 	// count range + heatmap flag) from the current layout. Pure read — never
 	// mutates state, so the legend stays a display-only overlay.
 	private buildModeLegendInput(): ModeLegendInput {
-		const encodingSpecs = encodingToSpecs(this.encLegends);
+		const isBubbles = this.settings.viewMode === "bubblesets";
+		const encodingSpecs = isBubbles ? [] : encodingToSpecs(this.encLegends);
 		const t = theme();
 		const aggSet = new Set(this.settings.aggregatedLayers);
 		// LAYERS & OVERRIDES content is surfaced in EVERY view mode and perspective

@@ -6,8 +6,40 @@ import {
 	stripeHuesForExtent,
 	resolveNodeStripe,
 	clusterHue,
+	membershipStripeHues,
 } from "../src/draw/canvas-utils";
+import { NONE_BUCKET } from "../src/types";
 import { setTheme, defaultTheme, theme } from "../src/draw/theme";
+
+// === membershipStripeHues: which hues stripe a multi-tag NOTE ===
+// A multi-tag note is an ∩ node → its card/icon stripes by its tag colours.
+{
+	const hues = membershipStripeHues(["a", "b", "c"]);
+	ok(
+		hues.length === 3 &&
+			hues[0] === clusterHue("a") &&
+			hues[1] === clusterHue("b") &&
+			hues[2] === clusterHue("c"),
+		"multi-tag note → one cluster hue per tag, in order",
+	);
+}
+// Single-tag note → 1 hue (caller treats length<=1 as SOLID, no stripe).
+{
+	ok(membershipStripeHues(["only"]).length === 1, "single-tag note → 1 hue (solid)");
+}
+// NONE_BUCKET is NOT a tag → dropped so an untagged note is never multi-tag.
+{
+	ok(membershipStripeHues([NONE_BUCKET]).length === 0, "untagged note → 0 hues");
+	const mixed = membershipStripeHues([NONE_BUCKET, "real"]);
+	ok(
+		mixed.length === 1 && mixed[0] === clusterHue("real"),
+		"NONE_BUCKET dropped → a note with 1 real tag + (none) stays single-tag",
+	);
+}
+// undefined memberships → empty (defensive).
+{
+	ok(membershipStripeHues(undefined).length === 0, "undefined memberships → 0 hues");
+}
 
 // These run in plain Node (no `document`), so createStripePattern must take the
 // flat-colour fallback path and NEVER throw. The DOM/CanvasPattern branch is

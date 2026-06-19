@@ -1,7 +1,7 @@
 import { buildIcon, type DrosteGallery, type IconDiagram } from "../layout/droste-layout";
 import type { AxisSpec } from "../layout/axis-layout";
 import { theme, colorAlpha, parseColor, relativeLuminance } from "./theme";
-import { truncateToWidth, clusterHue, createStripeGradient, stripeHuesForExtent } from "./canvas-utils";
+import { truncateToWidth, clusterHue, createStripeGradient, stripeHuesForExtent, membershipStripeHues } from "./canvas-utils";
 
 // Containment lens = Icon Gallery (spec 2026-06-01). Every node gets an "icon diagram"
 // (① N ∈ ② sig(N) ∈ ③ direct-superset sets ∈ …), all tiled in a grid and navigated by
@@ -123,6 +123,12 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 	const dpr = o.dpr;
 	const tags = icon.tKeys;
 	const tagHue = (t: string): number => clusterHue(t);
+	// A NOTE's OWN tag colours (NONE_BUCKET dropped). >1 ⇒ the note is multi-tag
+	// → its cell stripes ∩-vertical; ≤1 ⇒ undefined so the caller draws solid.
+	const memberStripeHues = (id: string): number[] | undefined => {
+		const hues = membershipStripeHues(o.gallery.nodeKeys.get(id));
+		return hues.length > 1 ? hues : undefined;
+	};
 
 
 	type Item = { id?: string; label: string; hue: number; hues?: number[]; agg?: boolean; placeholder?: boolean; spacer?: boolean };
@@ -141,7 +147,17 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDiagram, scx: number,
 					? set.keys.map((k) => tagHue(k))
 					: undefined;
 			if (si > 0) out.push({ label: "", hue, spacer: true }); // gap between incomparable sets
-			for (const m of set.members) out.push({ id: m.id, label: m.label, hue, hues });
+			// A NOTE that itself belongs to MULTIPLE tags is an ∩ node, so its
+			// individual cell must read as the VERTICAL stripe of ITS OWN tag
+			// colours (matching the lattice / card rule) — not the single set hue
+			// nor only this set's shared-signature stripe. We look the member's
+			// full tag keys up from the gallery index. ⑤ link/backlink cells keep
+			// the relationship hue (set.hue defined) — their colour encodes the
+			// link kind, not tags, so they are never tag-striped.
+			for (const m of set.members) {
+				const memberHues = set.hue === undefined ? memberStripeHues(m.id) : undefined;
+				out.push({ id: m.id, label: m.label, hue, hues: memberHues ?? hues });
+			}
 			if (set.overflow > 0) out.push({ label: `+${set.overflow}`, hue, agg: true });
 			if (set.members.length === 0 && set.overflow === 0) out.push({ label: set.label, hue, hues, placeholder: true });
 		});
