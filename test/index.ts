@@ -43,5 +43,6 @@ import "./zoom-math.test";
 import "./hit-modes.test";
 import "./settings-parity.test";
 import "./attribute-propagation.test";
+import "./euler-true-stripes.test";
 
 summary();
