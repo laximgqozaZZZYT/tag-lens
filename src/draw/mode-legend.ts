@@ -74,36 +74,53 @@ function sizeKey(title: string, input: ModeLegendInput): LegendSpec {
 	] };
 }
 
-// Group enclosures: each cluster is the UNION (∪) of its tag's notes, painted as
-// a tinted frame; overlapping frames are the INTERSECTION (∩) of two tags. Mirrors
-// draw-enclosures (swatch tint @0.32). The trailing ∩ row explains the overlap.
+// Group enclosures: each cluster is the frame drawn around one tag's notes
+// (a "group"); overlapping frames mark notes that carry two tags at once (the
+// "overlap"). Mirrors draw-enclosures (swatch tint @0.32). Labelled in plain
+// words instead of bare ∪/∩ glyphs so the row is legible without a legend-for-
+// the-legend; the trailing row explains the overlap when no addressable
+// Union/Intersection layer is present.
 function groupEnclosures(input: ModeLegendInput): LegendSpec {
 	const max = input.maxItems ?? 12;
 	const groups = input.groups ?? [];
 	const entries: { label: string; color?: string }[] = groups
 		.slice(0, max)
-		.map((g) => ({ label: `∪ ${g.label}`, color: g.color }));
+		.map((g) => ({ label: `Group: ${g.label}`, color: g.color }));
 	if (groups.length > max) entries.push({ label: `+${groups.length - max} more` });
-	// CLOSEUP: the ∪ / ∩ are addressable layers (own NODE_DISPLAY · count ·
-	// aggregate) — list them with their resolved content. PANORAMA: keep the
-	// prior plain "∩ overlap" descriptive row.
+	// CLOSEUP: Union/Intersection are addressable layers (their own resolved
+	// card size + note count + aggregate state) — list them with that content.
+	// PANORAMA: keep the prior plain descriptive row (no addressable layer to
+	// show details for).
 	const setLayers = input.setLayers ?? [];
 	if (setLayers.length) {
 		for (const sl of setLayers) entries.push({ label: sl.label, color: sl.color });
 	} else {
-		entries.push({ label: "∩ overlap: note in 2+ groups" });
+		entries.push({ label: "Overlap: note shared by 2+ groups" });
 	}
-	return { title: "Group enclosures (∪) / overlap (∩)", kind: "categorical", entries };
+	return { title: "Groups & overlap", kind: "categorical", entries };
+}
+
+// ALL VIEW MODES: Union/Intersection are addressable layers distinct from the
+// single-tag clusters. Enclosure modes fold them into `groupEnclosures`, but
+// every other mode surfaces them as their own unified "Union / Intersection"
+// spec so the LAYERS & OVERRIDES content (resolved card size + note count +
+// aggregate state) is visible regardless of view mode. Purely additive — the
+// mode's intrinsic specs are never altered.
+function setLayersLegend(input: ModeLegendInput): LegendSpec | null {
+	const setLayers = input.setLayers ?? [];
+	if (!setLayers.length) return null;
+	const entries: { label: string; color?: string }[] = setLayers.map((sl) => ({ label: sl.label, color: sl.color }));
+	return { title: "Union / Intersection layers", kind: "categorical", entries };
 }
 
 function drosteSetOps(input: ModeLegendInput): LegendSpec {
 	const d = input.droste;
 	const entries: { label: string; color?: string }[] = [
-		{ label: "Focus node (N)", color: d?.focusColor },
-		{ label: "Intersection (∩T): exact-T notes", color: d?.intersectionColor },
-		{ label: "Union/subset frame (∪): shared subsets of T", color: d?.unionColor },
+		{ label: "Focus note", color: d?.focusColor },
+		{ label: "Intersection: has every focus tag", color: d?.intersectionColor },
+		{ label: "Union frame: shares a subset of focus tags", color: d?.unionColor },
 	];
-	return { title: "Set operations", kind: "categorical", entries };
+	return { title: "Gallery key", kind: "categorical", entries };
 }
 
 function latticeLegend(input: ModeLegendInput): LegendSpec[] {
@@ -191,9 +208,21 @@ export function buildModeLegend(mode: ViewMode, input: ModeLegendInput): LegendS
 	// Heatmap / Lattice have intrinsic scales/structure. Even when encoding
 	// bindings exist globally, these legends must reflect their own view grammar.
 	const isEnclosure = mode === "euler" || mode === "euler-true" || mode === "euler-venn" || mode === "bubblesets";
+	// Enclosure modes fold the ∪/∩ set-layers into their Group enclosures spec;
+	// every other mode appends them as a separate unified "Set layers" spec so
+	// they show in ALL view modes. Computed once, appended after the intrinsic
+	// specs (including the bound-encoding early return) so nothing intrinsic
+	// changes — the set-layers row is strictly additive.
+	const extraSetLayers = isEnclosure ? null : setLayersLegend(input);
+	const withSetLayers = (specs: LegendSpec[]): LegendSpec[] =>
+		extraSetLayers ? [...specs, extraSetLayers] : specs;
 	if (mode !== "heatmap" && mode !== "lattice" && mode !== "droste" && !isEnclosure && input.encodingSpecs.length) {
-		return input.encodingSpecs;
+		return withSetLayers(input.encodingSpecs);
 	}
+	return withSetLayers(buildModeLegendBody(mode, input));
+}
+
+function buildModeLegendBody(mode: ViewMode, input: ModeLegendInput): LegendSpec[] {
 	switch (mode) {
 		case "heatmap": {
 			const co = input.heatmap?.jaccard ? "Co-occurrence (Jaccard)" : "Co-occurrence";

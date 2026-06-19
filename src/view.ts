@@ -17,7 +17,7 @@ import {
 	type ClusterRect,
 } from "./layout/layout";
 import type { MiniSettings, GraphNode, GraphData, ViewMode, LensPreset } from "./types";
-import { CARD_CELL_W, CARD_CELL_H } from "./types";
+import { CARD_CELL_W, CARD_CELL_H, NONE_BUCKET } from "./types";
 import { type LimitRule, applyLimitRules } from "./query/limit";
 import { filterMemberships, filterLabels } from "./query/query-filters";
 import {
@@ -1424,6 +1424,11 @@ export class MiniGraphView extends ItemView {
 		this.lastFramedMode = this.settings.viewMode;
 		const isDroste = this.settings.viewMode === "droste";
 		if (modeChanged || (wasEmpty && !isDroste)) this.fitToView();
+		// Keep the "Return to Panorama" toolbar button in sync with
+		// settings.perspective regardless of which code path drove this
+		// rebuild (toolbar buttons, drill-down, or the View mode radios in
+		// the settings panel).
+		this.updatePanoramaActionVisibility();
 		this.requestDraw();
 		this.refreshSettingsTab();
 	}
@@ -2887,8 +2892,9 @@ export class MiniGraphView extends ItemView {
 		const encodingSpecs = encodingToSpecs(this.encLegends);
 		const t = theme();
 		const aggSet = new Set(this.settings.aggregatedLayers);
-		// CLOSEUP-ONLY augmentation. In panorama the legend keeps its prior plain
-		// per-mode behaviour (no LAYERS & OVERRIDES suffix, no ∩/∪ layers).
+		// LAYERS & OVERRIDES content is surfaced in EVERY view mode and perspective
+		// now (the ∪/∩ set-layers + the resolved NODE_DISPLAY suffix), keeping the
+		// per-mode intrinsic legends intact and merely ADDING the layer info.
 		const isCloseup = this.settings.perspective === "closeup";
 		// Per-tag VISIBLE COUNT that is correct in every view mode. Euler-family
 		// stores it on `cluster.memberCount`, but node-grid modes
@@ -2918,14 +2924,15 @@ export class MiniGraphView extends ItemView {
 		};
 		// LAYERS & OVERRIDES content per layer: resolved NODE_DISPLAY (R×C) +
 		// visible-node count + aggregate state. ` ⊞` flags an aggregated layer.
-		// Empty in panorama. `count` lets callers pass a pre-resolved figure (e.g.
-		// the cluster's own memberCount) instead of re-deriving it.
+		// Shown in EVERY view mode + perspective. `count` lets callers pass a
+		// pre-resolved figure (e.g. the cluster's own memberCount) instead of
+		// re-deriving it; when no count is derivable the figure is safely omitted.
 		const layerSuffix = (groupKey: string, count?: number): string => {
-			if (!isCloseup) return "";
 			const n = count ?? tagVisibleCount(groupKey);
 			const d = this.resolveFromCluster(groupKey);
-			let s = ` ${d.nodeRows}×${d.nodeCols} · ${n}`;
-			if (aggSet.has(groupKey)) s += " ⊞";
+			const sizeLabel = `${d.nodeRows}×${d.nodeCols} card`;
+			let s = Number.isFinite(n) ? ` — ${sizeLabel}, ${n} note${n === 1 ? "" : "s"}` : ` — ${sizeLabel}`;
+			if (aggSet.has(groupKey)) s += " (aggregated)";
 			return s;
 		};
 		const seen = new Set<string>();
@@ -3050,34 +3057,82 @@ export class MiniGraphView extends ItemView {
 		let groups: ModeLegendInput["groups"];
 		let setLayers: ModeLegendInput["setLayers"];
 		const enclosureModes = ["euler", "euler-true", "euler-venn", "bubblesets"];
+		// `groups` (the cluster enclosure swatches) stay INTRINSIC to enclosure
+		// modes — leaving the per-mode element policy unchanged.
 		if (enclosureModes.includes(this.settings.viewMode) && this.laid.clusters?.length) {
 			groups = this.laid.clusters.map((c) => ({
 				key: c.groupKey,
 				label: `${c.label} (${c.memberCount})${layerSuffix(c.groupKey)}`,
 				color: t.swatch(clusterHue(c.groupKey), "tint", 0.32),
 			}));
-			// CLOSEUP only: surface ∪ / ∩ as addressable layers with their own
-			// resolved NODE_DISPLAY (R×C) · visible count · aggregate state.
-			if (isCloseup) {
+		}
+		// ∪ / ∩ are addressable layers DISTINCT from the single-tag clusters and are
+		// surfaced in EVERY view mode. `unionN` = distinct visible notes, `interN` =
+		// notes carrying 2+ tags. Each mode keeps its visible notes in a different
+		// place, so derive the membership multiplicity from whichever source the
+		// current layout populated (mirrors tagVisibleCount):
+		//   • node modes → `laid.nodes[].memberships`
+		//   • matrix     → `laid.matrix.bits` (per-row column bitset)
+		//   • droste     → `laid.drosteGallery.nodeKeys` (cell id → tag keys)
+		// resolveSetLayer applies the single-tag superset cascade (full/partial
+		// inheritance) so single-set settings influence ∪/∩.
+		const setMembershipCounts = (): { unionN: number; interN: number } | null => {
+			if (this.laid.nodes.length) {
 				const visible = this.laid.nodes;
-				const unionN = visible.length;
-				const interN = visible.filter((n) => (n.memberships?.length ?? 0) >= 2).length;
-				const aggSuffix = (key: string): string => (aggSet.has(key) ? " ⊞" : "");
-				const u = this.resolveSetLayer(UNION_LAYER_KEY);
-				const i = this.resolveSetLayer(INTERSECTION_LAYER_KEY);
-				setLayers = [
-					{
-						key: UNION_LAYER_KEY,
-						label: `${SET_LAYER_LABEL[UNION_LAYER_KEY]} ${u.nodeRows}×${u.nodeCols} · ${unionN}${aggSuffix(UNION_LAYER_KEY)}`,
-						color: t.swatch(140, "tint", 0.32),
-					},
-					{
-						key: INTERSECTION_LAYER_KEY,
-						label: `${SET_LAYER_LABEL[INTERSECTION_LAYER_KEY]} ${i.nodeRows}×${i.nodeCols} · ${interN}${aggSuffix(INTERSECTION_LAYER_KEY)}`,
-						color: t.swatch(45, "tint", 0.32),
-					},
-				];
+				return {
+					unionN: visible.length,
+					interN: visible.filter((n) => (n.memberships?.length ?? 0) >= 2).length,
+				};
 			}
+			const m = this.laid.matrix;
+			if (m?.bits?.length) {
+				let unionN = 0, interN = 0;
+				for (const row of m.bits) {
+					let deg = 0;
+					for (let c = 0; c < row.length; c++) if (row[c]) deg++;
+					if (deg >= 1) unionN++;
+					if (deg >= 2) interN++;
+				}
+				return { unionN, interN };
+			}
+			const gallery = this.laid.drosteGallery;
+			if (gallery?.cells.length) {
+				let unionN = 0, interN = 0;
+				const counted = new Set<string>();
+				for (const cell of gallery.cells) {
+					if (counted.has(cell.id)) continue;
+					counted.add(cell.id);
+					// keysOf() in droste-layout falls back to `[NONE_BUCKET]` for
+					// untagged notes, so count only REAL tag keys for the membership
+					// degree (mirrors matrix.bits / nodes.memberships — neither carries
+					// NONE_BUCKET). Otherwise untagged notes inflate the ∪ count.
+					const deg = (gallery.nodeKeys.get(cell.id) ?? []).filter((k) => k !== NONE_BUCKET).length;
+					if (deg >= 1) unionN++;
+					if (deg >= 2) interN++;
+				}
+				return { unionN, interN };
+			}
+			return null;
+		};
+		const setCounts = setMembershipCounts();
+		if (setCounts) {
+			const { unionN, interN } = setCounts;
+			const aggSuffix = (key: string): string => (aggSet.has(key) ? " (aggregated)" : "");
+			const u = this.resolveSetLayer(UNION_LAYER_KEY);
+			const i = this.resolveSetLayer(INTERSECTION_LAYER_KEY);
+			const noteWord = (n: number): string => `${n} note${n === 1 ? "" : "s"}`;
+			setLayers = [
+				{
+					key: UNION_LAYER_KEY,
+					label: `${SET_LAYER_LABEL[UNION_LAYER_KEY]} — ${u.nodeRows}×${u.nodeCols} card, ${noteWord(unionN)}${aggSuffix(UNION_LAYER_KEY)}`,
+					color: t.swatch(140, "tint", 0.32),
+				},
+				{
+					key: INTERSECTION_LAYER_KEY,
+					label: `${SET_LAYER_LABEL[INTERSECTION_LAYER_KEY]} — ${i.nodeRows}×${i.nodeCols} card, ${noteWord(interN)}${aggSuffix(INTERSECTION_LAYER_KEY)}`,
+					color: t.swatch(45, "tint", 0.32),
+				},
+			];
 		}
 		return {
 			encodingSpecs,

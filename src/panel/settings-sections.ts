@@ -288,20 +288,47 @@ export function renderViewModeOption(
 	input.addEventListener("change", () => {
 		if (!input.checked) return;
 		const next = input.value as MiniSettings["viewMode"];
-		
+
+		// Clicking a radio is navigation, not just a remembered preference:
+		// it must always switch the live canvas to that mode (and its
+		// perspective), even when the panel is currently showing the other
+		// perspective. Previously the panorama/closeup mode was only updated
+		// when its own perspective was already active, so e.g. clicking
+		// "Co-occurrence heatmap" (Panorama) while viewing BubbleSets
+		// (Close-up) silently recorded the preference without ever drawing
+		// heatmap or its legend — the radio looked selected but nothing
+		// visibly happened.
 		let changed = false;
-		if (type === "panorama" && deps.settings.panoramaMode !== next) {
-			deps.settings.panoramaMode = next;
-			if (deps.settings.perspective === "panorama") {
-				deps.settings.viewMode = next;
+		if (type === "panorama") {
+			if (deps.settings.panoramaMode !== next) {
+				deps.settings.panoramaMode = next;
+				changed = true;
 			}
-			changed = true;
-		} else if (type === "closeup" && deps.settings.closeupMode !== next) {
-			deps.settings.closeupMode = next;
-			if (deps.settings.perspective === "closeup") {
+			if (deps.settings.perspective !== "panorama" || deps.settings.viewMode !== next) {
+				deps.settings.perspective = "panorama";
 				deps.settings.viewMode = next;
+				changed = true;
 			}
-			changed = true;
+			// Returning to Panorama must show the WHOLE vault again, same as the
+			// toolbar's "Return to Panorama" button (see view.ts switchToPanorama).
+			// Close-up leaves `focusNodeIds` set to its (sub)set of notes; without
+			// clearing it here, navigating to Panorama via this radio kept the
+			// graph filtered to that stale closeup subset — vault-wide content
+			// never reappeared (the actual regression this fix addresses).
+			if (deps.settings.focusNodeIds !== undefined) {
+				delete deps.settings.focusNodeIds;
+				changed = true;
+			}
+		} else {
+			if (deps.settings.closeupMode !== next) {
+				deps.settings.closeupMode = next;
+				changed = true;
+			}
+			if (deps.settings.perspective !== "closeup" || deps.settings.viewMode !== next) {
+				deps.settings.perspective = "closeup";
+				deps.settings.viewMode = next;
+				changed = true;
+			}
 		}
 
 		if (!changed) return;

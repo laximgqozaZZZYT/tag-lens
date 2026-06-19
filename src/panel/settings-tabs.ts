@@ -40,10 +40,6 @@ import {
 	type NodeDisplay,
 } from "../visual/node-display";
 
-// Enclosure modes are the only ones that render ∪/∩ enclosures, so the
-// synthetic set-layers are only meaningful there.
-const ENCLOSURE_MODES = ["euler", "euler-true", "euler-venn", "bubblesets"];
-
 export interface ViewTabDeps {
 	settings: MiniSettings;
 	save: () => void;
@@ -536,23 +532,24 @@ export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): v
 
 function renderLayersSubSection(el: HTMLElement, deps: EncodeTabDeps): void {
 	const clusters = deps.laid.clusters;
-	if (clusters.length === 0) {
-		const hint = el.createDiv({ cls: "gim-panel-hint" });
-		hint.setText("No layers in the current graph (set GROUP_BY to create clusters).");
-		return;
-	}
-	// CLOSEUP-only: the synthetic ∪/∩ set-layers are addressable alongside the
-	// real clusters under enclosure modes. Absent in panorama.
-	const showSetLayers =
-		deps.settings.perspective === "closeup" &&
-		ENCLOSURE_MODES.includes(deps.settings.viewMode);
+	// The synthetic ∪/∩ set-layers are addressable layers in EVERY view mode and
+	// perspective — distinct from the single-tag clusters, with their own
+	// NODE_DISPLAY overrides + inheritance (the single-tag clusters are their
+	// supersets, so single-set settings still cascade into ∪/∩). Because ∪/∩ are
+	// always present, even when the layout has no real clusters (non-enclosure
+	// modes: matrix / droste / heatmap, or an empty enclosure graph) the ∪/∩ tabs
+	// remain editable — so there is no empty-hint fallback.
 	const tabKeys = [
 		...clusters.map((c) => c.groupKey),
-		...(showSetLayers ? SET_LAYER_KEYS : []),
+		...SET_LAYER_KEYS,
 	];
-	// Keep the selected layer valid; default to the first cluster.
+	// Keep the selected layer valid; default to the first cluster, or the first
+	// set-layer when there are no real clusters.
 	const validKeys = new Set(tabKeys);
-	if (!validKeys.has(deps.activeTab)) deps.setActiveTab(clusters[0].groupKey);
+	if (!validKeys.has(deps.activeTab)) {
+		const fallback = clusters.length > 0 ? clusters[0].groupKey : tabKeys[0];
+		deps.setActiveTab(fallback);
+	}
 
 	const tabBar = el.createDiv({ cls: "gim-panel-tabs" });
 	if (clusters.length > 1) {
@@ -576,10 +573,8 @@ function renderLayersSubSection(el: HTMLElement, deps: EncodeTabDeps): void {
 	for (const c of clusters) {
 		renderTabButton(chipsEl, c.groupKey, `${c.label} (${c.memberCount})`, clusterHue(c.groupKey), c.label, deps);
 	}
-	if (showSetLayers) {
-		for (const sk of SET_LAYER_KEYS) {
-			renderTabButton(chipsEl, sk, SET_LAYER_LABEL[sk], null, SET_LAYER_LABEL[sk], deps);
-		}
+	for (const sk of SET_LAYER_KEYS) {
+		renderTabButton(chipsEl, sk, SET_LAYER_LABEL[sk], null, SET_LAYER_LABEL[sk], deps);
 	}
 	applyTabFilter(el, deps.tabFilter);
 
