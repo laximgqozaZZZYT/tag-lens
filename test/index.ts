@@ -53,5 +53,7 @@ import "./bases-relations.test";
 import "./bases-project.test";
 import "./bases-mode-gate.test";
 import "./bases-fallback.test";
+import "./bases-selection.test";
+import "./bases-skip-postprocess.test";
 
 summary();

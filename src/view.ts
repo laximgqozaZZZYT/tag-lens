@@ -1169,7 +1169,13 @@ export class MiniGraphView extends ItemView {
 		// bubblesets / matrix etc. figure them out natively. Empty selection ⇒ this
 		// block is skipped entirely (classic pipeline, zero impact). Any failure
 		// falls back to the original `data` (non-destructive) and surfaces a Notice.
-		if (shouldScopeToBases(this.settings.filterMode, this.settings.selectedBases)) {
+		// True when the base projection is the active graph source. Used below to
+		// SKIP the SQL-like post-projection stages (HAVING / AUTO-HAVING / LIMIT /
+		// ORDER_BY), keeping Bases mode completely separate from the SQL pipeline so
+		// a base-scoped graph is never thinned by SQL-like filters. Layout / degree /
+		// adjacency (rendering essentials) still run on the base graph as-is.
+		const baseScoped = shouldScopeToBases(this.settings.filterMode, this.settings.selectedBases);
+		if (baseScoped) {
 			try {
 				const edgeKinds = new Set<BaseEdgeKind>();
 				if (this.settings.basesLinkEdges) edgeKinds.add("link");
@@ -1271,43 +1277,52 @@ export class MiniGraphView extends ItemView {
 
 		const _noteCount = this.app.vault.getMarkdownFiles().length;
 
-		// Seed the HAVING field's initial value: when auto is on and the user
-		// has no manual rows, populate settings.having with the concrete auto
-		// rows resolved against this build's node count, so they show up in the
-		// Data > Logic > HAVING field and stay editable. Persisted so the field
-		// retains them and never re-seeds over the user's edits.
-		seedAutoHavingRows(
-			this.settings.having,
-			effHavingAuto,
-			data.nodes.length,
-			(seeded) => {
-				this.settings.having = seeded;
-				void this.save();
-			},
-		);
-		const effHaving = resolveEffectiveHaving(
-			this.settings.having,
-			effHavingAuto,
-			data.nodes.length,
-		);
-		const { dropped, errors: havingErrors } = this.computeDroppedClusters(
-			data.nodes,
-			effHaving,
-			effHavingAuto,
-			{ _noteCount },
-		);
-		if (havingErrors.length > 0) this.havingError = havingErrors.join("; ");
-		else this.havingError = "";
+		// ── HAVING / AUTO-HAVING — SQL-like post-projection filter. SKIPPED in
+		// Bases mode: the base projection is its own complete graph and must not be
+		// thinned by SQL-like cluster filters. Clear prior HAVING state so stale
+		// highlights/errors from an earlier sql/dvjs build don't leak through. ──
+		if (!baseScoped) {
+			// Seed the HAVING field's initial value: when auto is on and the user
+			// has no manual rows, populate settings.having with the concrete auto
+			// rows resolved against this build's node count, so they show up in the
+			// Data > Logic > HAVING field and stay editable. Persisted so the field
+			// retains them and never re-seeds over the user's edits.
+			seedAutoHavingRows(
+				this.settings.having,
+				effHavingAuto,
+				data.nodes.length,
+				(seeded) => {
+					this.settings.having = seeded;
+					void this.save();
+				},
+			);
+			const effHaving = resolveEffectiveHaving(
+				this.settings.having,
+				effHavingAuto,
+				data.nodes.length,
+			);
+			const { dropped, errors: havingErrors } = this.computeDroppedClusters(
+				data.nodes,
+				effHaving,
+				effHavingAuto,
+				{ _noteCount },
+			);
+			if (havingErrors.length > 0) this.havingError = havingErrors.join("; ");
+			else this.havingError = "";
 
-		if (this.settings.havingMode === "highlight") {
-			this.highlightedHavingClusters = dropped;
-		} else {
-			this.highlightedHavingClusters.clear();
-			if (dropped.size > 0) {
-				const droppedSet = new Set(dropped.keys());
-				data = filterMemberships(data, droppedSet);
-				clusterLabels = filterLabels(clusterLabels, droppedSet);
+			if (this.settings.havingMode === "highlight") {
+				this.highlightedHavingClusters = dropped;
+			} else {
+				this.highlightedHavingClusters.clear();
+				if (dropped.size > 0) {
+					const droppedSet = new Set(dropped.keys());
+					data = filterMemberships(data, droppedSet);
+					clusterLabels = filterLabels(clusterLabels, droppedSet);
+				}
 			}
+		} else {
+			this.havingError = "";
+			this.highlightedHavingClusters.clear();
 		}
 		this.clusterLabels = clusterLabels;
 
@@ -1336,9 +1351,14 @@ export class MiniGraphView extends ItemView {
 		this.inDegreeMap = degrees.inDegreeMap;
 		this.outDegreeMap = degrees.outDegreeMap;
 
-		// Stage 3: LIMIT. Per-tier visible-node selection + display-mode
-		// assignment. Edges are re-filtered against the surviving id set.
-		const limitTiers = this.parseLimitRules();
+		// Stage 3: LIMIT (+ ORDER_BY, which only ranks within LIMIT tiers).
+		// Per-tier visible-node selection + display-mode assignment. Edges are
+		// re-filtered against the surviving id set.
+		// SKIPPED in Bases mode: passing zero tiers makes applyLimitRules return
+		// every node at "full" with NO reordering, so the base projection is shown
+		// whole — LIMIT never trims it and ORDER_BY never reshuffles it. Keeps Bases
+		// completely separate from the SQL-like pipeline.
+		const limitTiers = baseScoped ? [] : this.parseLimitRules();
 		const { visibleNodes, modes } = applyLimitRules(
 			data.nodes,
 			limitTiers,
@@ -1369,7 +1389,8 @@ export class MiniGraphView extends ItemView {
 			limitedNodes: menuLimitedNodes(menuSourceData, {
 				app: this.app,
 				settings: this.settings,
-				tiers: this.parseLimitRules(),
+				// Bases mode skips LIMIT ⇒ navigator lists the full base set too.
+				tiers: baseScoped ? [] : this.parseLimitRules(),
 			}),
 		});
 		this.menuNotes = projectMenuNotes(menuNodeSource, this.app);

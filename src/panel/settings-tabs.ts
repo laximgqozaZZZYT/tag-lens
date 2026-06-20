@@ -8,8 +8,9 @@ import {
 	renderExprSection,
 	renderPresetSection,
 } from "./panel-sections";
-import { setIcon, Notice, type App } from "obsidian";
+import { setIcon, Notice, AbstractInputSuggest, type App, type TFile } from "obsidian";
 import { scanBaseFiles } from "../bases/parser";
+import { addBaseFileToSelected, removeBaseFileFromSelected } from "../bases/selection";
 import { applyLens, captureLens, upsertPreset, removePreset } from "../interaction/lens-presets";
 import { displayToggleApplies } from "../visual/display-applicability";
 import type { LensPreset } from "../types";
@@ -95,12 +96,14 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 	const isHeatmap = deps.settings.viewMode === "heatmap";
 	const isBases = deps.settings.filterMode === "bases";
 
-	// ── Bases mode: hide the WHERE + GROUP_BY query UI (the base SCOPE replaces
-	// them) and show the Bases-specific controls instead. HAVING / LIMIT /
-	// ORDER_BY stay visible below as post-projection processing. ──
+	// ── Bases mode is COMPLETELY separate from the SQL-like pipeline: the base
+	// SCOPE replaces WHERE/GROUP_BY, and NONE of the SQL/Dataview-derived query
+	// UI is shown (no HAVING / SORT / ORDER_BY / LIMIT). The Bases input + the
+	// selected-base list are the only controls. The corresponding post-projection
+	// stages are also skipped in view.ts rebuild(), so a base-scoped graph is
+	// never thinned by SQL-like filters. ──
 	if (isBases) {
 		renderBasesSection(el, deps);
-		renderHavingSection(el, deps, isMatrix, isHeatmap);
 		return;
 	}
 
@@ -193,16 +196,57 @@ function renderHavingSection(
 	if (isHeatmap) renderHeatmapMinTagControl(havingSection, deps);
 }
 
+// Typeahead suggester for `.base` files. Filters scanBaseFiles(app) by the
+// current input substring (matched on basename OR path, case-insensitive) and,
+// on selection, hands the chosen file back to the caller via onPick. Already-
+// selected files are excluded so they can't be added twice. The input is an
+// `<input>` text box; AbstractInputSuggest renders the popover under it.
+class BaseFileSuggest extends AbstractInputSuggest<TFile> {
+	constructor(
+		app: App,
+		inputEl: HTMLInputElement,
+		private getFiles: () => TFile[],
+		private isSelected: (path: string) => boolean,
+		private onPick: (file: TFile) => void,
+	) {
+		super(app, inputEl);
+	}
+
+	protected getSuggestions(query: string): TFile[] {
+		const q = query.trim().toLowerCase();
+		return this.getFiles()
+			.filter((f) => !this.isSelected(f.path))
+			.filter(
+				(f) =>
+					q === "" ||
+					f.basename.toLowerCase().includes(q) ||
+					f.path.toLowerCase().includes(q),
+			);
+	}
+
+	renderSuggestion(file: TFile, el: HTMLElement): void {
+		el.createDiv({ text: file.basename });
+		const sub = el.createDiv({ text: file.path });
+		sub.setCssStyles({ fontSize: "10px", color: "var(--text-muted)" });
+	}
+
+	selectSuggestion(file: TFile): void {
+		this.onPick(file);
+	}
+}
+
 // Bases integration (Stage 2). Selecting one or more `.base` files SCOPES the
 // graph to those bases' elements/edges (replaces WHERE/GROUP_BY); deselecting
-// all restores the classic pipeline. Edge-kind + cluster-granularity toggles
-// shape the projection. Each change saves then rebuilds for instant feedback.
+// all restores the classic pipeline. This UI is intentionally minimal and
+// COMPLETELY separate from the SQL-like pipeline: a typeahead input to add
+// bases + a list of the selected ones (each removable). Edge-kind and cluster
+// granularity live in Settings > Display, NOT here. Each change saves + rebuilds.
 function renderBasesSection(el: HTMLElement, deps: FilterTabDeps): void {
 	const section = el.createDiv({ cls: "gim-panel-section" });
 	section.createEl("h4", { text: "Bases" });
 
 	const hint = section.createDiv({
-		text: "Select .base files to scope the graph to their notes (replaces WHERE / GROUP_BY).",
+		text: "Add .base files to scope the graph to their notes (replaces WHERE / GROUP_BY).",
 	});
 	hint.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" });
 
@@ -213,47 +257,61 @@ function renderBasesSection(el: HTMLElement, deps: FilterTabDeps): void {
 		return;
 	}
 
+	// Typeahead input — type to search `.base` files; pick one to add it.
+	const input = section.createEl("input", { type: "text", cls: "gim-base-suggest-input" });
+	input.setAttribute("placeholder", "Search .base files…");
+	input.setCssStyles({ width: "100%", marginBottom: "6px" });
+	if (deps.app) {
+		new BaseFileSuggest(
+			deps.app,
+			input,
+			() => scanBaseFiles(deps.app!),
+			(path) => deps.settings.selectedBases.includes(path),
+			(file) => {
+				deps.settings.selectedBases = addBaseFileToSelected(
+					deps.settings.selectedBases,
+					file.path,
+				);
+				input.value = "";
+				deps.save();
+				deps.refreshFilterTab();
+				deps.rebuild();
+			},
+		);
+	}
+
 	// Bases mode but nothing selected ⇒ no SCOPE is applied (the graph falls back
 	// to the classic WHERE/GROUP_BY result). Nudge the user to pick a base.
 	if (deps.settings.selectedBases.length === 0) {
 		const empty = section.createDiv({ text: "Select at least one .base to scope the graph." });
 		empty.setCssStyles({ fontSize: "11px", color: "var(--text-warning, var(--text-muted))", marginBottom: "6px" });
+		return;
 	}
 
-	const list = section.createDiv();
-	for (const f of baseFiles) {
-		const row = list.createEl("label", { cls: "gim-toggle-row" });
-		const cb = row.createEl("input", { type: "checkbox" });
-		cb.checked = deps.settings.selectedBases.includes(f.path);
-		cb.addEventListener("change", () => {
-			toggleArrayMember(deps.settings, "selectedBases", f.path, cb.checked);
+	// Selected list — one removable row per selected base. Stale entries whose
+	// `.base` no longer exists still show (so the user can clear them).
+	const byPath = new Map(baseFiles.map((f) => [f.path, f]));
+	const list = section.createDiv({ cls: "gim-base-selected-list" });
+	for (const path of deps.settings.selectedBases) {
+		const row = list.createDiv({ cls: "gim-base-selected-row" });
+		row.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", padding: "2px 0" });
+		const file = byPath.get(path);
+		const label = row.createSpan({ text: file ? file.basename : path });
+		label.setCssStyles({ flex: "1 1 auto", minWidth: "0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px" });
+		if (file) label.setAttribute("title", file.path);
+		const remove = row.createEl("a", { cls: "view-action clickable-icon", title: "Remove" });
+		remove.setAttribute("aria-label", "Remove this base");
+		setIcon(remove, "x");
+		remove.addEventListener("click", () => {
+			deps.settings.selectedBases = removeBaseFileFromSelected(
+				deps.settings.selectedBases,
+				path,
+			);
 			deps.save();
+			deps.refreshFilterTab();
 			deps.rebuild();
 		});
-		row.createSpan({ text: f.basename });
 	}
-
-	// Edge-kind + cluster-granularity toggles.
-	const togs = section.createDiv();
-	togs.setCssStyles({ marginTop: "6px" });
-	const boolToggle = (
-		label: string,
-		key: "basesLinkEdges" | "basesSharedTagEdges" | "basesSharedPropEdges" | "basesClusterByView",
-	): void => {
-		const row = togs.createEl("label", { cls: "gim-toggle-row" });
-		const cb = row.createEl("input", { type: "checkbox" });
-		cb.checked = deps.settings[key];
-		cb.addEventListener("change", () => {
-			deps.settings[key] = cb.checked;
-			deps.save();
-			deps.rebuild();
-		});
-		row.createSpan({ text: label });
-	};
-	boolToggle("Edges: internal links", "basesLinkEdges");
-	boolToggle("Edges: shared tags", "basesSharedTagEdges");
-	boolToggle("Edges: shared property", "basesSharedPropEdges");
-	boolToggle("Cluster by view (not by file)", "basesClusterByView");
 }
 
 // Logic-source selector (filterMode). Three mutually-exclusive segments:
@@ -347,9 +405,14 @@ export function renderFilterBodyTab(host: HTMLElement, deps: FilterBodyDeps): vo
 	const filterSection = host.createDiv({ cls: "gim-panel-section" });
 	renderSettingsFilterTab(filterSection, deps);
 
-	const sortSection = host.createDiv({ cls: "gim-panel-section" });
-	sortSection.createEl("h4", { text: "Sort" });
-	renderSettingsSortTab(sortSection, { ...deps, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); } });
+	// The Sort sub-panel (ORDER_BY + LIMIT) is SQL/DataviewJS-only. Bases mode is
+	// completely separate from the SQL-like pipeline, so it shows neither the Sort
+	// UI here nor HAVING above; the matching stages are skipped in rebuild().
+	if (deps.settings.filterMode !== "bases") {
+		const sortSection = host.createDiv({ cls: "gim-panel-section" });
+		sortSection.createEl("h4", { text: "Sort" });
+		renderSettingsSortTab(sortSection, { ...deps, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); } });
+	}
 }
 
 export interface DisplayTabDeps {
@@ -408,6 +471,11 @@ export function renderSettingsDisplayTab(el: HTMLElement, deps: DisplayTabDeps):
 		}
 	}
 
+	// Bases edge kinds + cluster granularity. Moved here from Data > Logic so the
+	// Bases logic UI stays completely separate from these display-shaping options.
+	// They affect how the base projection is wired/clustered, so save + rebuild.
+	renderBasesDisplaySection(el, deps);
+
 	if (displayToggleApplies(deps.settings.viewMode, "showEdges")) {
 		const bridgeSection = el.createDiv({ cls: "gim-panel-section" });
 		bridgeSection.createEl("h4", { text: "Bridge finder" });
@@ -439,6 +507,47 @@ export function renderSettingsDisplayTab(el: HTMLElement, deps: DisplayTabDeps):
 			}
 		});
 	}
+}
+
+// Bases display options, shown in Settings > Display. The Edge-kind checklist
+// (internal links / shared tags / shared property) sits under a "Show Edges"
+// heading; "Cluster by view" follows. These shape the Bases projection but are
+// display concerns, kept OUT of the Data > Logic Bases UI so that the Bases logic
+// surface is purely "pick .base files". Values bind to the same settings keys.
+function renderBasesDisplaySection(el: HTMLElement, deps: DisplayTabDeps): void {
+	const section = el.createDiv({ cls: "gim-panel-section" });
+	section.createEl("h4", { text: "Show Edges" });
+
+	const hint = section.createDiv({ text: "Which relations become edges in Bases mode." });
+	hint.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" });
+
+	const edgeKinds: Array<{ key: "basesLinkEdges" | "basesSharedTagEdges" | "basesSharedPropEdges"; label: string }> = [
+		{ key: "basesLinkEdges", label: "Internal links" },
+		{ key: "basesSharedTagEdges", label: "Shared tags" },
+		{ key: "basesSharedPropEdges", label: "Shared property" },
+	];
+	for (const { key, label } of edgeKinds) {
+		const row = section.createEl("label", { cls: "gim-toggle-row" });
+		const cb = row.createEl("input", { type: "checkbox" });
+		cb.checked = deps.settings[key];
+		cb.addEventListener("change", () => {
+			deps.settings[key] = cb.checked;
+			deps.save();
+			deps.rebuild();
+		});
+		row.createSpan({ text: label });
+	}
+
+	const clusterRow = section.createEl("label", { cls: "gim-toggle-row" });
+	clusterRow.setCssStyles({ marginTop: "6px" });
+	const clusterCb = clusterRow.createEl("input", { type: "checkbox" });
+	clusterCb.checked = deps.settings.basesClusterByView;
+	clusterCb.addEventListener("change", () => {
+		deps.settings.basesClusterByView = clusterCb.checked;
+		deps.save();
+		deps.rebuild();
+	});
+	clusterRow.createSpan({ text: "Cluster by view (not by file)" });
 }
 
 export interface EncodeTabDeps {
