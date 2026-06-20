@@ -93,6 +93,17 @@ export interface FilterTabDeps {
 export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): void {
 	const isMatrix = deps.settings.viewMode === "matrix";
 	const isHeatmap = deps.settings.viewMode === "heatmap";
+	const isBases = deps.settings.filterMode === "bases";
+
+	// ── Bases mode: hide the WHERE + GROUP_BY query UI (the base SCOPE replaces
+	// them) and show the Bases-specific controls instead. HAVING / LIMIT /
+	// ORDER_BY stay visible below as post-projection processing. ──
+	if (isBases) {
+		renderBasesSection(el, deps);
+		renderHavingSection(el, deps, isMatrix, isHeatmap);
+		return;
+	}
+
 	if (deps.settings.filterMode === "dvjs") {
 		const info = el.createDiv({ text: "Return an array of paths or Dataview pages. Example:\nreturn dv.pages('\"\"').map(p => p.file.path).array();" });
 		info.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", whiteSpace: "pre-wrap" });
@@ -143,6 +154,20 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 		{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); } },
 		{ autoKey: "groupByAuto" }
 	);
+
+	renderHavingSection(el, deps, isMatrix, isHeatmap);
+}
+
+// HAVING (+ its filter/highlight mode toggle and the matrix/heatmap tag-size
+// controls). Shown in EVERY logic mode — including Bases — because it post-
+// processes whatever graph the upstream stage produced (classic WHERE/GROUP_BY
+// result OR the base projection).
+function renderHavingSection(
+	el: HTMLElement,
+	deps: FilterTabDeps,
+	isMatrix: boolean,
+	isHeatmap: boolean,
+): void {
 	const havingSection = renderExprSection(
 		el,
 		"HAVING",
@@ -166,8 +191,6 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 	// Matrix "min column size" / heatmap "min tag size" are tag filters.
 	if (isMatrix) renderMatrixMinColumnControl(havingSection, deps);
 	if (isHeatmap) renderHeatmapMinTagControl(havingSection, deps);
-
-	renderBasesSection(el, deps);
 }
 
 // Bases integration (Stage 2). Selecting one or more `.base` files SCOPES the
@@ -188,6 +211,13 @@ function renderBasesSection(el: HTMLElement, deps: FilterTabDeps): void {
 		const none = section.createDiv({ text: "No .base files found" });
 		none.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", fontStyle: "italic" });
 		return;
+	}
+
+	// Bases mode but nothing selected ⇒ no SCOPE is applied (the graph falls back
+	// to the classic WHERE/GROUP_BY result). Nudge the user to pick a base.
+	if (deps.settings.selectedBases.length === 0) {
+		const empty = section.createDiv({ text: "Select at least one .base to scope the graph." });
+		empty.setCssStyles({ fontSize: "11px", color: "var(--text-warning, var(--text-muted))", marginBottom: "6px" });
 	}
 
 	const list = section.createDiv();
@@ -224,6 +254,44 @@ function renderBasesSection(el: HTMLElement, deps: FilterTabDeps): void {
 	boolToggle("Edges: shared tags", "basesSharedTagEdges");
 	boolToggle("Edges: shared property", "basesSharedPropEdges");
 	boolToggle("Cluster by view (not by file)", "basesClusterByView");
+}
+
+// Logic-source selector (filterMode). Three mutually-exclusive segments:
+//   sql   — SQL-like WHERE/GROUP_BY rows (classic)
+//   dvjs  — a DataviewJS script returning paths
+//   bases — scope the graph to selected `.base` files (replaces WHERE/GROUP_BY)
+// Selecting a segment persists the mode, re-renders the Filter tab (so the body
+// swaps between the query UI and the Bases UI) and rebuilds the graph.
+const LOGIC_MODES: Array<{ id: "sql" | "dvjs" | "bases"; label: string }> = [
+	{ id: "sql", label: "SQL" },
+	{ id: "dvjs", label: "DataviewJS" },
+	{ id: "bases", label: "Bases" },
+];
+
+function renderLogicModeSelector(host: HTMLElement, deps: FilterTabDeps): void {
+	const seg = host.createDiv({ cls: "gim-logic-mode-seg" });
+	seg.setCssStyles({ display: "flex", gap: "2px", border: "1px solid var(--background-modifier-border)", borderRadius: "5px", overflow: "hidden", padding: "1px" });
+	for (const m of LOGIC_MODES) {
+		const active = deps.settings.filterMode === m.id;
+		const btn = seg.createEl("button", { text: m.label });
+		btn.setCssStyles({
+			border: "none",
+			borderRadius: "4px",
+			padding: "2px 8px",
+			fontSize: "11px",
+			cursor: "pointer",
+			background: active ? "var(--interactive-accent)" : "transparent",
+			color: active ? "var(--text-on-accent)" : "var(--text-muted)",
+		});
+		if (active) btn.setAttribute("aria-current", "true");
+		btn.addEventListener("click", () => {
+			if (deps.settings.filterMode === m.id) return;
+			deps.settings.filterMode = m.id;
+			deps.save();
+			deps.refreshFilterTab();
+			deps.rebuild();
+		});
+	}
 }
 
 export interface FilterBodyDeps extends FilterTabDeps, SortTabDeps {
@@ -270,16 +338,11 @@ export function renderFilterBodyTab(host: HTMLElement, deps: FilterBodyDeps): vo
 	const title = filterHeader.createEl("h4", { text: "Filter & Group", cls: "gim-panel-title" });
 	title.setCssStyles({ margin: "0" });
 
-	const modeToggle = filterHeader.createEl("a", { cls: "view-action clickable-icon" });
-	modeToggle.setAttribute("aria-label", deps.settings.filterMode === "dvjs" ? "Switch to SQL Mode" : "Switch to DataviewJS Mode");
-	setIcon(modeToggle, deps.settings.filterMode === "dvjs" ? "database" : "code");
-	
-	modeToggle.addEventListener("click", () => {
-		deps.settings.filterMode = deps.settings.filterMode === "dvjs" ? "sql" : "dvjs";
-		deps.save();
-		deps.refreshFilterTab();
-		deps.rebuild();
-	});
+	// Logic source selector: SQL / DataviewJS / Bases. A 3-way segmented control
+	// replacing the old sql↔dvjs icon toggle. Switching mode re-renders the tab,
+	// which conditionally shows WHERE/GROUP_BY (sql/dvjs) OR the Bases UI (bases),
+	// then rebuilds so the canvas reflects the active source immediately.
+	renderLogicModeSelector(filterHeader, deps);
 
 	const filterSection = host.createDiv({ cls: "gim-panel-section" });
 	renderSettingsFilterTab(filterSection, deps);

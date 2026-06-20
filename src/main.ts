@@ -278,6 +278,15 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		}
 		// --- Droste-effect view validation ---
 		if (typeof merged.drosteFocus !== "string") merged.drosteFocus = "";
+		// --- Logic source (filterMode) validation. "bases" is the third source
+		// added for the Bases integration; any other value falls back to "sql". ---
+		if (
+			merged.filterMode !== "sql" &&
+			merged.filterMode !== "dvjs" &&
+			merged.filterMode !== "bases"
+		) {
+			merged.filterMode = "sql";
+		}
 		// --- Bases integration (Stage 2) ---
 		if (!Array.isArray(merged.selectedBases)) merged.selectedBases = [];
 		if (typeof merged.basesLinkEdges !== "boolean") merged.basesLinkEdges = true;

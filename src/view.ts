@@ -10,7 +10,7 @@ import { LaneRegistry, routeZ } from "./layout/edge-routing";
 import { buildIdToRect, buildRouteObstacles } from "./layout/layout-shared";
 import { buildGraph } from "./query/parser";
 import { buildBaseIndex } from "./bases/build-index";
-import { projectBaseIndexToGraph, type BaseEdgeKind } from "./bases/project";
+import { projectBaseIndexToGraph, shouldScopeToBases, type BaseEdgeKind } from "./bases/project";
 import type { BaseIndex } from "./bases/types";
 import {
 	layout,
@@ -1132,14 +1132,18 @@ export class MiniGraphView extends ItemView {
 		this.groupByError = errors.groupBy ?? "";
 		let { data, clusterLabels } = result;
 
-		// ── Bases SCOPE: when one or more `.base` files are selected, REPLACE the
-		// WHERE/GROUP_BY graph with the projection of the base index. Everything
+		// ── Bases SCOPE: ONLY when the Logic source is "bases" AND one or more
+		// `.base` files are selected, REPLACE the WHERE/GROUP_BY graph with the
+		// projection of the base index. In sql/dvjs modes this block is skipped
+		// entirely even if selectedBases still holds values (mode gates it).
+		// Bases mode with zero selection ⇒ also skipped ⇒ the classic WHERE/GROUP_BY
+		// result stands as the fallback (no blank canvas). Everything
 		// downstream (degree / HAVING / LIMIT / layout / draw / legend) runs on the
 		// replaced data unchanged — base nodes carry memberships + edges, so euler /
 		// bubblesets / matrix etc. figure them out natively. Empty selection ⇒ this
 		// block is skipped entirely (classic pipeline, zero impact). Any failure
 		// falls back to the original `data` (non-destructive) and surfaces a Notice.
-		if (this.settings.selectedBases?.length) {
+		if (shouldScopeToBases(this.settings.filterMode, this.settings.selectedBases)) {
 			try {
 				const edgeKinds = new Set<BaseEdgeKind>();
 				if (this.settings.basesLinkEdges) edgeKinds.add("link");

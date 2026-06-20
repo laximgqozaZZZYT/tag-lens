@@ -51,5 +51,6 @@ import "./bases-parser.test";
 import "./bases-resolve.test";
 import "./bases-relations.test";
 import "./bases-project.test";
+import "./bases-mode-gate.test";
 
 summary();

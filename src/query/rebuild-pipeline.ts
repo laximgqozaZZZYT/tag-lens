@@ -31,6 +31,9 @@ export function resolveEffectiveQuery(settings: MiniSettings): EffectiveQuery {
 	if (settings.filterMode === "dvjs") {
 		return { effGroupBy, effWhere: [], filterMode: "dvjs", dvjsFilter: settings.dvjsFilter };
 	}
+	// "bases" mode runs the classic SQL-like pipeline as the FALLBACK graph (used
+	// when zero `.base` files are selected; the base SCOPE in view.ts replaces it
+	// otherwise). The parser only knows "sql"/"dvjs", so map bases → sql here.
 	let effWhere = [...settings.where];
 	if (settings.whereAuto) {
 		// Auto-WHERE = mirror non-empty GROUP_BY rows into WHERE so the

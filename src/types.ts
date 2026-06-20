@@ -55,7 +55,11 @@ export interface MiniSettings {
 	clusterSpacing: number;
 	nodeSpacing: number;
 	cardMaxChars: number;
-	filterMode: "sql" | "dvjs";
+	// Logic source for the Data > Logic tab. "sql"/"dvjs" run the classic
+	// WHERE/GROUP_BY pipeline (sql = SQL-like rows, dvjs = a DataviewJS script).
+	// "bases" SCOPES the graph to the selected `.base` files instead, REPLACING
+	// WHERE/GROUP_BY (see selectedBases + view.ts rebuild). Default "sql".
+	filterMode: "sql" | "dvjs" | "bases";
 	dvjsFilter: string;
 	staleDays: number;
 	// Note maturity badge on cards (Zettelkasten fleeting / literature /
