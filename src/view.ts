@@ -10,6 +10,8 @@ import { LaneRegistry, routeZ } from "./layout/edge-routing";
 import { buildIdToRect, buildRouteObstacles } from "./layout/layout-shared";
 import { buildGraph } from "./query/parser";
 import { buildBaseIndex } from "./bases/build-index";
+import { scanBaseFiles } from "./bases/parser";
+import { ensureFallbackBase } from "./bases/fallback";
 import { projectBaseIndexToGraph, shouldScopeToBases, type BaseEdgeKind } from "./bases/project";
 import type { BaseIndex } from "./bases/types";
 import {
@@ -1131,6 +1133,30 @@ export class MiniGraphView extends ItemView {
 		this.whereError = errors.where ?? "";
 		this.groupByError = errors.groupBy ?? "";
 		let { data, clusterLabels } = result;
+
+		// ── Bases FALLBACK: in Bases mode ONLY, if the vault has zero `.base`
+		// files, synthesise `_all.base` (a no-filter = match-all view over every
+		// note) and auto-select it so the user sees every note graphed instead of
+		// a blank Bases canvas. Strictly gated to avoid writing into non-Bases
+		// vaults; idempotent because once `_all.base` exists scanBaseFiles is
+		// non-empty so ensureFallbackBase is a no-op (no regenerate / no re-select
+		// / no rebuild loop). SQL & DataviewJS modes NEVER create a file.
+		if (this.settings.filterMode === "bases") {
+			try {
+				if (scanBaseFiles(this.app).length === 0) {
+					const created = await ensureFallbackBase(this.app);
+					if (
+						created &&
+						!this.settings.selectedBases.includes(created.path)
+					) {
+						this.settings.selectedBases.push(created.path);
+						void this.save();
+					}
+				}
+			} catch (e) {
+				console.warn("[tag-lens] Bases fallback generation skipped:", e);
+			}
+		}
 
 		// ── Bases SCOPE: ONLY when the Logic source is "bases" AND one or more
 		// `.base` files are selected, REPLACE the WHERE/GROUP_BY graph with the
