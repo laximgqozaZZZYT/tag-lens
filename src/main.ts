@@ -278,6 +278,12 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		}
 		// --- Droste-effect view validation ---
 		if (typeof merged.drosteFocus !== "string") merged.drosteFocus = "";
+		// --- Bases integration (Stage 2) ---
+		if (!Array.isArray(merged.selectedBases)) merged.selectedBases = [];
+		if (typeof merged.basesLinkEdges !== "boolean") merged.basesLinkEdges = true;
+		if (typeof merged.basesSharedTagEdges !== "boolean") merged.basesSharedTagEdges = false;
+		if (typeof merged.basesSharedPropEdges !== "boolean") merged.basesSharedPropEdges = false;
+		if (typeof merged.basesClusterByView !== "boolean") merged.basesClusterByView = false;
 		this.settings = merged as unknown as MiniSettings;
 	}
 

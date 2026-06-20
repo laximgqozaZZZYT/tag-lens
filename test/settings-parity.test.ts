@@ -45,6 +45,8 @@ for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) {
 		"showMaturity", "showNodes", "staleDays", "streamAxisField", "streamBinning",
 		"streamRowSort", "upsetColumnSort", "upsetMinColumnSize", "viewMode", "where",
 		"whereAuto",
+		"selectedBases", "basesLinkEdges", "basesSharedTagEdges", "basesSharedPropEdges",
+		"basesClusterByView",
 	].sort();
 	const actual = Object.keys(DEFAULT_SETTINGS).sort();
 	const added = actual.filter((k) => !EXPECTED_KEYS.includes(k));

@@ -50,5 +50,6 @@ import "./aggregation-properties.test";
 import "./bases-parser.test";
 import "./bases-resolve.test";
 import "./bases-relations.test";
+import "./bases-project.test";
 
 summary();

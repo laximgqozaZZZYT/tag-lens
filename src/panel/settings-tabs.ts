@@ -8,7 +8,8 @@ import {
 	renderExprSection,
 	renderPresetSection,
 } from "./panel-sections";
-import { setIcon, Notice } from "obsidian";
+import { setIcon, Notice, type App } from "obsidian";
+import { scanBaseFiles } from "../bases/parser";
 import { applyLens, captureLens, upsertPreset, removePreset } from "../interaction/lens-presets";
 import { displayToggleApplies } from "../visual/display-applicability";
 import type { LensPreset } from "../types";
@@ -84,6 +85,9 @@ export interface FilterTabDeps {
 	havingError: string | null;
 	limitError: string | null;
 	syncLensCommands?: (presets: LensPreset[]) => void;
+	// Obsidian app — only needed to scan `.base` files for the Bases sub-section.
+	// Optional so non-Bases call sites / tests don't have to provide it.
+	app?: App;
 }
 
 export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): void {
@@ -162,6 +166,64 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 	// Matrix "min column size" / heatmap "min tag size" are tag filters.
 	if (isMatrix) renderMatrixMinColumnControl(havingSection, deps);
 	if (isHeatmap) renderHeatmapMinTagControl(havingSection, deps);
+
+	renderBasesSection(el, deps);
+}
+
+// Bases integration (Stage 2). Selecting one or more `.base` files SCOPES the
+// graph to those bases' elements/edges (replaces WHERE/GROUP_BY); deselecting
+// all restores the classic pipeline. Edge-kind + cluster-granularity toggles
+// shape the projection. Each change saves then rebuilds for instant feedback.
+function renderBasesSection(el: HTMLElement, deps: FilterTabDeps): void {
+	const section = el.createDiv({ cls: "gim-panel-section" });
+	section.createEl("h4", { text: "Bases" });
+
+	const hint = section.createDiv({
+		text: "Select .base files to scope the graph to their notes (replaces WHERE / GROUP_BY).",
+	});
+	hint.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" });
+
+	const baseFiles = deps.app ? scanBaseFiles(deps.app) : [];
+	if (baseFiles.length === 0) {
+		const none = section.createDiv({ text: "No .base files found" });
+		none.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", fontStyle: "italic" });
+		return;
+	}
+
+	const list = section.createDiv();
+	for (const f of baseFiles) {
+		const row = list.createEl("label", { cls: "gim-toggle-row" });
+		const cb = row.createEl("input", { type: "checkbox" });
+		cb.checked = deps.settings.selectedBases.includes(f.path);
+		cb.addEventListener("change", () => {
+			toggleArrayMember(deps.settings, "selectedBases", f.path, cb.checked);
+			deps.save();
+			deps.rebuild();
+		});
+		row.createSpan({ text: f.basename });
+	}
+
+	// Edge-kind + cluster-granularity toggles.
+	const togs = section.createDiv();
+	togs.setCssStyles({ marginTop: "6px" });
+	const boolToggle = (
+		label: string,
+		key: "basesLinkEdges" | "basesSharedTagEdges" | "basesSharedPropEdges" | "basesClusterByView",
+	): void => {
+		const row = togs.createEl("label", { cls: "gim-toggle-row" });
+		const cb = row.createEl("input", { type: "checkbox" });
+		cb.checked = deps.settings[key];
+		cb.addEventListener("change", () => {
+			deps.settings[key] = cb.checked;
+			deps.save();
+			deps.rebuild();
+		});
+		row.createSpan({ text: label });
+	};
+	boolToggle("Edges: internal links", "basesLinkEdges");
+	boolToggle("Edges: shared tags", "basesSharedTagEdges");
+	boolToggle("Edges: shared property", "basesSharedPropEdges");
+	boolToggle("Cluster by view (not by file)", "basesClusterByView");
 }
 
 export interface FilterBodyDeps extends FilterTabDeps, SortTabDeps {

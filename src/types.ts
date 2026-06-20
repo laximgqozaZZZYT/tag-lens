@@ -311,6 +311,19 @@ export interface MiniSettings {
 	// Optional + defaulted in main.ts merge, so existing vaults load unchanged.
 	noteMenuPinned?: boolean;
 	noteMenuPinnedWidth?: number;
+	// --- Bases integration (Stage 2) ---
+	// Selected `.base` file paths. When NON-EMPTY the graph is SCOPED to the
+	// elements/edges derived from these bases (the WHERE/GROUP_BY result is
+	// REPLACED). Empty ⇒ Bases is inert and the classic pipeline runs unchanged.
+	selectedBases: string[];
+	// Which relation kinds become graph edges. Internal links default ON; the
+	// (potentially dense) shared-tag / shared-property kinds default OFF.
+	basesLinkEdges: boolean;
+	basesSharedTagEdges: boolean;
+	basesSharedPropEdges: boolean;
+	// Cluster granularity for projected base nodes. false ⇒ one cluster per
+	// `.base` file (default); true ⇒ one cluster per (base, view).
+	basesClusterByView: boolean;
 }
 
 export type ViewMode =
@@ -567,6 +580,12 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	// key inherit `true` via the settings merge. (noteMenuMinimized is
 	// intentionally absent here — it's optional so old vaults load unchanged.)
 	noteMenuVisible: true,
+	// Bases integration — inert by default (empty selection ⇒ classic pipeline).
+	selectedBases: [],
+	basesLinkEdges: true,
+	basesSharedTagEdges: false,
+	basesSharedPropEdges: false,
+	basesClusterByView: false,
 };
 
 export const NONE_BUCKET = "(none)";

@@ -9,6 +9,9 @@ import { assignGalleryAxes } from "./layout/droste-axis";
 import { LaneRegistry, routeZ } from "./layout/edge-routing";
 import { buildIdToRect, buildRouteObstacles } from "./layout/layout-shared";
 import { buildGraph } from "./query/parser";
+import { buildBaseIndex } from "./bases/build-index";
+import { projectBaseIndexToGraph, type BaseEdgeKind } from "./bases/project";
+import type { BaseIndex } from "./bases/types";
 import {
 	layout,
 	type LaidOut,
@@ -306,6 +309,10 @@ export class MiniGraphView extends ItemView {
 	private cardCache: Map<string, CardContent> = new Map();
 	private rebuildGen = 0;
 	private clusterLabels: Map<string, string> = new Map();
+	// Bases integration (Stage 2): the last successfully built index when
+	// selectedBases is non-empty, else null. Held so future stages (relation
+	// inspection / hover detail) can read it; rebuild() rebuilds it each pass.
+	private baseIndex: BaseIndex | null = null;
 	// Shared text-width measurer for `layoutLattice` — runs in the same 2D
 	// context that the renderer will eventually paint with, so the layout's
 	// "longest line" sizing matches what `drawHeader` renders pixel-for-pixel.
@@ -831,6 +838,7 @@ export class MiniGraphView extends ItemView {
 	private renderDataLogicBody(host: HTMLElement): void {
 		this.dataHostEl = host;
 		renderFilterBodyTab(host, {
+			app: this.app,
 			settings: this.settings,
 			save: () => void this.save(),
 			rebuild: () => void this.rebuild(),
@@ -1124,6 +1132,55 @@ export class MiniGraphView extends ItemView {
 		this.groupByError = errors.groupBy ?? "";
 		let { data, clusterLabels } = result;
 
+		// ── Bases SCOPE: when one or more `.base` files are selected, REPLACE the
+		// WHERE/GROUP_BY graph with the projection of the base index. Everything
+		// downstream (degree / HAVING / LIMIT / layout / draw / legend) runs on the
+		// replaced data unchanged — base nodes carry memberships + edges, so euler /
+		// bubblesets / matrix etc. figure them out natively. Empty selection ⇒ this
+		// block is skipped entirely (classic pipeline, zero impact). Any failure
+		// falls back to the original `data` (non-destructive) and surfaces a Notice.
+		if (this.settings.selectedBases?.length) {
+			try {
+				const edgeKinds = new Set<BaseEdgeKind>();
+				if (this.settings.basesLinkEdges) edgeKinds.add("link");
+				if (this.settings.basesSharedTagEdges) edgeKinds.add("shared-tag");
+				if (this.settings.basesSharedPropEdges) edgeKinds.add("shared-property");
+				this.baseIndex = await buildBaseIndex(this.app, this.settings.selectedBases, {
+					link: this.settings.basesLinkEdges,
+					sharedTag: this.settings.basesSharedTagEdges,
+					sharedProp: this.settings.basesSharedPropEdges,
+					resolvedLinks: this.app.metadataCache.resolvedLinks,
+				});
+				if (this.baseIndex.errors.length) {
+					console.warn("[tag-lens] Bases index warnings:", this.baseIndex.errors);
+				}
+				const { data: baseData, clusterLabels: baseLabels } = projectBaseIndexToGraph(
+					this.baseIndex,
+					{
+						clusterByView: this.settings.basesClusterByView,
+						edgeKinds,
+						labelOf: (notePath) => {
+							const f = this.app.vault.getAbstractFileByPath(notePath);
+							return f instanceof TFile ? f.basename : notePath;
+						},
+						mtimeOf: (notePath) => {
+							const f = this.app.vault.getAbstractFileByPath(notePath);
+							return f instanceof TFile ? f.stat.mtime : undefined;
+						},
+					},
+				);
+				// SCOPE replacement: the base projection supersedes WHERE/GROUP_BY.
+				data = baseData;
+				clusterLabels = baseLabels;
+			} catch (e) {
+				this.baseIndex = null;
+				console.error("[tag-lens] Bases projection failed; falling back to classic graph:", e);
+				new Notice("Tag Lens: Bases projection failed — showing the standard graph. See console.");
+			}
+		} else {
+			this.baseIndex = null;
+		}
+
 		// ── Early-out: skip the (expensive) relayout/redraw/menu-rebuild when the
 		// graph INPUTS are byte-for-byte identical to the last build. buildGraph
 		// (cheap, reads metadata) still ran, but its result is unchanged — typical
@@ -1133,8 +1190,8 @@ export class MiniGraphView extends ItemView {
 		// (The navigator's frontmatter SEARCH metadata can lag a frontmatter-only
 		// edit until the next graph-affecting change — acceptable for the win.)
 		const rebuildSig = JSON.stringify({
-			n: result.data.nodes.map((n) => [n.id, n.label, n.memberships ?? []]),
-			e: result.data.edges.map((e) => [e.source, e.target]),
+			n: data.nodes.map((n) => [n.id, n.label, n.memberships ?? []]),
+			e: data.edges.map((e) => [e.source, e.target]),
 			c: [...clusterLabels.entries()],
 			s: this.layoutSignature(this.settings),
 		});
@@ -1162,7 +1219,7 @@ export class MiniGraphView extends ItemView {
 		// from THIS via menuLimitedNodes() below, so switching between non-droste
 		// modes never changes the menu. `data` itself is mutated by the mode-specific
 		// HAVING/LIMIT stages, so we snapshot before that happens.
-		const menuSourceData = result.data;
+		const menuSourceData = data;
 
 		// Stage 1b: HAVING runs AFTER buildGraph so auto thresholds can scale
 		// with the produced node count, then drops the resulting clusters

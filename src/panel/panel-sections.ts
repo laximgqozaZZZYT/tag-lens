@@ -67,7 +67,9 @@ export function removeRow(rows: string[], idx: number): void {
 // Generic array-membership toggle for the boolean-set settings fields
 // (= hiddenNodes, aggregatedLayers). `present === true` inserts (idempotent),
 // `present === false` removes (no-op if absent).
-export function toggleArrayMember<K extends "hiddenNodes" | "aggregatedLayers" | "layerInheritFull">(
+export function toggleArrayMember<
+	K extends "hiddenNodes" | "aggregatedLayers" | "layerInheritFull" | "selectedBases",
+>(
 	settings: MiniSettings,
 	field: K,
 	value: string,
