@@ -12,7 +12,7 @@
 //     menus keep working untouched.
 
 import type { GraphData, GraphNode } from "../types";
-import type { BaseIndex, BaseRelation } from "./types";
+import type { BaseIndex, BaseRelation, BaseTable } from "./types";
 
 export type BaseEdgeKind = "link" | "shared-tag" | "shared-property";
 
@@ -28,7 +28,11 @@ export function shouldScopeToBases(
 }
 
 export interface ProjectOpts {
-	// false ⇒ cluster per `.base` file; true ⇒ cluster per (base, view).
+	// Global "always cluster by view" override. When true, EVERY base clusters per
+	// (base, view) regardless of how many views it has. When false (default) the
+	// granularity is decided PER TABLE: a `.base` with >1 view auto-clusters by
+	// view (so in-file grouping is reflected in the figure), while a single-view
+	// `.base` clusters per file. See `effectiveClusterByView`.
 	clusterByView: boolean;
 	// Which relation kinds become edges.
 	edgeKinds: Set<BaseEdgeKind>;
@@ -58,12 +62,26 @@ function clusterKeyFor(
 	return { key: `base=${tableName}`, label: tableName };
 }
 
+// Effective per-table granularity: the global `clusterByView` flag FORCES view
+// granularity for every table, but even with it off a table that carries more
+// than one view auto-clusters by view so that in-file grouping (multiple views
+// in one `.base`) is reflected in the figure. Single-view tables stay file-unit
+// (the two keys coincide anyway, so forcing view granularity there is harmless).
+function effectiveClusterByView(clusterByView: boolean, table: BaseTable | undefined): boolean {
+	return clusterByView || (table?.views.length ?? 0) > 1;
+}
+
 export function projectBaseIndexToGraph(index: BaseIndex, opts: ProjectOpts): ProjectResult {
 	const { clusterByView, edgeKinds, labelOf, mtimeOf } = opts;
 
 	// tablePath → human base name (for nice cluster labels). Falls back to path.
 	const baseNameByPath = new Map<string, string>();
-	for (const t of index.tables) baseNameByPath.set(t.filePath, t.name || t.filePath);
+	// tablePath → BaseTable so per-element granularity can read views.length.
+	const tableByPath = new Map<string, BaseTable>();
+	for (const t of index.tables) {
+		baseNameByPath.set(t.filePath, t.name || t.filePath);
+		tableByPath.set(t.filePath, t);
+	}
 
 	const clusterLabels = new Map<string, string>();
 
@@ -73,7 +91,11 @@ export function projectBaseIndexToGraph(index: BaseIndex, opts: ProjectOpts): Pr
 
 	for (const el of index.elements.values()) {
 		const tableName = baseNameByPath.get(el.tablePath) ?? el.tablePath;
-		const { key, label } = clusterKeyFor(tableName, el.viewName, clusterByView);
+		// Decide granularity per ELEMENT by looking up its own table: a mix of
+		// single-view and multi-view bases in one index each get their correct
+		// granularity independently.
+		const byView = effectiveClusterByView(clusterByView, tableByPath.get(el.tablePath));
+		const { key, label } = clusterKeyFor(tableName, el.viewName, byView);
 		clusterLabels.set(key, label);
 		let set = membershipsByNote.get(el.notePath);
 		if (!set) {

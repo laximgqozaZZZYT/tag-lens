@@ -1151,17 +1151,10 @@ export class MiniGraphView extends ItemView {
 					) {
 						this.settings.selectedBases.push(created.path);
 						// The fallback `_all.base` groups notes by tag via ONE view per
-						// tag. Tag (= view) grouping only surfaces when clusters are keyed
-						// by view; with the default file-unit clustering every tag-view of a
-						// note collapses into one cluster, hiding the grouping. So when we
-						// auto-generate the fallback we also switch clustering to view-unit —
-						// but ONLY from the default `false` (we never override a user who
-						// explicitly chose a granularity). Idempotent: once selectedBases
-						// already holds the path this whole block is skipped, so we never
-						// re-flip on later rebuilds.
-						if (this.settings.basesClusterByView === false) {
-							this.settings.basesClusterByView = true;
-						}
+						// tag (a multi-view base). projectBaseIndexToGraph now auto-clusters
+						// any base with >1 view per view, so the tag grouping surfaces with
+						// the default file-unit setting — no need to flip basesClusterByView
+						// (the global flag stays a user-controlled "always view-unit" override).
 						void this.save();
 					}
 				}

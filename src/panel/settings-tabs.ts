@@ -547,7 +547,7 @@ function renderBasesDisplaySection(el: HTMLElement, deps: DisplayTabDeps): void 
 		deps.save();
 		deps.rebuild();
 	});
-	clusterRow.createSpan({ text: "Cluster by view (not by file)" });
+	clusterRow.createSpan({ text: "Always cluster by view (even single-view bases)" });
 }
 
 export interface EncodeTabDeps {

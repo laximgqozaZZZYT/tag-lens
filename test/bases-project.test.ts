@@ -5,8 +5,13 @@ import { ok } from "./assert";
 import { projectBaseIndexToGraph, type BaseEdgeKind } from "../src/bases/project";
 import type { BaseElement, BaseIndex, BaseRelation, BaseTable } from "../src/bases/types";
 
-function table(filePath: string, name: string): BaseTable {
-	return { filePath, name, views: [], formulas: {} };
+function table(filePath: string, name: string, viewNames: string[] = []): BaseTable {
+	return {
+		filePath,
+		name,
+		views: viewNames.map((n) => ({ name: n, type: "table", filter: null, columns: [] })),
+		formulas: {},
+	};
 }
 
 function el(
@@ -192,6 +197,92 @@ const allKinds = new Set<BaseEdgeKind>(["link", "shared-tag", "shared-property"]
 		mtimeOf: (p) => (p === "a.md" ? 12345 : undefined),
 	});
 	ok(data.nodes[0].mtime === 12345, "mtimeOf is applied to the node");
+}
+
+// --- per-table auto granularity: single-view table ⇒ file-unit (global off) ---
+{
+	const idx = index(
+		[table("A.base", "Alpha", ["Open"])], // exactly ONE view
+		[el("A.base", "n1.md", "Open")],
+	);
+	const { data, clusterLabels } = projectBaseIndexToGraph(idx, {
+		clusterByView: false,
+		edgeKinds: allKinds,
+		labelOf,
+	});
+	const n1 = data.nodes.find((n) => n.id === "n1.md")!;
+	ok(
+		JSON.stringify(n1.memberships) === JSON.stringify(["base=Alpha"]),
+		`single-view table stays file-unit when global flag off, got ${JSON.stringify(n1.memberships)}`,
+	);
+	ok(clusterLabels.get("base=Alpha") === "Alpha", "single-view file-unit label = base name");
+}
+
+// --- per-table auto granularity: multi-view table ⇒ AUTO view-unit (global off) ---
+{
+	const idx = index(
+		[table("A.base", "Alpha", ["Open", "Done"])], // TWO views ⇒ grouped
+		[el("A.base", "n1.md", "Open"), el("A.base", "n1.md", "Done")],
+	);
+	const { data, clusterLabels } = projectBaseIndexToGraph(idx, {
+		clusterByView: false, // global default OFF — auto-detect still kicks in
+		edgeKinds: allKinds,
+		labelOf,
+	});
+	const n1 = data.nodes.find((n) => n.id === "n1.md")!;
+	const m = [...n1.memberships].sort();
+	ok(
+		JSON.stringify(m) === JSON.stringify(["base=Alpha::Done", "base=Alpha::Open"]),
+		`multi-view table auto-clusters by view even with global flag off, got ${JSON.stringify(m)}`,
+	);
+	ok(clusterLabels.get("base=Alpha::Open") === "Alpha / Open", "auto view-unit label = base / view");
+}
+
+// --- global override: single-view table ⇒ view-unit when flag ON ---
+{
+	const idx = index(
+		[table("A.base", "Alpha", ["Open"])], // ONE view
+		[el("A.base", "n1.md", "Open")],
+	);
+	const { data } = projectBaseIndexToGraph(idx, {
+		clusterByView: true, // global "always cluster by view" forces it
+		edgeKinds: allKinds,
+		labelOf,
+	});
+	const n1 = data.nodes.find((n) => n.id === "n1.md")!;
+	ok(
+		JSON.stringify(n1.memberships) === JSON.stringify(["base=Alpha::Open"]),
+		`global flag ON forces single-view table to view-unit, got ${JSON.stringify(n1.memberships)}`,
+	);
+}
+
+// --- MIXED: single-view base + multi-view base in one index, independent granularity ---
+{
+	const idx = index(
+		[
+			table("S.base", "Single", ["Only"]), // 1 view ⇒ file-unit
+			table("M.base", "Multi", ["Open", "Done"]), // 2 views ⇒ view-unit
+		],
+		[
+			el("S.base", "n1.md", "Only"),
+			el("M.base", "n1.md", "Open"),
+			el("M.base", "n1.md", "Done"),
+		],
+	);
+	const { data, clusterLabels } = projectBaseIndexToGraph(idx, {
+		clusterByView: false, // global default OFF — each table decided independently
+		edgeKinds: allKinds,
+		labelOf,
+	});
+	const n1 = data.nodes.find((n) => n.id === "n1.md")!;
+	const m = [...n1.memberships].sort();
+	ok(
+		JSON.stringify(m) ===
+			JSON.stringify(["base=Multi::Done", "base=Multi::Open", "base=Single"]),
+		`mixed index: Single stays file-unit, Multi splits per view, got ${JSON.stringify(m)}`,
+	);
+	ok(clusterLabels.get("base=Single") === "Single", "single-view base file-unit label");
+	ok(clusterLabels.get("base=Multi::Open") === "Multi / Open", "multi-view base view-unit label");
 }
 
 console.log("bases-project tests passed");
