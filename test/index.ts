@@ -47,5 +47,8 @@ import "./attribute-propagation.test";
 import "./euler-true-stripes.test";
 import "./aggregation-compute.test";
 import "./aggregation-properties.test";
+import "./bases-parser.test";
+import "./bases-resolve.test";
+import "./bases-relations.test";
 
 summary();
