@@ -32,7 +32,9 @@ export function renderInsightTab(host: HTMLElement, deps: InsightDeps): void {
 	let computed: ComputedCognitiveLoad;
 	try {
 		computed = computeCognitiveLoad(deps.app, k);
-		(window as any).app.lastInsight = computed;
+		// Debug breadcrumb: stash the latest computed insight on the global app object.
+		const globalApp = (window as { app?: { lastInsight?: ComputedCognitiveLoad } }).app;
+		if (globalApp) globalApp.lastInsight = computed;
 	} catch (e) {
 		host.createDiv({ text: `Could not compute cognitive load: ${e instanceof Error ? e.message : String(e)}` })
 			.setAttr("style", "font-size:11px;color:var(--color-red);padding:8px");
@@ -323,10 +325,10 @@ export function renderInsightAlerts(host: HTMLElement, deps: InsightDeps, comput
 		}
 		loadedCount += batch.length;
 		if (loadedCount < allCards.length) {
-			sentinel.style.display = "block";
+			sentinel.setCssStyles({ display: "block" });
 			listContainer.appendChild(sentinel); // Move sentinel to the end
 		} else {
-			sentinel.style.display = "none";
+			sentinel.setCssStyles({ display: "none" });
 		}
 	};
 

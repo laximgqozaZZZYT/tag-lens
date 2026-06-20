@@ -94,12 +94,10 @@ export function resolveNodeDisplay(
 		// Note: Every node in tag1 is in union(tag1, tag2).
 		// We only apply this if NO tag-level or intersection-level override hit.
 		if (sorted.length >= 1) {
-			for (const m of n.memberships) {
-				// We don't know the other part of the union from the node itself,
-				// but we can check if any override exists for unions involving this membership.
-				// However, that's expensive to search through `overrides` keys.
-				// For now, only support specific pair matches if they were defined.
-			}
+			// We don't know the other part of the union from the node itself, and
+			// searching `overrides` keys for every union involving each membership
+			// is expensive. Pairwise-union resolution is intentionally skipped here
+			// (no-op) until a better priority rule exists; broad union is handled below.
 			// Actually, if we have individual tabs, the user expects them to work.
 			// But a node belongs to MANY unions. We'll skip pairwise unions in the resolver
 			// for now until we have a better priority rule, or just support the broad one.

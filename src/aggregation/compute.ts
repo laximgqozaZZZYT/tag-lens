@@ -49,8 +49,6 @@ export function computeAggregationGroups(
 		// 3. Category-wide aggregation ("__TAGS__", "__UNIONS__", "__INTERSECTIONS__")
 		const isUnion = membership.startsWith("__union__") || membership === UNION_LAYER_KEY;
 		const isIntersection = membership.startsWith("__inter__") || membership === INTERSECTION_LAYER_KEY;
-		const isBroadUnion = membership === UNION_LAYER_KEY;
-		const isBroadInter = membership === INTERSECTION_LAYER_KEY;
 		const isTag = !isUnion && !isIntersection;
 
 		let enabled = false;

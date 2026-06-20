@@ -127,7 +127,7 @@ import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
-import { serializePresets, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
+import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
 import { hitMatrixLine, hitMatrixCol, hitHeatmapCell } from "./interaction/hit-modes";
 
@@ -871,7 +871,10 @@ export class MiniGraphView extends ItemView {
 		expLabel.setCssStyles({ fontSize: "11px", fontWeight: "600", margin: "4px 0 2px" });
 
 		const exportNodes = (this.laid?.nodes || []).map((n) => {
-			const { ageDays, mtime, ...rest } = n;
+			// Strip derived/volatile fields (ageDays, mtime) from each node before
+			// export; they are recomputed on import. The two destructured siblings
+			// are intentionally discarded, hence the leading-underscore names.
+			const { ageDays: _ageDays, mtime: _mtime, ...rest } = n;
 			return rest;
 		});
 
@@ -4971,7 +4974,7 @@ export class MiniGraphView extends ItemView {
 						const maxThumbY = trackH - thumbH;
 						
 						// Thumb's current physical position
-						const curScrollY = this.legendScrollY[this.settings.viewMode as ViewMode] ?? 0;
+						const curScrollY = this.legendScrollY[this.settings.viewMode] ?? 0;
 						const curThumbY = pr.y + trackTop + (maxThumbY > 0 ? (curScrollY / this.legendMaxScrollY) * maxThumbY : 0);
 						
 						// If clicking directly on the thumb, do relative drag
@@ -4984,7 +4987,7 @@ export class MiniGraphView extends ItemView {
 							targetThumbY = Math.max(0, Math.min(maxThumbY, targetThumbY));
 							const newScrollY = maxThumbY > 0 ? (targetThumbY / maxThumbY) * this.legendMaxScrollY : 0;
 							
-							const vmode = this.settings.viewMode as ViewMode;
+							const vmode = this.settings.viewMode;
 							this.legendScrollY[vmode] = newScrollY;
 							this.requestDraw();
 							
@@ -5037,7 +5040,7 @@ export class MiniGraphView extends ItemView {
 				const thumbH = Math.max(thumbMinH, trackH * (pr.h / boxH));
 				const maxThumbY = trackH - thumbH;
 				const scrollDelta = maxThumbY > 0 ? (dy / maxThumbY) * this.legendMaxScrollY : 0;
-				const vmode = this.settings.viewMode as ViewMode;
+				const vmode = this.settings.viewMode;
 				this.legendScrollY[vmode] = Math.max(0, Math.min(this.legendMaxScrollY, this.legendScrollDrag.startScrollY + scrollDelta));
 				this.requestDraw();
 				return;
@@ -5141,7 +5144,7 @@ export class MiniGraphView extends ItemView {
 			// Screen-space, checked first so it wins over any canvas content beneath.
 			const cr = this.legendCloseRect;
 			if (cr && sx >= cr.x && sx <= cr.x + cr.w && sy >= cr.y && sy <= cr.y + cr.h) {
-				this.sessionHiddenLegends.add(this.settings.viewMode as ViewMode);
+				this.sessionHiddenLegends.add(this.settings.viewMode);
 				this.draw();
 				return;
 			}
@@ -5368,7 +5371,7 @@ export class MiniGraphView extends ItemView {
 			const lr = this.legendPanelRect;
 			if (lr && sx >= lr.x && sx <= lr.x + lr.w && sy >= lr.y && sy <= lr.y + lr.h) {
 				if (this.legendMaxScrollY > 0) {
-					const vmode = this.settings.viewMode as ViewMode;
+					const vmode = this.settings.viewMode;
 					const cur = this.legendScrollY[vmode] ?? 0;
 					const dy = e.deltaMode === 1 ? e.deltaY * 20 : (e.deltaMode === 2 ? e.deltaY * 300 : e.deltaY);
 					this.legendScrollY[vmode] = Math.max(0, Math.min(this.legendMaxScrollY, cur + dy));

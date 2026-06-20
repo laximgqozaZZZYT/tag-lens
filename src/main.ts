@@ -60,7 +60,8 @@ export default class GraphIslandMiniPlugin extends Plugin {
 	}
 
 	onunload(): void {
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_MINI);
+		// Note: do NOT detach leaves here — Obsidian preserves user-moved leaf
+		// positions across plugin reloads, and detaching on unload would reset them.
 		this.views = [];
 	}
 

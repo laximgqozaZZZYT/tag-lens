@@ -302,7 +302,11 @@ export function createStripePattern(
 	// No DOM (unit-test/SSR) → flat fallback so callers never crash.
 	if (typeof document === "undefined") return fallback();
 
-	const canvas = document.createElement("canvas");
+	// Prefer `activeDocument` (popout-window aware) when available; fall back to
+	// the global `document` in non-Obsidian environments (it is guaranteed
+	// defined here by the guard above).
+	const doc = typeof activeDocument !== "undefined" ? activeDocument : document;
+	const canvas = doc.createElement("canvas");
 	canvas.width = 16;
 	canvas.height = 16;
 	const ctx = canvas.getContext("2d");

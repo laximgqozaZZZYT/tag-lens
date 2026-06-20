@@ -12,9 +12,6 @@ import { setIcon, Notice } from "obsidian";
 import { applyLens, captureLens, upsertPreset, removePreset } from "../interaction/lens-presets";
 import { displayToggleApplies } from "../visual/display-applicability";
 import type { LensPreset } from "../types";
-import { fieldSourceRegistry } from "../encoding/field-sources";
-import { shapeForKey } from "../encoding/shapes";
-import type { EncodingBinding, ScaleType } from "../encoding/types";
 import type { BindingLegend } from "../encoding/evaluate";
 import { clusterHue } from "../draw/canvas-utils";
 import { theme } from "../draw/theme";
@@ -656,44 +653,6 @@ function applyTabFilter(hostEl: HTMLElement, filterQuery: string): void {
 		}
 		const text = btn.dataset.filterText ?? "";
 		btn.setCssStyles({ display: q === "" || text.includes(q) ? "" : "none" });
-	});
-}
-
-function renderTabButton(
-	bar: HTMLElement,
-	key: string,
-	label: string,
-	hue: number | number[] | null,
-	filterText: string | null,
-	deps: EncodeTabDeps,
-	isVertical = false
-): void {
-	const btn = bar.createEl("button", { cls: "gim-panel-tab" });
-	if (deps.activeTab === key) btn.addClass("active");
-	
-	if (hue !== null) {
-		const sw = btn.createSpan({ cls: "gim-panel-tab-swatch" });
-		const t = theme();
-		if (Array.isArray(hue)) {
-			// Stripe-like gradient for pairwise sets
-			const c1 = t.swatch(hue[0], "fill");
-			const c2 = t.swatch(hue[1], "fillStrong");
-			const angle = isVertical ? "90deg" : "0deg";
-			sw.setCssStyles({ background: `linear-gradient(${angle}, ${c1} 50%, ${c2} 50%)` });
-		} else {
-			sw.setCssStyles({ background: t.swatch(hue, "fill") });
-		}
-	}
-	btn.createSpan({ text: label });
-	// filterText = null ⇒ pinned (never filtered, e.g. the 全体 tab).
-	if (filterText === null) {
-		btn.dataset.alwaysVisible = "1";
-	} else {
-		btn.dataset.filterText = filterText.toLowerCase();
-	}
-	btn.addEventListener("click", () => {
-		deps.setActiveTab(key);
-		deps.refreshSettingsTab();
 	});
 }
 
