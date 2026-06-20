@@ -289,7 +289,7 @@ function stripeBandColor(hue: number, index: number, alpha?: number): string {
 //   • no hues   → "gray"
 //   • one hue   → that hue's solid fill swatch
 //   • non-DOM   → first hue's swatch (tests run in plain Node with no
-//                 `document`; the SSR/test path must never throw).
+//                 `activeDocument`; the SSR/test path must never throw).
 // A `CanvasPattern` is only returned when a real 2D context is available.
 export function createStripePattern(
 	hues: number[],
@@ -299,14 +299,13 @@ export function createStripePattern(
 	if (hues.length === 0) return "gray";
 	const fallback = (): string => theme().swatch(hues[0], "fill", alpha);
 	if (hues.length === 1) return fallback();
-	// No DOM (unit-test/SSR) → flat fallback so callers never crash.
-	if (typeof document === "undefined") return fallback();
-
-	// Prefer `activeDocument` (popout-window aware) when available; fall back to
-	// the global `document` in non-Obsidian environments (it is guaranteed
-	// defined here by the guard above).
-	const doc = typeof activeDocument !== "undefined" ? activeDocument : document;
-	const canvas = doc.createElement("canvas");
+	// No DOM (unit-test/SSR) → flat fallback so callers never crash. We probe
+	// `activeDocument` (Obsidian's popout-window-aware document) rather than the
+	// global `document`: in Obsidian it is always defined, and in plain Node
+	// (tests/SSR) it is undefined → flat fallback. Using it as the sole DOM
+	// handle keeps the renderer popout-aware without referencing `document`.
+	if (typeof activeDocument === "undefined") return fallback();
+	const canvas = activeDocument.createElement("canvas");
 	canvas.width = 16;
 	canvas.height = 16;
 	const ctx = canvas.getContext("2d");

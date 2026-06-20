@@ -872,9 +872,13 @@ export class MiniGraphView extends ItemView {
 
 		const exportNodes = (this.laid?.nodes || []).map((n) => {
 			// Strip derived/volatile fields (ageDays, mtime) from each node before
-			// export; they are recomputed on import. The two destructured siblings
-			// are intentionally discarded, hence the leading-underscore names.
-			const { ageDays: _ageDays, mtime: _mtime, ...rest } = n;
+			// export; they are recomputed on import. Shallow-copy then delete the
+			// two keys (instead of a rest-omit destructure) so no unused binding
+			// is left behind, while the exported object is identical to the old
+			// `...rest` result.
+			const rest: Partial<typeof n> = { ...n };
+			delete rest.ageDays;
+			delete rest.mtime;
 			return rest;
 		});
 
