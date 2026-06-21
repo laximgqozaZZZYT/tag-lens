@@ -22,14 +22,8 @@ Tag Lens currently provides **4 view modes**:
 The floating settings panel is a **unified control center** available in every view mode. It is divided into four main tabs to help you filter, navigate, display, and analyze your graph:
 
 ### 1. Filter
-Control exactly what data enters the graph. Switch between modes using the toggle at the top of the tab.
-- **SQL Mode**: Use the built-in expression engine to filter notes.
-  - **WHERE**: Filter source notes by a query (`field:value`, `AND`, `OR`, glob, fuzzy).
-  - **GROUP_BY**: Partition by `tag:*` or a frontmatter field.
-  - **HAVING**: Drop clusters whose count fails the predicate.
-  - **Sort (ORDER_BY / LIMIT)**: Sort criteria and limit tiers for per-cluster top-N display.
-- **DataviewJS Mode**: Bypass the built-in `WHERE` parser and use Obsidian Dataview's JavaScript API (`dv.pages()`). Returns a dynamic list of notes to feed into the graph while still preserving the same layout / encoding / rendering pipeline.
-- **Bases Mode**: Scope the graph directly to selected `.base` files, replacing the built-in query pipeline with elements derived from the base.
+Control exactly what data enters the graph.
+- **Bases**: Scope the graph directly to selected `.base` files. The built-in pipeline constructs a unified graph from these bases, including optionally extracting implicit links, shared tags, or shared properties based on your settings.
 
 ### 2. Notes (Note Navigator)
 A list of all notes surviving the filter pipeline.
@@ -89,7 +83,7 @@ Requires Obsidian **1.5.0** or later. Works on desktop and mobile (the heavier e
 
 ## Architecture & contributing
 
-Design docs and the agent/contributor guide live under [`docs/0.3.18/`](docs/0.3.18/):
+Design docs and the agent/contributor guide live under [`docs/0.3.21/`](docs/0.3.21/):
 **basic-design** (architecture), **detailed-design** (module reference) and **AGENTS.md**
 (verification gate, gotchas, E2E/deploy workflow). Run `npm run verify`
 (`tsc --noEmit && node test/run.mjs && node esbuild.config.mjs`) before committing — `tsc` is the only type gate
