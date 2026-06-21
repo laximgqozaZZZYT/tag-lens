@@ -145,7 +145,7 @@ export interface MiniSettings {
 	// ONLY these node IDs.
 	focusNodeIds?: string[];
 	// Visual Encoding bindings (attribute -> visual channel). Independent of the
-	// SQL/dvjs filter layer: never changes which notes appear. See src/encoding/.
+	// Visual Encoding filter layer: never changes which notes appear. See src/encoding/.
 	encoding: EncodingBinding[];
 	// UpSet plot column ordering. "size" = intersection size desc;
 	// "degree" = signature length asc (= "1-way sets first, then

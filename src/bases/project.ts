@@ -16,16 +16,6 @@ import type { BaseIndex, BaseRelation, BaseTable } from "./types";
 
 export type BaseEdgeKind = "link" | "shared-tag" | "shared-property";
 
-// Single source of truth for the rebuild() SCOPE gate: the base projection
-// REPLACES the WHERE/GROUP_BY graph ONLY when the Logic source is "bases" AND at
-// least one `.base` file is selected. In sql/dvjs mode (or with no selection)
-// the classic pipeline result stands — even if selectedBases still holds values.
-export function shouldScopeToBases(
-	filterMode: "sql" | "dvjs" | "bases",
-	selectedBases: readonly string[] | undefined,
-): boolean {
-	return filterMode === "bases" && (selectedBases?.length ?? 0) > 0;
-}
 
 export interface ProjectOpts {
 	// Global "always cluster by view" override. When true, EVERY base clusters per

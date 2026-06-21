@@ -46,8 +46,8 @@ export function shouldGenerateFallback(baseFilePaths: readonly string[]): boolea
 	return baseFilePaths.length === 0;
 }
 
-// Lightweight tag collector — mirrors src/query/parser.ts `collectTags` but kept
-// local to avoid a circular import (parser.ts pulls in the whole graph builder).
+// Lightweight tag collector — originally mirrored from the legacy SQL parser,
+// now kept local to avoid depending on heavy graph-build modules.
 // Reads inline tags (cache.tags) and frontmatter tags, strips a leading '#'.
 function collectTags(cache: CachedMetadata | null): string[] {
 	if (!cache) return [];

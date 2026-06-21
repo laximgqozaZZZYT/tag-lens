@@ -90,7 +90,7 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		delete merged.nodeRadius;
 		delete merged.manifestPath;
 		delete merged.rules;
-		// Strip removed SQL/dvjs fields
+		// Strip deprecated SQL/dvjs fields from legacy settings
 		delete merged.filterMode;
 		delete merged.dvjsFilter;
 		delete merged.where;

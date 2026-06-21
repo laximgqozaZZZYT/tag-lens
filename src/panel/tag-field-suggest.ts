@@ -117,10 +117,8 @@ function dedupe(arr: string[]): string[] {
 
 // ── Vault source collection ─────────────────────────────────────────────────
 // Walks markdown files via the public metadataCache. Mirrors the lightweight
-// tag-collection approach already used in src/query/parser.ts (inline tags +
-// frontmatter `tags`), and additionally gathers all frontmatter KEYS. Kept here
-// (not imported from parser.ts) to avoid pulling the heavy graph-build module
-// into the settings panel; this is a small, intentional duplicate.
+// tag-collection approach to avoid pulling heavy graph-build modules
+// into the lightweight UI layers.
 export function collectSuggestSources(app: App): SuggestSources {
 	const tags = new Set<string>();
 	const fields = new Set<string>();
