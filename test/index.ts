@@ -61,6 +61,7 @@ import "./friendly-error.test";
 import "./tag-field-suggest.test";
 import "./query-builder.test";
 import "./triple-overlap-guarantee.test";
+import "./intersection-region.test";
 
 
 summary();
