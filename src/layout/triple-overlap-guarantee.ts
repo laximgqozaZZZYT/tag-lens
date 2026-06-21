@@ -10,7 +10,10 @@ import type { SizedNode } from "./layout";
 // centre to the minimal position such that its rectangle contains the
 // small square P±eps. All three then contain that square by construction,
 // so their intersection is guaranteed non-degenerate — no iteration, no
-// convergence risk.
+// convergence risk. Assumes every box has positive width and height: a
+// box with zero extent in some axis can never gain a positive-area
+// intersection in that axis, regardless of eps (its own extent is the
+// hard ceiling) — that sub-case is geometrically unfixable, not a bug.
 export function guaranteeTripleOverlaps(
 	boxes: SizedNode[],
 	positions: { x: number; y: number }[],
