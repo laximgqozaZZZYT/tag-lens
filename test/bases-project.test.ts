@@ -296,4 +296,34 @@ const allKinds = new Set<BaseEdgeKind>(["link", "shared-tag", "shared-property"]
 	ok(clusterLabels.get("base=Multi::Open") === "Multi / Open", "multi-view base view-unit label");
 }
 
+{
+	const ddIdx = index(
+		[table("A.base", "A")],
+		[el("A.base", "n1.md"), el("A.base", "n2.md"), el("A.base", "n3.md")],
+		[rel("link", "n1.md", "n2.md"), rel("link", "n2.md", "n3.md")]
+	);
+
+	const { data: ddData } = projectBaseIndexToGraph(ddIdx, {
+		clusterByView: false,
+		showPrefix: false,
+		edgeKinds: new Set(["link"]),
+		labelOf: (n) => n,
+		focusNodeIds: ["n1.md", "n2.md"] // Only keep n1 and n2
+	});
+
+	ok(
+		ddData.nodes.length === 2 &&
+		ddData.nodes.some((n) => n.id === "n1.md") &&
+		ddData.nodes.some((n) => n.id === "n2.md"),
+		"focusNodeIds filters the returned nodes"
+	);
+
+	ok(
+		ddData.edges.length === 1 &&
+		((ddData.edges[0].source === "n1.md" && ddData.edges[0].target === "n2.md") ||
+		 (ddData.edges[0].source === "n2.md" && ddData.edges[0].target === "n1.md")),
+		"focusNodeIds filters edges dropping those connected to excluded nodes"
+	);
+}
+
 console.log("bases-project tests passed");

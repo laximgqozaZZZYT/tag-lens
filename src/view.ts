@@ -1142,6 +1142,7 @@ export class MiniGraphView extends ItemView {
 						clusterByView: !!this.settings.basesClusterByView,
 						showPrefix: !!this.settings.basesShowPrefix,
 						injectBaseEnclosures: this.settings.viewMode === "bubblesets",
+						focusNodeIds: this.settings.focusNodeIds,
 						edgeKinds,
 						labelOf: (notePath) => {
 							const f = this.app.vault.getAbstractFileByPath(notePath);

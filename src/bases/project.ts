@@ -35,6 +35,8 @@ export interface ProjectOpts {
 	showPrefix: boolean;
 	// When true, multi-view bases will inject an extra "wrapper" membership for the entire base file.
 	injectBaseEnclosures?: boolean;
+	// Optional filter used for drill-down closeup views. If set, ONLY notes in this list are kept.
+	focusNodeIds?: string[];
 }
 
 export interface ProjectResult {
@@ -108,7 +110,9 @@ export function projectBaseIndexToGraph(index: BaseIndex, opts: ProjectOpts): Pr
 
 	// One node per note path.
 	const nodes: GraphNode[] = [];
+	const focusSet = opts.focusNodeIds ? new Set(opts.focusNodeIds) : null;
 	for (const [notePath, memberSet] of membershipsByNote) {
+		if (focusSet && !focusSet.has(notePath)) continue;
 		const node: GraphNode = {
 			id: notePath,
 			label: labelOf(notePath),
@@ -128,6 +132,7 @@ export function projectBaseIndexToGraph(index: BaseIndex, opts: ProjectOpts): Pr
 		const a = rel.aNote;
 		const b = rel.bNote;
 		if (!a || !b || a === b) continue;
+		if (focusSet && (!focusSet.has(a) || !focusSet.has(b))) continue;
 		const [lo, hi] = a <= b ? [a, b] : [b, a];
 		const dedupe = `${lo}|${hi}`;
 		if (seenEdge.has(dedupe)) continue;
