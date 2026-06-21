@@ -1,4 +1,4 @@
-import { AbstractInputSuggest, type App, type TFile } from "obsidian";
+import { AbstractInputSuggest, type App } from "obsidian";
 
 // Beginner-friendly typeahead for the SQL-like WHERE / GROUP_BY text inputs.
 // It is a BEST-EFFORT input aid layered on top of the existing free-text box:

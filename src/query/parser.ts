@@ -193,9 +193,9 @@ export function collectPathsDeep(
 	if (typeof value !== "object") return out;
 
 	// Cycle guard.
-	// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TypeScript inference doesn't always narrow unknown here
 	if (seen.has(value as object)) return out;
-	// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TypeScript inference doesn't always narrow unknown here
 	seen.add(value as object);
 
 	// Unwrap Dataview DataArray-like wrappers into a plain array first.
@@ -287,7 +287,7 @@ function runDvjsFilter(
 
 	let raw: unknown;
 	try {
-		// eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+		// eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func -- Required for DataviewJS dynamic evaluation
 		const fn = new Function("dv", "app", `"use strict";\n${script}`) as (dv: DataviewApiLike, app: App) => unknown;
 		raw = fn(dv, app);
 	} catch (e) {

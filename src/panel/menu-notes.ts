@@ -3,7 +3,7 @@
 // from view.ts (DI pattern) — note-menu.ts itself stays pure/DOM-less; this is
 // the one place Obsidian metadata is read for the navigator. Behaviour-preserving.
 import { App, TFile } from "obsidian";
-import type { GraphNode, GraphData, MiniSettings } from "../types";
+import type { GraphNode } from "../types";
 import { stripTabPrefix } from "../interaction/note-menu";
 
 

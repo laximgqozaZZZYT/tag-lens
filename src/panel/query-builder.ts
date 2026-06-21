@@ -1,4 +1,4 @@
-import type { App, TFile } from "obsidian";
+import type { App } from "obsidian";
 import { collectSuggestSources, type SuggestSources } from "./tag-field-suggest";
 
 // ────────────────────────────────────────────────────────────────────────────
