@@ -85,3 +85,23 @@ function aabbIntersect3(r1: ReturnType<typeof rectOf>, r2: ReturnType<typeof rec
 	ok(after.w > 0 && after.h > 0, "the one needed triple (A,B,C) must end up overlapping");
 	ok(positions[3].x === 500 && positions[3].y === 500, "box D (not part of any needed triple) must be untouched");
 }
+
+// Very small boxes (non-zero but tiny): eps must not go negative.
+// The guarantee should still hold (positive area intersection).
+{
+	const boxes = [box("A", 0.1, 0.1), box("B", 0.1, 0.1), box("C", 0.1, 0.1)];
+	const positions = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 200, y: 0 }];
+	guaranteeTripleOverlaps(boxes, positions, () => true, 10);
+	const after = aabbIntersect3(rectOf(positions[0], boxes[0]), rectOf(positions[1], boxes[1]), rectOf(positions[2], boxes[2]));
+	ok(after.w > 0 && after.h > 0, `expected positive-area guaranteed overlap even with tiny boxes, got w=${after.w} h=${after.h}`);
+}
+
+// Degenerate minEps: minEps <= 0 should also produce a positive-area intersection
+// (eps floored to 1e-6 ensures this).
+{
+	const boxes = [box("A", 100, 60), box("B", 100, 60), box("C", 100, 60)];
+	const positions = [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 160, y: 0 }];
+	guaranteeTripleOverlaps(boxes, positions, () => true, 0); // minEps = 0
+	const after = aabbIntersect3(rectOf(positions[0], boxes[0]), rectOf(positions[1], boxes[1]), rectOf(positions[2], boxes[2]));
+	ok(after.w > 0 && after.h > 0, `expected positive-area guaranteed overlap even with minEps=0, got w=${after.w} h=${after.h}`);
+}

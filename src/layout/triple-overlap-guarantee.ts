@@ -34,11 +34,16 @@ export function guaranteeTripleOverlaps(
 
 				const px = idx.reduce((s, n) => s + positions[n].x, 0) / 3;
 				const py = idx.reduce((s, n) => s + positions[n].y, 0) / 3;
-				const eps = Math.min(
+				let eps = Math.min(
 					minEps,
 					...idx.map((n) => boxes[n].width / 2),
 					...idx.map((n) => boxes[n].height / 2),
 				);
+				// Floor eps to a small positive value to ensure the constructed square P±eps
+				// always has positive area, even when inputs are degenerate (zero/near-zero
+				// boxes or minEps <= 0). This guarantees a genuinely non-degenerate
+				// intersection, not just a touching point.
+				eps = Math.max(eps, 1e-6);
 				for (const n of idx) {
 					const halfW = boxes[n].width / 2;
 					const halfH = boxes[n].height / 2;
