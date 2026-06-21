@@ -2,7 +2,7 @@
 	"name": "tag-lens",
 	"version": "0.3.29",
 	"private": true,
-	"description": "Lightweight tag-membership visualisations: intersection lattice, co-occurrence heatmap, UpSet, BubbleSets.",
+	"description": "Lightweight tag-membership visualisations: connection matrix, tag co-occurrence heatmap, UpSet, bipartite tag graph.",
 	"author": "laximgqozaZZZYT",
 	"license": "MIT",
 	"repository": {
