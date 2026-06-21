@@ -9,6 +9,7 @@ import {
 	renderTagPickerSection,
 	renderPresetSection,
 } from "./panel-sections";
+import { renderVisualBuilder } from "./visual-builder";
 import { setIcon, Notice, AbstractInputSuggest, type App, type TFile } from "obsidian";
 import { scanBaseFiles } from "../bases/parser";
 import { addBaseFileToSelected, removeBaseFileFromSelected } from "../bases/selection";
@@ -111,10 +112,13 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 	if (deps.settings.filterMode === "dvjs") {
 		const info = el.createDiv({ text: "Return an array of paths or Dataview pages. Example:\nreturn dv.pages('\"\"').map(p => p.file.path).array();" });
 		info.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", whiteSpace: "pre-wrap" });
+		const hint = el.createDiv({ text: "Tips: Tab=indent / Ctrl(Cmd)+Enter=Run now" });
+		hint.setCssStyles({ fontSize: "10px", color: "var(--text-faint)", marginBottom: "6px" });
 		
 		const textarea = el.createEl("textarea", { cls: "gim-expr-input" });
 		textarea.value = deps.settings.dvjsFilter;
 		textarea.setCssStyles({ width: "100%", minHeight: "120px", fontFamily: "var(--font-monospace)", fontSize: "11px", resize: "vertical" });
+		textarea.spellcheck = false;
 		
 		let debounce: number | null = null;
 		textarea.addEventListener("input", () => {
@@ -123,27 +127,88 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 			if (debounce !== null) window.clearTimeout(debounce);
 			debounce = window.setTimeout(() => deps.rebuild(), 600);
 		});
+		textarea.addEventListener("keydown", (e) => {
+			if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+				e.preventDefault();
+				deps.settings.dvjsFilter = textarea.value;
+				deps.save();
+				deps.rebuild();
+				return;
+			}
+			if (e.key === "Tab") {
+				e.preventDefault();
+				const start = textarea.selectionStart ?? textarea.value.length;
+				const end = textarea.selectionEnd ?? start;
+				const insert = "  ";
+				textarea.setRangeText(insert, start, end, "end");
+				textarea.dispatchEvent(new Event("input"));
+				return;
+			}
+			if (e.key === "Enter" && !e.shiftKey && !e.altKey) {
+				e.preventDefault();
+				const start = textarea.selectionStart ?? textarea.value.length;
+				const end = textarea.selectionEnd ?? start;
+				const prevNl = textarea.value.lastIndexOf("\n", Math.max(0, start - 1));
+				const lineStart = prevNl + 1;
+				const line = textarea.value.slice(lineStart, start);
+				const indent = (line.match(/^\s*/) ?? [""])[0];
+				textarea.setRangeText(`\n${indent}`, start, end, "end");
+				textarea.dispatchEvent(new Event("input"));
+			}
+		});
 		
 		if (deps.whereError) {
-			const errorDiv = el.createDiv({ text: deps.whereError });
-			errorDiv.setCssStyles({ color: "var(--text-error)", fontSize: "11px", marginTop: "4px" });
+			if (deps.whereError === "Dataview plugin is not available.") {
+				// Prominent banner: the whole mode is non-functional without the
+				// Dataview community plugin, so make the call-to-action obvious
+				// instead of a small grey line that's easy to miss.
+				const banner = el.createDiv({
+					text: "Dataview plugin is not available. Enable the Dataview community plugin to use this mode.",
+				});
+				banner.setCssStyles({
+					color: "var(--text-error)",
+					backgroundColor: "var(--background-modifier-error)",
+					border: "1px solid var(--text-error)",
+					borderRadius: "6px",
+					padding: "8px 10px",
+					fontSize: "12px",
+					marginTop: "8px",
+					lineHeight: "1.4",
+				});
+			} else {
+				const errorDiv = el.createDiv({ text: deps.whereError });
+				errorDiv.setCssStyles({ color: "var(--text-error)", fontSize: "11px", marginTop: "4px" });
+			}
 		}
+		return;
+	}
+
+	// ── SQL mode: Bases-style visual query builder ──
+	// All 4 sections (Filter/GroupBy/HAVING/Limit) are rendered by the visual
+	// builder component. The old tag-picker + expr-section UI is replaced.
+	if (deps.app) {
+		renderVisualBuilder(el, {
+			app: deps.app,
+			settings: deps.settings,
+			save: deps.save,
+			rebuild: deps.rebuild,
+			rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); },
+			havingError: deps.havingError ?? "",
+		});
 	} else {
+		// Fallback: if no app available (tests etc.), render old UI
 		renderTagPickerSection(
 			el,
 			"where",
 			"Which notes to show",
 			deps.settings.where,
 			deps.whereError ?? "",
-			{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); }, app: deps.app },
-			{
-				autoKey: "whereAuto",
-				help: "Only include notes with these tags.",
-				suggest: true,
-			}
+			{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); } },
+			{ autoKey: "whereAuto", help: "Only include notes with these tags.", suggest: true }
 		);
 	}
-	
+
+	// Expand neighborhood toggle (shared by sql and dvjs)
 	const expandRow = el.createEl("label", { cls: "gim-toggle-row" });
 	expandRow.setCssStyles({ marginTop: "8px", marginBottom: "8px" });
 	const expandCb = expandRow.createEl("input", { type: "checkbox" });
@@ -154,29 +219,12 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 		deps.rebuild();
 	});
 	expandRow.createSpan({ text: "Include 1-hop links & backlinks" });
-
-	renderTagPickerSection(
-		el,
-		"groupBy",
-		"Group notes by",
-		deps.settings.groupBy,
-		deps.groupByError ?? "",
-		{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); }, app: deps.app },
-		{
-			autoKey: "groupByAuto",
-			help: "Group notes into clusters by tag.",
-			suggest: true,
-		}
-	);
-
-	renderHavingSection(el, deps, isMatrix, isHeatmap);
 }
 
 // HAVING (+ its filter/highlight mode toggle and the matrix/heatmap tag-size
-// controls). Shown in EVERY logic mode — including Bases — because it post-
-// processes whatever graph the upstream stage produced (classic WHERE/GROUP_BY
-// result OR the base projection).
-function renderHavingSection(
+// controls). Used by dvjs mode and as a fallback when the visual builder is
+// not available. In sql mode, HAVING is rendered by the visual builder.
+function renderOldHavingSection(
 	el: HTMLElement,
 	deps: FilterTabDeps,
 	isMatrix: boolean,
@@ -325,19 +373,23 @@ function renderBasesSection(el: HTMLElement, deps: FilterTabDeps): void {
 	}
 }
 
-// Logic-source selector (filterMode). Three mutually-exclusive segments:
-//   sql   — SQL-like WHERE/GROUP_BY rows (classic)
+// Logic-source selector (filterMode). Two mutually-exclusive segments:
 //   dvjs  — a DataviewJS script returning paths
 //   bases — scope the graph to selected `.base` files (replaces WHERE/GROUP_BY)
 // Selecting a segment persists the mode, re-renders the Filter tab (so the body
 // swaps between the query UI and the Bases UI) and rebuilds the graph.
-const LOGIC_MODES: Array<{ id: "sql" | "dvjs" | "bases"; label: string }> = [
-	{ id: "sql", label: "Simple" },
-	{ id: "dvjs", label: "Advanced (code)" },
+const LOGIC_MODES: Array<{ id: "dvjs" | "bases"; label: string }> = [
+	{ id: "dvjs", label: "Dataview" },
 	{ id: "bases", label: "Bases" },
 ];
 
 function renderLogicModeSelector(host: HTMLElement, deps: FilterTabDeps): void {
+	if (deps.settings.filterMode === "sql") {
+		deps.settings.filterMode = "dvjs";
+		deps.save();
+		deps.rebuild();
+	}
+
 	const seg = host.createDiv({ cls: "gim-logic-mode-seg" });
 	seg.setCssStyles({ display: "flex", gap: "2px", border: "1px solid var(--background-modifier-border)", borderRadius: "5px", overflow: "hidden", padding: "1px" });
 	for (const m of LOGIC_MODES) {
@@ -369,61 +421,22 @@ export interface FilterBodyDeps extends FilterTabDeps, SortTabDeps {
 
 export function renderFilterBodyTab(host: HTMLElement, deps: FilterBodyDeps): void {
 	host.empty();
-	
-	renderPresetSection(host, {
-		settings: deps.settings,
-		save: deps.save,
-		rerender: deps.refreshFilterTab,
-		rebuild: deps.rebuild,
-		applyPreset: (name) => {
-			const preset = deps.settings.lensPresets.find(p => p.name === name);
-			if (preset) {
-				applyLens(deps.settings, preset);
-				deps.save();
-				deps.refreshFilterTab();
-				deps.rebuild();
-			}
-		},
-		savePreset: (name) => {
-			deps.settings.lensPresets = upsertPreset(deps.settings.lensPresets, name, captureLens(deps.settings), deps.settings.encoding);
-			deps.save();
-			deps.refreshFilterTab();
-			if (deps.syncLensCommands) {
-				deps.syncLensCommands(deps.settings.lensPresets);
-			}
-		},
-		removePreset: (name) => {
-			deps.settings.lensPresets = removePreset(deps.settings.lensPresets, name);
-			deps.save();
-			deps.refreshFilterTab();
-			new Notice(`Lens '${name}' deleted. Note: its command palette entry will disappear on next reload.`);
-		}
-	});
 
-	// Split into two sub-panels: Filter and Sort
+	// Keep only one panel: Filter & Group
 	const filterHeader = host.createDiv({ cls: "gim-panel-section" });
 	filterHeader.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", borderBottom: "none" });
 	
 	const title = filterHeader.createEl("h4", { text: "Filter & Group", cls: "gim-panel-title" });
 	title.setCssStyles({ margin: "0" });
 
-	// Logic source selector: SQL / DataviewJS / Bases. A 3-way segmented control
-	// replacing the old sql↔dvjs icon toggle. Switching mode re-renders the tab,
-	// which conditionally shows WHERE/GROUP_BY (sql/dvjs) OR the Bases UI (bases),
+	// Logic source selector: Dataview / Bases. A 2-way segmented control.
+	// Switching mode re-renders the tab, which conditionally shows
+	// Dataview input OR the Bases UI,
 	// then rebuilds so the canvas reflects the active source immediately.
 	renderLogicModeSelector(filterHeader, deps);
 
 	const filterSection = host.createDiv({ cls: "gim-panel-section" });
 	renderSettingsFilterTab(filterSection, deps);
-
-	// The Sort sub-panel (ORDER_BY + LIMIT) is SQL/DataviewJS-only. Bases mode is
-	// completely separate from the SQL-like pipeline, so it shows neither the Sort
-	// UI here nor HAVING above; the matching stages are skipped in rebuild().
-	if (deps.settings.filterMode !== "bases") {
-		const sortSection = host.createDiv({ cls: "gim-panel-section" });
-		sortSection.createEl("h4", { text: "Sort" });
-		renderSettingsSortTab(sortSection, { ...deps, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); } });
-	}
 }
 
 export interface DisplayTabDeps {

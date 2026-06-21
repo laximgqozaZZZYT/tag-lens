@@ -8,7 +8,7 @@ import { axisLayout, type AxisSpec, type AxisBand, type AxisTick } from "./layou
 import { assignGalleryAxes } from "./layout/droste-axis";
 import { LaneRegistry, routeZ } from "./layout/edge-routing";
 import { buildIdToRect, buildRouteObstacles } from "./layout/layout-shared";
-import { buildGraph } from "./query/parser";
+import { buildGraph, runDvjsDqlFilter } from "./query/parser";
 import { buildBaseIndex } from "./bases/build-index";
 import { scanBaseFiles } from "./bases/parser";
 import { ensureFallbackBase } from "./bases/fallback";
@@ -1119,6 +1119,17 @@ export class MiniGraphView extends ItemView {
 		// builder. Errors from the query parsers are surfaced into panel
 		// state so the user sees them inline.
 		const { effGroupBy, effWhere, filterMode, dvjsFilter } = resolveEffectiveQuery(this.settings);
+		// DataviewJS DQL is evaluated by Dataview's own engine (async) BEFORE the
+		// synchronous graph build so WHERE/SORT/GROUP BY/FLATTEN are fully honoured.
+		// JS scripts return matchedPaths: null here and are evaluated synchronously
+		// inside buildGraph (unchanged). Mirrors the Bases `await buildBaseIndex`
+		// pattern. Guarded by gen so a stale async result can't clobber a newer build.
+		let dvjsResolved: { matchedPaths: Set<string> | null; error?: string } | undefined;
+		if (filterMode === "dvjs") {
+			const allPaths = new Set(this.app.vault.getMarkdownFiles().map((f) => f.path));
+			dvjsResolved = await runDvjsDqlFilter(this.app, dvjsFilter ?? "", allPaths);
+			if (gen !== this.rebuildGen) return;
+		}
 		const { result, errors } = buildGraph(
 			this.app,
 			effWhere,
@@ -1128,7 +1139,8 @@ export class MiniGraphView extends ItemView {
 			this.settings.focusNodeIds,
 			// Prevent recursive expansion in closeup view. The focused nodes
 			// already include the relevant neighborhood from the panorama state.
-			this.settings.focusNodeIds ? false : this.settings.expandNeighborhood
+			this.settings.focusNodeIds ? false : this.settings.expandNeighborhood,
+			dvjsResolved
 		);
 		this.whereError = errors.where ?? "";
 		this.groupByError = errors.groupBy ?? "";
@@ -1281,12 +1293,14 @@ export class MiniGraphView extends ItemView {
 				: this.settings.havingAuto;
 
 		const _noteCount = this.app.vault.getMarkdownFiles().length;
+		const applySqlPostFilters = !baseScoped && this.settings.filterMode === "sql";
 
-		// ── HAVING / AUTO-HAVING — SQL-like post-projection filter. SKIPPED in
-		// Bases mode: the base projection is its own complete graph and must not be
+		// ── HAVING / AUTO-HAVING — SQL-like post-projection filter. SKIPPED unless
+		// filterMode is "sql": Dataview/Bases must reflect their own source only.
+		// In Bases mode the base projection is its own complete graph and must not be
 		// thinned by SQL-like cluster filters. Clear prior HAVING state so stale
 		// highlights/errors from an earlier sql/dvjs build don't leak through. ──
-		if (!baseScoped) {
+		if (applySqlPostFilters) {
 			// Seed the HAVING field's initial value: when auto is on and the user
 			// has no manual rows, populate settings.having with the concrete auto
 			// rows resolved against this build's node count, so they show up in the
@@ -1359,11 +1373,9 @@ export class MiniGraphView extends ItemView {
 		// Stage 3: LIMIT (+ ORDER_BY, which only ranks within LIMIT tiers).
 		// Per-tier visible-node selection + display-mode assignment. Edges are
 		// re-filtered against the surviving id set.
-		// SKIPPED in Bases mode: passing zero tiers makes applyLimitRules return
-		// every node at "full" with NO reordering, so the base projection is shown
-		// whole — LIMIT never trims it and ORDER_BY never reshuffles it. Keeps Bases
-		// completely separate from the SQL-like pipeline.
-		const limitTiers = baseScoped ? [] : this.parseLimitRules();
+		// SKIPPED unless filterMode is "sql": in Dataview/Bases, zero tiers keeps
+		// every node at "full" with NO trimming/reordering by SQL-like controls.
+		const limitTiers = applySqlPostFilters ? this.parseLimitRules() : [];
 		const { visibleNodes, modes } = applyLimitRules(
 			data.nodes,
 			limitTiers,
@@ -1394,8 +1406,8 @@ export class MiniGraphView extends ItemView {
 			limitedNodes: menuLimitedNodes(menuSourceData, {
 				app: this.app,
 				settings: this.settings,
-				// Bases mode skips LIMIT ⇒ navigator lists the full base set too.
-				tiers: baseScoped ? [] : this.parseLimitRules(),
+				// Dataview/Bases skip LIMIT/ORDER_BY ⇒ navigator lists full source set.
+				tiers: applySqlPostFilters ? this.parseLimitRules() : [],
 			}),
 		});
 		this.menuNotes = projectMenuNotes(menuNodeSource, this.app);
