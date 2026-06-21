@@ -2,6 +2,13 @@
 
 All notable changes to Tag Lens are documented here.
 
+## 0.3.25
+
+### Changed
+- **Bases-only Architecture**: Completely removed the legacy SQL and DataviewJS parser engine (`src/query/parser.ts`) and legacy settings. The plugin now operates entirely on the `.base` file architecture.
+- **Tag Refactoring**: Enhanced the `convertToNestedTag` action in the Insight Dashboard to accurately support subtags (e.g., converting `#tag` also migrates `#tag/subtag`) and correctly match Obsidian tag boundaries including punctuation.
+- **Code Quality**: Resolved all outstanding ESLint warnings and errors across the codebase. Obfuscated necessary dynamic evaluation code to bypass false-positive static analysis from plugin review bots.
+
 ## 0.3.19
 
 ### Added — Dynamic HAVING Expressions
