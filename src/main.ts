@@ -3,6 +3,8 @@ import { DEFAULT_SETTINGS, MiniSettings, LensPreset } from "./types";
 import { applyLens } from "./interaction/lens-presets";
 import { MiniGraphView, VIEW_TYPE_MINI } from "./view";
 
+const DEFAULT_DVJS_FILTER = "return dv.pages('\\\"\\\"').map(p => p.file.path).array();";
+
 export default class GraphIslandMiniPlugin extends Plugin {
 	settings: MiniSettings = DEFAULT_SETTINGS;
 	private views: MiniGraphView[] = [];
@@ -286,6 +288,17 @@ export default class GraphIslandMiniPlugin extends Plugin {
 			merged.filterMode !== "bases"
 		) {
 			merged.filterMode = "sql";
+		}
+		// dvjs filter text migration: keep existing user scripts, but replace empty
+		// or legacy Dataview-source placeholders (e.g. `FROM ""`) with a runnable
+		// default Dataview script so switching to Dataview mode is usable immediately.
+		if (typeof merged.dvjsFilter !== "string") {
+			merged.dvjsFilter = DEFAULT_DVJS_FILTER;
+		} else {
+			const t = merged.dvjsFilter.trim();
+			if (t.length === 0 || /^FROM\s+""\s*$/i.test(t)) {
+				merged.dvjsFilter = DEFAULT_DVJS_FILTER;
+			}
 		}
 		// --- Bases integration (Stage 2) ---
 		if (!Array.isArray(merged.selectedBases)) merged.selectedBases = [];

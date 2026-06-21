@@ -188,6 +188,23 @@ export function collectBuilderSources(app: App): BuilderSources {
 	return buildBuilderSources(collectSuggestSources(app));
 }
 
+// Gather the distinct values of EVERY builder-simple frontmatter field, capped
+// per field, so the picker can offer "field: value" candidates without a second
+// vault pass per keystroke. Returns a field → values[] map (values pre-capped).
+// Reuses collectPropertyValues (one pass per field); the field set is small
+// (frontmatter keys), so this stays cheap and is gathered once per render.
+export function collectPropertyValueMap(
+	app: App,
+	fields: string[],
+	cap = PROPERTY_VALUE_CANDIDATE_CAP,
+): Record<string, string[]> {
+	const map: Record<string, string[]> = {};
+	for (const field of fields) {
+		map[field] = collectPropertyValues(app, field).slice(0, cap);
+	}
+	return map;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Minimal tag-picker classification (for the beginner WHERE / GROUP_BY UI).
 //
@@ -219,6 +236,160 @@ export function classifyTagPickerRow(raw: string, index: number): TagPickerRow {
 		return { index, raw, kind: "tag", tag: cond.value };
 	}
 	return { index, raw, kind: "raw", tag: "" };
+}
+
+// Human-readable label for a saved row in the picker's selected-row list. A row
+// that parses to one of the SIX simple conditions gets a friendly label (so
+// property and auto-split rows no longer fall through to raw monospace text);
+// anything else is returned verbatim so its exact text is shown unchanged.
+//
+// Returns BOTH the display text and whether it is a "simple" (recognised) row.
+// The renderer styles raw rows differently (monospace, muted) and shows them as
+// non-editable advanced conditions, exactly as before.
+export interface TagPickerRowLabel {
+	text: string;
+	// true ⇒ one of the six simple conditions (friendly label); false ⇒ raw
+	// advanced text shown verbatim.
+	simple: boolean;
+}
+
+export function tagPickerRowLabel(raw: string): TagPickerRowLabel {
+	const c = parseSimpleRow(raw);
+	if (!c) return { text: raw.trim(), simple: false };
+	switch (c.kind) {
+		case "tag-has":
+			return { text: `#${c.value}`, simple: true };
+		case "tag-not":
+			return { text: `not #${c.value}`, simple: true };
+		case "tag-any":
+			return { text: "One group per tag (auto-split)", simple: true };
+		case "fm-eq":
+			return { text: `${c.field}: ${c.value}`, simple: true };
+		case "fm-not":
+			return { text: `${c.field} not ${c.value}`, simple: true };
+		case "fm-any":
+			return { text: `One group per ${c.field} value (auto-split)`, simple: true };
+	}
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Mixed candidate generation for the beginner picker's ONE input.
+//
+// The picker keeps its single text input + suggestion popover + chip list. What
+// changes is ONLY the CONTENT of the popover: instead of tag names alone, it now
+// offers four candidate kinds, all of which insert a SIMPLE saved-row string the
+// existing parser already understands. No new input widget, no new save format.
+//
+//   kind "tag"        → `tag:#<name>`     pick a tag value
+//   kind "property"   → `<field>:<value>` pick a property = value pair
+//   kind "tag-split"  → `tag:?`           one group per tag (auto-split)
+//   kind "field-split"→ `<field>:?`       one group per property value
+//
+// All candidates carry the exact `insert` string written into rows[] on pick,
+// plus a primary label + a muted type hint for the popover. Pure — no DOM/app.
+// ────────────────────────────────────────────────────────────────────────────
+
+export type PickerCandidateKind = "tag" | "property" | "tag-split" | "field-split";
+
+export interface PickerCandidate {
+	kind: PickerCandidateKind;
+	// Primary popover label.
+	label: string;
+	// Muted secondary hint shown after the label ("tag", "property", "split").
+	hint: string;
+	// The canonical saved-row string appended to rows[] when this is picked.
+	insert: string;
+}
+
+// Per-property cap on how many distinct values become "property = value"
+// candidates. A property with hundreds of distinct values (e.g. a free-text
+// title) would otherwise flood the popover and bury the tag candidates; 10 keeps
+// the common enum-like properties (status, priority, type, stage) fully usable
+// while bounding the candidate count. Values beyond the cap are reachable via
+// the Advanced (text) editor, and the "auto-split" candidate covers "all values".
+export const PROPERTY_VALUE_CANDIDATE_CAP = 10;
+
+// Overall popover cap (mirrors the tag-only suggester's previous slice(0, 20)).
+export const PICKER_CANDIDATE_CAP = 20;
+
+// Build the full, UNFILTERED candidate pool from vault sources + the per-field
+// value map. Ordering inside the pool is: auto-split-all-tags, then tag values,
+// then per property [its auto-split, then its capped values]. The query filter
+// (computePickerCandidates) re-ranks/limits this pool; this function only shapes
+// it so the pure value collection is testable in isolation.
+//
+// `propertyValues` maps a (builder-simple) field name → its distinct vault
+// values (already collected via collectPropertyValues, capped by the caller or
+// here). Fields absent from the map contribute only an auto-split candidate.
+export function buildPickerCandidates(
+	sources: BuilderSources,
+	propertyValues: Record<string, string[]>,
+	valueCap = PROPERTY_VALUE_CANDIDATE_CAP,
+): PickerCandidate[] {
+	const out: PickerCandidate[] = [];
+
+	// 1. Auto-split-all-tags — the headline "tag:?" capability. Always first so a
+	//    user who just focuses the empty input sees it at the top.
+	out.push({
+		kind: "tag-split",
+		label: "Show one group per tag (auto-split)",
+		hint: "split",
+		insert: "tag:?",
+	});
+
+	// 2. Tag values.
+	for (const t of sources.tags) {
+		out.push({ kind: "tag", label: `#${t}`, hint: "tag", insert: tagRowString(t) });
+	}
+
+	// 3. Per property: its auto-split, then its capped distinct values.
+	for (const field of sources.fields) {
+		out.push({
+			kind: "field-split",
+			label: `Show one group per ${field} value (auto-split)`,
+			hint: "split",
+			insert: stringifySimpleCondition({ kind: "fm-any", field, value: "" }),
+		});
+		const values = propertyValues[field] ?? [];
+		for (const v of values.slice(0, valueCap)) {
+			out.push({
+				kind: "property",
+				label: `${field}: ${v}`,
+				hint: "property",
+				insert: stringifySimpleCondition({ kind: "fm-eq", field, value: v }),
+			});
+		}
+	}
+
+	return out;
+}
+
+// Filter + rank + cap the candidate pool against the typed query. Matching is a
+// case-insensitive substring over the label (so "status: dr" and "dr" both find
+// "status: draft", and "char" finds the #character tag). Empty query ⇒ the pool
+// head (auto-split + first tags …) up to the cap, so focusing the empty input
+// surfaces the auto-split capability immediately. Already-present inserts are
+// excluded so the user can't add a duplicate row. Pure — no DOM/app.
+export function computePickerCandidates(
+	pool: PickerCandidate[],
+	query: string,
+	existingRows: string[],
+	limit = PICKER_CANDIDATE_CAP,
+): PickerCandidate[] {
+	const q = query.trim().toLowerCase();
+	const present = new Set(existingRows.map((r) => r.trim()));
+	const eligible = pool.filter((c) => !present.has(c.insert.trim()));
+	const filtered =
+		q === "" ? eligible : eligible.filter((c) => c.label.toLowerCase().includes(q));
+	if (q === "") return filtered.slice(0, limit);
+	// Prefix matches (on the label) rank before mere substring matches.
+	filtered.sort((a, b) => {
+		const ap = a.label.toLowerCase().startsWith(q) ? 0 : 1;
+		const bp = b.label.toLowerCase().startsWith(q) ? 0 : 1;
+		if (ap !== bp) return ap - bp;
+		return 0;
+	});
+	return filtered.slice(0, limit);
 }
 
 export function classifyTagPickerRows(rows: string[]): TagPickerRow[] {

@@ -9,7 +9,13 @@ import {
 import {
 	classifyTagPickerRows,
 	tagRowString,
+	tagPickerRowLabel,
+	buildBuilderSources,
+	buildPickerCandidates,
+	computePickerCandidates,
+	collectPropertyValueMap,
 	type TagPickerRow,
+	type PickerCandidate,
 } from "./query-builder";
 
 // ORDER_BY field schema. Listed by source group so the dropdown reads
@@ -248,32 +254,37 @@ export function renderExprSection(
 // in-memory only (NOT persisted) — beginners always start collapsed.
 const advancedOpenState = new Set<string>();
 
-// Tag-only suggester for the beginner input. Reuses the vault tag collection
-// (collectSuggestSources) but offers ONLY tag values — no field-name / property
-// candidates — so the beginner is never presented with anything but tags.
-class TagOnlySuggest extends AbstractInputSuggest<string> {
+// Mixed-candidate suggester for the beginner input. Same ONE input + popover +
+// chip pattern as before, but the popover now offers four candidate kinds (tag
+// value, property = value, "one group per tag", "one group per <field> value"),
+// all of which insert a SIMPLE saved-row string the existing parser understands.
+// No new input widget, no new save format — only the popover CONTENT is richer.
+//
+// `getCandidates(query)` returns the already-filtered/ranked candidate list for
+// the current input text (built from the cached vault sources). `onPick` appends
+// the chosen candidate's `insert` string to rows[].
+class TagPickerSuggest extends AbstractInputSuggest<PickerCandidate> {
 	constructor(
 		app: App,
 		inputEl: HTMLInputElement,
-		private readonly getTags: () => string[],
-		private readonly onPick: (tag: string) => void,
+		private readonly getCandidates: (query: string) => PickerCandidate[],
+		private readonly onPick: (c: PickerCandidate) => void,
 	) {
 		super(app, inputEl);
 	}
 
-	protected getSuggestions(query: string): string[] {
-		const q = query.trim().toLowerCase();
-		const pool = this.getTags();
-		const filtered = q === "" ? pool : pool.filter((t) => t.toLowerCase().includes(q));
-		return filtered.slice(0, 20);
+	protected getSuggestions(query: string): PickerCandidate[] {
+		return this.getCandidates(query);
 	}
 
-	renderSuggestion(tag: string, el: HTMLElement): void {
-		el.createSpan({ text: `#${tag}` });
+	renderSuggestion(c: PickerCandidate, el: HTMLElement): void {
+		el.createSpan({ text: c.label });
+		const sub = el.createSpan({ text: `  ${c.hint}` });
+		sub.setCssStyles({ fontSize: "10px", color: "var(--text-muted)" });
 	}
 
-	selectSuggestion(tag: string): void {
-		this.onPick(tag);
+	selectSuggestion(c: PickerCandidate): void {
+		this.onPick(c);
 	}
 }
 
@@ -313,19 +324,20 @@ export function renderTagPickerSection(
 		helpEl.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" });
 	}
 
-	// 1. The single tag input (typeahead, tag values only).
+	// 1. The single input (typeahead over tags + property=value + auto-split).
 	const input = section.createEl("input", { type: "text", cls: "gim-tag-picker-input" });
-	input.setAttribute("placeholder", "Type a tag…");
+	input.setAttribute("placeholder", "Tag, property, or “one group per…”");
 	input.spellcheck = false;
 	input.setCssStyles({ width: "100%", marginBottom: "6px" });
 
-	const addTag = (tag: string): void => {
-		const t = tag.trim().replace(/^#/, "");
-		if (t === "") return;
-		const row = tagRowString(t);
-		// Idempotent: don't append a duplicate of an existing identical row.
-		if (!rows.includes(row)) {
-			rows.push(row);
+	// Append a finished saved-row string (the candidate's canonical insert, or a
+	// hand-typed bare tag). Idempotent — never appends a duplicate of an existing
+	// identical row. Shared by the suggester pick and the Enter-to-commit path.
+	const addRowString = (rowString: string): void => {
+		const r = rowString.trim();
+		if (r === "") return;
+		if (!rows.includes(r)) {
+			rows.push(r);
 			void deps.save();
 			deps.rebuild?.();
 		}
@@ -334,35 +346,51 @@ export function renderTagPickerSection(
 	};
 
 	if (deps.app) {
-		new TagOnlySuggest(
-			deps.app,
+		// Cache the vault sources + property-value map ONCE per render so the
+		// per-keystroke filter is pure string work (no metadataCache walk per key).
+		const app = deps.app;
+		let cachedPool: PickerCandidate[] | null = null;
+		const getPool = (): PickerCandidate[] => {
+			if (!cachedPool) {
+				const builderSources = buildBuilderSources(collectSuggestSources(app));
+				const valueMap = collectPropertyValueMap(app, builderSources.fields);
+				cachedPool = buildPickerCandidates(builderSources, valueMap);
+			}
+			return cachedPool;
+		};
+		new TagPickerSuggest(
+			app,
 			input,
-			() => collectSuggestSources(deps.app!).tags,
-			(tag) => addTag(tag),
+			(query) => computePickerCandidates(getPool(), query, rows),
+			(c) => addRowString(c.insert),
 		);
 	}
-	// Enter commits the typed text too (covers tags not in the vault yet / no app).
+	// Enter commits the typed text as a bare tag (covers tags not in the vault
+	// yet, or when no app is wired). The canonical `tag:#name` row is produced so
+	// it round-trips identically to a picked tag candidate.
 	input.addEventListener("keydown", (e) => {
 		if (e.key === "Enter") {
 			e.preventDefault();
-			if (input.value.trim() !== "") addTag(input.value);
+			const typed = input.value.trim();
+			if (typed !== "") addRowString(tagRowString(typed.replace(/^#/, "")));
 		}
 	});
 
-	// 2. Selected-row list — tag chips for simple rows, raw text for the rest.
+	// 2. Selected-row list — friendly labels for the six simple conditions
+	//    (tag / property=value / auto-split), raw verbatim text for the rest.
 	const picked: TagPickerRow[] = classifyTagPickerRows(rows);
 	if (picked.length === 0) {
-		const empty = section.createDiv({ cls: "gim-expr-help", text: "No tags chosen yet." });
+		const empty = section.createDiv({ cls: "gim-expr-help", text: "Nothing chosen yet." });
 		empty.setCssStyles({ fontSize: "11px", color: "var(--text-muted)" });
 	} else {
 		const list = section.createDiv({ cls: "gim-tag-picker-list" });
 		for (const item of picked) {
 			const row = list.createDiv({ cls: "gim-tag-picker-row" });
 			row.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", padding: "2px 0" });
-			const text = item.kind === "tag" ? `#${item.tag}` : item.raw;
-			const labelEl = row.createSpan({ text });
+			const lbl = tagPickerRowLabel(item.raw);
+			const labelEl = row.createSpan({ text: lbl.text });
 			labelEl.setCssStyles({ flex: "1 1 auto", minWidth: "0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px" });
-			if (item.kind === "raw") {
+			if (!lbl.simple) {
 				labelEl.setAttr("title", "Advanced condition — edit it under Advanced below.");
 				labelEl.setCssStyles({ fontFamily: "var(--font-monospace)", color: "var(--text-muted)" });
 			}

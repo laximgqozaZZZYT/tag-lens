@@ -6,10 +6,16 @@ import {
 	stringifySimpleCondition,
 	buildBuilderSources,
 	collectPropertyValues,
+	collectPropertyValueMap,
 	classifyTagPickerRow,
 	classifyTagPickerRows,
 	tagRowString,
+	tagPickerRowLabel,
+	buildPickerCandidates,
+	computePickerCandidates,
+	PROPERTY_VALUE_CANDIDATE_CAP,
 	type SimpleCondition,
+	type BuilderSources,
 } from "../src/panel/query-builder";
 import type { SuggestSources } from "../src/panel/tag-field-suggest";
 
@@ -179,4 +185,112 @@ import type { SuggestSources } from "../src/panel/tag-field-suggest";
 	ok(tagRowString("  spaced  ") === "tag:#spaced", "tagRowString trims");
 	const back = parseSimpleRow(tagRowString("foo/bar"));
 	ok(back?.kind === "tag-has" && back.value === "foo/bar", "tagRowString round-trips through parseSimpleRow");
+}
+
+// ── tagPickerRowLabel: friendly labels for all six simple kinds ──────────────
+// Property = value AND the auto-split rows are now "simple" (friendly label),
+// so they no longer fall through to raw monospace text. Anything non-simple is
+// returned verbatim and flagged simple === false.
+{
+	ok(tagPickerRowLabel("tag:#wip").text === "#wip", "label tag-has → #wip");
+	ok(tagPickerRowLabel("tag:#wip").simple === true, "label tag-has is simple");
+	ok(tagPickerRowLabel("-tag:#wip").text === "not #wip", "label tag-not → not #wip");
+	ok(
+		tagPickerRowLabel("tag:?").text === "One group per tag (auto-split)",
+		"label tag-any → auto-split tags",
+	);
+	ok(tagPickerRowLabel("tag:?").simple === true, "label tag-any is simple");
+	ok(tagPickerRowLabel("status:draft").text === "status: draft", "label fm-eq → status: draft");
+	ok(tagPickerRowLabel("status:draft").simple === true, "label fm-eq is simple");
+	ok(tagPickerRowLabel("-status:draft").text === "status not draft", "label fm-not → status not draft");
+	ok(
+		tagPickerRowLabel("status:?").text === "One group per status value (auto-split)",
+		"label fm-any → auto-split per status",
+	);
+	ok(tagPickerRowLabel("status:?").simple === true, "label fm-any is simple");
+	// Non-simple → verbatim, flagged not simple.
+	const adv = tagPickerRowLabel("tag:#a AND tag:#b");
+	ok(adv.text === "tag:#a AND tag:#b" && adv.simple === false, "label non-simple → verbatim, not simple");
+}
+
+// ── buildPickerCandidates: four candidate kinds, capped per-property values ──
+{
+	const sources: BuilderSources = { tags: ["wip", "done"], fields: ["status", "priority"] };
+	const valueMap = {
+		status: ["draft", "review", "done"],
+		priority: Array.from({ length: 25 }, (_, i) => `p${i}`),
+	};
+	const cands = buildPickerCandidates(sources, valueMap, 10);
+
+	// Auto-split-all-tags is the headline candidate, always first.
+	ok(cands[0].kind === "tag-split" && cands[0].insert === "tag:?", "first candidate = tag auto-split");
+
+	// Tag value candidates inserted as canonical tag:#name.
+	const wip = cands.find((c) => c.kind === "tag" && c.label === "#wip");
+	ok(!!wip && wip.insert === "tag:#wip", "tag candidate inserts tag:#wip");
+
+	// Each property contributes an auto-split candidate.
+	const statusSplit = cands.find((c) => c.kind === "field-split" && c.insert === "status:?");
+	ok(!!statusSplit && statusSplit.label === "Show one group per status value (auto-split)", "status field-split present");
+
+	// Property = value candidates inserted as field:value.
+	const statusDraft = cands.find((c) => c.kind === "property" && c.insert === "status:draft");
+	ok(!!statusDraft && statusDraft.label === "status: draft", "property candidate inserts status:draft");
+
+	// Per-property value cap applied: priority has 25 values but only 10 become
+	// candidates (plus its one field-split).
+	const priorityValues = cands.filter((c) => c.kind === "property" && c.label.startsWith("priority:"));
+	ok(priorityValues.length === 10, "per-property value cap applied (10 of 25 priority values)");
+}
+{
+	// Default cap constant is wired through when the arg is omitted.
+	const sources: BuilderSources = { tags: [], fields: ["f"] };
+	const valueMap = { f: Array.from({ length: 50 }, (_, i) => `v${i}`) };
+	const cands = buildPickerCandidates(sources, valueMap);
+	const fValues = cands.filter((c) => c.kind === "property");
+	ok(fValues.length === PROPERTY_VALUE_CANDIDATE_CAP, "default per-property cap == PROPERTY_VALUE_CANDIDATE_CAP");
+}
+
+// ── computePickerCandidates: mixed filter hits tags AND properties ──────────
+{
+	const sources: BuilderSources = { tags: ["draft-notes", "wip"], fields: ["status"] };
+	const valueMap = { status: ["draft", "done"] };
+	const pool = buildPickerCandidates(sources, valueMap);
+
+	// "draft" matches BOTH the #draft-notes tag and the status: draft property.
+	const hits = computePickerCandidates(pool, "draft", []);
+	const labels = hits.map((c) => c.label);
+	ok(labels.includes("#draft-notes"), "filter hits tag candidate");
+	ok(labels.includes("status: draft"), "filter hits property candidate");
+
+	// Empty query surfaces the auto-split head first (capability discoverable).
+	const empty = computePickerCandidates(pool, "", []);
+	ok(empty[0].kind === "tag-split", "empty query surfaces tag auto-split first");
+
+	// Already-present rows are excluded so no duplicate can be added.
+	const dedup = computePickerCandidates(pool, "", ["tag:?"]);
+	ok(!dedup.some((c) => c.insert === "tag:?"), "existing row excluded from candidates");
+
+	// Limit cap respected.
+	const capped = computePickerCandidates(pool, "", [], 2);
+	ok(capped.length === 2, "candidate limit cap respected");
+}
+
+// ── collectPropertyValueMap: per-field capped value collection ──────────────
+{
+	const files = [
+		{ frontmatter: { status: "draft" } },
+		{ frontmatter: { status: "done" } },
+		{ frontmatter: { priority: Array.from({ length: 20 }, (_, i) => `p${i}`) } },
+	];
+	const app = {
+		vault: { getMarkdownFiles: () => files.map((_, i) => ({ id: i })) },
+		metadataCache: {
+			getFileCache: (f: { id: number }) => ({ frontmatter: files[f.id].frontmatter }),
+		},
+	} as unknown as import("obsidian").App;
+
+	const map = collectPropertyValueMap(app, ["status", "priority"], 10);
+	ok(JSON.stringify(map.status) === JSON.stringify(["done", "draft"]), "status values collected/sorted");
+	ok(map.priority.length === 10, "priority values capped at 10");
 }

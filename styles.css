@@ -515,3 +515,391 @@
 	background: var(--background-modifier-border);
 	color: var(--text-normal);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Visual Query Builder (Bases-style)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Accordion section */
+.gim-vb-section {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	margin-bottom: 6px;
+	overflow: hidden;
+}
+
+.gim-vb-section-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 8px;
+	cursor: pointer;
+	background: var(--background-secondary);
+	user-select: none;
+}
+
+.gim-vb-section-header:hover {
+	background: var(--background-modifier-hover);
+}
+
+.gim-vb-chevron {
+	font-size: 10px;
+	width: 12px;
+	flex-shrink: 0;
+	text-align: center;
+	color: var(--text-muted);
+}
+
+.gim-vb-section-title {
+	font-size: 12px;
+	font-weight: 600;
+	flex: 1 1 auto;
+}
+
+.gim-vb-section-body {
+	padding: 8px;
+}
+
+.gim-vb-section-body.is-collapsed {
+	display: none;
+}
+
+/* View accordion (All Views / This View) */
+.gim-vb-view-header {
+	padding: 4px 0;
+	margin-bottom: 6px;
+}
+
+.gim-vb-view-label {
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+/* AND/OR conjunction */
+.gim-vb-conjunction {
+	font-size: 11px;
+	color: var(--text-muted);
+	margin-bottom: 6px;
+	padding: 2px 4px;
+}
+
+/* Condition rows container */
+.gim-vb-rows {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-bottom: 6px;
+}
+
+/* Single condition row */
+.gim-vb-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 3px 0;
+	min-height: 28px;
+}
+
+.gim-vb-row-visual {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.gim-vb-field-cell {
+	flex: 0 0 auto;
+}
+
+/* Value input */
+.gim-vb-value-input {
+	flex: 1 1 auto;
+	min-width: 60px;
+	padding: 3px 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	font-size: 12px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+}
+
+.gim-vb-value-input:focus {
+	border-color: var(--interactive-accent);
+	outline: none;
+}
+
+.gim-vb-value-input::placeholder {
+	color: var(--text-faint);
+}
+
+/* HAVING value input (narrower) */
+.gim-vb-having-value {
+	max-width: 80px;
+}
+
+/* HAVING / LIMIT select */
+.gim-vb-select {
+	padding: 3px 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	font-size: 12px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	cursor: pointer;
+}
+
+/* Icon buttons (code toggle, delete) */
+.gim-vb-icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.gim-vb-icon-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.gim-vb-delete-btn:hover {
+	color: var(--text-error);
+}
+
+.gim-vb-icon-btn svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* Code display (inline raw string) */
+.gim-vb-row-code,
+.gim-vb-row-code-inline {
+	font-family: var(--font-monospace);
+	font-size: 11px;
+	color: var(--text-muted);
+	background: var(--background-secondary);
+	padding: 3px 6px;
+	border-radius: 4px;
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Advanced row (read-only) */
+.gim-vb-row-advanced {
+	opacity: 0.8;
+}
+
+/* Action buttons */
+.gim-vb-actions {
+	display: flex;
+	gap: 6px;
+	margin-top: 4px;
+}
+
+.gim-vb-add-btn {
+	font-size: 11px;
+	padding: 3px 8px;
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: 4px;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.gim-vb-add-btn:hover {
+	border-color: var(--interactive-accent);
+	color: var(--interactive-accent);
+	background: var(--background-modifier-hover);
+}
+
+.gim-vb-add-btn[disabled] {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+.gim-vb-add-group-btn {
+	border-style: dotted;
+}
+
+/* Empty/disabled hints */
+.gim-vb-empty-hint,
+.gim-vb-disabled-hint,
+.gim-vb-hint {
+	font-size: 11px;
+	color: var(--text-muted);
+	padding: 4px 0;
+	font-style: italic;
+}
+
+/* LIMIT section */
+.gim-vb-limit-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 6px;
+}
+
+.gim-vb-limit-label {
+	font-size: 12px;
+	color: var(--text-normal);
+	flex-shrink: 0;
+}
+
+.gim-vb-number-input {
+	width: 70px;
+	padding: 3px 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	font-size: 12px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	text-align: right;
+}
+
+.gim-vb-number-input:focus {
+	border-color: var(--interactive-accent);
+	outline: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Searchable Dropdown (shared component)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.gim-vb-dropdown-trigger {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 3px 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 12px;
+	cursor: pointer;
+	white-space: nowrap;
+	max-width: 140px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.gim-vb-dropdown-trigger:hover {
+	border-color: var(--interactive-accent);
+}
+
+.gim-vb-dropdown-trigger::after {
+	content: "▾";
+	font-size: 10px;
+	color: var(--text-muted);
+	margin-left: 2px;
+}
+
+.gim-vb-dropdown-panel {
+	position: fixed;
+	z-index: var(--layer-popover, 1000);
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+	max-height: 280px;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.gim-vb-dropdown-search {
+	width: 100%;
+	padding: 8px 10px;
+	border: none;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 12px;
+	outline: none;
+	box-sizing: border-box;
+}
+
+.gim-vb-dropdown-search::placeholder {
+	color: var(--text-faint);
+}
+
+.gim-vb-dropdown-list {
+	overflow-y: auto;
+	max-height: 240px;
+}
+
+.gim-vb-dropdown-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 10px;
+	cursor: pointer;
+	font-size: 12px;
+}
+
+.gim-vb-dropdown-item:hover {
+	background: var(--background-modifier-hover);
+}
+
+.gim-vb-dropdown-item.is-selected {
+	background: var(--background-modifier-active-hover, var(--background-modifier-hover));
+}
+
+.gim-vb-dropdown-item-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.gim-vb-dropdown-item-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.gim-vb-dropdown-item-label {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.gim-vb-dropdown-item-hint {
+	flex-shrink: 0;
+	color: var(--text-faint);
+	font-size: 10px;
+	margin-left: auto;
+}
+
+.gim-vb-dropdown-item-check {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	flex-shrink: 0;
+	color: var(--interactive-accent);
+}
+
+.gim-vb-dropdown-item-check svg {
+	width: 14px;
+	height: 14px;
+}
