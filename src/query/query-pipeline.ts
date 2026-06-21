@@ -93,17 +93,18 @@ export function getSortKey(
 }
 
 // Single gate for the HAVING (cluster-size filter/highlight) stage in
-// rebuild(). HAVING only inspects cluster MEMBER COUNTS, so it applies the same
-// whether the grouping came from settings.groupBy (sql) or a dvjs script's
-// returned groups — both "sql" and "dvjs" qualify. Bases mode is excluded
-// (baseScoped): a base projection is its own complete graph and must never be
-// thinned/highlighted by SQL-like cluster filters. NOTE: LIMIT/ORDER_BY remain
-// sql-only and are gated separately (filterMode === "sql"), NOT by this.
+// rebuild(). HAVING is an sql-only post-projection stage. In dvjs mode the
+// script's return value is the single source of truth for grouping (mirroring
+// GROUP_BY): there is no hidden cluster-size post-processing, so dvjs does NOT
+// qualify — users who want to drop small/large groups compute their own
+// `groups` in-script. Bases mode is also excluded (baseScoped): a base
+// projection is its own complete graph and must never be thinned/highlighted by
+// SQL-like cluster filters. LIMIT/ORDER_BY are likewise sql-only.
 export function shouldApplyHaving(
 	filterMode: MiniSettings["filterMode"],
 	baseScoped: boolean,
 ): boolean {
-	return !baseScoped && (filterMode === "sql" || filterMode === "dvjs");
+	return !baseScoped && filterMode === "sql";
 }
 
 // Parse + evaluate HAVING. Counts come from `nodes` BEFORE any cluster

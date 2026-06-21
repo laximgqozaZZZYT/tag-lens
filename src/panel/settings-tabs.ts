@@ -110,7 +110,7 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 	}
 
 	if (deps.settings.filterMode === "dvjs") {
-		const info = el.createDiv({ text: "Return an array of paths or Dataview pages. Example:\nreturn dv.pages('\"\"').map(p => p.file.path).array();\n\nNotes are grouped by their own tags automatically — settings.groupBy is ignored in this mode. To control grouping yourself, return { path, groups } objects instead of plain paths. Example:\nreturn dv.pages('\"\"').map(p => ({ path: p.file.path, groups: p.file.tags }));" });
+		const info = el.createDiv({ text: "Return an array of paths or Dataview pages. Example:\nreturn dv.pages('\"\"').map(p => p.file.path).array();\n\nNotes are grouped by their own tags automatically — settings.groupBy is ignored in this mode. To control grouping yourself, return { path, groups } objects instead of plain paths. Example:\nreturn dv.pages('\"\"').map(p => ({ path: p.file.path, groups: p.file.tags }));\n\nTo hide groups that are too small or too large, count the members in your script and include only the tags that meet your condition in groups." });
 		info.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", whiteSpace: "pre-wrap" });
 		const hint = el.createDiv({ text: "Tips: Tab=indent / Ctrl(Cmd)+Enter=Run now" });
 		hint.setCssStyles({ fontSize: "10px", color: "var(--text-faint)", marginBottom: "6px" });
@@ -180,10 +180,10 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 				errorDiv.setCssStyles({ color: "var(--text-error)", fontSize: "11px", marginTop: "4px" });
 			}
 		}
-		// HAVING (cluster-size filter/highlight) applies in dvjs mode too: it acts
-		// on the script-derived clusters' member counts, mirroring the view.ts
-		// applyHaving gate. LIMIT/ORDER_BY stay sql-only and are not shown here.
-		renderOldHavingSection(el, deps, isMatrix, isHeatmap);
+		// Dataview mode has NO independent HAVING/grouping UI: the script's return
+		// value is the single source of truth (same treatment as GROUP_BY). Users
+		// who want to drop small/large groups do so in-script by computing their
+		// own `groups`. Only the textarea + hints + (on error) banner are shown.
 		return;
 	}
 
