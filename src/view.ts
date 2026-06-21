@@ -1139,7 +1139,9 @@ export class MiniGraphView extends ItemView {
 				const { data: baseData, clusterLabels: baseLabels } = projectBaseIndexToGraph(
 					this.baseIndex,
 					{
-						clusterByView: this.settings.basesClusterByView,
+						clusterByView: !!this.settings.basesClusterByView,
+						showPrefix: !!this.settings.basesShowPrefix,
+						injectBaseEnclosures: this.settings.viewMode === "bubblesets",
 						edgeKinds,
 						labelOf: (notePath) => {
 							const f = this.app.vault.getAbstractFileByPath(notePath);

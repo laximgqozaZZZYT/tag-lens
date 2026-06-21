@@ -41,6 +41,10 @@ export interface ProjectOpts {
 	// notePath → file modified time (epoch ms), optional. Injected like labelOf
 	// so freshness/maturity-aware modes get real mtime where available.
 	mtimeOf?: (notePath: string) => number | undefined;
+	// Whether to show the base file name as a prefix in cluster labels.
+	showPrefix: boolean;
+	// When true, multi-view bases will inject an extra "wrapper" membership for the entire base file.
+	injectBaseEnclosures?: boolean;
 }
 
 export interface ProjectResult {
@@ -55,9 +59,10 @@ function clusterKeyFor(
 	tableName: string,
 	viewName: string,
 	clusterByView: boolean,
+	showPrefix: boolean,
 ): { key: string; label: string } {
 	if (clusterByView) {
-		return { key: `base=${tableName}::${viewName}`, label: `${tableName} / ${viewName}` };
+		return { key: `base=${tableName}::${viewName}`, label: showPrefix ? `${tableName} / ${viewName}` : viewName };
 	}
 	return { key: `base=${tableName}`, label: tableName };
 }
@@ -95,7 +100,7 @@ export function projectBaseIndexToGraph(index: BaseIndex, opts: ProjectOpts): Pr
 		// single-view and multi-view bases in one index each get their correct
 		// granularity independently.
 		const byView = effectiveClusterByView(clusterByView, tableByPath.get(el.tablePath));
-		const { key, label } = clusterKeyFor(tableName, el.viewName, byView);
+		const { key, label } = clusterKeyFor(tableName, el.viewName, byView, opts.showPrefix);
 		clusterLabels.set(key, label);
 		let set = membershipsByNote.get(el.notePath);
 		if (!set) {
@@ -103,6 +108,12 @@ export function projectBaseIndexToGraph(index: BaseIndex, opts: ProjectOpts): Pr
 			membershipsByNote.set(el.notePath, set);
 		}
 		set.add(key);
+
+		if (opts.injectBaseEnclosures && byView) {
+			const baseKey = `base=${tableName}`;
+			clusterLabels.set(baseKey, tableName);
+			set.add(baseKey);
+		}
 	}
 
 	// One node per note path.

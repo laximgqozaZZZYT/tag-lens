@@ -275,7 +275,10 @@ export interface MiniSettings {
 	basesSharedPropEdges: boolean;
 	// Cluster granularity for projected base nodes. false ⇒ one cluster per
 	// `.base` file (default); true ⇒ one cluster per (base, view).
-	basesClusterByView: boolean;
+	basesClusterByView?: boolean;
+	// When true, displays the base file name as a prefix before the view name (e.g. "Base / View").
+	// When false, displays only the view name.
+	basesShowPrefix?: boolean;
 }
 
 export type ViewMode =
@@ -524,6 +527,7 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	basesSharedTagEdges: false,
 	basesSharedPropEdges: false,
 	basesClusterByView: false,
+	basesShowPrefix: false,
 };
 
 export const NONE_BUCKET = "(none)";

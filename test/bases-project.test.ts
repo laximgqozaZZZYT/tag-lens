@@ -88,6 +88,7 @@ const allKinds = new Set<BaseEdgeKind>(["link", "shared-tag", "shared-property"]
 	// file granularity: A.base + B.base ⇒ two cluster keys for n1.
 	const { data, clusterLabels } = projectBaseIndexToGraph(idx, {
 		clusterByView: false,
+		showPrefix: false,
 		edgeKinds: allKinds,
 		labelOf,
 	});
@@ -113,6 +114,7 @@ const allKinds = new Set<BaseEdgeKind>(["link", "shared-tag", "shared-property"]
 	);
 	const { data, clusterLabels } = projectBaseIndexToGraph(idx, {
 		clusterByView: true,
+		showPrefix: true,
 		edgeKinds: allKinds,
 		labelOf,
 	});
@@ -139,6 +141,7 @@ const allKinds = new Set<BaseEdgeKind>(["link", "shared-tag", "shared-property"]
 	// Only links.
 	const onlyLink = projectBaseIndexToGraph(idx, {
 		clusterByView: false,
+		showPrefix: false,
 		edgeKinds: new Set<BaseEdgeKind>(["link"]),
 		labelOf,
 	});
@@ -150,6 +153,7 @@ const allKinds = new Set<BaseEdgeKind>(["link", "shared-tag", "shared-property"]
 	// Link + shared-tag.
 	const two = projectBaseIndexToGraph(idx, {
 		clusterByView: false,
+		showPrefix: false,
 		edgeKinds: new Set<BaseEdgeKind>(["link", "shared-tag"]),
 		labelOf,
 	});
@@ -157,6 +161,7 @@ const allKinds = new Set<BaseEdgeKind>(["link", "shared-tag", "shared-property"]
 	// None.
 	const none = projectBaseIndexToGraph(idx, {
 		clusterByView: false,
+		showPrefix: false,
 		edgeKinds: new Set<BaseEdgeKind>(),
 		labelOf,
 	});
@@ -176,6 +181,7 @@ const allKinds = new Set<BaseEdgeKind>(["link", "shared-tag", "shared-property"]
 	);
 	const { data } = projectBaseIndexToGraph(idx, {
 		clusterByView: false,
+		showPrefix: false,
 		edgeKinds: allKinds,
 		labelOf,
 	});
@@ -192,6 +198,7 @@ const allKinds = new Set<BaseEdgeKind>(["link", "shared-tag", "shared-property"]
 	const idx = index([table("A.base", "Alpha")], [el("A.base", "a.md")]);
 	const { data } = projectBaseIndexToGraph(idx, {
 		clusterByView: false,
+		showPrefix: false,
 		edgeKinds: allKinds,
 		labelOf,
 		mtimeOf: (p) => (p === "a.md" ? 12345 : undefined),
@@ -207,6 +214,7 @@ const allKinds = new Set<BaseEdgeKind>(["link", "shared-tag", "shared-property"]
 	);
 	const { data, clusterLabels } = projectBaseIndexToGraph(idx, {
 		clusterByView: false,
+		showPrefix: false,
 		edgeKinds: allKinds,
 		labelOf,
 	});
@@ -226,6 +234,7 @@ const allKinds = new Set<BaseEdgeKind>(["link", "shared-tag", "shared-property"]
 	);
 	const { data, clusterLabels } = projectBaseIndexToGraph(idx, {
 		clusterByView: false, // global default OFF — auto-detect still kicks in
+		showPrefix: true,
 		edgeKinds: allKinds,
 		labelOf,
 	});
@@ -246,6 +255,7 @@ const allKinds = new Set<BaseEdgeKind>(["link", "shared-tag", "shared-property"]
 	);
 	const { data } = projectBaseIndexToGraph(idx, {
 		clusterByView: true, // global "always cluster by view" forces it
+		showPrefix: true,
 		edgeKinds: allKinds,
 		labelOf,
 	});
@@ -271,6 +281,7 @@ const allKinds = new Set<BaseEdgeKind>(["link", "shared-tag", "shared-property"]
 	);
 	const { data, clusterLabels } = projectBaseIndexToGraph(idx, {
 		clusterByView: false, // global default OFF — each table decided independently
+		showPrefix: true,
 		edgeKinds: allKinds,
 		labelOf,
 	});
