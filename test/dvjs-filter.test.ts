@@ -10,6 +10,7 @@
 //     JS branch never touches api.query).
 import { ok } from "./assert";
 import { collectPathsDeep, runDvjsDqlFilter, buildGraph } from "../src/query/parser";
+import { NONE_BUCKET } from "../src/types";
 
 // ── Minimal duck-typed App ────────────────────────────────────────────────
 // Builds an app whose Dataview api.query returns `queryValue` (or throws/fails
@@ -217,4 +218,139 @@ await (async () => {
 		{ matchedPaths: null, error: "Dataview plugin is not available." },
 	);
 	ok(errors.where === "Dataview plugin is not available.", "buildGraph surfaces DQL-unavailable error for the banner");
+}
+
+// ── dvjs GROUP_BY contract ────────────────────────────────────────────────
+// In dvjs mode, grouping is decided SOLELY by the script's return value:
+//   - plain path / Page → the note's OWN real tags (settings.groupBy ignored)
+//   - { path, groups }  → the explicit groups verbatim (real tags ignored)
+//   - no tags / no groups → NONE_BUCKET
+// settings.groupBy is conveyed via buildGraph's `groupByRows` arg — passing a
+// non-empty one and asserting it has NO effect proves dvjs ignores it.
+
+// App whose getFileCache returns per-file tags (frontmatter tags array).
+function makeTaggedApp(tagsByPath: Record<string, string[]>): any {
+	const paths = Object.keys(tagsByPath);
+	const files = paths.map(fileStub);
+	return {
+		plugins: { plugins: { dataview: { api: { pages: () => files.map((f) => ({ file: { path: f.path } })) } } } },
+		vault: { getMarkdownFiles: () => files },
+		metadataCache: {
+			resolvedLinks: {},
+			getFileCache: (f: any) => ({ frontmatter: { tags: tagsByPath[f.path] ?? [] } }),
+			getFirstLinkpathDest: (link: string) => {
+				const hit = files.find((f) => f.path === link || f.basename === link);
+				return hit ? { path: hit.path } : null;
+			},
+		},
+	};
+}
+
+function membershipsOf(nodes: any[], path: string): string[] {
+	const n = nodes.find((x) => x.id === path);
+	return n ? n.memberships : [];
+}
+
+// Plain-path script → memberships come from each note's OWN real tags, and a
+// non-empty settings.groupBy ("tag:specific") has ZERO effect (proves dvjs
+// ignores the hidden setting).
+{
+	const a = makeTaggedApp({ "a.md": ["alpha", "shared"], "b.md": ["beta"], "c.md": [] });
+	const run = (groupByRows: string[]) =>
+		buildGraph(a, [], groupByRows, "dvjs", "x", undefined, false, {
+			matchedPaths: new Set(["a.md", "b.md", "c.md"]),
+			matched: new Map([["a.md", undefined], ["b.md", undefined], ["c.md", undefined]]),
+		}).result.data.nodes;
+
+	const nodesEmpty = run([]);
+	ok(
+		membershipsOf(nodesEmpty, "a.md").sort().join(",") === "alpha,shared",
+		"dvjs plain path → membership from note's own real tags",
+	);
+	ok(membershipsOf(nodesEmpty, "b.md").join(",") === "beta", "dvjs plain path → b grouped by its own tag");
+
+	// Same inputs but with a non-empty groupBy → identical result (ignored).
+	const nodesWithGroupBy = run(["tag:specific"]);
+	ok(
+		membershipsOf(nodesWithGroupBy, "a.md").sort().join(",") === "alpha,shared",
+		"dvjs ignores settings.groupBy (result unchanged with non-empty groupBy rows)",
+	);
+}
+
+// { path, groups } script → explicit groups used verbatim; real tags ignored.
+{
+	const a = makeTaggedApp({ "a.md": ["realtag"], "b.md": ["x"] });
+	const { result } = buildGraph(a, [], ["tag:*"], "dvjs", "x", undefined, false, {
+		matchedPaths: new Set(["a.md", "b.md"]),
+		matched: new Map<string, string[] | undefined>([
+			["a.md", ["custom1", "custom2"]],
+			["b.md", undefined],
+		]),
+	});
+	const nodes = result.data.nodes;
+	ok(
+		membershipsOf(nodes, "a.md").sort().join(",") === "custom1,custom2",
+		"dvjs { path, groups } → explicit groups verbatim (real tag 'realtag' ignored)",
+	);
+	ok(membershipsOf(nodes, "b.md").join(",") === "x", "dvjs mixed: undefined groups → real tag fallback");
+}
+
+// Untagged note with no explicit groups → NONE_BUCKET.
+{
+	const a = makeTaggedApp({ "a.md": [] });
+	const { result } = buildGraph(a, [], [], "dvjs", "x", undefined, false, {
+		matchedPaths: new Set(["a.md"]),
+		matched: new Map([["a.md", undefined]]),
+	});
+	ok(membershipsOf(result.data.nodes, "a.md").join(",") === NONE_BUCKET, "dvjs untagged note → NONE_BUCKET");
+}
+
+// Empty explicit groups array → NONE_BUCKET (explicit, but no usable group).
+{
+	const a = makeTaggedApp({ "a.md": ["realtag"] });
+	const { result } = buildGraph(a, [], [], "dvjs", "x", undefined, false, {
+		matchedPaths: new Set(["a.md"]),
+		matched: new Map<string, string[] | undefined>([["a.md", []]]),
+	});
+	ok(
+		membershipsOf(result.data.nodes, "a.md").join(",") === NONE_BUCKET,
+		"dvjs explicit empty groups → NONE_BUCKET (real tags NOT used)",
+	);
+}
+
+// DQL-delegation path: api.query returns Page-like objects → real-tag fallback
+// (collectPathsDeep records groups=undefined for plain pages).
+await (async () => {
+	const tagsByPath = { "a.md": ["dqltag"], "b.md": ["other"] };
+	const a = makeTaggedApp(tagsByPath);
+	// Wire a DQL api.query onto the same tagged app.
+	a.plugins.plugins.dataview.api.query = async () => ({
+		successful: true,
+		value: { values: [{ path: "a.md" }, { path: "b.md" }] },
+	});
+	const resolved = await runDvjsDqlFilter(a, "LIST FROM #t", new Set(["a.md", "b.md"]));
+	ok(resolved.matched !== undefined && resolved.matched.get("a.md") === undefined, "DQL Page → groups undefined (real-tag fallback)");
+	const { result } = buildGraph(a, [], ["tag:*"], "dvjs", "LIST FROM #t", undefined, false, resolved);
+	ok(membershipsOf(result.data.nodes, "a.md").join(",") === "dqltag", "DQL path groups by note's own real tag");
+	ok(membershipsOf(result.data.nodes, "b.md").join(",") === "other", "DQL path groups b by its own real tag");
+})();
+
+// itemToGroups via JS path: a real `{ path, groups }` array honoured end-to-end
+// through runDvjsFilter (exercised via buildGraph's JS branch).
+{
+	const tagsByPath = { "a.md": ["ignored"], "b.md": ["alsoignored"] };
+	const a = makeTaggedApp(tagsByPath);
+	const { result } = buildGraph(
+		a,
+		[],
+		["tag:*"],
+		"dvjs",
+		"return [{ path: 'a.md', groups: ['G1'] }, { path: 'b.md', groups: 'G2' }]",
+		undefined,
+		false,
+		{ matchedPaths: null }, // JS path: buildGraph runs runDvjsFilter synchronously
+	);
+	const nodes = result.data.nodes;
+	ok(membershipsOf(nodes, "a.md").join(",") === "G1", "JS { path, groups:[...] } honoured (array)");
+	ok(membershipsOf(nodes, "b.md").join(",") === "G2", "JS { path, groups:'...' } honoured (string coerced)");
 }

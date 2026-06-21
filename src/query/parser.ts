@@ -80,9 +80,53 @@ function itemToPath(item: unknown): string | null {
 	if (typeof item === "string") return item;
 	if (!item || typeof item !== "object") return null;
 	const page = item as { path?: unknown; file?: { path?: unknown } };
+	// `path` may itself be a Dataview Page-like object (`{ path, groups }` where
+	// `path` is `p.file`), so duck-type both string and `.path`/`.file.path`.
 	if (typeof page.path === "string") return page.path;
+	if (page.path && typeof page.path === "object") {
+		const nested = page.path as { path?: unknown; file?: { path?: unknown } };
+		if (typeof nested.path === "string") return nested.path;
+		if (nested.file && typeof nested.file.path === "string") return nested.file.path;
+	}
 	if (page.file && typeof page.file.path === "string") return page.file.path;
 	return null;
+}
+
+// Coerce a Dataview-ish tag value (string | array | DataArray) into a clean
+// string[] of bare tags (leading '#' stripped). Used only for the EXPLICIT
+// `{ path, groups }` contract — when a script wants to dictate grouping itself.
+function toGroupsArray(value: unknown): string[] {
+	const out: string[] = [];
+	const push = (v: unknown) => {
+		if (typeof v === "string") {
+			const t = stripHash(v.trim());
+			if (t) out.push(t);
+		} else if (v != null) {
+			const t = stripHash(String(v).trim());
+			if (t) out.push(t);
+		}
+	};
+	if (typeof value === "string") {
+		push(value);
+		return out;
+	}
+	const arr = toItems(value);
+	for (const v of arr) push(v);
+	return out;
+}
+
+// Extract EXPLICIT grouping membership from a returned item, honouring the
+// `{ path, groups }` contract. Returns:
+//   - string[]   → the script dictated grouping (used verbatim; real tags ignored)
+//   - undefined  → no explicit groups field → caller falls back to the note's
+//                  own real tags.
+// Plain strings and plain Page objects (no own `groups` key) yield undefined.
+function itemToGroups(item: unknown): string[] | undefined {
+	if (!item || typeof item !== "object") return undefined;
+	if (Array.isArray(item)) return undefined;
+	const obj = item as Record<string, unknown>;
+	if (!("groups" in obj)) return undefined;
+	return toGroupsArray(obj.groups);
 }
 
 // Resolve a raw vault-path string to a path that exists in `allPaths`, following
@@ -95,13 +139,22 @@ function resolveToVaultPath(app: App, rawPath: string, allPaths: Set<string>): s
 	return null;
 }
 
+// path → EXPLICIT groups (from a `{ path, groups }` item) or `undefined` when
+// the item carried no explicit grouping (caller falls back to the note's own
+// real tags). This is the unified carrier for dvjs grouping: in dvjs mode,
+// `settings.groupBy` / `groupByAuto` are NEVER consulted — grouping comes from
+// here only.
+export type DvjsMatched = Map<string, string[] | undefined>;
+
 // Recursively walk an arbitrary Dataview query result value, collecting every
 // vault path it can find. Dataview's QueryResult shape differs per query kind
 // (TABLE/LIST/TASK/CALENDAR) and across versions, so instead of assuming a shape
 // we deep-scan for anything that ducks like a page (`.path` string or
-// `.file.path`) — the same heuristic `itemToPath` uses. Safety: `depthLimit`
-// caps recursion depth, and a `seen` set breaks reference cycles so a circular
-// graph can't loop forever. 0 matches is fine (no throw).
+// `.file.path`) — the same heuristic `itemToPath` uses. When `groupsOut` is
+// supplied, an item's EXPLICIT `groups` field (the `{ path, groups }` contract)
+// is recorded for its resolved path. Safety: `depthLimit` caps recursion depth,
+// and a `seen` set breaks reference cycles so a circular graph can't loop
+// forever. 0 matches is fine (no throw).
 export function collectPathsDeep(
 	value: unknown,
 	allPaths: Set<string>,
@@ -109,6 +162,7 @@ export function collectPathsDeep(
 	depthLimit = 6,
 	out: Set<string> = new Set(),
 	seen: WeakSet<object> = new WeakSet(),
+	groupsOut?: DvjsMatched,
 ): Set<string> {
 	if (depthLimit < 0 || value == null) return out;
 
@@ -116,7 +170,17 @@ export function collectPathsDeep(
 	const direct = itemToPath(value);
 	if (direct) {
 		const resolved = resolveToVaultPath(app, direct, allPaths);
-		if (resolved) out.add(resolved);
+		if (resolved) {
+			out.add(resolved);
+			if (groupsOut) {
+				const groups = itemToGroups(value);
+				// Only record explicit groups; an undefined here means "fall back to
+				// real tags" and must not overwrite a previously-found explicit set.
+				if (groups !== undefined || !groupsOut.has(resolved)) {
+					groupsOut.set(resolved, groups);
+				}
+			}
+		}
 		// A matched page object can still contain nested page references
 		// (e.g. links), so we fall through to recurse rather than return early.
 	}
@@ -134,7 +198,7 @@ export function collectPathsDeep(
 	// but recursing its own entries is what we want).
 	if (Array.isArray(items) && !(items.length === 1 && items[0] === value)) {
 		for (const item of items) {
-			collectPathsDeep(item, allPaths, app, depthLimit - 1, out, seen);
+			collectPathsDeep(item, allPaths, app, depthLimit - 1, out, seen, groupsOut);
 		}
 		return out;
 	}
@@ -148,6 +212,7 @@ export function collectPathsDeep(
 			depthLimit - 1,
 			out,
 			seen,
+			groupsOut,
 		);
 	}
 	return out;
@@ -165,7 +230,7 @@ export async function runDvjsDqlFilter(
 	app: App,
 	dvjsFilter: string,
 	allPaths: Set<string>,
-): Promise<{ matchedPaths: Set<string> | null; error?: string }> {
+): Promise<{ matchedPaths: Set<string> | null; matched?: DvjsMatched; error?: string }> {
 	const script = dvjsFilter.trim();
 	if (!script) return { matchedPaths: null };
 	// Not DQL → let buildGraph's synchronous JS path handle it.
@@ -184,17 +249,19 @@ export async function runDvjsDqlFilter(
 	} catch (e) {
 		return {
 			matchedPaths: new Set(),
+			matched: new Map(),
 			error: e instanceof Error ? `Dataviewjs error: ${e.message}` : `Dataviewjs error: ${String(e)}`,
 		};
 	}
 
 	if (!res || !res.successful) {
 		const detail = res && typeof res.error === "string" ? res.error : "query failed";
-		return { matchedPaths: new Set(), error: `Dataviewjs error: ${detail}` };
+		return { matchedPaths: new Set(), matched: new Map(), error: `Dataviewjs error: ${detail}` };
 	}
 
-	const matchedPaths = collectPathsDeep(res.value, allPaths, app);
-	return { matchedPaths };
+	const matched: DvjsMatched = new Map();
+	const matchedPaths = collectPathsDeep(res.value, allPaths, app, 6, new Set(), new WeakSet(), matched);
+	return { matchedPaths, matched };
 }
 
 // Synchronous JS-only filter: runs the user's `new Function(...)` script and
@@ -205,11 +272,11 @@ function runDvjsFilter(
 	app: App,
 	dvjsFilter: string,
 	allPaths: Set<string>,
-): { matchedPaths: Set<string>; error?: string } {
+): { matchedPaths: Set<string>; matched: DvjsMatched; error?: string } {
 	const script = dvjsFilter.trim();
-	if (!script) return { matchedPaths: new Set(), error: "Dataviewjs query is empty." };
+	if (!script) return { matchedPaths: new Set(), matched: new Map(), error: "Dataviewjs query is empty." };
 	const dv = getDataviewApi(app);
-	if (!dv) return { matchedPaths: new Set(), error: "Dataview plugin is not available." };
+	if (!dv) return { matchedPaths: new Set(), matched: new Map(), error: "Dataview plugin is not available." };
 
 	let raw: unknown;
 	try {
@@ -218,6 +285,7 @@ function runDvjsFilter(
 	} catch (e) {
 		return {
 			matchedPaths: new Set(),
+			matched: new Map(),
 			error: e instanceof Error ? `Dataviewjs error: ${e.message}` : `Dataviewjs error: ${String(e)}`,
 		};
 	}
@@ -225,18 +293,26 @@ function runDvjsFilter(
 	if (raw && typeof raw === "object" && "then" in raw && typeof (raw as { then?: unknown }).then === "function") {
 		return {
 			matchedPaths: new Set(),
+			matched: new Map(),
 			error: "Async Dataviewjs is not supported. Return paths/pages synchronously.",
 		};
 	}
 
 	const matchedPaths = new Set<string>();
+	const matched: DvjsMatched = new Map();
 	for (const item of toItems(raw)) {
 		const rawPath = itemToPath(item);
 		if (!rawPath) continue;
 		const resolved = resolveToVaultPath(app, rawPath, allPaths);
-		if (resolved) matchedPaths.add(resolved);
+		if (!resolved) continue;
+		matchedPaths.add(resolved);
+		// Explicit `{ path, groups }` wins; undefined → fall back to real tags.
+		const groups = itemToGroups(item);
+		if (groups !== undefined || !matched.has(resolved)) {
+			matched.set(resolved, groups);
+		}
 	}
-	return { matchedPaths };
+	return { matchedPaths, matched };
 }
 
 export function buildGraph(
@@ -253,7 +329,10 @@ export function buildGraph(
 	// script is JS (or DQL was unavailable) and buildGraph runs the synchronous
 	// JS path via runDvjsFilter. An `error` present alongside `null` means DQL was
 	// requested but the engine was unavailable → fall back to SQL pipeline.
-	dvjsResolved?: { matchedPaths: Set<string> | null; error?: string },
+	// `matched` (path → explicit groups | undefined) carries dvjs grouping; when
+	// only `matchedPaths` is supplied (legacy callers / tests), every matched
+	// path falls back to its own real tags for grouping.
+	dvjsResolved?: { matchedPaths: Set<string> | null; matched?: DvjsMatched; error?: string },
 ): { result: BuildResult; errors: BuildErrors } {
 	const errors: BuildErrors = {};
 	let whereAst: QueryAst | null = null;
@@ -306,6 +385,10 @@ export function buildGraph(
 	const clusterLabels = new Map<string, string>();
 
 	let matchedPaths: Set<string> | null = null;
+	// path → EXPLICIT groups (from a `{ path, groups }` item) or undefined (→ fall
+	// back to the note's own real tags). In dvjs mode this map is the ONLY source
+	// of grouping; settings.groupBy / groupByAuto / groupByAst are never consulted.
+	let dvjsMatched: DvjsMatched | null = null;
 	let useDvjsPaths = filterMode === "dvjs";
 	if (filterMode === "dvjs") {
 		// DQL was pre-resolved in view.ts (async). If it produced a path set, use
@@ -315,6 +398,8 @@ export function buildGraph(
 		const dqlMatched = dvjsResolved?.matchedPaths;
 		if (dqlMatched) {
 			matchedPaths = dqlMatched;
+			// Legacy callers may pass only matchedPaths; default to real-tag grouping.
+			dvjsMatched = dvjsResolved?.matched ?? null;
 		} else if (dvjsResolved?.error) {
 			useDvjsPaths = false;
 			errors.where = dvjsResolved.error;
@@ -329,10 +414,15 @@ export function buildGraph(
 				useDvjsPaths = false;
 			} else {
 				matchedPaths = dv.matchedPaths;
+				dvjsMatched = dv.matched;
 			}
 			if (dv.error) errors.where = dv.error;
 		}
 	}
+	// dvjs mode owns its grouping entirely from the script's return value: any
+	// groupByAst (incl. the implicit tag:* default) is intentionally discarded so
+	// hidden settings can never re-introduce clustering.
+	const useDvjsGrouping = filterMode === "dvjs" && useDvjsPaths;
 
 	const focusSet = focusNodeIds ? new Set(focusNodeIds) : null;
 
@@ -387,7 +477,26 @@ export function buildGraph(
 		const memberships: string[] = [];
 		const seen = new Set<string>();
 
-		if (groupByAst) {
+		if (useDvjsGrouping) {
+			// dvjs grouping contract: the script's return value alone decides
+			// grouping. An EXPLICIT `{ path, groups }` set is used verbatim; a plain
+			// path / Page falls back to the note's OWN real tags. settings.groupBy /
+			// groupByAuto are NEVER consulted here. Empty → NONE_BUCKET.
+			const explicit = dvjsMatched?.get(f.path);
+			const groups = explicit !== undefined ? explicit : facts.tags;
+			for (const g of groups) {
+				if (!g) continue;
+				if (!seen.has(g)) {
+					seen.add(g);
+					memberships.push(g);
+					if (!clusterLabels.has(g)) clusterLabels.set(g, g);
+				}
+			}
+			if (memberships.length === 0) {
+				memberships.push(NONE_BUCKET);
+				if (!clusterLabels.has(NONE_BUCKET)) clusterLabels.set(NONE_BUCKET, NONE_BUCKET);
+			}
+		} else if (groupByAst) {
 			const result = evalQuery(groupByAst, facts);
 			for (const instance of result.instances) {
 				const { key, label } = instanceCluster(instance, groupByText);

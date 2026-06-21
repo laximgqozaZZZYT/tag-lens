@@ -23,13 +23,18 @@ export interface EffectiveQuery {
 }
 
 export function resolveEffectiveQuery(settings: MiniSettings): EffectiveQuery {
+	if (settings.filterMode === "dvjs") {
+		// DataviewJS mode owns grouping entirely from the script's return value
+		// (see buildGraph's dvjs grouping contract). settings.groupBy / groupByAuto
+		// — including the implicit `tag:*` default — are NOT consulted here, so no
+		// hidden clustering can leak in. Pass an empty effGroupBy as an explicit
+		// dummy; buildGraph ignores groupBy rows in dvjs mode regardless.
+		return { effGroupBy: [], effWhere: [], filterMode: "dvjs", dvjsFilter: settings.dvjsFilter };
+	}
 	let effGroupBy = [...settings.groupBy];
 	if (settings.groupByAuto && !effGroupBy.some((r) => r.trim().length > 0)) {
 		// Empty GROUP_BY with auto on → cluster every tag.
 		effGroupBy = ["tag:*"];
-	}
-	if (settings.filterMode === "dvjs") {
-		return { effGroupBy, effWhere: [], filterMode: "dvjs", dvjsFilter: settings.dvjsFilter };
 	}
 	// "bases" mode runs the classic SQL-like pipeline as the FALLBACK graph (used
 	// when zero `.base` files are selected; the base SCOPE in view.ts replaces it

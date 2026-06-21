@@ -110,7 +110,7 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 	}
 
 	if (deps.settings.filterMode === "dvjs") {
-		const info = el.createDiv({ text: "Return an array of paths or Dataview pages. Example:\nreturn dv.pages('\"\"').map(p => p.file.path).array();" });
+		const info = el.createDiv({ text: "Return an array of paths or Dataview pages. Example:\nreturn dv.pages('\"\"').map(p => p.file.path).array();\n\nNotes are grouped by their own tags automatically — settings.groupBy is ignored in this mode. To control grouping yourself, return { path, groups } objects instead of plain paths. Example:\nreturn dv.pages('\"\"').map(p => ({ path: p.file.path, groups: p.file.tags }));" });
 		info.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", whiteSpace: "pre-wrap" });
 		const hint = el.createDiv({ text: "Tips: Tab=indent / Ctrl(Cmd)+Enter=Run now" });
 		hint.setCssStyles({ fontSize: "10px", color: "var(--text-faint)", marginBottom: "6px" });
