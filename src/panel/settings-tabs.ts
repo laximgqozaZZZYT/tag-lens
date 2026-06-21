@@ -6,7 +6,7 @@ import {
 import {
 	renderOrderBySection,
 	renderExprSection,
-	renderBuilderExprSection,
+	renderTagPickerSection,
 	renderPresetSection,
 } from "./panel-sections";
 import { setIcon, Notice, AbstractInputSuggest, type App, type TFile } from "obsidian";
@@ -129,7 +129,7 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 			errorDiv.setCssStyles({ color: "var(--text-error)", fontSize: "11px", marginTop: "4px" });
 		}
 	} else {
-		renderBuilderExprSection(
+		renderTagPickerSection(
 			el,
 			"where",
 			"Which notes to show",
@@ -138,13 +138,8 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 			{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); }, app: deps.app },
 			{
 				autoKey: "whereAuto",
-				help: "Only include notes that match these conditions.",
+				help: "Only include notes with these tags.",
 				suggest: true,
-				chips: [
-					{ label: "Has a tag", insert: "tag:#example" },
-					{ label: "All tags", insert: "tag:?" },
-					{ label: "Frontmatter equals", insert: "status:draft" },
-				],
 			}
 		);
 	}
@@ -160,7 +155,7 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 	});
 	expandRow.createSpan({ text: "Include 1-hop links & backlinks" });
 
-	renderBuilderExprSection(
+	renderTagPickerSection(
 		el,
 		"groupBy",
 		"Group notes by",
@@ -169,13 +164,8 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 		{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); }, app: deps.app },
 		{
 			autoKey: "groupByAuto",
-			help: "Group notes into clusters based on a tag or property.",
+			help: "Group notes into clusters by tag.",
 			suggest: true,
-			chips: [
-				{ label: "Has a tag", insert: "tag:#example" },
-				{ label: "All tags", insert: "tag:?" },
-				{ label: "Frontmatter equals", insert: "status:draft" },
-			],
 		}
 	);
 

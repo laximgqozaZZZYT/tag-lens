@@ -187,3 +187,50 @@ function addScalar(set: Set<string>, v: unknown): void {
 export function collectBuilderSources(app: App): BuilderSources {
 	return buildBuilderSources(collectSuggestSources(app));
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Minimal tag-picker classification (for the beginner WHERE / GROUP_BY UI).
+//
+// The beginner UI shows ONE tag input + a list of the saved rows. Each saved
+// row is classified here into how it should appear in that list:
+//   • "tag"  — a plain `tag:#x` "Has this tag" row → shown as a tag chip with
+//              the bare tag name, removable with ×.
+//   • "raw"  — anything else (NOT / property / wildcard / AND-OR / parens /
+//              tagN / …) → shown verbatim as read-only text, removable with ×.
+//              These are created/edited via the Advanced (text) disclosure; the
+//              beginner list never rewrites them, so no data is ever lost.
+// Pure — no DOM, no app.
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface TagPickerRow {
+	// Index into the underlying rows[] array (the saved string array).
+	index: number;
+	// Original saved string (never mutated by the picker).
+	raw: string;
+	// "tag" ⇒ a plain positive tag chip; "raw" ⇒ verbatim advanced text.
+	kind: "tag" | "raw";
+	// For kind === "tag": the bare tag name (no '#'). Empty otherwise.
+	tag: string;
+}
+
+export function classifyTagPickerRow(raw: string, index: number): TagPickerRow {
+	const cond = parseSimpleRow(raw);
+	if (cond && cond.kind === "tag-has") {
+		return { index, raw, kind: "tag", tag: cond.value };
+	}
+	return { index, raw, kind: "raw", tag: "" };
+}
+
+export function classifyTagPickerRows(rows: string[]): TagPickerRow[] {
+	return rows
+		.map((raw, index) => classifyTagPickerRow(raw, index))
+		// Blank rows aren't real conditions — never list them.
+		.filter((r) => r.raw.trim() !== "");
+}
+
+// The canonical saved-row string for a beginner-picked tag. Mirrors the
+// "tag-has" branch of stringifySimpleCondition so the round-trip is identical
+// to a hand-typed `tag:#x` and the existing parser handles it unchanged.
+export function tagRowString(tag: string): string {
+	return stringifySimpleCondition({ kind: "tag-has", field: "tag", value: stripHash(tag.trim()) });
+}

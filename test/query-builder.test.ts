@@ -6,6 +6,9 @@ import {
 	stringifySimpleCondition,
 	buildBuilderSources,
 	collectPropertyValues,
+	classifyTagPickerRow,
+	classifyTagPickerRows,
+	tagRowString,
 	type SimpleCondition,
 } from "../src/panel/query-builder";
 import type { SuggestSources } from "../src/panel/tag-field-suggest";
@@ -137,4 +140,43 @@ import type { SuggestSources } from "../src/panel/tag-field-suggest";
 	const values = collectPropertyValues(app, "status");
 	ok(JSON.stringify(values) === JSON.stringify(["done", "draft", "review"]), "property values flattened/sorted/deduped");
 	ok(collectPropertyValues(app, "missing").length === 0, "missing field → empty (free-text fallback)");
+}
+
+// ── Beginner tag-picker classification ──────────────────────────────────────
+// The beginner WHERE/GROUP_BY UI shows plain `tag:#x` rows as removable tag
+// chips and EVERYTHING else as verbatim read-only text (never rewritten), so
+// the SQL-like power survives untouched.
+{
+	const r = classifyTagPickerRow("tag:#wip", 0);
+	ok(r.kind === "tag" && r.tag === "wip" && r.index === 0, "tag:#wip → tag chip 'wip'");
+}
+{
+	const r = classifyTagPickerRow("tag:wip", 3); // '#' optional, parsed the same
+	ok(r.kind === "tag" && r.tag === "wip" && r.index === 3, "tag:wip (no #) → tag chip 'wip'");
+}
+{
+	// NOT / property / wildcard / depth / compound → raw verbatim, NOT a chip.
+	for (const raw of ["-tag:#wip", "status:draft", "tag:?", "tag2:#x", "tag:a AND tag:b", "(tag:#a)"]) {
+		const r = classifyTagPickerRow(raw, 0);
+		ok(r.kind === "raw" && r.raw === raw && r.tag === "", `non-simple '${raw}' → raw verbatim`);
+	}
+}
+{
+	// classifyTagPickerRows drops blank rows but keeps everything else in order
+	// with original indices preserved (so deletion by index/value is correct).
+	const rows = ["tag:#a", "", "status:draft", "tag:#b"];
+	const got = classifyTagPickerRows(rows);
+	ok(got.length === 3, "blank rows excluded from picker list");
+	ok(got[0].kind === "tag" && got[0].tag === "a" && got[0].index === 0, "row0 tag a @ index 0");
+	ok(got[1].kind === "raw" && got[1].raw === "status:draft" && got[1].index === 2, "row1 raw @ index 2 (blank skipped)");
+	ok(got[2].kind === "tag" && got[2].tag === "b" && got[2].index === 3, "row2 tag b @ index 3");
+}
+{
+	// tagRowString produces the canonical saved string and round-trips back to a
+	// tag-has condition (same as a hand-typed row).
+	ok(tagRowString("wip") === "tag:#wip", "tagRowString('wip') → tag:#wip");
+	ok(tagRowString("#wip") === "tag:#wip", "tagRowString strips a leading #");
+	ok(tagRowString("  spaced  ") === "tag:#spaced", "tagRowString trims");
+	const back = parseSimpleRow(tagRowString("foo/bar"));
+	ok(back?.kind === "tag-has" && back.value === "foo/bar", "tagRowString round-trips through parseSimpleRow");
 }
