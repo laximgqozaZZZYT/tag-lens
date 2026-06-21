@@ -29,6 +29,7 @@ import {
 	parseLimitRules as parseLimitRulesFn,
 	getSortKey as getSortKeyFn,
 	computeDroppedClusters as computeDroppedClustersFn,
+	shouldApplyHaving,
 } from "./query/query-pipeline";
 import { clusterHue, createStripePattern, createStripeGradient, resolveNodeStripe, membershipStripeHues } from "./draw/canvas-utils";
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
@@ -1294,13 +1295,19 @@ export class MiniGraphView extends ItemView {
 
 		const _noteCount = this.app.vault.getMarkdownFiles().length;
 		const applySqlPostFilters = !baseScoped && this.settings.filterMode === "sql";
+		// HAVING (cluster-size filter/highlight) applies to BOTH sql and dvjs: it
+		// only looks at cluster member counts, so it works the same whether the
+		// grouping came from settings.groupBy (sql) or the dvjs script's returned
+		// groups. LIMIT/ORDER_BY remain sql-only via applySqlPostFilters above.
+		// Bases mode is excluded from both (baseScoped): the base projection is its
+		// own complete graph and must not be thinned by SQL-like cluster filters.
+		const applyHaving = shouldApplyHaving(this.settings.filterMode, baseScoped);
 
-		// ── HAVING / AUTO-HAVING — SQL-like post-projection filter. SKIPPED unless
-		// filterMode is "sql": Dataview/Bases must reflect their own source only.
-		// In Bases mode the base projection is its own complete graph and must not be
+		// ── HAVING / AUTO-HAVING — cluster-size post-projection filter. SKIPPED in
+		// Bases mode: the base projection is its own complete graph and must not be
 		// thinned by SQL-like cluster filters. Clear prior HAVING state so stale
 		// highlights/errors from an earlier sql/dvjs build don't leak through. ──
-		if (applySqlPostFilters) {
+		if (applyHaving) {
 			// Seed the HAVING field's initial value: when auto is on and the user
 			// has no manual rows, populate settings.having with the concrete auto
 			// rows resolved against this build's node count, so they show up in the

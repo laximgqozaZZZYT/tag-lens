@@ -180,6 +180,10 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 				errorDiv.setCssStyles({ color: "var(--text-error)", fontSize: "11px", marginTop: "4px" });
 			}
 		}
+		// HAVING (cluster-size filter/highlight) applies in dvjs mode too: it acts
+		// on the script-derived clusters' member counts, mirroring the view.ts
+		// applyHaving gate. LIMIT/ORDER_BY stay sql-only and are not shown here.
+		renderOldHavingSection(el, deps, isMatrix, isHeatmap);
 		return;
 	}
 
@@ -222,8 +226,9 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 }
 
 // HAVING (+ its filter/highlight mode toggle and the matrix/heatmap tag-size
-// controls). Used by dvjs mode and as a fallback when the visual builder is
-// not available. In sql mode, HAVING is rendered by the visual builder.
+// controls). Wired into dvjs mode (renderSettingsFilterTab's dvjs branch) and
+// used as a fallback when the visual builder is not available. In sql mode,
+// HAVING is rendered by the visual builder instead.
 function renderOldHavingSection(
 	el: HTMLElement,
 	deps: FilterTabDeps,

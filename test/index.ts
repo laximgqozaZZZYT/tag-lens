@@ -26,6 +26,7 @@ import "./gap-finder.test";
 import "./bridge-finder.test";
 import "./having-highlight.test";
 import "./having-auto-seed.test";
+import "./having-mode-gate.test";
 import "./status-overlay.test";
 import "./note-maturity.test";
 import "./stream-layout.test";
