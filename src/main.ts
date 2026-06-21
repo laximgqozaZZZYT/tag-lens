@@ -3,7 +3,6 @@ import { DEFAULT_SETTINGS, MiniSettings, LensPreset } from "./types";
 import { applyLens } from "./interaction/lens-presets";
 import { MiniGraphView, VIEW_TYPE_MINI } from "./view";
 
-const DEFAULT_DVJS_FILTER = "return dv.pages('\\\"\\\"').map(p => p.file.path).array();";
 
 export default class GraphIslandMiniPlugin extends Plugin {
 	settings: MiniSettings = DEFAULT_SETTINGS;

@@ -161,7 +161,7 @@ export function collectPropertyValues(app: App, field: string): string[] {
 	if (!field) return [];
 	const out = new Set<string>();
 	for (const f of app.vault.getMarkdownFiles()) {
-		const cache = app.metadataCache.getFileCache(f as TFile);
+		const cache = app.metadataCache.getFileCache(f);
 		const fm = cache?.frontmatter;
 		if (!fm || typeof fm !== "object") continue;
 		const v = (fm as Record<string, unknown>)[field];

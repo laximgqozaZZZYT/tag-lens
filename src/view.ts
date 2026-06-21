@@ -12,7 +12,7 @@ import { buildIdToRect, buildRouteObstacles } from "./layout/layout-shared";
 import { buildBaseIndex } from "./bases/build-index";
 import { scanBaseFiles } from "./bases/parser";
 import { ensureFallbackBase } from "./bases/fallback";
-import { projectBaseIndexToGraph, shouldScopeToBases, type BaseEdgeKind } from "./bases/project";
+import { projectBaseIndexToGraph, type BaseEdgeKind } from "./bases/project";
 import type { BaseIndex } from "./bases/types";
 import {
 	layout,
@@ -108,7 +108,7 @@ import {
 	renderFilterBodyTab,
 } from "./panel/settings-tabs";
 import { renderDataTableView } from "./panel/data-table-view";
-import { projectMenuNotes, menuLimitedNodes } from "./panel/menu-notes";
+import { projectMenuNotes } from "./panel/menu-notes";
 import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVault } from "./panel/export-image";
 import { SvgRecorderContext } from "./visual/svg-recorder";
 import { findGaps, type TagGap } from "./query/gap-finder";

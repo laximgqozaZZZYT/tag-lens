@@ -59,10 +59,10 @@ export function parseBaseStructure(obj: unknown, filePath: string): BaseTable {
 
 function parseView(raw: unknown, index: number): BaseView {
 	const v = isRecord(raw) ? raw : {};
-	const type = typeof v["type"] === "string" ? (v["type"] as string) : "table";
+	const type = typeof v["type"] === "string" ? v["type"] : "table";
 	const name =
-		typeof v["name"] === "string" && (v["name"] as string).length > 0
-			? (v["name"] as string)
+		typeof v["name"] === "string" && v["name"].length > 0
+			? v["name"]
 			: `view${index + 1}`;
 
 	const columns: string[] = [];
@@ -86,9 +86,9 @@ function parseSort(raw: unknown): BaseSort[] | undefined {
 		} else if (isRecord(s)) {
 			const property =
 				typeof s["property"] === "string"
-					? (s["property"] as string)
+					? s["property"]
 					: typeof s["column"] === "string"
-						? (s["column"] as string)
+						? s["column"]
 						: "";
 			if (!property) continue;
 			const dirRaw = String(s["direction"] ?? s["order"] ?? "ASC").toUpperCase();

@@ -1,5 +1,5 @@
 import { App, TFile } from "obsidian";
-import type { GraphNode, MiniSettings } from "../types";
+
 
 
 // Inputs the sort-key resolver needs from the surrounding view.

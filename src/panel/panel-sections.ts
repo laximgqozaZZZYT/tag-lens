@@ -6,10 +6,10 @@ export interface ToggleSectionDeps {
 	save: () => void;
 	redraw?: () => void;
 }
-export function toggleArrayMember<T extends Record<string, any>>(obj: T, field: keyof T, value: string, active: boolean): void {
+export function toggleArrayMember<T>(obj: T, field: keyof T, value: string, active: boolean): void {
 	const arr = (obj[field] || []) as string[];
-	if (active && !arr.includes(value)) obj[field] = [...arr, value] as any;
-	if (!active && arr.includes(value)) obj[field] = arr.filter((x) => x !== value) as any;
+	if (active && !arr.includes(value)) obj[field] = [...arr, value] as T[keyof T];
+	if (!active && arr.includes(value)) obj[field] = arr.filter((x) => x !== value) as T[keyof T];
 }
 
 export function renderToggleSection<

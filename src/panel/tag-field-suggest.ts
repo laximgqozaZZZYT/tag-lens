@@ -126,7 +126,7 @@ export function collectSuggestSources(app: App): SuggestSources {
 	const fields = new Set<string>();
 	const files = app.vault.getMarkdownFiles();
 	for (const f of files) {
-		const cache = app.metadataCache.getFileCache(f as TFile);
+		const cache = app.metadataCache.getFileCache(f);
 		if (!cache) continue;
 		if (cache.tags) {
 			for (const t of cache.tags) tags.add(stripHash(t.tag));

@@ -66,17 +66,6 @@ export function noteSearchMeta(
 	return { tags: [...tagSet], frontmatter };
 }
 
-// Build the navigator's universal note set MODE-INDEPENDENTLY: re-run the user's
-// REAL HAVING + LIMIT (stages 1-2) on the pristine post-buildGraph graph so the
-// same vault + settings yield an identical list in every NON-droste mode.
-// Returns the surviving (un-projected) GraphNodes so the caller can pick this OR
-// the full droste snapshot before the single projection pass.
-export function menuLimitedNodes(
-	source: GraphData,
-	deps: { app: App; settings: MiniSettings; tiers: any[] },
-): GraphNode[] {
-	return source.nodes;
-}
 
 // Project navigator GraphNodes to MenuNotes, backfilling search metadata
 // (tags/frontmatter) from Obsidian's metadataCache.

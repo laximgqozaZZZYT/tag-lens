@@ -3,13 +3,9 @@ import {
 	renderViewModeSection,
 	renderBipartiteSection,
 } from "./settings-sections";
-import {
-	renderPresetSection,
-} from "./panel-sections";
-import { setIcon, Notice, AbstractInputSuggest, type App, type TFile } from "obsidian";
+import { setIcon, AbstractInputSuggest, type App, type TFile } from "obsidian";
 import { scanBaseFiles } from "../bases/parser";
 import { addBaseFileToSelected, removeBaseFileFromSelected } from "../bases/selection";
-import { applyLens, captureLens, upsertPreset, removePreset } from "../interaction/lens-presets";
 import { displayToggleApplies } from "../visual/display-applicability";
 import type { LensPreset } from "../types";
 import type { BindingLegend } from "../encoding/evaluate";
