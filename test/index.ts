@@ -62,6 +62,7 @@ import "./tag-field-suggest.test";
 import "./query-builder.test";
 import "./triple-overlap-guarantee.test";
 import "./intersection-region.test";
+import "./bubblesets-degree-cascade.test";
 
 
 summary();
