@@ -1,43 +1,35 @@
 # Tag Lens
 
-Tag Lens is an Obsidian plugin for exploring tag-membership structure through **11 view modes** and a **unified control panel**.
+Tag Lens is an Obsidian plugin for exploring tag-membership structure through **4 view modes** and a **unified control panel**.
 
-It combines multi-perspective visualisation with **Visual Encoding**, **Insight** tools, freshness/status/maturity overlays, Saved Lenses, Active-Note follow, and PNG export — all fully local, with no network requests.
+It combines multi-perspective visualisation with **Visual Encoding**, **Insight** tools, Saved Lenses, Active-Note follow, and PNG export — all fully local, with no network requests.
 
 Designed for vaults where notes are tagged in deeply overlapping ways and a single force-directed graph would just hairball. Each view answers a different question; encoding and overlays let you read your own dimensions into the figure.
 
 ## View modes
 
-Tag Lens currently provides **11 view modes**:
+Tag Lens currently provides **4 view modes**:
 
 | Mode | What it shows |
 |---|---|
 | **Icon Gallery** | One compact icon per note, tiled in a grid. From the note outward, each icon nests: the note itself, notes that share **all** its tags, groups of notes that share **some** of its tags, and its link / backlink neighborhood. |
 | **Intersection lattice** | Degree-tiered Hasse-style layout of exact tag intersections with subset links; each node auto-switches between overview / density / individual rendering by count and zoom. |
 | **Tag co-occurrence heatmap** | Symmetric tag × tag grid; cell shade = how many notes share two tags (Jaccard by default; raw count on a log/p95 scale). Diagonal = tag size. Click a cell to list the notes in that co-occurrence. |
-| **UpSet plot** | Stack of cards per intersection signature + dot matrix at the bottom — handles ≥ 4-way intersections that diagrams can't draw. |
-| **Connection matrix** | Notes × tags dot grid with seriation for structural scanning. |
-| **Tag graph** | Bipartite notes + tag nodes, with force / concentric / clustered arrangements. |
 | **BubbleSets** | Containment layout drawn as rectangular iso-contour bubbles. |
-| **Nested set diagram** | Rectangular containment view in the experimental region family. |
-| **Containment map** | Experimental containment-focused layout for overlapping tag regions. |
-| **Euler** | Experimental rectangle-based overlap view in the Euler family. |
-| **Sequence Stream** | (Beta) Time-series transposed heatmap. The X-axis represents time bins (e.g. month, week) or sequential fields (e.g. chapters), and the Y-axis represents tags. Shows tag usage flow over time and helps detect dropped threads. |
-
-Internally, the experimental containment family corresponds to `euler`, `euler-true`, and `euler-venn`.
 
 ## Unified Control Panel
 
 The floating settings panel is a **unified control center** available in every view mode. It is divided into four main tabs to help you filter, navigate, display, and analyze your graph:
 
 ### 1. Filter
-Control exactly what data enters the graph. Switch between modes using the toggle icon at the top right of the tab.
+Control exactly what data enters the graph. Switch between modes using the toggle at the top of the tab.
 - **SQL Mode**: Use the built-in expression engine to filter notes.
   - **WHERE**: Filter source notes by a query (`field:value`, `AND`, `OR`, glob, fuzzy).
   - **GROUP_BY**: Partition by `tag:*` or a frontmatter field.
   - **HAVING**: Drop clusters whose count fails the predicate.
   - **Sort (ORDER_BY / LIMIT)**: Sort criteria and limit tiers for per-cluster top-N display.
 - **DataviewJS Mode**: Bypass the built-in `WHERE` parser and use Obsidian Dataview's JavaScript API (`dv.pages()`). Returns a dynamic list of notes to feed into the graph while still preserving the same layout / encoding / rendering pipeline.
+- **Bases Mode**: Scope the graph directly to selected `.base` files, replacing the built-in query pipeline with elements derived from the base.
 
 ### 2. Notes (Note Navigator)
 A list of all notes surviving the filter pipeline.

@@ -7,35 +7,34 @@ import type { EncodingBinding } from "../src/encoding/types";
 {
 	const s: MiniSettings = {
 		...DEFAULT_SETTINGS,
-		filterMode: "sql",
-		where: ["a", "b"],
-		limit: ["limit 10"]
+		viewMode: "lattice",
+		selectedBases: ["a", "b"],
 	};
 	const q = captureLens(s);
 	
-	ok(q.filterMode === "sql", "Primitive copied");
-	ok(q.where.length === 2, "Array length correct");
-	ok(q.where !== s.where, "Array is a new reference");
+	ok(q.viewMode === "lattice", "Primitive copied");
+	ok(q.selectedBases.length === 2, "Array length correct");
+	ok(q.selectedBases !== s.selectedBases, "Array is a new reference");
 	
-	s.where.push("c");
-	ok(q.where.length === 2, "Captured array unaffected by original modification");
+	s.selectedBases.push("c");
+	ok(q.selectedBases.length === 2, "Captured array unaffected by original modification");
 }
 
 // applyLens overwrites and deep copies
 {
 	const presetQuery = captureLens(DEFAULT_SETTINGS);
-	presetQuery.where = ["x", "y"];
+	presetQuery.selectedBases = ["x", "y"];
 	presetQuery.viewMode = "lattice";
 
 	const s: MiniSettings = { ...DEFAULT_SETTINGS, viewMode: "heatmap" };
 	applyLens(s, { name: "test", query: presetQuery });
 
 	ok(s.viewMode === "lattice", "Primitive overwritten");
-	ok(s.where.length === 2 && s.where[0] === "x", "Array applied");
-	ok(s.where !== presetQuery.where, "Array is a new reference");
+	ok(s.selectedBases.length === 2 && s.selectedBases[0] === "x", "Array applied");
+	ok(s.selectedBases !== presetQuery.selectedBases, "Array is a new reference");
 
-	presetQuery.where.push("z");
-	ok(s.where.length === 2, "Applied settings unaffected by preset modification");
+	presetQuery.selectedBases.push("z");
+	ok(s.selectedBases.length === 2, "Applied settings unaffected by preset modification");
 }
 
 // upsertPreset replaces or adds
@@ -47,11 +46,11 @@ import type { EncodingBinding } from "../src/encoding/types";
 	ok(presets[0].name === "Test", "Name is correct");
 
 	const query2 = captureLens(DEFAULT_SETTINGS);
-	query2.filterMode = "dvjs";
+	query2.viewMode = "heatmap";
 	const updated = upsertPreset(presets, "Test", query2);
 	
 	ok(updated.length === 1, "Replaced preset");
-	ok(updated[0].query.filterMode === "dvjs", "Updated content");
+	ok(updated[0].query.viewMode === "heatmap", "Updated content");
 
 	const added = upsertPreset(updated, "Another", query1);
 	ok(added.length === 2, "Added another");

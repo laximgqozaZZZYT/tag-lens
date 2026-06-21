@@ -4,12 +4,8 @@ import {
 	renderBipartiteSection,
 } from "./settings-sections";
 import {
-	renderOrderBySection,
-	renderExprSection,
-	renderTagPickerSection,
 	renderPresetSection,
 } from "./panel-sections";
-import { renderVisualBuilder } from "./visual-builder";
 import { setIcon, Notice, AbstractInputSuggest, type App, type TFile } from "obsidian";
 import { scanBaseFiles } from "../bases/parser";
 import { addBaseFileToSelected, removeBaseFileFromSelected } from "../bases/selection";
@@ -28,10 +24,7 @@ import {
 	renderHeatmapDisplayToggles,
 	renderStreamDisplayToggles,
 } from "./settings-sections";
-import {
-	renderToggleSection,
-	toggleArrayMember,
-} from "./panel-sections";
+import { renderToggleSection, toggleArrayMember } from "./panel-sections";
 import type { LaidOut } from "../layout/layout";
 import {
 	UNION_LAYER_KEY,
@@ -54,28 +47,7 @@ export function renderSettingsViewTab(el: HTMLElement, deps: ViewTabDeps): void 
 	if (deps.settings.viewMode === "bipartite") renderBipartiteSection(el, deps);
 }
 
-export interface SortTabDeps {
-	settings: MiniSettings;
-	save: () => void;
-	rebuild: () => void;
-	limitError: string | null;
-	rerender?: () => void;
-}
-
-export function renderSettingsSortTab(el: HTMLElement, deps: SortTabDeps): void {
-	renderOrderBySection(el, {
-		settings: deps.settings,
-		save: deps.save,
-	});
-	renderExprSection(
-		el,
-		"How many notes to show",
-		deps.settings.limit,
-		deps.limitError ?? "",
-		{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: deps.rerender ?? (() => {}) },
-		{ placeholder: "limit 10 / brief 30", autoKey: "limitAuto", help: "Limit how many notes are shown per cluster." }
-	);
-}
+// Sort tab removed as LIMIT and ORDER_BY are deprecated
 
 export interface FilterTabDeps {
 	settings: MiniSettings;
@@ -83,10 +55,6 @@ export interface FilterTabDeps {
 	rebuild: () => void;
 	refreshFilterTab: () => void;
 	refreshSettingsTab: () => void;
-	whereError: string | null;
-	groupByError: string | null;
-	havingError: string | null;
-	limitError: string | null;
 	syncLensCommands?: (presets: LensPreset[]) => void;
 	// Obsidian app — only needed to scan `.base` files for the Bases sub-section.
 	// Optional so non-Bases call sites / tests don't have to provide it.
@@ -96,168 +64,12 @@ export interface FilterTabDeps {
 export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): void {
 	const isMatrix = deps.settings.viewMode === "matrix";
 	const isHeatmap = deps.settings.viewMode === "heatmap";
-	const isBases = deps.settings.filterMode === "bases";
 
-	// ── Bases mode is COMPLETELY separate from the SQL-like pipeline: the base
-	// SCOPE replaces WHERE/GROUP_BY, and NONE of the SQL/Dataview-derived query
-	// UI is shown (no HAVING / SORT / ORDER_BY / LIMIT). The Bases input + the
-	// selected-base list are the only controls. The corresponding post-projection
-	// stages are also skipped in view.ts rebuild(), so a base-scoped graph is
-	// never thinned by SQL-like filters. ──
-	if (isBases) {
-		renderBasesSection(el, deps);
-		return;
-	}
+	renderBasesSection(el, deps);
 
-	if (deps.settings.filterMode === "dvjs") {
-		const info = el.createDiv({ text: "Return an array of paths or Dataview pages. Example:\nreturn dv.pages('\"\"').map(p => p.file.path).array();\n\nNotes are grouped by their own tags automatically — settings.groupBy is ignored in this mode. To control grouping yourself, return { path, groups } objects instead of plain paths. Example:\nreturn dv.pages('\"\"').map(p => ({ path: p.file.path, groups: p.file.tags }));\n\nTo hide groups that are too small or too large, count the members in your script and include only the tags that meet your condition in groups." });
-		info.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", whiteSpace: "pre-wrap" });
-		const hint = el.createDiv({ text: "Tips: Tab=indent / Ctrl(Cmd)+Enter=Run now" });
-		hint.setCssStyles({ fontSize: "10px", color: "var(--text-faint)", marginBottom: "6px" });
-		
-		const textarea = el.createEl("textarea", { cls: "gim-expr-input" });
-		textarea.value = deps.settings.dvjsFilter;
-		textarea.setCssStyles({ width: "100%", minHeight: "120px", fontFamily: "var(--font-monospace)", fontSize: "11px", resize: "vertical" });
-		textarea.spellcheck = false;
-		
-		let debounce: number | null = null;
-		textarea.addEventListener("input", () => {
-			deps.settings.dvjsFilter = textarea.value;
-			deps.save();
-			if (debounce !== null) window.clearTimeout(debounce);
-			debounce = window.setTimeout(() => deps.rebuild(), 600);
-		});
-		textarea.addEventListener("keydown", (e) => {
-			if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-				e.preventDefault();
-				deps.settings.dvjsFilter = textarea.value;
-				deps.save();
-				deps.rebuild();
-				return;
-			}
-			if (e.key === "Tab") {
-				e.preventDefault();
-				const start = textarea.selectionStart ?? textarea.value.length;
-				const end = textarea.selectionEnd ?? start;
-				const insert = "  ";
-				textarea.setRangeText(insert, start, end, "end");
-				textarea.dispatchEvent(new Event("input"));
-				return;
-			}
-			if (e.key === "Enter" && !e.shiftKey && !e.altKey) {
-				e.preventDefault();
-				const start = textarea.selectionStart ?? textarea.value.length;
-				const end = textarea.selectionEnd ?? start;
-				const prevNl = textarea.value.lastIndexOf("\n", Math.max(0, start - 1));
-				const lineStart = prevNl + 1;
-				const line = textarea.value.slice(lineStart, start);
-				const indent = (line.match(/^\s*/) ?? [""])[0];
-				textarea.setRangeText(`\n${indent}`, start, end, "end");
-				textarea.dispatchEvent(new Event("input"));
-			}
-		});
-		
-		if (deps.whereError) {
-			if (deps.whereError === "Dataview plugin is not available.") {
-				// Prominent banner: the whole mode is non-functional without the
-				// Dataview community plugin, so make the call-to-action obvious
-				// instead of a small grey line that's easy to miss.
-				const banner = el.createDiv({
-					text: "Dataview plugin is not available. Enable the Dataview community plugin to use this mode.",
-				});
-				banner.setCssStyles({
-					color: "var(--text-error)",
-					backgroundColor: "var(--background-modifier-error)",
-					border: "1px solid var(--text-error)",
-					borderRadius: "6px",
-					padding: "8px 10px",
-					fontSize: "12px",
-					marginTop: "8px",
-					lineHeight: "1.4",
-				});
-			} else {
-				const errorDiv = el.createDiv({ text: deps.whereError });
-				errorDiv.setCssStyles({ color: "var(--text-error)", fontSize: "11px", marginTop: "4px" });
-			}
-		}
-		// Dataview mode has NO independent HAVING/grouping UI: the script's return
-		// value is the single source of truth (same treatment as GROUP_BY). Users
-		// who want to drop small/large groups do so in-script by computing their
-		// own `groups`. Only the textarea + hints + (on error) banner are shown.
-		return;
-	}
-
-	// ── SQL mode: Bases-style visual query builder ──
-	// All 4 sections (Filter/GroupBy/HAVING/Limit) are rendered by the visual
-	// builder component. The old tag-picker + expr-section UI is replaced.
-	if (deps.app) {
-		renderVisualBuilder(el, {
-			app: deps.app,
-			settings: deps.settings,
-			save: deps.save,
-			rebuild: deps.rebuild,
-			rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); },
-			havingError: deps.havingError ?? "",
-		});
-	} else {
-		// Fallback: if no app available (tests etc.), render old UI
-		renderTagPickerSection(
-			el,
-			"where",
-			"Which notes to show",
-			deps.settings.where,
-			deps.whereError ?? "",
-			{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); } },
-			{ autoKey: "whereAuto", help: "Only include notes with these tags.", suggest: true }
-		);
-	}
-
-	// Expand neighborhood toggle (shared by sql and dvjs)
-	const expandRow = el.createEl("label", { cls: "gim-toggle-row" });
-	expandRow.setCssStyles({ marginTop: "8px", marginBottom: "8px" });
-	const expandCb = expandRow.createEl("input", { type: "checkbox" });
-	expandCb.checked = deps.settings.expandNeighborhood;
-	expandCb.addEventListener("change", () => {
-		deps.settings.expandNeighborhood = expandCb.checked;
-		deps.save();
-		deps.rebuild();
-	});
-	expandRow.createSpan({ text: "Include 1-hop links & backlinks" });
-}
-
-// HAVING (+ its filter/highlight mode toggle and the matrix/heatmap tag-size
-// controls). Wired into dvjs mode (renderSettingsFilterTab's dvjs branch) and
-// used as a fallback when the visual builder is not available. In sql mode,
-// HAVING is rendered by the visual builder instead.
-function renderOldHavingSection(
-	el: HTMLElement,
-	deps: FilterTabDeps,
-	isMatrix: boolean,
-	isHeatmap: boolean,
-): void {
-	const havingSection = renderExprSection(
-		el,
-		"Hide small or large groups",
-		deps.settings.having,
-		deps.havingError ?? "",
-		{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); } },
-		{ placeholder: "e.g. count >= 3", autoKey: "havingAuto", help: "Hide clusters that are too small or too large." }
-	);
-	const havingHeader = havingSection.querySelector(".gim-panel-section-header") as HTMLElement;
-	if (havingHeader) {
-		const modeToggle = havingHeader.createEl("a", { cls: "view-action clickable-icon", title: "Toggle highlight mode" });
-		modeToggle.setAttribute("aria-label", deps.settings.havingMode === "highlight" ? "Switch to filter mode" : "Switch to highlight mode");
-		setIcon(modeToggle, deps.settings.havingMode === "highlight" ? "highlighter" : "filter");
-		modeToggle.addEventListener("click", () => {
-			deps.settings.havingMode = deps.settings.havingMode === "highlight" ? "filter" : "highlight";
-			deps.save();
-			deps.refreshFilterTab();
-			deps.rebuild();
-		});
-	}
 	// Matrix "min column size" / heatmap "min tag size" are tag filters.
-	if (isMatrix) renderMatrixMinColumnControl(havingSection, deps);
-	if (isHeatmap) renderHeatmapMinTagControl(havingSection, deps);
+	if (isMatrix) renderMatrixMinColumnControl(el, deps);
+	if (isHeatmap) renderHeatmapMinTagControl(el, deps);
 }
 
 // Typeahead suggester for `.base` files. Filters scanBaseFiles(app) by the
@@ -378,49 +190,9 @@ function renderBasesSection(el: HTMLElement, deps: FilterTabDeps): void {
 	}
 }
 
-// Logic-source selector (filterMode). Two mutually-exclusive segments:
-//   dvjs  — a DataviewJS script returning paths
-//   bases — scope the graph to selected `.base` files (replaces WHERE/GROUP_BY)
-// Selecting a segment persists the mode, re-renders the Filter tab (so the body
-// swaps between the query UI and the Bases UI) and rebuilds the graph.
-const LOGIC_MODES: Array<{ id: "dvjs" | "bases"; label: string }> = [
-	{ id: "dvjs", label: "Dataview" },
-	{ id: "bases", label: "Bases" },
-];
 
-function renderLogicModeSelector(host: HTMLElement, deps: FilterTabDeps): void {
-	if (deps.settings.filterMode === "sql") {
-		deps.settings.filterMode = "dvjs";
-		deps.save();
-		deps.rebuild();
-	}
 
-	const seg = host.createDiv({ cls: "gim-logic-mode-seg" });
-	seg.setCssStyles({ display: "flex", gap: "2px", border: "1px solid var(--background-modifier-border)", borderRadius: "5px", overflow: "hidden", padding: "1px" });
-	for (const m of LOGIC_MODES) {
-		const active = deps.settings.filterMode === m.id;
-		const btn = seg.createEl("button", { text: m.label });
-		btn.setCssStyles({
-			border: "none",
-			borderRadius: "4px",
-			padding: "2px 8px",
-			fontSize: "11px",
-			cursor: "pointer",
-			background: active ? "var(--interactive-accent)" : "transparent",
-			color: active ? "var(--text-on-accent)" : "var(--text-muted)",
-		});
-		if (active) btn.setAttribute("aria-current", "true");
-		btn.addEventListener("click", () => {
-			if (deps.settings.filterMode === m.id) return;
-			deps.settings.filterMode = m.id;
-			deps.save();
-			deps.refreshFilterTab();
-			deps.rebuild();
-		});
-	}
-}
-
-export interface FilterBodyDeps extends FilterTabDeps, SortTabDeps {
+export interface FilterBodyDeps extends FilterTabDeps {
 	syncLensCommands?: (presets: LensPreset[]) => void;
 }
 
@@ -434,11 +206,7 @@ export function renderFilterBodyTab(host: HTMLElement, deps: FilterBodyDeps): vo
 	const title = filterHeader.createEl("h4", { text: "Filter & Group", cls: "gim-panel-title" });
 	title.setCssStyles({ margin: "0" });
 
-	// Logic source selector: Dataview / Bases. A 2-way segmented control.
-	// Switching mode re-renders the tab, which conditionally shows
-	// Dataview input OR the Bases UI,
-	// then rebuilds so the canvas reflects the active source immediately.
-	renderLogicModeSelector(filterHeader, deps);
+
 
 	const filterSection = host.createDiv({ cls: "gim-panel-section" });
 	renderSettingsFilterTab(filterSection, deps);

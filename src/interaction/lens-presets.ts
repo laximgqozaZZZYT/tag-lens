@@ -14,19 +14,12 @@ function cloneEncoding(enc: EncodingBinding[]): EncodingBinding[] {
  */
 export function captureLens(settings: MiniSettings): LensQuerySettings {
 	return {
-		filterMode: settings.filterMode,
-		dvjsFilter: settings.dvjsFilter,
-		where: [...settings.where],
-		groupBy: [...settings.groupBy],
-		having: [...settings.having],
-		limit: [...settings.limit],
-		orderField: settings.orderField,
-		orderDir: settings.orderDir,
 		viewMode: settings.viewMode,
-		whereAuto: settings.whereAuto,
-		groupByAuto: settings.groupByAuto,
-		havingAuto: settings.havingAuto,
-		limitAuto: settings.limitAuto,
+		selectedBases: [...settings.selectedBases],
+		basesLinkEdges: settings.basesLinkEdges,
+		basesSharedTagEdges: settings.basesSharedTagEdges,
+		basesSharedPropEdges: settings.basesSharedPropEdges,
+		basesClusterByView: settings.basesClusterByView,
 	};
 }
 
@@ -46,19 +39,12 @@ export function capturePreset(settings: MiniSettings, name: string): LensPreset 
  */
 export function applyLens(settings: MiniSettings, preset: LensPreset): void {
 	const q = preset.query;
-	settings.filterMode = q.filterMode;
-	settings.dvjsFilter = q.dvjsFilter;
-	settings.where = [...q.where];
-	settings.groupBy = [...q.groupBy];
-	settings.having = [...q.having];
-	settings.limit = [...q.limit];
-	settings.orderField = q.orderField;
-	settings.orderDir = q.orderDir;
 	settings.viewMode = q.viewMode;
-	settings.whereAuto = q.whereAuto;
-	settings.groupByAuto = q.groupByAuto;
-	settings.havingAuto = q.havingAuto;
-	settings.limitAuto = q.limitAuto;
+	settings.selectedBases = [...q.selectedBases];
+	settings.basesLinkEdges = q.basesLinkEdges;
+	settings.basesSharedTagEdges = q.basesSharedTagEdges;
+	settings.basesSharedPropEdges = q.basesSharedPropEdges;
+	settings.basesClusterByView = q.basesClusterByView;
 	if (Array.isArray(preset.encoding)) {
 		settings.encoding = cloneEncoding(preset.encoding);
 	}

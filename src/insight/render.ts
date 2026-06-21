@@ -152,23 +152,7 @@ export function renderInsightAlerts(host: HTMLElement, deps: InsightDeps, comput
 		}
 	}
 
-	// Under-covered clusters check
-	if (deps.settings.havingMode === "highlight" && deps.highlightedHavingClusters.size > 0) {
-		const arr = Array.from(deps.highlightedHavingClusters.entries());
-		// Sort ascending by count (most under-covered first)
-		arr.sort((a, b) => a[1] - b[1]);
-		const details = arr.slice(0, 10).map(c => `${c[0]} — only ${c[1]} notes`).join("\n");
-		const extra = arr.length > 10 ? `\n...and ${arr.length - 10} more.` : "";
-		
-		allCards.push({
-			label: "Under-covered clusters",
-			severity: "WARNING",
-			summary: `Found ${arr.length} clusters failing HAVING conditions.`,
-			detail: `These clusters do not meet the HAVING threshold but are kept visible via highlight mode.\n${details}${extra}`,
-			advice: "Consider adding more notes to these clusters, or adjusting the HAVING thresholds.",
-			offender: "Highlight Mode"
-		});
-	}
+
 
 	// Stalled Cluster check (Insight driven by staleDays)
 	if (deps.settings.staleDays > 0) {

@@ -2,13 +2,13 @@ import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon, Notice, Menu, Markdo
 import { exportCanvasDims } from "./visual/image-export";
 import { renderInsightTab } from "./insight/render";
 import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
-import { effectiveEncoding } from "./encoding/migrate";
+
 import type { EncContext, EncNode, NodeDrawParams, EncodingBinding } from "./encoding/types";
 import { axisLayout, type AxisSpec, type AxisBand, type AxisTick } from "./layout/axis-layout";
 import { assignGalleryAxes } from "./layout/droste-axis";
 import { LaneRegistry, routeZ } from "./layout/edge-routing";
 import { buildIdToRect, buildRouteObstacles } from "./layout/layout-shared";
-import { buildGraph, runDvjsDqlFilter } from "./query/parser";
+
 import { buildBaseIndex } from "./bases/build-index";
 import { scanBaseFiles } from "./bases/parser";
 import { ensureFallbackBase } from "./bases/fallback";
@@ -23,14 +23,7 @@ import {
 } from "./layout/layout";
 import type { MiniSettings, GraphNode, GraphData, ViewMode, LensPreset } from "./types";
 import { CARD_CELL_W, CARD_CELL_H, NONE_BUCKET } from "./types";
-import { type LimitRule, applyLimitRules } from "./query/limit";
-import { filterMemberships, filterLabels } from "./query/query-filters";
-import {
-	parseLimitRules as parseLimitRulesFn,
-	getSortKey as getSortKeyFn,
-	computeDroppedClusters as computeDroppedClustersFn,
-	shouldApplyHaving,
-} from "./query/query-pipeline";
+
 import { clusterHue, createStripePattern, createStripeGradient, resolveNodeStripe, membershipStripeHues } from "./draw/canvas-utils";
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
@@ -92,13 +85,9 @@ import {
 	type HoverTarget,
 } from "./interaction/hit-test";
 import {
-	resolveEffectiveQuery,
-	resolveEffectiveHaving,
-	seedAutoHavingRows,
 	computeDegreeMaps,
-	filterEdgesByAlive,
-	filterLayoutData,
 	buildAdjacency,
+	filterLayoutData,
 } from "./query/rebuild-pipeline";
 import {
 	type CardContent,
@@ -110,6 +99,7 @@ import {
 import {
 	toggleArrayMember as toggleArrayMemberFn,
 } from "./panel/panel-sections";
+
 
 import {
 	renderSettingsViewTab,
@@ -847,10 +837,7 @@ export class MiniGraphView extends ItemView {
 			rebuild: () => void this.rebuild(),
 			refreshFilterTab: () => this.refreshFilterTab(),
 			refreshSettingsTab: () => this.refreshSettingsTab(),
-			whereError: this.whereError,
-			groupByError: this.groupByError,
-			havingError: this.havingError,
-			limitError: this.limitError,
+
 			syncLensCommands: (presets) => this.syncLensCommands(presets),
 		});
 	}
@@ -1116,84 +1103,25 @@ export class MiniGraphView extends ItemView {
 	private async rebuild(): Promise<void> {
 		const gen = ++this.rebuildGen;
 
-		// Stage 1: AUTO-augment GROUP_BY / WHERE, then run the vault → graph
-		// builder. Errors from the query parsers are surfaced into panel
-		// state so the user sees them inline.
-		const { effGroupBy, effWhere, filterMode, dvjsFilter } = resolveEffectiveQuery(this.settings);
-		// DataviewJS DQL is evaluated by Dataview's own engine (async) BEFORE the
-		// synchronous graph build so WHERE/SORT/GROUP BY/FLATTEN are fully honoured.
-		// JS scripts return matchedPaths: null here and are evaluated synchronously
-		// inside buildGraph (unchanged). Mirrors the Bases `await buildBaseIndex`
-		// pattern. Guarded by gen so a stale async result can't clobber a newer build.
-		let dvjsResolved: { matchedPaths: Set<string> | null; error?: string } | undefined;
-		if (filterMode === "dvjs") {
-			const allPaths = new Set(this.app.vault.getMarkdownFiles().map((f) => f.path));
-			dvjsResolved = await runDvjsDqlFilter(this.app, dvjsFilter ?? "", allPaths);
-			if (gen !== this.rebuildGen) return;
-		}
-		const { result, errors } = buildGraph(
-			this.app,
-			effWhere,
-			effGroupBy,
-			filterMode,
-			dvjsFilter,
-			this.settings.focusNodeIds,
-			// Prevent recursive expansion in closeup view. The focused nodes
-			// already include the relevant neighborhood from the panorama state.
-			this.settings.focusNodeIds ? false : this.settings.expandNeighborhood,
-			dvjsResolved
-		);
-		this.whereError = errors.where ?? "";
-		this.groupByError = errors.groupBy ?? "";
-		let { data, clusterLabels } = result;
 
-		// ── Bases FALLBACK: in Bases mode ONLY, if the vault has zero `.base`
-		// files, synthesise `_all.base` (a no-filter = match-all view over every
-		// note) and auto-select it so the user sees every note graphed instead of
-		// a blank Bases canvas. Strictly gated to avoid writing into non-Bases
-		// vaults; idempotent because once `_all.base` exists scanBaseFiles is
-		// non-empty so ensureFallbackBase is a no-op (no regenerate / no re-select
-		// / no rebuild loop). SQL & DataviewJS modes NEVER create a file.
-		if (this.settings.filterMode === "bases") {
-			try {
-				if (scanBaseFiles(this.app).length === 0) {
-					const created = await ensureFallbackBase(this.app);
-					if (
-						created &&
-						!this.settings.selectedBases.includes(created.path)
-					) {
-						this.settings.selectedBases.push(created.path);
-						// The fallback `_all.base` groups notes by tag via ONE view per
-						// tag (a multi-view base). projectBaseIndexToGraph now auto-clusters
-						// any base with >1 view per view, so the tag grouping surfaces with
-						// the default file-unit setting — no need to flip basesClusterByView
-						// (the global flag stays a user-controlled "always view-unit" override).
-						void this.save();
-					}
+		// ── Bases FALLBACK: if the vault has zero `.base` files, synthesise `_all.base`
+		// and auto-select it so the user sees every note graphed.
+		try {
+			if (scanBaseFiles(this.app).length === 0) {
+				const created = await ensureFallbackBase(this.app);
+				if (created && !this.settings.selectedBases.includes(created.path)) {
+					this.settings.selectedBases.push(created.path);
+					void this.save();
 				}
-			} catch (e) {
-				console.warn("[tag-lens] Bases fallback generation skipped:", e);
 			}
+		} catch (e) {
+			console.warn("[tag-lens] Bases fallback generation skipped:", e);
 		}
 
-		// ── Bases SCOPE: ONLY when the Logic source is "bases" AND one or more
-		// `.base` files are selected, REPLACE the WHERE/GROUP_BY graph with the
-		// projection of the base index. In sql/dvjs modes this block is skipped
-		// entirely even if selectedBases still holds values (mode gates it).
-		// Bases mode with zero selection ⇒ also skipped ⇒ the classic WHERE/GROUP_BY
-		// result stands as the fallback (no blank canvas). Everything
-		// downstream (degree / HAVING / LIMIT / layout / draw / legend) runs on the
-		// replaced data unchanged — base nodes carry memberships + edges, so euler /
-		// bubblesets / matrix etc. figure them out natively. Empty selection ⇒ this
-		// block is skipped entirely (classic pipeline, zero impact). Any failure
-		// falls back to the original `data` (non-destructive) and surfaces a Notice.
-		// True when the base projection is the active graph source. Used below to
-		// SKIP the SQL-like post-projection stages (HAVING / AUTO-HAVING / LIMIT /
-		// ORDER_BY), keeping Bases mode completely separate from the SQL pipeline so
-		// a base-scoped graph is never thinned by SQL-like filters. Layout / degree /
-		// adjacency (rendering essentials) still run on the base graph as-is.
-		const baseScoped = shouldScopeToBases(this.settings.filterMode, this.settings.selectedBases);
-		if (baseScoped) {
+		let data: GraphData = { nodes: [], edges: [] };
+		let clusterLabels = new Map<string, string>();
+
+		if (this.settings.selectedBases.length > 0) {
 			try {
 				const edgeKinds = new Set<BaseEdgeKind>();
 				if (this.settings.basesLinkEdges) edgeKinds.add("link");
@@ -1223,26 +1151,19 @@ export class MiniGraphView extends ItemView {
 						},
 					},
 				);
-				// SCOPE replacement: the base projection supersedes WHERE/GROUP_BY.
 				data = baseData;
 				clusterLabels = baseLabels;
 			} catch (e) {
 				this.baseIndex = null;
-				console.error("[tag-lens] Bases projection failed; falling back to classic graph:", e);
-				new Notice("Tag Lens: Bases projection failed — showing the standard graph. See console.");
+				console.error("[tag-lens] Bases projection failed:", e);
+				new Notice("Tag Lens: Bases projection failed. See console.");
 			}
 		} else {
 			this.baseIndex = null;
 		}
 
 		// ── Early-out: skip the (expensive) relayout/redraw/menu-rebuild when the
-		// graph INPUTS are byte-for-byte identical to the last build. buildGraph
-		// (cheap, reads metadata) still ran, but its result is unchanged — typical
-		// for editing a note's BODY that touches no tags/memberships. Settings
-		// changes are caught via layoutSignature; create/delete/rename and real
-		// tag edits change the graph signature and fall through to a full rebuild.
-		// (The navigator's frontmatter SEARCH metadata can lag a frontmatter-only
-		// edit until the next graph-affecting change — acceptable for the win.)
+		// graph INPUTS are byte-for-byte identical to the last build.
 		const rebuildSig = JSON.stringify({
 			n: data.nodes.map((n) => [n.id, n.label, n.memberships ?? []]),
 			e: data.edges.map((e) => [e.source, e.target]),
@@ -1262,169 +1183,47 @@ export class MiniGraphView extends ItemView {
 					this.hasShownCognitiveAlert = true;
 				}
 			} catch (e) {
-				// Don't let a metric error abort the rebuild, but surface it —
-				// a silent swallow here hid cognitive-load regressions before.
 				console.error("[tag-lens] cognitive-load metric failed:", e);
 			}
 		}
 
-		// Pristine post-buildGraph graph (post WHERE/GROUP_BY, pre any HAVING/LIMIT
-		// mutation). The navigator's mode-invariant (non-droste) note set is derived
-		// from THIS via menuLimitedNodes() below, so switching between non-droste
-		// modes never changes the menu. `data` itself is mutated by the mode-specific
-		// HAVING/LIMIT stages, so we snapshot before that happens.
-		const menuSourceData = data;
-
-		// Stage 1b: HAVING runs AFTER buildGraph so auto thresholds can scale
-		// with the produced node count, then drops the resulting clusters
-		// from each node's memberships + the cluster-label map.
-		// Lattice AND Containment-lens (droste) both derive their value from each
-		// note's FULL multi-tag membership: the lattice from DEEP intersections
-		// (3-way, 4-way, …), and the lens from T (= N's tag intersection), its
-		// exact-T peers (②) and its proper-subset groups (④). Auto-HAVING's
-		// TOP_K=20 long-tail drop strips rare tags from every note's memberships,
-		// collapsing a {act,drama,character} note to its dominant {character} —
-		// which flattens both views (T becomes a single tag, ④ subsets vanish).
-		// Skip AUTO for both; manual HAVING expressions still run. Other modes
-		// keep AUTO unchanged.
-		const effHavingAuto =
-			this.settings.viewMode === "lattice" ||
-			this.settings.viewMode === "droste"
-				? false
-				: this.settings.havingAuto;
-
-		const _noteCount = this.app.vault.getMarkdownFiles().length;
-		const applySqlPostFilters = !baseScoped && this.settings.filterMode === "sql";
-		// HAVING (cluster-size filter/highlight) applies to BOTH sql and dvjs: it
-		// only looks at cluster member counts, so it works the same whether the
-		// grouping came from settings.groupBy (sql) or the dvjs script's returned
-		// groups. LIMIT/ORDER_BY remain sql-only via applySqlPostFilters above.
-		// Bases mode is excluded from both (baseScoped): the base projection is its
-		// own complete graph and must not be thinned by SQL-like cluster filters.
-		const applyHaving = shouldApplyHaving(this.settings.filterMode, baseScoped);
-
-		// ── HAVING / AUTO-HAVING — cluster-size post-projection filter. SKIPPED in
-		// Bases mode: the base projection is its own complete graph and must not be
-		// thinned by SQL-like cluster filters. Clear prior HAVING state so stale
-		// highlights/errors from an earlier sql/dvjs build don't leak through. ──
-		if (applyHaving) {
-			// Seed the HAVING field's initial value: when auto is on and the user
-			// has no manual rows, populate settings.having with the concrete auto
-			// rows resolved against this build's node count, so they show up in the
-			// Data > Logic > HAVING field and stay editable. Persisted so the field
-			// retains them and never re-seeds over the user's edits.
-			seedAutoHavingRows(
-				this.settings.having,
-				effHavingAuto,
-				data.nodes.length,
-				(seeded) => {
-					this.settings.having = seeded;
-					void this.save();
-				},
-			);
-			const effHaving = resolveEffectiveHaving(
-				this.settings.having,
-				effHavingAuto,
-				data.nodes.length,
-			);
-			const { dropped, errors: havingErrors } = this.computeDroppedClusters(
-				data.nodes,
-				effHaving,
-				effHavingAuto,
-				{ _noteCount },
-			);
-			if (havingErrors.length > 0) this.havingError = havingErrors.join("; ");
-			else this.havingError = "";
-
-			if (this.settings.havingMode === "highlight") {
-				this.highlightedHavingClusters = dropped;
-			} else {
-				this.highlightedHavingClusters.clear();
-				if (dropped.size > 0) {
-					const droppedSet = new Set(dropped.keys());
-					data = filterMemberships(data, droppedSet);
-					clusterLabels = filterLabels(clusterLabels, droppedSet);
-				}
-			}
-		} else {
-			this.havingError = "";
-			this.highlightedHavingClusters.clear();
-		}
+		this.whereError = "";
+		this.groupByError = "";
+		this.havingError = "";
+		this.highlightedHavingClusters.clear();
 		this.clusterLabels = clusterLabels;
 
-		// Containment lens operates vault-wide: snapshot the post-HAVING graph BEFORE the
-		// LIMIT stage trims it, so the icon gallery covers all notes, not the limited set.
-		// Hiding is NOT applied here: the gallery always bakes the full pre-LIMIT note set
-		// and drawDroste skips hidden cells at draw time (its hiddenSet is the single source
-		// of truth for hiding). This lets Select all / Deselect all and per-note toggles
-		// show/hide tiles instantly via requestDraw, with no rebuild required.
+		// Containment lens operates vault-wide: snapshot the graph
 		const drosteFullData =
 			this.settings.viewMode === "droste"
 				? { nodes: data.nodes.slice(), edges: data.edges.slice() }
 				: undefined;
 		this.drosteData = drosteFullData ?? null;
-		// Rebuild the always-on note navigator fresh (node set may have changed);
-		// ensureNoteMenu re-creates it on the next draw in EVERY mode. The located-
-		// note highlight is per-graph, so clear it on every rebuild.
+		
 		this.removeNoteMenu();
 		this.locatedNoteId = null;
 
-		// Stage 2: degree maps (total / in / out). Used by ORDER_BY + size-
-		// mode resolvers. Cleared in place so view-state references stay
-		// valid for callers holding the same Map instance.
 		const degrees = computeDegreeMaps(data.edges);
 		this.degreeMap = degrees.degreeMap;
 		this.inDegreeMap = degrees.inDegreeMap;
 		this.outDegreeMap = degrees.outDegreeMap;
 
-		// Stage 3: LIMIT (+ ORDER_BY, which only ranks within LIMIT tiers).
-		// Per-tier visible-node selection + display-mode assignment. Edges are
-		// re-filtered against the surviving id set.
-		// SKIPPED unless filterMode is "sql": in Dataview/Bases, zero tiers keeps
-		// every node at "full" with NO trimming/reordering by SQL-like controls.
-		const limitTiers = applySqlPostFilters ? this.parseLimitRules() : [];
-		const { visibleNodes, modes } = applyLimitRules(
-			data.nodes,
-			limitTiers,
-			this.settings.orderField,
-			this.settings.orderDir,
-			(id, field) => this.getSortKey(id, field),
-		);
+		const modes = new Map<string, "full" | "brief">();
+		for (const n of data.nodes) modes.set(n.id, "full");
 		this.displayMode = modes;
-		data = {
-			nodes: visibleNodes,
-			edges: filterEdgesByAlive(data.edges, (id) => modes.has(id)),
-		};
 
-		// Note list for the note navigator. Every on-canvas node MUST get a
-		// checkbox, else "Deselect all" can't hide it. `navigatorNodeSource` picks
-		// the right universe per mode:
-		//   • non-droste — the mode-invariant LIMIT-trimmed set (menuLimitedNodes),
-		//     built from the pristine post-buildGraph graph with the user's REAL
-		//     havingAuto, so the menu (note list, Folder/Tag tree, search) is
-		//     IDENTICAL across all those modes regardless of their on-canvas state.
-		//   • droste (Icon Gallery) — the FULL pre-LIMIT snapshot the gallery bakes
-		//     (`drosteFullData`); the gallery draws one tile PER NODE, so the
-		//     navigator must list that same full set or LIMIT-dropped tiles would
-		//     have no checkbox and could never be hidden.
+		// Note list for the note navigator.
 		const menuNodeSource = navigatorNodeSource({
 			isDroste: this.settings.viewMode === "droste",
 			galleryNodes: drosteFullData?.nodes ?? [],
-			limitedNodes: menuLimitedNodes(menuSourceData, {
-				app: this.app,
-				settings: this.settings,
-				// Dataview/Bases skip LIMIT/ORDER_BY ⇒ navigator lists full source set.
-				tiers: applySqlPostFilters ? this.parseLimitRules() : [],
-			}),
+			limitedNodes: data.nodes,
 		});
 		this.menuNotes = projectMenuNotes(menuNodeSource, this.app);
 
-		await this.ensureBodies(data.nodes);
 		if (gen !== this.rebuildGen) return;
 
 		// Recompute the cluster member sets + strict supersets against the
-		// CURRENT (post-LIMIT) graph so the NODE_DISPLAY override chain
-		// (own cluster → inheritFrom → strict superset → global) reflects
+		// CURRENT graph so the NODE_DISPLAY override chain reflects
 		// what's actually on screen.
 		this.recomputeClusterRelations(data.nodes);
 		this.recomputeNodeDisplayCache(data.nodes);
@@ -1456,7 +1255,7 @@ export class MiniGraphView extends ItemView {
 					: undefined;
 			},
 		};
-		const effEnc = effectiveEncoding(this.settings.encoding, this.settings);
+		const effEnc = this.settings.encoding ?? [];
 		const encRes = evaluateEncoding(layoutData.nodes, effEnc, encCtx, this.settings.viewMode);
 		this.encParams = encRes.params;
 		this.encLegends = encRes.legends;
@@ -1855,50 +1654,7 @@ export class MiniGraphView extends ItemView {
 		// cellSize world coords), distinct from the card lattice's world-coord grid.
 	}
 
-	// Build the effective LIMIT rule list by parsing manual rows + filling in
-	// missing slots with auto defaults when `limitAuto` is on. Manual rows are
-	// always respected; auto only adds rules of kinds the user didn't specify.
-	private parseLimitRules(): LimitRule[] {
-		const { tiers, errors } = parseLimitRulesFn(this.settings);
-		this.limitError = errors.length > 0 ? errors.join("; ") : "";
-		return tiers;
-	}
 
-	private getSortKey(id: string, field: string): string | number {
-		return getSortKeyFn(id, field, {
-			app: this.app,
-			degreeMap: this.degreeMap,
-			membershipsOf: (id) =>
-				this.laid.nodes.find((n) => n.id === id)?.memberships,
-		});
-	}
-
-	private computeDroppedClusters(
-		nodes: GraphNode[],
-		rawRows: string[],
-		// Optional override so the rebuild() pipeline can SUPPRESS auto-drop
-		// for lattice mode (where TOP_K=20 long-tail dropping cuts off any
-		// 3rd+ tag on a note and collapses the intersection lattice to
-		// degree ≤ 2). Falls back to settings.havingAuto for every other
-		// mode, preserving prior behaviour.
-		havingAutoOverride?: boolean,
-		context?: { _noteCount: number },
-	): { dropped: Map<string, number>; errors: string[] } {
-		const { dropped, errors } = computeDroppedClustersFn(
-			nodes,
-			rawRows,
-			havingAutoOverride ?? this.settings.havingAuto,
-			context ?? { _noteCount: this.app.vault.getMarkdownFiles().length },
-		);
-		this.havingError = errors.length > 0 ? errors.join("; ") : "";
-		return { dropped, errors };
-	}
-
-	// Body preview was retired (both Euler + UpSet): cards and the hover tip
-	// show title only, so no file contents are loaded.
-	private async ensureBodies(_nodes: GraphNode[]): Promise<void> {
-		/* no-op — body preview feature removed */
-	}
 
 	// Shared visual scale factor. ALL per-card metrics — pixel size,
 	// font size, padding, stroke, text wrap width, body line count —
@@ -2921,7 +2677,7 @@ export class MiniGraphView extends ItemView {
 				ctx,
 				this.laid.clusters,
 				this.highlightedClusters,
-				this.settings.havingMode === "highlight" ? new Set(this.highlightedHavingClusters.keys()) : undefined,
+				undefined,
 				this.zoom,
 				hn ? { x: hn.x, y: hn.y } : null,
 				this.settings.viewMode === "bubblesets",
@@ -3010,7 +2766,7 @@ export class MiniGraphView extends ItemView {
 		// display toggles, and separate from the on-grid title bars. Not in
 		// UpSet mode.
 		if (this.overviewActive && !this.laid.upset) {
-			drawOverviewLabelsFn(ctx, this.laid, this.zoom, this.settings.havingMode === "highlight" ? this.highlightedHavingClusters : undefined);
+			drawOverviewLabelsFn(ctx, this.laid, this.zoom, undefined);
 		}
 	}
 
@@ -3049,7 +2805,7 @@ export class MiniGraphView extends ItemView {
 			this.laid,
 			this.zoom,
 			this.settings.minFontPx,
-			this.settings.havingMode === "highlight" ? this.highlightedHavingClusters : undefined,
+			undefined,
 		);
 	}
 

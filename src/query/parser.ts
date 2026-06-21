@@ -117,9 +117,11 @@ function toGroupsArray(value: unknown): string[] {
 
 // Extract EXPLICIT grouping membership from a returned item, honouring the
 // `{ path, groups }` contract. Returns:
-//   - string[]   → the script dictated grouping (used verbatim; real tags ignored)
-//   - undefined  → no explicit groups field → caller falls back to the note's
-//                  own real tags.
+//   - string[]   → the script dictated grouping (used verbatim). An empty array
+//                  means the script explicitly declared "no groups" → NONE_BUCKET.
+//   - undefined  → no explicit `groups` field at all → the note is left
+//                  COMPLETELY ungrouped (memberships = []). The note's own real
+//                  tags are NEVER consulted in dvjs mode.
 // Plain strings and plain Page objects (no own `groups` key) yield undefined.
 function itemToGroups(item: unknown): string[] | undefined {
 	if (!item || typeof item !== "object") return undefined;
@@ -140,10 +142,13 @@ function resolveToVaultPath(app: App, rawPath: string, allPaths: Set<string>): s
 }
 
 // path → EXPLICIT groups (from a `{ path, groups }` item) or `undefined` when
-// the item carried no explicit grouping (caller falls back to the note's own
-// real tags). This is the unified carrier for dvjs grouping: in dvjs mode,
-// `settings.groupBy` / `groupByAuto` are NEVER consulted — grouping comes from
-// here only.
+// the item carried no explicit `groups` field. This is the SOLE carrier for
+// dvjs grouping: in dvjs mode `settings.groupBy` / `groupByAuto` are NEVER
+// consulted, and a note's own real tags are NEVER auto-used. Mapping of the
+// value to memberships (in buildGraph Pass 2):
+//   - string[] non-empty → those groups verbatim
+//   - string[] empty     → NONE_BUCKET (script explicitly said "no groups")
+//   - undefined          → [] (no `groups` field → note is left fully ungrouped)
 export type DvjsMatched = Map<string, string[] | undefined>;
 
 // Recursively walk an arbitrary Dataview query result value, collecting every
@@ -306,7 +311,12 @@ function runDvjsFilter(
 		const resolved = resolveToVaultPath(app, rawPath, allPaths);
 		if (!resolved) continue;
 		matchedPaths.add(resolved);
-		// Explicit `{ path, groups }` wins; undefined → fall back to real tags.
+		// dvjs grouping contract: ONLY an explicit `{ path, groups }` field
+		// produces grouping. A plain path / Page (no own `groups` key) yields
+		// `undefined` here, which downstream means "no grouping at all" ([]),
+		// NOT a fall-back to the note's real tags. We never overwrite a
+		// previously-recorded explicit set with a later undefined for the
+		// same path.
 		const groups = itemToGroups(item);
 		if (groups !== undefined || !matched.has(resolved)) {
 			matched.set(resolved, groups);
@@ -331,7 +341,8 @@ export function buildGraph(
 	// requested but the engine was unavailable → fall back to SQL pipeline.
 	// `matched` (path → explicit groups | undefined) carries dvjs grouping; when
 	// only `matchedPaths` is supplied (legacy callers / tests), every matched
-	// path falls back to its own real tags for grouping.
+	// path is left fully ungrouped (memberships = []) — real tags are NEVER
+	// auto-used.
 	dvjsResolved?: { matchedPaths: Set<string> | null; matched?: DvjsMatched; error?: string },
 ): { result: BuildResult; errors: BuildErrors } {
 	const errors: BuildErrors = {};
@@ -385,9 +396,10 @@ export function buildGraph(
 	const clusterLabels = new Map<string, string>();
 
 	let matchedPaths: Set<string> | null = null;
-	// path → EXPLICIT groups (from a `{ path, groups }` item) or undefined (→ fall
-	// back to the note's own real tags). In dvjs mode this map is the ONLY source
-	// of grouping; settings.groupBy / groupByAuto / groupByAst are never consulted.
+	// path → EXPLICIT groups (from a `{ path, groups }` item) or undefined when
+	// the script returned a plain path/Page (no `groups` field). In dvjs mode this
+	// map is the ONLY source of grouping; settings.groupBy / groupByAuto /
+	// groupByAst are never consulted, and a note's real tags are never auto-used.
 	let dvjsMatched: DvjsMatched | null = null;
 	let useDvjsPaths = filterMode === "dvjs";
 	if (filterMode === "dvjs") {
@@ -398,7 +410,8 @@ export function buildGraph(
 		const dqlMatched = dvjsResolved?.matchedPaths;
 		if (dqlMatched) {
 			matchedPaths = dqlMatched;
-			// Legacy callers may pass only matchedPaths; default to real-tag grouping.
+			// Legacy callers may pass only matchedPaths (no `matched` map); those
+			// paths then carry no explicit groups → fully ungrouped ([]).
 			dvjsMatched = dvjsResolved?.matched ?? null;
 		} else if (dvjsResolved?.error) {
 			useDvjsPaths = false;
@@ -479,23 +492,35 @@ export function buildGraph(
 
 		if (useDvjsGrouping) {
 			// dvjs grouping contract: the script's return value alone decides
-			// grouping. An EXPLICIT `{ path, groups }` set is used verbatim; a plain
-			// path / Page falls back to the note's OWN real tags. settings.groupBy /
-			// groupByAuto are NEVER consulted here. Empty → NONE_BUCKET.
+			// grouping. Nothing happens that the script did not write down.
+			//   - EXPLICIT `{ path, groups }`, non-empty → those groups verbatim.
+			//   - EXPLICIT `{ path, groups: [] }` (empty) → NONE_BUCKET (the script
+			//     deliberately declared "this note has no groups").
+			//   - undefined (plain path / Page, no `groups` field) → memberships
+			//     stay [] (the note is left COMPLETELY ungrouped). The note's own
+			//     real tags are intentionally NOT consulted — auto-falling-back to
+			//     real tags would be an invisible behaviour the script never asked
+			//     for. settings.groupBy / groupByAuto are NEVER consulted either.
 			const explicit = dvjsMatched?.get(f.path);
-			const groups = explicit !== undefined ? explicit : facts.tags;
-			for (const g of groups) {
-				if (!g) continue;
-				if (!seen.has(g)) {
-					seen.add(g);
-					memberships.push(g);
-					if (!clusterLabels.has(g)) clusterLabels.set(g, g);
+			if (explicit !== undefined) {
+				for (const g of explicit) {
+					if (!g) continue;
+					if (!seen.has(g)) {
+						seen.add(g);
+						memberships.push(g);
+						if (!clusterLabels.has(g)) clusterLabels.set(g, g);
+					}
+				}
+				// Explicit groups present but none usable (e.g. `groups: []`) → the
+				// script explicitly said "no groups" → bucket as NONE_BUCKET. This
+				// NONE_BUCKET is reserved for an explicit empty `groups`; a MISSING
+				// `groups` field leaves memberships = [] (handled by skipping this).
+				if (memberships.length === 0) {
+					memberships.push(NONE_BUCKET);
+					if (!clusterLabels.has(NONE_BUCKET)) clusterLabels.set(NONE_BUCKET, NONE_BUCKET);
 				}
 			}
-			if (memberships.length === 0) {
-				memberships.push(NONE_BUCKET);
-				if (!clusterLabels.has(NONE_BUCKET)) clusterLabels.set(NONE_BUCKET, NONE_BUCKET);
-			}
+			// else: explicit === undefined → leave memberships = [] (fully ungrouped).
 		} else if (groupByAst) {
 			const result = evalQuery(groupByAst, facts);
 			for (const instance of result.instances) {

@@ -91,32 +91,21 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		delete merged.nodeRadius;
 		delete merged.manifestPath;
 		delete merged.rules;
-		// Migrate groupBy: GroupBySpec object → string[] or string → string[].
-		if (Array.isArray(merged.groupBy)) {
-			// already in new shape
-		} else if (typeof merged.groupBy === "string") {
-			merged.groupBy = merged.groupBy.trim() ? [merged.groupBy.trim()] : [];
-		} else {
-			const gb = merged.groupBy as { kind?: string; field?: string } | undefined;
-			if (gb?.kind === "tag") merged.groupBy = ["tag:*"];
-			else if (gb?.kind === "frontmatter" && gb.field) merged.groupBy = [`${gb.field}:*`];
-			else merged.groupBy = [];
-		}
-		if (Array.isArray(merged.where)) {
-			// already in new shape
-		} else if (typeof merged.where === "string") {
-			merged.where = merged.where.trim() ? [merged.where.trim()] : [];
-		} else {
-			merged.where = [];
-		}
-		if (!Array.isArray(merged.having)) merged.having = [];
-		if (!Array.isArray(merged.limit)) merged.limit = [];
-		if (typeof merged.orderField !== "string" || merged.orderField === "") {
-			merged.orderField = "name";
-		}
-		if (merged.orderDir !== "asc" && merged.orderDir !== "desc") {
-			merged.orderDir = "asc";
-		}
+		// Strip removed SQL/dvjs fields
+		delete merged.filterMode;
+		delete merged.dvjsFilter;
+		delete merged.where;
+		delete merged.groupBy;
+		delete merged.having;
+		delete merged.havingMode;
+		delete merged.limit;
+		delete merged.orderField;
+		delete merged.orderDir;
+		delete merged.whereAuto;
+		delete merged.groupByAuto;
+		delete merged.havingAuto;
+		delete merged.limitAuto;
+		delete merged.expandNeighborhood;
 		// The unified menu (note navigator + graph-settings tabs) shows by default;
 		// the toolbar gear / the menu's × toggle it. `panelVisible` (the old docking
 		// settings panel) is retired.
@@ -268,38 +257,8 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		delete merged.lodHubTopK;
 		delete merged.lodAggregateBadge;
 		delete merged.lodAuto;
-		if (typeof merged.whereAuto !== "boolean") merged.whereAuto = true;
-		if (typeof merged.groupByAuto !== "boolean") merged.groupByAuto = true;
-		if (typeof merged.havingAuto !== "boolean") merged.havingAuto = true;
-		if (typeof merged.limitAuto !== "boolean") merged.limitAuto = true;
-		if (
-			merged.anchorPlacement !== "concentric" &&
-			merged.anchorPlacement !== "flow"
-		) {
-			merged.anchorPlacement = "concentric";
-		}
 		// --- Droste-effect view validation ---
 		if (typeof merged.drosteFocus !== "string") merged.drosteFocus = "";
-		// --- Logic source (filterMode) validation. "bases" is the third source
-		// added for the Bases integration; any other value falls back to "sql". ---
-		if (
-			merged.filterMode !== "sql" &&
-			merged.filterMode !== "dvjs" &&
-			merged.filterMode !== "bases"
-		) {
-			merged.filterMode = "sql";
-		}
-		// dvjs filter text migration: keep existing user scripts, but replace empty
-		// or legacy Dataview-source placeholders (e.g. `FROM ""`) with a runnable
-		// default Dataview script so switching to Dataview mode is usable immediately.
-		if (typeof merged.dvjsFilter !== "string") {
-			merged.dvjsFilter = DEFAULT_DVJS_FILTER;
-		} else {
-			const t = merged.dvjsFilter.trim();
-			if (t.length === 0 || /^FROM\s+""\s*$/i.test(t)) {
-				merged.dvjsFilter = DEFAULT_DVJS_FILTER;
-			}
-		}
 		// --- Bases integration (Stage 2) ---
 		if (!Array.isArray(merged.selectedBases)) merged.selectedBases = [];
 		if (typeof merged.basesLinkEdges !== "boolean") merged.basesLinkEdges = true;
@@ -349,7 +308,7 @@ class MiniSettingTab extends PluginSettingTab {
 			.setName("WHERE / GROUP_BY")
 			.setDesc(
 				"Filter and partition expressions are edited inside the view. " +
-					"Open the Tag Lens view and click the sliders icon in its toolbar.",
+				"Open the Tag Lens view and click the sliders icon in its toolbar.",
 			)
 			.addButton((b) => {
 				b.setButtonText("Open Tag Lens")

@@ -10,7 +10,7 @@ import type { LensPreset } from "../src/types";
 	for (const p of BUNDLED_PRESETS) {
 		ok(typeof p.name === "string" && p.name.trim().length > 0, `name set: ${p.name}`);
 		ok(typeof p.query.viewMode === "string", `${p.name}: viewMode set`);
-		ok(Array.isArray(p.query.where), `${p.name}: where is array`);
+		ok(Array.isArray(p.query.selectedBases), `${p.name}: selectedBases is array`);
 		ok(p.encoding === undefined, `${p.name}: no encoding (legacy shape, won't wipe user encoding)`);
 	}
 	const { presets, errors } = parsePresets(serializePresets(BUNDLED_PRESETS));

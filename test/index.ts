@@ -5,7 +5,7 @@ import { summary } from "./assert";
 import "./conformal.test";
 import "./droste-layout.test";
 import "./note-menu.test";
-import "./hidden-nodes.test";
+
 import "./theme.test";
 import "./query.test";
 import "./image-export.test";
@@ -24,9 +24,8 @@ import "./bundled-presets.test";
 import "./freshness.test";
 import "./gap-finder.test";
 import "./bridge-finder.test";
-import "./having-highlight.test";
-import "./having-auto-seed.test";
-import "./having-mode-gate.test";
+
+
 import "./status-overlay.test";
 import "./note-maturity.test";
 import "./stream-layout.test";
@@ -59,6 +58,6 @@ import "./bases-skip-postprocess.test";
 import "./friendly-error.test";
 import "./tag-field-suggest.test";
 import "./query-builder.test";
-import "./dvjs-filter.test";
+
 
 summary();

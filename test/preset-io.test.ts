@@ -6,7 +6,7 @@ import { DEFAULT_SETTINGS } from "../src/types";
 import type { LensPreset } from "../src/types";
 
 const sample: LensPreset[] = [
-	{ name: "Alpha", query: { ...captureLens(DEFAULT_SETTINGS), viewMode: "lattice", where: ["a"] } },
+	{ name: "Alpha", query: { ...captureLens(DEFAULT_SETTINGS), viewMode: "lattice", selectedBases: ["a"] } },
 	{ name: "Beta", query: { ...captureLens(DEFAULT_SETTINGS), viewMode: "heatmap" } },
 ];
 
@@ -21,7 +21,7 @@ const sample: LensPreset[] = [
 	ok(presets.length === 2, "both presets recovered");
 	ok(presets[0].name === "Alpha" && presets[0].query.viewMode === "lattice", "Alpha round-trips");
 	ok(presets[1].query.viewMode === "heatmap", "Beta round-trips");
-	ok(presets[0].query.where.length === 1 && presets[0].query.where[0] === "a", "array field round-trips");
+	ok(presets[0].query.selectedBases.length === 1 && presets[0].query.selectedBases[0] === "a", "array field round-trips");
 }
 
 // Accepts a bare array (no bundle wrapper).
@@ -47,7 +47,7 @@ const sample: LensPreset[] = [
 			{ name: "", query: { ...captureLens(DEFAULT_SETTINGS) } }, // empty name
 			{ query: { ...captureLens(DEFAULT_SETTINGS) } },           // no name
 			{ name: "NoQuery" },                                       // no query
-			{ name: "BadArr", query: { ...captureLens(DEFAULT_SETTINGS), where: "x" } }, // where not array
+			{ name: "BadArr", query: { ...captureLens(DEFAULT_SETTINGS), selectedBases: "x" } }, // where not array
 			"nope",                                                    // not an object
 		],
 	});

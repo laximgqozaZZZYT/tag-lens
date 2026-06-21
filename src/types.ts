@@ -33,9 +33,7 @@ export interface Offset {
 }
 
 export type LensQuerySettings = Pick<MiniSettings,
-	"filterMode" | "dvjsFilter" | "where" | "groupBy" | "having" |
-	"limit" | "orderField" | "orderDir" | "viewMode" |
-	"whereAuto" | "groupByAuto" | "havingAuto" | "limitAuto">;
+	"viewMode" | "selectedBases" | "basesLinkEdges" | "basesSharedTagEdges" | "basesSharedPropEdges" | "basesClusterByView">;
 
 export interface LensPreset {
 	name: string;
@@ -55,67 +53,15 @@ export interface MiniSettings {
 	clusterSpacing: number;
 	nodeSpacing: number;
 	cardMaxChars: number;
-	// Logic source for the Data > Logic tab. "sql"/"dvjs" run the classic
-	// WHERE/GROUP_BY pipeline (sql = SQL-like rows, dvjs = a DataviewJS script).
-	// "bases" SCOPES the graph to the selected `.base` files instead, REPLACING
-	// WHERE/GROUP_BY (see selectedBases + view.ts rebuild). Default "bases"
-	// (initial mode for new/unset vaults; with selectedBases empty it falls back
-	// to the classic WHERE/GROUP_BY pipeline, so the canvas is never blank).
-	filterMode: "sql" | "dvjs" | "bases";
-	dvjsFilter: string;
-	staleDays: number;
-	// Note maturity badge on cards (Zettelkasten fleeting / literature /
-	// permanent), derived in the parser and optionally overridden per-note.
-	showMaturity: boolean;
-	// Sequence Stream mode: the frontmatter field used as the axis ("mtime" =
-	// file modified time), and how axis values are bucketed into columns.
-	streamAxisField: string;
-	streamBinning: "value" | "month" | "week";
-	// Sequence Stream row ordering: "size" = by tag note-count desc;
-	// "first-appearance" = by the earliest bin a tag appears in.
-	streamRowSort: "size" | "first-appearance";
-	// Each entry is one query row in the panel. Empty rows are ignored; all
-	// non-empty rows are AND-combined for evaluation.
-	where: string[];
-	groupBy: string[];
-	// SQL-like aggregate post-filter. Each row is "count <op> <number>"; rows
-	// are AND-combined. Failing clusters keep their nodes visible but their
-	// enclosure (outline + label) is suppressed. When `havingAuto` is on and
-	// this is empty, it is auto-seeded with concrete count thresholds resolved
-	// from the current node count (see seedAutoHavingRows) so the conditions
-	// are visible and editable rather than injected silently.
-	having: string[];
-	// HAVING application mode: "filter" drops failing clusters' enclosures;
-	// "highlight" keeps everything but visually flags the failing clusters.
-	havingMode: "filter" | "highlight";
-	// Per-cluster node display tiers: `limit N` (top N shown full) and
-	// `brief N` (next batch shown title-only). Anything beyond the highest
-	// tier is hidden. The sort order used to compute "top N" comes from
-	// orderField/orderDir below.
-	limit: string[];
-	// Sort criterion shared by LIMIT tiers. `orderField` accepts built-ins
-	// (name/mtime/ctime/size) plus any frontmatter field name.
-	orderField: string;
-	orderDir: "asc" | "desc";
-	// When `*Auto` is true, the system AND-augments the corresponding section
-	// with auto-computed conditions so the default view stays readable. Manual
-	// rows are always respected and combine multiplicatively with the auto
-	// additions.
-	whereAuto: boolean;
-	groupByAuto: boolean;
-	// havingAuto drives two things: (1) seeding the HAVING field with concrete
-	// count thresholds when it's empty (seedAutoHavingRows), and (2) the
-	// grammar-inexpressible TOP_K long-tail cap + NONE_BUCKET suppression inside
-	// computeDroppedClusters. The count thresholds, once seeded, live in
-	// `having` as ordinary editable rows.
-	havingAuto: boolean;
-	limitAuto: boolean;
-	// Whether to expand the filtered "core" set to include 1-hop links/backlinks.
-	expandNeighborhood: boolean;
 	// "concentric": focus at centre, others fill expanding rings around it.
 	// "flow": focus at top-left, others fill columns to the right (main flow
 	// direction = toward the focus / "stage").
 	anchorPlacement: "concentric" | "flow";
+	staleDays: number;
+	showMaturity: boolean;
+	streamAxisField: string;
+	streamBinning: "value" | "month" | "week";
+	streamRowSort: "size" | "first-appearance";
 	// Per-view display toggles.
 	showBody: boolean;
 	// Card span in grid units. nodeRows = m (height in cells), nodeCols = n
@@ -496,25 +442,11 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	clusterSpacing: 80,
 	nodeSpacing: 16,
 	cardMaxChars: 160,
-	filterMode: "bases",
-	dvjsFilter: "return dv.pages('\"\"').map(p => p.file.path).array();",
 	staleDays: 14,
 	showMaturity: false,
 	streamAxisField: "mtime",
 	streamBinning: "month",
 	streamRowSort: "size",
-	where: [],
-	groupBy: ["tag:*"],
-	having: [],
-	havingMode: "filter",
-	limit: [],
-	orderField: "name",
-	orderDir: "asc",
-	whereAuto: true,
-	groupByAuto: true,
-	havingAuto: true,
-	limitAuto: true,
-	expandNeighborhood: false,
 	anchorPlacement: "concentric",
 	showBody: true,
 	nodeRows: 1,

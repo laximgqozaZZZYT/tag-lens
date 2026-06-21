@@ -14,7 +14,7 @@ export interface PresetBundle {
 }
 
 // Query fields that MUST be arrays / a string for a preset to be applyLens-safe.
-const QUERY_ARRAY_KEYS = ["where", "groupBy", "having", "limit"] as const;
+const QUERY_ARRAY_KEYS = ["selectedBases"] as const;
 
 // Pretty-printed bundle, suitable for a textarea or a .json file in the vault.
 export function serializePresets(presets: LensPreset[]): string {
