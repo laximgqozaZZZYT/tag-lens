@@ -1,7 +1,7 @@
 {
 	"id": "tag-lens",
 	"name": "Tag Lens",
-	"version": "0.3.25",
+	"version": "0.3.29",
 	"minAppVersion": "1.5.0",
 	"description": "Tag-membership visualisations: Icon Gallery, lattice, heatmap, UpSet, matrix, tag graph, BubbleSets, Euler-family, and Sequence Stream.",
 	"author": "laximgqozaZZZYT",
