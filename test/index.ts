@@ -55,5 +55,7 @@ import "./bases-mode-gate.test";
 import "./bases-fallback.test";
 import "./bases-selection.test";
 import "./bases-skip-postprocess.test";
+import "./friendly-error.test";
+import "./tag-field-suggest.test";
 
 summary();

@@ -1,4 +1,11 @@
 import type { MiniSettings } from "../types";
+import type { App } from "obsidian";
+import { friendlyError } from "./friendly-error";
+import {
+	TagFieldSuggest,
+	collectSuggestSources,
+	type SuggestSources,
+} from "./tag-field-suggest";
 
 // ORDER_BY field schema. Listed by source group so the dropdown reads
 // like a labelled menu. Centralised here so a new field can be added
@@ -101,6 +108,24 @@ export interface ExprSectionDeps {
 	// WHERE / GROUP_BY / HAVING / LIMIT are query-pipeline settings — editing
 	// them must produce a full rebuild, not just a repaint.
 	rebuild?: () => void;
+	// Optional — only WHERE/GROUP_BY (in SQL mode) pass this so the tag/property
+	// typeahead can read vault metadata. Absent ⇒ no suggester is attached
+	// (behaviour identical to before this feature).
+	app?: App;
+}
+
+// Per-section beginner help + quick-insert chip config. All optional and purely
+// additive: a section with no entry behaves exactly as before.
+export interface ExprSectionUiOpts {
+	placeholder?: string;
+	autoKey?: AutoKey;
+	// Plain one-line explanation shown under the heading.
+	help?: string;
+	// Attach the tag/property typeahead to each row input (needs deps.app).
+	suggest?: boolean;
+	// Clickable templates inserted as a NEW row when clicked. Each rides the
+	// existing addRow + change pipeline; no new save format is introduced.
+	chips?: { label: string; insert: string }[];
 }
 
 // Expression-row section (WHERE / GROUP_BY / HAVING / LIMIT). Each row
@@ -112,7 +137,7 @@ export function renderExprSection(
 	rows: string[],
 	error: string,
 	deps: ExprSectionDeps,
-	opts: { placeholder?: string; autoKey?: AutoKey } = {},
+	opts: ExprSectionUiOpts = {},
 ): HTMLElement {
 	const section = parent.createDiv({ cls: "gim-panel-section" });
 	const header = section.createDiv({ cls: "gim-panel-section-header" });
@@ -129,6 +154,24 @@ export function renderExprSection(
 		});
 		autoLabel.createSpan({ text: "auto" });
 	}
+
+	// Beginner help line under the heading (additive; placeholder kept too).
+	if (opts.help) {
+		const helpEl = section.createDiv({ cls: "gim-expr-help", text: opts.help });
+		helpEl.setCssStyles({
+			fontSize: "11px",
+			color: "var(--text-muted)",
+			marginBottom: "6px",
+		});
+	}
+
+	// Vault sources for the typeahead are gathered once per render (lazily) and
+	// shared across all rows in this section. Only when suggest + app present.
+	let sources: SuggestSources | null = null;
+	const getSources = (): SuggestSources => {
+		if (!sources) sources = collectSuggestSources(deps.app!);
+		return sources;
+	};
 
 	// Ensure at least one editable row is shown so users can type into it.
 	const displayRows = rows.length > 0 ? rows : [""];
@@ -148,6 +191,9 @@ export function renderExprSection(
 			void deps.save();
 			deps.rebuild?.();
 		});
+		if (opts.suggest && deps.app) {
+			new TagFieldSuggest(deps.app, input, getSources);
+		}
 		const del = row.createEl("button", { cls: "gim-expr-del", text: "×" });
 		del.setAttr("aria-label", "Remove row");
 		del.disabled = rows.length === 0;
@@ -167,7 +213,37 @@ export function renderExprSection(
 		deps.rerender();
 	});
 
-	if (error) section.createDiv({ cls: "gim-expr-msg", text: error });
+	// Quick-insert chips: clicking appends a NEW row pre-filled with a template
+	// the user can then edit/delete like any other row (rides addRow/updateRow).
+	if (opts.chips && opts.chips.length > 0) {
+		const chipBar = section.createDiv({ cls: "gim-expr-chips" });
+		chipBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "6px" });
+		const hint = chipBar.createSpan({ text: "Quick add:" });
+		hint.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", alignSelf: "center" });
+		for (const chip of opts.chips) {
+			const btn = chipBar.createEl("button", { text: chip.label, cls: "gim-expr-chip" });
+			btn.setCssStyles({
+				fontSize: "11px",
+				padding: "1px 8px",
+				borderRadius: "10px",
+				cursor: "pointer",
+			});
+			btn.setAttr("title", `Adds a row: ${chip.insert}`);
+			btn.addEventListener("click", () => {
+				// updateRow on a fresh appended index commits the template value,
+				// so it persists like a hand-typed row.
+				addRow(rows);
+				updateRow(rows, rows.length - 1, chip.insert);
+				void deps.save();
+				deps.rebuild?.();
+				deps.rerender();
+			});
+		}
+	}
+
+	// Error is shown via the plain-language mapper (display-layer only; the raw
+	// `error` string passed in / stored in settings is never altered).
+	if (error) section.createDiv({ cls: "gim-expr-msg", text: friendlyError(error) });
 	return section;
 }
 
@@ -217,6 +293,9 @@ export function renderOrderBySection(
 	const section = parent.createDiv({ cls: "gim-panel-section" });
 	const header = section.createDiv({ cls: "gim-panel-section-header" });
 	header.createEl("h4", { text: "ORDER_BY" });
+
+	const help = section.createDiv({ cls: "gim-expr-help", text: "Choose how notes are sorted." });
+	help.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" });
 
 	const row = section.createDiv({ cls: "gim-order-row" });
 	const isCustom = !KNOWN_ORDER_FIELDS.has(deps.settings.orderField);

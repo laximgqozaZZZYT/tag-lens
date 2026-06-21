@@ -71,7 +71,7 @@ export function renderSettingsSortTab(el: HTMLElement, deps: SortTabDeps): void 
 		deps.settings.limit,
 		deps.limitError ?? "",
 		{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: deps.rerender ?? (() => {}) },
-		{ placeholder: "limit 10 / brief 30", autoKey: "limitAuto" }
+		{ placeholder: "limit 10 / brief 30", autoKey: "limitAuto", help: "Limit how many notes are shown per cluster." }
 	);
 }
 
@@ -133,8 +133,17 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 			"WHERE",
 			deps.settings.where,
 			deps.whereError ?? "",
-			{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); } },
-			{ autoKey: "whereAuto" }
+			{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); }, app: deps.app },
+			{
+				autoKey: "whereAuto",
+				help: "Only include notes that match these conditions.",
+				suggest: true,
+				chips: [
+					{ label: "Has a tag", insert: "tag:#example" },
+					{ label: "All tags", insert: "tag:?" },
+					{ label: "Frontmatter equals", insert: "status:draft" },
+				],
+			}
 		);
 	}
 	
@@ -154,8 +163,17 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 		"GROUP_BY",
 		deps.settings.groupBy,
 		deps.groupByError ?? "",
-		{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); } },
-		{ autoKey: "groupByAuto" }
+		{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); }, app: deps.app },
+		{
+			autoKey: "groupByAuto",
+			help: "Group notes into clusters based on a tag or property.",
+			suggest: true,
+			chips: [
+				{ label: "Has a tag", insert: "tag:#example" },
+				{ label: "All tags", insert: "tag:?" },
+				{ label: "Frontmatter equals", insert: "status:draft" },
+			],
+		}
 	);
 
 	renderHavingSection(el, deps, isMatrix, isHeatmap);
@@ -177,7 +195,7 @@ function renderHavingSection(
 		deps.settings.having,
 		deps.havingError ?? "",
 		{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); } },
-		{ placeholder: "e.g. count >= 3", autoKey: "havingAuto" }
+		{ placeholder: "e.g. count >= 3", autoKey: "havingAuto", help: "Hide clusters that are too small or too large." }
 	);
 	const havingHeader = havingSection.querySelector(".gim-panel-section-header") as HTMLElement;
 	if (havingHeader) {
