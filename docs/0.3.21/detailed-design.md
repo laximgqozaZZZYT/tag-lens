@@ -1,4 +1,4 @@
-# Tag Lens — Detailed Design (v0.3.18)
+# Tag Lens — Detailed Design (v0.3.21)
 
 Per-module detail behind the layers in basic-design.md. Line numbers drift in the
 god-file, so re-anchor with `grep -n` (use **`grep -a`** for `layout.ts`).
@@ -7,19 +7,13 @@ god-file, so re-anchor with `grep -n` (use **`grep -a`** for `layout.ts`).
 
 ## 1. Data layer
 
-### parser.ts — `buildGraph(app, whereRows, groupByRows, filterMode, dvjsFilter, statusField)`
-- Scans every Markdown file and produces `GraphNode[]`.
-- Per node: `id=path`, `label=basename`, `memberships` (cluster keys from GROUP_BY), `mtime`,
-  `fmStatus` (frontmatter value of `statusField`, lowercased), `fmMaturity` (below), `ageDays`.
+### bases/parser.ts / bases/selection.ts / bases/project.ts
+- Parses `.base` files to establish the structural scope of the graph.
+- Generates `GraphNode[]` and relationships by expanding implicit linkages, properties, and shared tags as requested.
+- Per node: `id=path`, `label=basename`, `mtime`, `fmStatus`, `fmMaturity`, `ageDays`.
 - **maturity**: frontmatter `maturity` resolved via `effectiveMaturity(persisted, suggestMaturity(...))`
   (valid value overrides, invalid/absent falls back to the heuristic). Backlink counts are precomputed.
 - links/backlinks come from cache.links + frontmatterLinks.
-
-### query.ts / query-pipeline.ts / query-filters.ts / qp-1d.ts
-- `parseQuery` / `evalQuery` / `isMatched`, `FileFacts{path, tags, frontmatter, tagProperties}`.
-- WHERE/GROUP_BY/HAVING/ORDER_BY/LIMIT. `tagN:` hierarchy, `tag.<key>:` join, AND/OR/XOR/NOR/NAND/glob/fuzzy.
-- `havingMode: "filter"|"highlight"` (filter = drop, highlight = keep and emphasise).
-- **filterMode**: `"sql"` (built-in) / `"dvjs"` (feed the output of DataviewJS `dv.pages()` into the node set).
 
 ### rebuild-pipeline.ts
 - Orchestrates the full rebuild cycle: parser → query → layout → encoding evaluation.
@@ -94,7 +88,7 @@ Attribute → visual-channel mapping only. **Never changes the displayed node se
 - **Invariants (test-pinned)**: input nodes are not mutated / `params.size == nodes.length`.
 
 ### migrate.ts
-- `synthesizeEncodingFromLegacy(settings)` / `effectiveEncoding(encoding, legacy)`.
+- Legacy schema migrations (primarily preserving scale/channel defaults).
 
 ### Tests
 `test/encoding-{scales,evaluate,migrate}.test.ts` (pure, Obsidian-free).
@@ -107,8 +101,8 @@ Attribute → visual-channel mapping only. **Never changes the displayed node se
 - `actions.ts`: `applyGolderClassification`, `convertToNestedTag`.
 
 ## 6. Panel UI (src/panel/)
-- `panel-sections.ts`: `renderToggleSection`/`renderOrderBySection` (free functions, DI pattern).
-- `panel/settings-sections.ts`, `panel/settings-tabs.ts`: settings UI extracted from view.ts.
+- `panel-sections.ts`: `renderToggleSection` and generic UI components (free functions, DI pattern).
+- `panel/settings-tabs.ts`: settings UI extracted from view.ts.
 - `note-menu.ts`: navigator (folder/tag trees, search, show/hide, pin to sidebar).
 
 ## 7. Settings / types / applicability

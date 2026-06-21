@@ -16,10 +16,7 @@ attribute-driven visual encoding on top.
 Vault (Markdown)
    │  metadataCache (tags / links / frontmatter / mtime)
    ▼
-[parser]  buildGraph        … node creation (GraphNode: tags=memberships, links/backlinks, fmStatus/fmMaturity/ageDays)
-   ▼
-[query]   WHERE/GROUP_BY/HAVING/ORDER_BY/LIMIT  … "which notes/clusters to show" = DATA-SELECTION layer
-   │       (filterMode: "sql" built-in engine, or "dvjs" DataviewJS)
+[parser]  buildBaseIndex / projectBaseIndexToGraph … node creation (Bases-only) = DATA-SELECTION layer
    ▼
 [layout]  layout() → per-mode layout fns … geometry (PositionedNode / LaidOut)
    ▼
@@ -30,7 +27,7 @@ Vault (Markdown)
 [UI panel] unified control panel (Filter / Notes / Settings(View/Display/Encode/Layers) / Insight)
 ```
 
-**Most important design principle: the data-selection layer (query, SQL/dvjs) and the
+**Most important design principle: the data-selection layer (Bases) and the
 visual layer (encoding) are separate concerns.** Encoding never changes *which* notes
 are shown — it only assigns per-node draw parameters.
 
@@ -63,7 +60,7 @@ Modes are grouped by **perspective** in the View-mode picker:
 ## 3. Key features
 
 - **Unified control panel**: a floating panel (movable / resizable / minimisable / dockable). Tabs = Filter / Notes (navigator) / Settings / Insight.
-- **Filter**: built-in SQL-like expressions (WHERE/GROUP_BY/HAVING/ORDER_BY/LIMIT) or DataviewJS.
+- **Filter**: Declarative `.base` files providing exactly scoped node inclusion and relationship rules.
 - **Display**: showNodes/Enclosures/Edges/Grid, minFontPx, freshness/status overlay, maturity badge.
 - **Encode**: the Visual Encoding Engine (bind attributes → visual channels; first scope = Color, Position X/Y via Cartesian axis layout).
 - **Insight**: cognitive-load metric / Alerts (Gap finder, Bridge finder, Stalled cluster, Ripening backlog) / Suggest (tag-classification suggestions based on Golder & Huberman).
@@ -79,7 +76,7 @@ Modes are grouped by **perspective** in the View-mode picker:
 | Area | Files |
 |---|---|
 | Entry | `main.ts` (plugin, command, ribbon), `view.ts` (MiniGraphView core, ~5200 lines) |
-| Data | `parser.ts` (buildGraph), `query.ts` / `query-pipeline.ts` / `query-filters.ts` / `qp-1d.ts` (query), `types.ts` (GraphNode/MiniSettings/ViewMode/EncodingBinding …) |
+| Data | `bases/parser.ts` / `bases/project.ts` / `bases/selection.ts`, `types.ts` (GraphNode/MiniSettings/ViewMode/EncodingBinding …) |
 | Layout | `layout.ts` (dispatch), `*-layout.ts` (upset/matrix/bipartite/heatmap/lattice/stream/region/droste), `droste-axis.ts` (Icon Gallery Cartesian axis), `axis-layout.ts` (shared axis engine), `cluster-bbox.ts`, `anchor-placement.ts`, `edge-routing.ts`, `layout-shared.ts`, … |
 | Rebuild | `rebuild-pipeline.ts` (orchestrates parser → query → layout → encoding pipeline) |
 | Draw | `draw-*.ts` (card/matrix/heatmap/lattice/upset/droste/stream/edges/enclosures/helpers), `theme.ts`, `canvas-utils.ts` |
@@ -96,7 +93,7 @@ Modes are grouped by **perspective** in the View-mode picker:
 - `GraphNode`: id (path), label, memberships (tags), mtime, fmStatus, fmMaturity, ageDays.
 - `PositionedNode`: GraphNode + x/y/width/height (after layout).
 - `LaidOut`: nodes/edges/clusters + per-mode meta (upset/matrix/heatmap/lattice/stream/drosteGallery).
-- `MiniSettings`: all persisted settings (viewMode, where/groupBy/having/…, per-mode settings, statusField/statusColors, freshnessOverlay/staleDays, showMaturity, **encoding: EncodingBinding[]**, …).
+- `MiniSettings`: all persisted settings (viewMode, selectedBases, per-mode settings, **encoding: EncodingBinding[]**, …).
 - `EncodingBinding`: { channelId, fieldId, scale, enabled } (visual encoding).
 
 ---

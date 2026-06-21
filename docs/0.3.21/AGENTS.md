@@ -1,4 +1,4 @@
-# AGENTS.md — Tag Lens v0.3.18 (required reading, authoritative)
+# AGENTS.md — Tag Lens v0.3.21 (required reading, authoritative)
 
 The standard every agent (human/AI) working in this repo reads first. It collects the
 traps, verification gate, and key workflows that agents have repeatedly hit. For the
@@ -16,8 +16,8 @@ full design see **basic-design.md** / **detailed-design.md** in this directory.
 1. **`src/layout.ts` contains NUL bytes (sentinel strings).** Plain `grep` treats it as binary and
    returns empty *without warning* → always use **`grep -a`** when searching `layout.ts`.
 2. **`src/view.ts` is a ~5200-line god-file.** Line numbers drift constantly; re-anchor with `grep -n` before editing.
-   The split is in `docs/0.3.18/refactor-view-split.md` (Tier 1–3 done, Tier 4 = drawing, deferred).
-3. **Visual Encoding (`src/encoding/`) is a separate layer from the SQL/DataviewJS filter.**
+   The split is in `docs/0.3.21/refactor-view-split.md` (Tier 1–3 done, Tier 4 = drawing, deferred).
+3. **Visual Encoding (`src/encoding/`) is a separate layer from the Bases projection filter.**
    It must never change *which* notes are shown (attribute → visual-channel mapping only). In review, always
    confirm the displayed node set / count did not change because of encoding.
 4. **A new settings field must be added to both the `MiniSettings` interface and `DEFAULT_SETTINGS`**
@@ -62,7 +62,7 @@ as the E2E harness. Reload Obsidian after deploying.
 - Refactors are behaviour-preserving, verify-green, one-extraction-one-commit.
 
 ## 5. References
-- Design: `docs/0.3.18/basic-design.md`, `docs/0.3.18/detailed-design.md`
-- In progress: `docs/0.3.18/refactor-view-split.md` (view.ts split)
-- Handoff: `docs/0.3.18/handoff-droste-axis.md` (Icon Gallery custom-axis Cartesian)
+- Design: `docs/0.3.21/basic-design.md`, `docs/0.3.21/detailed-design.md`
+- In progress: `docs/0.3.21/refactor-view-split.md` (view.ts split)
+- Handoff: `docs/0.3.21/handoff-droste-axis.md` (Icon Gallery custom-axis Cartesian)
 - Archived (no need to read; isolated to avoid confusion): `docs/old/`
