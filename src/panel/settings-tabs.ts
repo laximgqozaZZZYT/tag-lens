@@ -6,6 +6,7 @@ import {
 import {
 	renderOrderBySection,
 	renderExprSection,
+	renderBuilderExprSection,
 	renderPresetSection,
 } from "./panel-sections";
 import { setIcon, Notice, AbstractInputSuggest, type App, type TFile } from "obsidian";
@@ -67,7 +68,7 @@ export function renderSettingsSortTab(el: HTMLElement, deps: SortTabDeps): void 
 	});
 	renderExprSection(
 		el,
-		"LIMIT",
+		"How many notes to show",
 		deps.settings.limit,
 		deps.limitError ?? "",
 		{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: deps.rerender ?? (() => {}) },
@@ -128,9 +129,10 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 			errorDiv.setCssStyles({ color: "var(--text-error)", fontSize: "11px", marginTop: "4px" });
 		}
 	} else {
-		renderExprSection(
+		renderBuilderExprSection(
 			el,
-			"WHERE",
+			"where",
+			"Which notes to show",
 			deps.settings.where,
 			deps.whereError ?? "",
 			{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); }, app: deps.app },
@@ -158,9 +160,10 @@ export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): v
 	});
 	expandRow.createSpan({ text: "Include 1-hop links & backlinks" });
 
-	renderExprSection(
+	renderBuilderExprSection(
 		el,
-		"GROUP_BY",
+		"groupBy",
+		"Group notes by",
 		deps.settings.groupBy,
 		deps.groupByError ?? "",
 		{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); }, app: deps.app },
@@ -191,7 +194,7 @@ function renderHavingSection(
 ): void {
 	const havingSection = renderExprSection(
 		el,
-		"HAVING",
+		"Hide small or large groups",
 		deps.settings.having,
 		deps.havingError ?? "",
 		{ settings: deps.settings, save: deps.save, rebuild: deps.rebuild, rerender: () => { deps.refreshSettingsTab(); deps.refreshFilterTab(); } },
@@ -339,8 +342,8 @@ function renderBasesSection(el: HTMLElement, deps: FilterTabDeps): void {
 // Selecting a segment persists the mode, re-renders the Filter tab (so the body
 // swaps between the query UI and the Bases UI) and rebuilds the graph.
 const LOGIC_MODES: Array<{ id: "sql" | "dvjs" | "bases"; label: string }> = [
-	{ id: "sql", label: "SQL" },
-	{ id: "dvjs", label: "DataviewJS" },
+	{ id: "sql", label: "Simple" },
+	{ id: "dvjs", label: "Advanced (code)" },
 	{ id: "bases", label: "Bases" },
 ];
 

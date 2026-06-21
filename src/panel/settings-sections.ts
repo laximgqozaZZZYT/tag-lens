@@ -456,7 +456,7 @@ export interface GenericSectionDeps {
 export function renderMatrixOrderBySection(parent: HTMLElement, deps: GenericSectionDeps): void {
 	const section = parent.createDiv({ cls: "gim-panel-section" });
 	const header = section.createDiv({ cls: "gim-panel-section-header" });
-	header.createEl("h4", { text: "ORDER_BY" });
+	header.createEl("h4", { text: "Sort columns by" });
 
 	const row = section.createDiv({ cls: "gim-order-row" });
 	const fieldSel = row.createEl("select", { cls: "gim-order-field" });
@@ -505,7 +505,7 @@ export function renderMatrixMinColumnControl(section: HTMLElement, deps: Generic
 export function renderHeatmapOrderBySection(parent: HTMLElement, deps: GenericSectionDeps): void {
 	const section = parent.createDiv({ cls: "gim-panel-section" });
 	const header = section.createDiv({ cls: "gim-panel-section-header" });
-	header.createEl("h4", { text: "ORDER_BY" });
+	header.createEl("h4", { text: "Sort tags by" });
 	const row = section.createDiv({ cls: "gim-order-row" });
 	const fieldSel = row.createEl("select", { cls: "gim-order-field" });
 	for (const o of HEATMAP_ORDER_CRITERIA) {

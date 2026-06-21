@@ -57,5 +57,6 @@ import "./bases-selection.test";
 import "./bases-skip-postprocess.test";
 import "./friendly-error.test";
 import "./tag-field-suggest.test";
+import "./query-builder.test";
 
 summary();
