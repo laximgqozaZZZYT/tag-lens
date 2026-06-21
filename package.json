@@ -2,7 +2,7 @@
 	"name": "tag-lens",
 	"version": "0.3.29",
 	"private": true,
-	"description": "Lightweight tag-membership visualisations: connection matrix, tag co-occurrence heatmap, UpSet, bipartite tag graph.",
+	"description": "Visualize tag–note relationships in your Obsidian Bases vault. Co-occurrence heatmap, intersection lattice, BubbleSets, and Icon Gallery.",
 	"author": "laximgqozaZZZYT",
 	"license": "MIT",
 	"repository": {
