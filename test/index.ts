@@ -46,6 +46,7 @@ import "./settings-parity.test";
 import "./attribute-propagation.test";
 import "./euler-true-stripes.test";
 import "./sibling-overlap-pack.test";
+import "./bubblesets-sibling-overlap.test";
 import "./aggregation-compute.test";
 import "./aggregation-properties.test";
 import "./bases-parser.test";
