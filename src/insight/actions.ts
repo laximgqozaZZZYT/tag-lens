@@ -39,19 +39,19 @@ export async function convertToNestedTag(
 ): Promise<void> {
 	const files = app.vault.getMarkdownFiles();
 	let updatedCount = 0;
-	// Handle both #tag and tags in frontmatter. For body replacement, ensure word boundaries
-	const searchRegex = new RegExp(`(^|\\s)#${tag.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}(\\s|$)`, "gm");
-	const replacement = `$1#${parentPath}/${tag}$2`;
+	// Handle both #tag and its subtags (#tag/...), allowing punctuation after the tag.
+	const searchRegex = new RegExp(`(^|\\s)#(${tag.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}(?:/[^\\s.,;:?!\\]]*)?)(?=[\\s.,;:?!\\]]|$)`, "gm");
+	const replacement = `$1#${parentPath}/$2`;
 
 	for (const f of files) {
 		const cache = app.metadataCache.getFileCache(f);
 		if (!cache) continue;
 		
 		const fmTags: unknown = cache.frontmatter?.tags;
-		const hasTag = cache.tags?.some(t => t.tag === `#${tag}`) || 
+		const hasTag = cache.tags?.some(t => t.tag === `#${tag}` || t.tag.startsWith(`#${tag}/`)) || 
 					   (fmTags && (
-						   (Array.isArray(fmTags) && fmTags.some(t => typeof t === "string" && t === tag)) ||
-						   (typeof fmTags === "string" && fmTags === tag)
+						   (Array.isArray(fmTags) && fmTags.some(t => typeof t === "string" && (t === tag || t.startsWith(`${tag}/`)))) ||
+						   (typeof fmTags === "string" && (fmTags === tag || fmTags.startsWith(`${tag}/`)))
 					   ));
 		
 		if (hasTag) {
@@ -64,9 +64,13 @@ export async function convertToNestedTag(
 					const rfm = fm as Record<string, unknown>;
 					if (rfm.tags) {
 						if (Array.isArray(rfm.tags)) {
-							rfm.tags = rfm.tags.map((t: unknown) => t === tag ? `${parentPath}/${tag}` : t);
-						} else if (rfm.tags === tag) {
-							rfm.tags = `${parentPath}/${tag}`;
+							rfm.tags = rfm.tags.map((t: unknown) => {
+								if (typeof t !== "string") return t;
+								if (t === tag || t.startsWith(`${tag}/`)) return `${parentPath}/${t}`;
+								return t;
+							});
+						} else if (typeof rfm.tags === "string" && (rfm.tags === tag || rfm.tags.startsWith(`${tag}/`))) {
+							rfm.tags = `${parentPath}/${rfm.tags}`;
 						}
 					}
 				}
