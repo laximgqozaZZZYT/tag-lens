@@ -15,8 +15,8 @@ const ALL_KEYS: DisplayToggleKey[] = [
 ];
 
 const ALL_MODES = [
-	"euler", "euler-true", "euler-venn", "bipartite", "bubblesets",
-	"matrix", "heatmap", "lattice", "stream", "droste", "upset"
+	"euler", "bubblesets",
+	"heatmap", "lattice", "droste", "upset"
 ] as const;
 
 for (const mode of ALL_MODES) {

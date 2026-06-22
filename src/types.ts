@@ -59,9 +59,6 @@ export interface MiniSettings {
 	anchorPlacement: "concentric" | "flow";
 	staleDays: number;
 	showMaturity: boolean;
-	streamAxisField: string;
-	streamBinning: "value" | "month" | "week";
-	streamRowSort: "size" | "first-appearance";
 	// Per-view display toggles.
 	showBody: boolean;
 	// Card span in grid units. nodeRows = m (height in cells), nodeCols = n
@@ -154,27 +151,6 @@ export interface MiniSettings {
 	// UpSet plot minimum column size — intersections with fewer nodes
 	// are culled from the matrix. Default 1 = keep everything.
 	upsetMinColumnSize: number;
-	// Connection-matrix row/column ordering. "original" = pipeline order;
-	// "cooccurrence" = barycenter seriation to surface co-occurrence blocks.
-	matrixSort: "original" | "cooccurrence";
-	// Connection-matrix minimum column size — tags with fewer member notes
-	// are dropped from the columns. Default 1 = keep everything.
-	matrixMinColumnSize: number;
-	// Connection-matrix row-order direction (ORDER_BY asc/desc). For
-	// "block-priority": desc = biggest blocks first (default), asc = smallest
-	// first. For "co-occurrence": desc reverses the seriation order.
-	matrixSortDir: "asc" | "desc";
-	// Connection-matrix: bundle consecutive same-signature rows into a block
-	// (count badge + divider) without collapsing them. Default true.
-	matrixGroupBySignature: boolean;
-	// Connection-matrix: collapse each signature block to a "×N" summary row
-	// (click a block to expand). Default false.
-	matrixCollapseGroups: boolean;
-	// Connection-matrix: order whole signature blocks by size desc (big blocks
-	// to the top) instead of pure per-row Jaccard. Within a block, Jaccard
-	// order is kept; the same-signature grouping is preserved either way.
-	// Default true — restores the "count overview" lost when singletons scatter.
-	matrixBlockPriority: boolean;
 	// Names saved presets (Lenses).
 	lensPresets: LensPreset[];
 	// Heatmap: minimum tag size to appear on an axis (default 2 = drop
@@ -187,10 +163,6 @@ export interface MiniSettings {
 	gapFinder: boolean;
 	showGhostEdges: boolean;
 	ghostEdgeMinJaccard: number;
-	// Bipartite tag graph: maximum number of tag (set) nodes shown. The layout
-	// first drops singleton + giant (>40% of notes) tags, then keeps the
-	// top-N by size. Caps hub fan-out so a sparse vault stays operable.
-	bipartiteMaxTags: number;
 	// Intersection lattice: per-node level-of-detail. "auto" picks one of
 	// overview / density / individual from count and the current zoom; the
 	// explicit values force a single LOD regardless.
@@ -220,10 +192,6 @@ export interface MiniSettings {
 	// for the per-node "show names" checkbox — toggling that checkbox swaps
 	// the node body for a list of basenames truncated to this many rows.
 	latticeNamedMax: number;
-	// Bipartite node placement: "force" (spring embedder, default) or
-	// "concentric" (tags inner ring, notes outer ring(s), Jaccard-seriated).
-	// Topology is identical — only positions change.
-	bipartiteLayout: "force" | "concentric" | "clustered";
 	// Minimum font size (screen pixels) below which NO text element
 	// will render. Applies to card titles/bodies, cluster labels,
 	// matrix labels, grid headers, etc. World-space fonts that would
@@ -283,16 +251,11 @@ export interface MiniSettings {
 
 export type ViewMode =
 	| "euler"
-	| "euler-true"
-	| "euler-venn"
 	| "bubblesets"
-	| "matrix"
-	| "bipartite"
 	| "heatmap"
 	| "lattice"
 	| "upset"
-	| "droste"
-	| "stream";
+	| "droste";
 
 export interface ViewModeOption {
 	id: ViewMode;
@@ -332,61 +295,6 @@ export const VIEW_MODES: ViewModeOption[] = [
 		experimental: true,
 	},
 	{
-		// `id` stays "euler-true" for settings/preset compatibility. NOT a
-		// strict Euler diagram: subset → nested rectangles, partial overlaps →
-		// exclave pieces (not contiguous lens regions). Each node shown once.
-		id: "euler-true",
-		label: "Containment map",
-		description: "Subset → nested rectangles; partial overlaps as exclaves (each node once)",
-		// Without a clear tag containment hierarchy, partial overlaps fragment
-		// into exclaves everywhere and the map becomes hard to read.
-		experimental: true,
-	},
-	{
-		// Simplified Euler: same grid/box drawing as the nested-set mode, but
-		// each node placed ONCE and each tag drawn as ONE overlapping rectangle
-		// (= bbox of its members). Containment → nested bbox, partial overlap →
-		// overlapping bbox, disjoint → separate bbox. The bbox approximation is
-		// the deliberate simplification of Euler's hard drawing cases.
-		id: "euler-venn",
-		label: "Euler diagram",
-		description: "Overlapping tag rectangles (each node once; bbox-simplified)",
-		// Same region/containment family as Nested set / Containment — overlapping
-		// bbox rectangles hairball on a giant-tag, hierarchy-less vault.
-		experimental: true,
-	},
-	{
-		// Bipartite tag graph: note nodes + set (tag) nodes, joined by an edge
-		// per membership. Closest to Obsidian's native tag graph. Note click
-		// → open file; set click → highlight neighbours.
-		//
-		// Demoted to Experimental in v0.2.x: the "clustered" layout pins
-		// multi-membership notes to a single tag island instead of placing
-		// them BETWEEN tags (the Obsidian Graph experience the mode is named
-		// for), and the giant-tag / max-tag heuristics are still unvalidated
-		// on real vaults. Will return to GA once placement + thresholds are
-		// settled. Existing users keep their saved `viewMode: "bipartite"`.
-		id: "bipartite",
-		label: "Tag graph",
-		description: "Notes + tag nodes joined by membership edges (native-style graph)",
-		experimental: true,
-	},
-	{
-		// Connection matrix: rows = notes, columns = unique membership values,
-		// a dot marks membership. One row holds all of a note's tags.
-		//
-		// Demoted to Experimental in v0.2.x: the row-per-note model scales
-		// poorly on vaults with thousands of files (long vertical scroll,
-		// hard to grasp at a glance), and its analytical role overlaps with
-		// the heatmap / UpSet / lattice family. Will return to GA once row
-		// summarisation / collapsed signature blocks settle the readability
-		// gap. Existing users keep their saved `viewMode: "matrix"`.
-		id: "matrix",
-		label: "Connection matrix",
-		description: "Rows = notes, columns = tags; a dot marks membership",
-		experimental: true,
-	},
-	{
 		// Reuses the Containment-map layout but draws each set as concentric
 		// rectangular iso-contours ("bubbles"), evoking BubbleSets while
 		// keeping nodes and contours quadrilateral.
@@ -419,15 +327,6 @@ export const VIEW_MODES: ViewModeOption[] = [
 		description: "Stack of cards per intersection + dot matrix (handles ≥4-way intersections)",
 		experimental: true,
 	},
-	{
-		// Sequence Stream: tags as rows, axis (time/value) bins as columns. Each
-		// cell aggregates the notes whose axis value falls in that bin, so a tag's
-		// row reads as when it was active and when it went dormant over the axis.
-		id: "stream",
-		label: "Sequence Stream",
-		description: "Tags as rows, time/value bins as columns; tracks when each tag is active or dormant",
-		experimental: true,
-	},
 ];
 
 // Perspective helpers — used by the View-mode picker to group modes into
@@ -447,9 +346,6 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	cardMaxChars: 160,
 	staleDays: 14,
 	showMaturity: false,
-	streamAxisField: "mtime",
-	streamBinning: "month",
-	streamRowSort: "size",
 	anchorPlacement: "concentric",
 	showBody: true,
 	nodeRows: 1,
@@ -490,12 +386,6 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	encoding: [],
 	upsetColumnSort: "size",
 	upsetMinColumnSize: 1,
-	matrixSort: "cooccurrence",
-	matrixMinColumnSize: 1,
-	matrixSortDir: "desc",
-	matrixGroupBySignature: true,
-	matrixCollapseGroups: false,
-	matrixBlockPriority: true,
 	lensPresets: [],
 	heatmapMinTagSize: 2,
 	heatmapCriterion: "co-occurrence",
@@ -504,8 +394,6 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 	gapFinder: false,
 	showGhostEdges: false,
 	ghostEdgeMinJaccard: 0.5,
-	bipartiteMaxTags: 80,
-	bipartiteLayout: "force",
 	latticeNodeLOD: "auto",
 	latticeIndividualMax: 60,
 	latticeDensityMax: 2000,
@@ -532,16 +420,6 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 
 export const NONE_BUCKET = "(none)";
 
-// Matrix row-order criteria — the matrix-only entries added to the standard
-// ORDER_BY criterion dropdown (alongside the asc/desc direction). They map to
-// the stored matrix layout flags (see view.ts): "block-priority" ⇒
-// matrixBlockPriority = true; "co-occurrence" ⇒ false. matrixSort is always
-// "cooccurrence" (the seriation underlies both).
-export const MATRIX_ORDER_CRITERIA: Array<{ value: string; text: string }> = [
-	{ value: "co-occurrence", text: "co-occurrence" },
-	{ value: "block-priority", text: "block-priority" },
-];
-
 // Heatmap ORDER_BY criteria — added to the standard criterion dropdown in
 // heatmap mode only. "co-occurrence" = Jaccard seriation (related tags cluster
 // on the diagonal); "size" = by tag size. Maps to heatmapCriterion.
@@ -549,11 +427,6 @@ export const HEATMAP_ORDER_CRITERIA: Array<{ value: string; text: string }> = [
 	{ value: "co-occurrence", text: "co-occurrence" },
 	{ value: "size", text: "size" },
 ];
-
-// Id prefix for bipartite SET nodes (one per tag). NUL bytes guarantee it can
-// never collide with a real vault file path; the authoritative kind check is
-// `LaidOut.setNodeIds.has(id)`, not parsing this prefix.
-export const SET_PREFIX = "\u0000tag\u0000";
 
 // Card text geometry. Title and body lines use different sizes/weights.
 export const CARD_RADIUS_PX = 4;

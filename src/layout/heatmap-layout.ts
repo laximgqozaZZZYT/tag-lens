@@ -1,11 +1,10 @@
 // Tag co-occurrence heatmap layout. Rows AND columns are the same seriated
 // list of membership tags (symmetric), so cell (i,j) = |Ti ∩ Tj| and the
 // diagonal (i,i) = |Ti|. Pairwise only (2 tags) — 3-way+ intersections are the
-// matrix / UpSet job. Reuses the matrix Jaccard barycenter for the tag order
-// and the matrix min-size filter pattern for axis culling.
+// UpSet job. Reuses the shared Jaccard barycenter for the tag order.
 import { GraphData } from "../types";
 import type { LaidOut, LayoutOptions, HeatmapMeta } from "./layout";
-import { barycenter } from "./matrix-layout";
+import { barycenter } from "./layout-shared";
 import { computeChannelDims, minFontScale } from "./card-sizing";
 
 const CELL = 18; // world units per square cell (px at zoom 1)

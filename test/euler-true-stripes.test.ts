@@ -39,12 +39,10 @@ function opts(viewMode: ViewMode): LayoutOptions {
 		clusterLabels: new Map<string, string>(),
 		anchorPlacement: "concentric",
 		viewMode,
-		bipartiteMaxTags: 80,
-		bipartiteLayout: "concentric",
 	} as LayoutOptions;
 }
 
-for (const mode of ["euler-true", "bubblesets"] as ViewMode[]) {
+for (const mode of ["bubblesets"] as ViewMode[]) {
 	const d = makeData();
 	const r = layout(d, sizedFrom(d), opts(mode));
 	const subPieces = r.clusters.flatMap((c) => (c.pieces ?? []).filter((p) => p.kind === "sub"));

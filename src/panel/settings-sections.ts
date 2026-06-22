@@ -1,5 +1,5 @@
 import type { MiniSettings } from "../types";
-import { MATRIX_ORDER_CRITERIA, HEATMAP_ORDER_CRITERIA, VIEW_MODES, isPanorama, isCloseup } from "../types";
+import { HEATMAP_ORDER_CRITERIA, VIEW_MODES, isPanorama, isCloseup } from "../types";
 import type { NodeDisplay } from "../visual/node-display";
 
 export interface MinFontSectionDeps {
@@ -122,55 +122,6 @@ export function renderNodeDisplaySection(
 	nIn.addEventListener("change", applySize);
 
 
-}
-
-export interface StreamSectionDeps {
-	settings: MiniSettings;
-	save: () => void;
-	scheduleRebuild: () => void;
-}
-
-export function renderStreamDisplayToggles(section: HTMLElement, deps: StreamSectionDeps): void {
-	section.createEl("h4", { text: "Sequence Stream", cls: "gim-panel-heading" });
-
-	const axisRow = section.createDiv({ cls: "gim-setting-row" });
-	axisRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" });
-	axisRow.createSpan({ text: "Axis field:" });
-	const axisInput = axisRow.createEl("input", { type: "text", cls: "gim-text-input" });
-	axisInput.setCssStyles({ width: "100px" });
-	axisInput.value = deps.settings.streamAxisField;
-	axisInput.addEventListener("change", () => {
-		deps.settings.streamAxisField = axisInput.value.trim() || "mtime";
-		deps.save();
-		deps.scheduleRebuild();
-	});
-
-	const binRow = section.createDiv({ cls: "gim-setting-row" });
-	binRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" });
-	binRow.createSpan({ text: "Binning:" });
-	const binSel = binRow.createEl("select");
-	binSel.add(new Option("Value", "value"));
-	binSel.add(new Option("Month", "month"));
-	binSel.add(new Option("Week", "week"));
-	binSel.value = deps.settings.streamBinning;
-	binSel.addEventListener("change", () => {
-		deps.settings.streamBinning = binSel.value as MiniSettings["streamBinning"];
-		deps.save();
-		deps.scheduleRebuild();
-	});
-
-	const rowSortRow = section.createDiv({ cls: "gim-setting-row" });
-	rowSortRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" });
-	rowSortRow.createSpan({ text: "Row sort:" });
-	const rsSel = rowSortRow.createEl("select");
-	rsSel.add(new Option("Size", "size"));
-	rsSel.add(new Option("First appearance", "first-appearance"));
-	rsSel.value = deps.settings.streamRowSort;
-	rsSel.addEventListener("change", () => {
-		deps.settings.streamRowSort = rsSel.value as MiniSettings["streamRowSort"];
-		deps.save();
-		deps.scheduleRebuild();
-	});
 }
 
 export function renderLatticeSection(parent: HTMLElement, deps: GenericSectionDeps): void {
@@ -401,105 +352,12 @@ export function renderViewModeSection(parent: HTMLElement, deps: GenericSectionD
 
 }
 
-export function renderBipartiteSection(parent: HTMLElement, deps: GenericSectionDeps): void {
-	const section = parent.createDiv({ cls: "gim-panel-section" });
-	section.createEl("h4", { text: "Tag graph" });
-
-	const layRow = section.createDiv({ cls: "gim-order-row" });
-	layRow.createSpan({ text: "Layout", cls: "gim-order-field" });
-	const laySel = layRow.createEl("select");
-	for (const [val, label] of [
-		["force", "Force"],
-		["concentric", "Concentric"],
-		["clustered", "Clustered"],
-	] as const) {
-		const o = laySel.createEl("option", { value: val, text: label });
-		if (val === deps.settings.bipartiteLayout) o.selected = true;
-	}
-	laySel.addEventListener("change", () => {
-		deps.settings.bipartiteLayout = laySel.value as
-			| "force"
-			| "concentric"
-			| "clustered";
-		deps.save();
-		deps.rebuild();
-	});
-
-	const row = section.createDiv({ cls: "gim-order-row" });
-	row.createSpan({ text: "Max tags", cls: "gim-order-field" });
-	const inp = row.createEl("input", { type: "number" });
-	inp.min = "1";
-	inp.setCssStyles({ width: "56px" });
-	inp.value = String(deps.settings.bipartiteMaxTags);
-	inp.addEventListener("change", () => {
-		const v = Math.max(1, Math.floor(Number(inp.value) || 1));
-		deps.settings.bipartiteMaxTags = v;
-		inp.value = String(v);
-		deps.save();
-		deps.rebuild();
-	});
-	section.createEl("p", {
-		cls: "gim-panel-hint",
-		text: "Singleton + giant (>40% of notes) tags are dropped first; then the top-N by size are kept. Click a tag node to highlight its notes; click a note to open it.",
-	});
-}
-
 export interface GenericSectionDeps {
 	settings: MiniSettings;
 	save: () => void;
 	rebuild: () => void;
 	requestDraw?: () => void;
 	refreshSettingsTab?: () => void;
-	rebuildMatrixDisplay?: () => void;
-}
-
-export function renderMatrixOrderBySection(parent: HTMLElement, deps: GenericSectionDeps): void {
-	const section = parent.createDiv({ cls: "gim-panel-section" });
-	const header = section.createDiv({ cls: "gim-panel-section-header" });
-	header.createEl("h4", { text: "Sort columns by" });
-
-	const row = section.createDiv({ cls: "gim-order-row" });
-	const fieldSel = row.createEl("select", { cls: "gim-order-field" });
-	const current = deps.settings.matrixBlockPriority
-		? "block-priority"
-		: "co-occurrence";
-	for (const o of MATRIX_ORDER_CRITERIA) {
-		const opt = fieldSel.createEl("option", { value: o.value, text: o.text });
-		if (o.value === current) opt.selected = true;
-	}
-	fieldSel.addEventListener("change", () => {
-		deps.settings.matrixSort = "cooccurrence";
-		deps.settings.matrixBlockPriority = fieldSel.value === "block-priority";
-		deps.save();
-		deps.rebuild();
-	});
-
-	const dirSel = row.createEl("select", { cls: "gim-order-dir" });
-	for (const d of ["asc", "desc"] as const) {
-		const opt = dirSel.createEl("option", { value: d, text: d });
-		if (deps.settings.matrixSortDir === d) opt.selected = true;
-	}
-	dirSel.addEventListener("change", () => {
-		deps.settings.matrixSortDir = dirSel.value as "asc" | "desc";
-		deps.save();
-		deps.rebuild();
-	});
-}
-
-export function renderMatrixMinColumnControl(section: HTMLElement, deps: GenericSectionDeps): void {
-	const row = section.createDiv({ cls: "gim-order-row" });
-	row.createSpan({ text: "Min column size", cls: "gim-order-field" });
-	const inp = row.createEl("input", { type: "number" });
-	inp.min = "1";
-	inp.setCssStyles({ width: "56px" });
-	inp.value = String(deps.settings.matrixMinColumnSize);
-	inp.addEventListener("change", () => {
-		const v = Math.max(1, Math.floor(Number(inp.value) || 1));
-		deps.settings.matrixMinColumnSize = v;
-		inp.value = String(v);
-		deps.save();
-		deps.rebuild();
-	});
 }
 
 export function renderHeatmapOrderBySection(parent: HTMLElement, deps: GenericSectionDeps): void {
@@ -577,37 +435,3 @@ export function renderHeatmapDisplayToggles(section: HTMLElement, deps: GenericS
 	row.createSpan({ text: "Jaccard color scale" });
 }
 
-export function renderMatrixDisplayToggles(section: HTMLElement, deps: GenericSectionDeps): void {
-	const add = (
-		label: string,
-		get: () => boolean,
-		set: (v: boolean) => void,
-		enabled: boolean,
-	): void => {
-		const row = section.createEl("label", { cls: "gim-toggle-row" });
-		if (!enabled) row.setCssStyles({ opacity: "0.45" });
-		const cb = row.createEl("input", { type: "checkbox" });
-		cb.checked = get();
-		cb.disabled = !enabled;
-		cb.addEventListener("change", () => {
-			set(cb.checked);
-			deps.save();
-			deps.refreshSettingsTab?.();
-			deps.rebuildMatrixDisplay?.();
-			deps.requestDraw?.();
-		});
-		row.createSpan({ text: label });
-	};
-	add(
-		"Group identical rows",
-		() => deps.settings.matrixGroupBySignature,
-		(v) => (deps.settings.matrixGroupBySignature = v),
-		true,
-	);
-	add(
-		"Collapse groups",
-		() => deps.settings.matrixCollapseGroups,
-		(v) => (deps.settings.matrixCollapseGroups = v),
-		deps.settings.matrixGroupBySignature,
-	);
-}

@@ -1,8 +1,5 @@
 import type { MiniSettings } from "../types";
-import {
-	renderViewModeSection,
-	renderBipartiteSection,
-} from "./settings-sections";
+import { renderViewModeSection } from "./settings-sections";
 import { setIcon, AbstractInputSuggest, type App, type TFile } from "obsidian";
 import { scanBaseFiles } from "../bases/parser";
 import { addBaseFileToSelected, removeBaseFileFromSelected } from "../bases/selection";
@@ -12,13 +9,10 @@ import type { BindingLegend } from "../encoding/evaluate";
 import { clusterHue } from "../draw/canvas-utils";
 import { theme } from "../draw/theme";
 import {
-	renderMatrixMinColumnControl,
 	renderHeatmapMinTagControl,
 	renderNodeDisplaySection,
 	renderMinFontSection,
-	renderMatrixDisplayToggles,
 	renderHeatmapDisplayToggles,
-	renderStreamDisplayToggles,
 } from "./settings-sections";
 import { renderToggleSection, toggleArrayMember } from "./panel-sections";
 import type { LaidOut } from "../layout/layout";
@@ -40,7 +34,6 @@ export interface ViewTabDeps {
 
 export function renderSettingsViewTab(el: HTMLElement, deps: ViewTabDeps): void {
 	renderViewModeSection(el, deps);
-	if (deps.settings.viewMode === "bipartite") renderBipartiteSection(el, deps);
 }
 
 // Sort tab removed as LIMIT and ORDER_BY are deprecated
@@ -58,13 +51,11 @@ export interface FilterTabDeps {
 }
 
 export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): void {
-	const isMatrix = deps.settings.viewMode === "matrix";
 	const isHeatmap = deps.settings.viewMode === "heatmap";
 
 	renderBasesSection(el, deps);
 
-	// Matrix "min column size" / heatmap "min tag size" are tag filters.
-	if (isMatrix) renderMatrixMinColumnControl(el, deps);
+	// Heatmap "min tag size" is a tag filter.
 	if (isHeatmap) renderHeatmapMinTagControl(el, deps);
 }
 
@@ -214,14 +205,11 @@ export interface DisplayTabDeps {
 	rebuild: () => void;
 	requestDraw: () => void;
 	refreshSettingsTab: () => void;
-	rebuildMatrixDisplay?: () => void;
-	scheduleRebuild?: () => void;
 	clearCardCache: () => void;
 	resolveFromCluster: (groupKey: string) => NodeDisplay;
 }
 
 export function renderSettingsDisplayTab(el: HTMLElement, deps: DisplayTabDeps): void {
-	const isMatrix = deps.settings.viewMode === "matrix";
 	const isHeatmap = deps.settings.viewMode === "heatmap";
 
 	const autoFollowSection = el.createDiv({ cls: "gim-panel-section" });
@@ -245,23 +233,14 @@ export function renderSettingsDisplayTab(el: HTMLElement, deps: DisplayTabDeps):
 		{ key: "showGrid" as const, label: "Show grid" },
 	].filter((t) => displayToggleApplies(deps.settings.viewMode, t.key));
 	
-	const hasModeToggles = isMatrix || isHeatmap || deps.settings.viewMode === "stream";
-	if (gdToggles.length > 0 || hasModeToggles) {
+	if (gdToggles.length > 0 || isHeatmap) {
 		const gdSection = renderToggleSection(
 			el,
 			{ settings: deps.settings, save: deps.save, redraw: deps.requestDraw },
 			"Graph display",
 			gdToggles
 		);
-		if (isMatrix) renderMatrixDisplayToggles(gdSection, deps);
 		if (isHeatmap) renderHeatmapDisplayToggles(gdSection, deps);
-		if (deps.settings.viewMode === "stream" && deps.scheduleRebuild) {
-			renderStreamDisplayToggles(gdSection, {
-				settings: deps.settings,
-				save: deps.save,
-				scheduleRebuild: deps.scheduleRebuild
-			});
-		}
 	}
 
 	// Bases edge kinds + cluster granularity. Moved here from Data > Logic so the

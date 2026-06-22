@@ -148,25 +148,6 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		) {
 			merged.nodeSizeMode = "fixed";
 		}
-		if (merged.matrixSort !== "original" && merged.matrixSort !== "cooccurrence")
-			merged.matrixSort = "cooccurrence";
-		if (typeof merged.matrixMinColumnSize !== "number")
-			merged.matrixMinColumnSize = 1;
-		if (typeof merged.matrixGroupBySignature !== "boolean")
-			merged.matrixGroupBySignature = true;
-		if (typeof merged.matrixCollapseGroups !== "boolean")
-			merged.matrixCollapseGroups = false;
-		if (typeof merged.matrixBlockPriority !== "boolean")
-			merged.matrixBlockPriority = true;
-		// Matrix order is now a standard ORDER_BY: criterion (co-occurrence /
-		// block-priority ⇒ matrixBlockPriority) + direction (matrixSortDir).
-		// matrixSort folds to "cooccurrence" (the brief "original" is dropped);
-		// matrixSortDir defaults to "desc" so an existing block-priority view
-		// keeps "biggest blocks first". Group / Collapse stay as independent
-		// display toggles (any combo valid now).
-		if (merged.matrixSort !== "cooccurrence") merged.matrixSort = "cooccurrence";
-		if (merged.matrixSortDir !== "asc" && merged.matrixSortDir !== "desc")
-			merged.matrixSortDir = "desc";
 		if (
 			typeof merged.heatmapMinTagSize !== "number" ||
 			!Number.isFinite(merged.heatmapMinTagSize) ||
@@ -181,21 +162,6 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		if (merged.heatmapSortDir !== "asc" && merged.heatmapSortDir !== "desc")
 			merged.heatmapSortDir = "desc";
 		if (typeof merged.heatmapJaccard !== "boolean") merged.heatmapJaccard = true;
-		if (
-			typeof merged.bipartiteMaxTags !== "number" ||
-			!Number.isFinite(merged.bipartiteMaxTags) ||
-			merged.bipartiteMaxTags < 1
-		) {
-			merged.bipartiteMaxTags = 80;
-		} else {
-			merged.bipartiteMaxTags = Math.max(1, Math.floor(merged.bipartiteMaxTags));
-		}
-		if (
-			merged.bipartiteLayout !== "force" &&
-			merged.bipartiteLayout !== "concentric" &&
-			merged.bipartiteLayout !== "clustered"
-		)
-			merged.bipartiteLayout = "force";
 		// The region/containment views (Nested set / Containment / Euler diagram)
 		// are Experimental (beta) and break on this data shape, so a beta mode
 		// must never be the effective DEFAULT. The legacy default was "euler"
@@ -210,6 +176,14 @@ export default class GraphIslandMiniPlugin extends Plugin {
 		// Experimental list still keeps it (this only fires on the literal
 		// id "euler" which is its OLD default-state value).
 		if (merged.viewMode === "euler") merged.viewMode = "heatmap";
+		// Sequence Stream / Connection matrix / Containment map / Tag graph /
+		// Euler diagram were removed entirely (no longer selectable, no longer
+		// a valid ViewMode). Any saved config still pointing at one of these
+		// falls back to the stable default instead of landing on a dead mode.
+		const REMOVED_VIEW_MODES = ["stream", "matrix", "euler-true", "bipartite", "euler-venn"];
+		if (REMOVED_VIEW_MODES.includes(merged.viewMode as string)) merged.viewMode = "heatmap";
+		if (REMOVED_VIEW_MODES.includes(merged.panoramaMode as string)) merged.panoramaMode = "heatmap";
+		if (REMOVED_VIEW_MODES.includes(merged.closeupMode as string)) merged.closeupMode = "droste";
 		// --- lattice (intersection lattice) settings ---
 		const latticeLODs = ["auto", "overview", "density", "individual"];
 		if (!latticeLODs.includes(merged.latticeNodeLOD as string))

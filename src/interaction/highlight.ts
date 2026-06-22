@@ -20,9 +20,7 @@ export function sameTarget(a: HoverTarget, b: HoverTarget): boolean {
 	if (a.kind !== b.kind) return false;
 	if (a.kind === "node" && b.kind === "node") return a.nodeId === b.nodeId;
 	if (a.kind === "cluster" && b.kind === "cluster") return a.group === b.group;
-	if (a.kind === "matrixCol" && b.kind === "matrixCol") return a.col === b.col;
 	if (a.kind === "heatmapCell" && b.kind === "heatmapCell") return a.i === b.i && a.j === b.j;
-	if (a.kind === "streamCell" && b.kind === "streamCell") return a.r === b.r && a.c === b.c;
 	if (a.kind === "aggregationGroup" && b.kind === "aggregationGroup") return a.groupKey === b.groupKey;
 	if (a.kind === "ghostEdge" && b.kind === "ghostEdge") {
 		return a.bridge.a === b.bridge.a && a.bridge.b === b.bridge.b;

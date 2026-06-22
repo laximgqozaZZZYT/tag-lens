@@ -212,7 +212,7 @@ function latticeLegend(input: ModeLegendInput): LegendSpec[] {
 export function buildModeLegend(mode: ViewMode, input: ModeLegendInput): LegendSpec[] {
 	// Heatmap / Lattice have intrinsic scales/structure. Even when encoding
 	// bindings exist globally, these legends must reflect their own view grammar.
-	const isEnclosure = mode === "euler" || mode === "euler-true" || mode === "euler-venn" || mode === "bubblesets";
+	const isEnclosure = mode === "euler" || mode === "bubblesets";
 	// ∪/∩ set-layers are surfaced as a DISPLAY-INDEPENDENT "Union / Intersection
 	// layers" spec, appended after the intrinsic specs (incl. the bound-encoding
 	// early return) so nothing intrinsic changes — strictly additive.
@@ -241,8 +241,6 @@ function buildModeLegendBody(mode: ViewMode, input: ModeLegendInput): LegendSpec
 				{ title: co, kind: "gradient", ramp: { stops: rampStops(heatmapCoRamp), minLabel: "0", maxLabel: fmt(coMax) } },
 			];
 		}
-		case "stream":
-			return [tagKey(input, "Row · Tag"), sizeKey("Circle ∝ notes", input)];
 		case "upset":
 			return [tagKey(input, "Dot · in set"), sizeKey("Bar ∝ set size", input)];
 		case "lattice": {
@@ -250,8 +248,6 @@ function buildModeLegendBody(mode: ViewMode, input: ModeLegendInput): LegendSpec
 			if (input.groups?.length || input.setLayers?.length) out.unshift(groupEnclosures(input));
 			return out;
 		}
-		case "matrix":
-			return [tagKey(input, "Dot · Tag")];
 		case "droste":
 			return [tagKey(input, "Color · Tag"), drosteSetOps(input)];
 		case "bubblesets": {
@@ -261,9 +257,7 @@ function buildModeLegendBody(mode: ViewMode, input: ModeLegendInput): LegendSpec
 			if (input.groups?.length || input.setLayers?.length) out.push(groupEnclosures(input));
 			return out;
 		}
-		case "euler":
-		case "euler-true":
-		case "euler-venn": {
+		case "euler": {
 			const out: LegendSpec[] = [];
 			// Emit the "Groups & overlap" spec when there are single-tag cluster
 			// frames OR addressable ∪/∩ set-layers to fold in. Without the
@@ -276,22 +270,19 @@ function buildModeLegendBody(mode: ViewMode, input: ModeLegendInput): LegendSpec
 			else out.push(tagKey(input, "Color · Tag"));
 			return out;
 		}
-		case "bipartite":
 		default:
 			return [tagKey(input, "Color · Tag")];
 	}
 }
 
-// Anchor that clears each mode's fixed UI bands: matrix/heatmap have left label
-// bands + top headers; stream left+bottom margins; lattice left gutter; droste
-// top/left headers; upset a bottom footer + top-right toolbar. Card modes
-// (euler*, bipartite, bubblesets) have no fixed bands -> bottom-left (clears the
-// top-left meta badges and the top-right toolbar).
+// Anchor that clears each mode's fixed UI bands: heatmap has left label bands
+// + top headers; lattice left gutter; droste top/left headers; upset a bottom
+// footer + top-right toolbar. Card modes (euler, bubblesets) have no fixed
+// bands -> bottom-left (clears the top-left meta badges and the top-right
+// toolbar).
 export function legendAnchor(mode: ViewMode): LegendAnchor {
 	switch (mode) {
-		case "matrix":
 		case "heatmap":
-		case "stream":
 		case "lattice":
 		case "upset":
 			return "bottom-right";

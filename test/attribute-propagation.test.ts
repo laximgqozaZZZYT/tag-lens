@@ -37,21 +37,18 @@ function opts(viewMode: ViewMode): LayoutOptions {
 		clusterLabels: new Map<string, string>(),
 		anchorPlacement: "concentric",
 		viewMode,
-		bipartiteMaxTags: 80,
-		bipartiteLayout: "concentric",
 	} as LayoutOptions;
 }
 
 // Modes whose layout() produces per-note PositionedNodes.
-const CARD_MODES: ViewMode[] = ["euler", "euler-true", "euler-venn", "bubblesets", "bipartite"];
+const CARD_MODES: ViewMode[] = ["euler", "bubblesets"];
 
 for (const mode of CARD_MODES) {
 	const d = makeData();
 	const want = new Map(d.nodes.map((n) => [n.id, n]));
 	const r = layout(d, sizedFrom(d), opts(mode));
 	// Euler-family copies a multi-tag note once PER tag with id "<tag>\t<path>";
-	// stripTabPrefix maps back to the source id. Bipartite SET nodes are NUL-
-	// prefixed (no tab) so they strip to a non-note id and are excluded.
+	// stripTabPrefix maps back to the source id.
 	const notes = r.nodes.filter((p) => want.has(stripTabPrefix(p.id)));
 	ok(notes.length > 0, `[${mode}] lays out at least one note node`);
 	for (const p of notes) {

@@ -32,10 +32,10 @@ import type { LensPreset } from "../src/types";
 
 // mergeBundled never overwrites a user preset with the same name, never duplicates.
 {
-	const mine: LensPreset[] = [{ name: "Icon Gallery", query: { ...BUNDLED_PRESETS[0].query, viewMode: "matrix" } }];
+	const mine: LensPreset[] = [{ name: "Icon Gallery", query: { ...BUNDLED_PRESETS[0].query, viewMode: "lattice" } }];
 	const merged = mergeBundled(mine);
 	const icon = merged.filter((p) => p.name === "Icon Gallery");
 	ok(icon.length === 1, "no duplicate name");
-	ok(icon[0].query.viewMode === "matrix", "user's preset preserved (not overwritten)");
+	ok(icon[0].query.viewMode === "lattice", "user's preset preserved (not overwritten)");
 	ok(merged.length === 1 + (BUNDLED_PRESETS.length - 1), "only the missing bundled presets added");
 }

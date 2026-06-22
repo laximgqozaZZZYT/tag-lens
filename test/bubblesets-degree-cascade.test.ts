@@ -25,7 +25,6 @@ function opts(viewMode: ViewMode): LayoutOptions {
 	return {
 		clusterSpacing: 80, nodeSpacing: 16, cellW: 40, cellH: 24, minFontPx: 8,
 		clusterLabels: new Map<string, string>(), anchorPlacement: "concentric", viewMode,
-		bipartiteMaxTags: 80, bipartiteLayout: "concentric",
 	} as LayoutOptions;
 }
 
@@ -64,8 +63,8 @@ function contains(rect: { x: number; y: number; w: number; h: number }, x: numbe
 // mode must be unaffected by this plan.
 {
 	const d = makeData();
-	const r1 = layout(d, sizedFrom(d), opts("euler-true"));
-	const r2 = layout(d, sizedFrom(d), opts("euler-true"));
+	const r1 = layout(d, sizedFrom(d), opts("bubblesets"));
+	const r2 = layout(d, sizedFrom(d), opts("bubblesets"));
 	const abc1a = r1.nodes.find((n) => n.id === "abc1")!;
 	const abc1b = r2.nodes.find((n) => n.id === "abc1")!;
 	ok(abc1a.x === abc1b.x && abc1a.y === abc1b.y, "[euler-true] placement is deterministic and unaffected by this plan (unchanged exclave-marker behavior)");

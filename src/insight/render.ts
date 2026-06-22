@@ -2,7 +2,6 @@ import { App, setIcon, Modal, Notice } from "obsidian";
 import type { LaidOut } from "../layout/layout";
 import type { MiniSettings } from "../types";
 import { staleClusters } from "../visual/freshness";
-import { streamGeom } from "../draw/draw-stream";
 import { computeCognitiveLoad, computeTagSuggestions, type ComputedCognitiveLoad } from "./compute";
 import { applyGolderClassification, convertToNestedTag } from "./actions";
 
@@ -200,23 +199,6 @@ export function renderInsightAlerts(host: HTMLElement, deps: InsightDeps, comput
 				detail: `These notes have remained 'fleeting' for over 30 days:\n${details}${extra}`,
 				advice: "Consider reviewing these notes to synthesize them into 'permanent' notes or refactor them.",
 				offender: "Note Maturity"
-			});
-		}
-	}
-
-	// Sequence Stream: Dropped threads
-	if (deps.settings.viewMode === "stream" && deps.laid.stream) {
-		const geom = streamGeom(deps.laid.stream, deps.canvasWidth, deps.canvasHeight);
-		if (geom.droppedThreads.length > 0) {
-			const details = geom.droppedThreads.slice(0, 10).map(t => `${t.tag} — last seen at '${deps.laid.stream!.cols[t.c]}', absent for ${t.ageBins} bins`).join("\n");
-			const extra = geom.droppedThreads.length > 10 ? `\n...and ${geom.droppedThreads.length - 10} more.` : "";
-			allCards.push({
-				label: "Dropped threads",
-				severity: "WARNING",
-				summary: `Found ${geom.droppedThreads.length} tags that stopped appearing.`,
-				detail: `These tags appear early in the sequence but have no occurrences in recent bins:\n${details}${extra}`,
-				advice: "Review these to see if a thread was abandoned or a tag is no longer needed.",
-				offender: "Sequence Stream"
 			});
 		}
 	}

@@ -24,7 +24,7 @@ import {
 import type { MiniSettings, GraphNode, GraphData, ViewMode, LensPreset } from "./types";
 import { CARD_CELL_W, CARD_CELL_H, NONE_BUCKET } from "./types";
 
-import { clusterHue, createStripePattern, createStripeGradient, resolveNodeStripe, membershipStripeHues } from "./draw/canvas-utils";
+import { clusterHue, createStripePattern, createStripeGradient, membershipStripeHues } from "./draw/canvas-utils";
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
 import { runAggregateSnap } from "./layout/aggregate-snap";
@@ -60,13 +60,9 @@ import {
 	upsetFooterHeight,
 	LEFT_BAND_PX as UPSET_LEFT_BAND_PX,
 } from "./draw/draw-upset";
-import { drawMatrix, matrixGeom, MATRIX_BADGE_W } from "./draw/draw-matrix";
-import type { MatrixLine } from "./draw/draw-matrix";
 import { drawHeatmap, heatmapGeom } from "./draw/draw-heatmap";
 import { clampSpreadsheetPan } from "./interaction/spreadsheet-pan";
 import { drawDroste } from "./draw/draw-droste";
-import { layoutStream } from "./layout/stream-layout";
-import { drawStream, streamGeom } from "./draw/draw-stream";
 import {
 	drawLattice,
 	latticeCellAt,
@@ -125,7 +121,7 @@ import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth } from "./interaction/
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
-import { hitMatrixLine, hitMatrixCol, hitHeatmapCell } from "./interaction/hit-modes";
+import { hitHeatmapCell } from "./interaction/hit-modes";
 
 export const VIEW_TYPE_MINI = "tag-lens-view";
 
@@ -395,11 +391,6 @@ export class MiniGraphView extends ItemView {
 	// currently selected by the user (highlighted in the matrix; drives
 	// the detail panel listing in Phase C). null = nothing selected.
 	private upsetSelectedSignatureKey: string | null = null;
-	// Connection-matrix mode: key of the highlighted column (tag). null = none.
-	private matrixSelectedCol: string | null = null;
-	// Bipartite mode: id of the SET node whose neighbours are PINNED-
-	// highlighted by a click (persists across hover). null = none.
-	private pinnedSet: string | null = null;
 	// Lattice mode: selected / hovered node key (signature key) for highlight
 	// and the floating note-list overlay. Cleared when the selected key no
 	// longer exists after a relayout (clearStaleSelection).
@@ -417,13 +408,6 @@ export class MiniGraphView extends ItemView {
 	private heatmapSelected: { i: number; j: number } | null = null;
 	private heatmapHoverRow = -1;
 	private heatmapHoverCol = -1;
-	// Block indices currently EXPANDED while collapse mode is on.
-	private matrixExpanded = new Set<number>();
-	// Cached display lines (rows + collapsed summaries) — virtualization unit.
-	private matrixLines: MatrixLine[] = [];
-	// Hover crosshair: display line + column under the cursor (-1 = none).
-	private matrixHoverLine = -1;
-	private matrixHoverCol = -1;
 	// Last view mode we framed (fitToView) for — re-fit when the mode changes.
 	private lastFramedMode: ViewMode | null = null;
 	// Per-cluster "truly-aggregated" member count. Populated during
@@ -775,7 +759,6 @@ export class MiniGraphView extends ItemView {
 						rebuild: () => void this.rebuild(),
 						requestDraw: () => this.requestDraw(),
 						refreshSettingsTab: () => this.refreshSettingsTab(),
-						scheduleRebuild: () => this.scheduleRebuild(),
 						clearCardCache: () => this.cardCache.clear(),
 						resolveFromCluster: (groupKey) => this.resolveLayerDisplay(groupKey),
 					});
@@ -1053,11 +1036,6 @@ export class MiniGraphView extends ItemView {
 		"showEdges",
 		"showGrid",
 		"showBody",
-		// Matrix grouping / collapsing only reshape the row-line PROJECTION
-		// (rebuildMatrixDisplay) + draw flags — the seriation / blocks are
-		// already computed, so these repaint without a relayout.
-		"matrixGroupBySignature",
-		"matrixCollapseGroups",
 		// Heatmap colour scale (Jaccard vs raw) only changes cell shading.
 		"heatmapJaccard",
 		// Lattice subset links only affect the back-layer of drawLattice —
@@ -1084,10 +1062,7 @@ export class MiniGraphView extends ItemView {
 			this.cardCache.clear();
 			void this.rebuild();
 		} else {
-			// Display-only toggle → keep the existing layout. Matrix group /
-			// collapse reshape the row-line projection, so refresh it before
-			// repainting (no-op when there's no matrix).
-			this.rebuildMatrixDisplay();
+			// Display-only toggle → keep the existing layout, just repaint.
 			this.requestDraw();
 			this.refreshJsonTab();
 		}
@@ -1275,12 +1250,6 @@ export class MiniGraphView extends ItemView {
 		// an optional encoding-driven scale that preserves the m : n aspect.
 		const sized = layoutData.nodes.map((n) => this.cardFor(n));
 		const wasEmpty = this.laid.clusters.length === 0;
-		// Seed the bipartite force layout from the previous frame's positions
-		// (only when the outgoing layout WAS bipartite) so a tag-count change
-		// nudges nodes instead of teleporting them.
-		const bipartitePrev = this.laid?.setNodeIds
-			? new Map(this.laid.nodes.map((n) => [n.id, { x: n.x, y: n.y }]))
-			: undefined;
 
 		this.currentBridges = [];
 		if (this.settings.showGhostEdges) {
@@ -1317,12 +1286,6 @@ export class MiniGraphView extends ItemView {
 			viewMode: this.settings.viewMode,
 			upsetColumnSort: this.settings.upsetColumnSort,
 			upsetMinColumnSize: this.settings.upsetMinColumnSize,
-			matrixSort: this.settings.matrixSort,
-			matrixMinColumnSize: this.settings.matrixMinColumnSize,
-			matrixBlockPriority: this.settings.matrixBlockPriority,
-			matrixSortDir: this.settings.matrixSortDir,
-			bipartiteMaxTags: this.settings.bipartiteMaxTags,
-			bipartiteLayout: this.settings.bipartiteLayout,
 			latticeNodeLOD: "auto",
 			latticeIndividualMax: this.settings.latticeIndividualMax,
 			latticeDensityMax: this.settings.latticeDensityMax,
@@ -1347,7 +1310,6 @@ export class MiniGraphView extends ItemView {
 			// canvas's 2D context gives pixel-accurate widths in the same
 			// font family the renderer will eventually use.
 			latticeMeasureText: this.measureLatticeText,
-			bipartitePrev,
 			heatmapCriterion: this.settings.heatmapCriterion,
 			heatmapSortDir: this.settings.heatmapSortDir,
 			ghostBridges: this.settings.showGhostEdges ? this.currentBridges : undefined,
@@ -1371,20 +1333,6 @@ export class MiniGraphView extends ItemView {
 			);
 		}
 
-		if (this.settings.viewMode === "stream") {
-			this.laid.stream = layoutStream(data, {
-				axisField: this.settings.streamAxisField,
-				binning: this.settings.streamBinning,
-				rowSort: this.settings.streamRowSort,
-				deps: {
-					app: this.app,
-					degreeMap: this.degreeMap,
-					membershipsOf: (id) => this.laid.nodes.find((n) => n.id === id)?.memberships,
-				}
-			});
-		} else {
-			this.laid.stream = undefined;
-		}
 		// Stage 5: id → incident-edge-index adjacency for hover lookups.
 		this.adjacency = buildAdjacency(this.laid.edges);
 
@@ -1395,49 +1343,32 @@ export class MiniGraphView extends ItemView {
 
 
 
-		// Aggregate-snap + inheritance operate on the Euler cluster/edge model
-		// (note→note vault links, per-cluster aggregation). Bipartite has its
-		// own node/edge model (note↔tag) and no enclosures, so running them
-		// would stitch foreign note→note edges and stray clusters into the
-		// graph. Skip the whole pipeline there.
-		if (this.laid.setNodeIds) {
-			this.trulyAggSet = new Set();
-			this.aggregateCount = new Map();
-		} else {
-			// Aggregate-snap: badge cell selection + edge stitching back into
-			// the aggregate stack. trulyAgg + hidden were already excluded
-			// from the layout pass, so the layout above ran on visible nodes
-			// only and the surrounding cards have already taken their space.
-			// Here we just drop the badges in free cells and add the
-			// previously-omitted edges back as routes through the badges.
-			const aggResult = runAggregateSnap(this.laid, {
-				aggregatedLayers: this.settings.aggregatedLayers,
-				hiddenNodes: this.settings.hiddenNodes,
-				inheritFrom: this.settings.inheritFrom ?? {},
-				trulyAgg: preTrulyAgg,
-				allNodes: data.nodes,
-				allEdges: data.edges,
-				clusterLabels: this.clusterLabels,
-			});
-			this.trulyAggSet = aggResult.trulyAgg;
-			this.aggregateCount = aggResult.aggregateCount;
+		// Aggregate-snap: badge cell selection + edge stitching back into
+		// the aggregate stack. trulyAgg + hidden were already excluded
+		// from the layout pass, so the layout above ran on visible nodes
+		// only and the surrounding cards have already taken their space.
+		// Here we just drop the badges in free cells and add the
+		// previously-omitted edges back as routes through the badges.
+		const aggResult = runAggregateSnap(this.laid, {
+			aggregatedLayers: this.settings.aggregatedLayers,
+			hiddenNodes: this.settings.hiddenNodes,
+			inheritFrom: this.settings.inheritFrom ?? {},
+			trulyAgg: preTrulyAgg,
+			allNodes: data.nodes,
+			allEdges: data.edges,
+			clusterLabels: this.clusterLabels,
+		});
+		this.trulyAggSet = aggResult.trulyAgg;
+		this.aggregateCount = aggResult.aggregateCount;
 
-			expandClustersByInheritance(
-				this.laid.clusters,
-				this.settings.inheritFrom ?? {},
-			);
-		}
+		expandClustersByInheritance(
+			this.laid.clusters,
+			this.settings.inheritFrom ?? {},
+		);
 		this.highlightedNodes.clear();
 		this.highlightedEdgeIdx.clear();
-		// Drop a selected column if the relayout removed it (matrix + UpSet).
+		// Drop a selected column if the relayout removed it (UpSet).
 		this.clearStaleSelection();
-		// Rebuild the matrix display projection (blocks re-collapse on relayout).
-		this.matrixExpanded.clear();
-		this.matrixHoverLine = -1;
-		this.matrixHoverCol = -1;
-		// Drop a pinned set selection whose node may no longer exist (bipartite).
-		this.pinnedSet = null;
-		this.rebuildMatrixDisplay();
 		// Baseline the layout signature so subsequent display-only toggles
 		// (which leave this unchanged) repaint without relaying out.
 		this.lastLayoutSig = this.layoutSignature(this.settings);
@@ -1471,9 +1402,6 @@ export class MiniGraphView extends ItemView {
 
 		const isCardMode =
 			this.settings.viewMode === "euler" ||
-			this.settings.viewMode === "euler-true" ||
-			this.settings.viewMode === "euler-venn" ||
-			this.settings.viewMode === "bipartite" ||
 			this.settings.viewMode === "bubblesets";
 
 		if (!isCardMode) {
@@ -1990,14 +1918,10 @@ export class MiniGraphView extends ItemView {
 	private overviewActive = false;
 
 	private isOverview(): boolean {
-		// Bipartite has no enclosures (its set nodes ARE the labels), so the
-		// big centred auxiliary labels don't apply — same exclusion as UpSet.
 		if (
 			this.laid.upset ||
-			this.laid.matrix ||
 			this.laid.heatmap ||
-			this.laid.lattice ||
-			this.laid.setNodeIds
+			this.laid.lattice
 		)
 			return false;
 		if (this.laid.clusters.length === 0 && this.laid.nodes.length === 0)
@@ -2070,19 +1994,6 @@ export class MiniGraphView extends ItemView {
 			// Provide an initial value of 0; clamp will center or pin
 			// as appropriate.
 			this.panX = 0;
-			this.requestDraw();
-			return;
-		}
-		if (this.laid.matrix) {
-			// Fit ALL columns across the data-area width; rows scroll
-			// vertically. Pin the grid origin just past the frozen bands.
-			const m = this.laid.matrix;
-			const g = matrixGeom(m, 1, this.canvas.clientWidth);
-			const colsW = m.cols.length * m.colW;
-			const avail = Math.max(1, this.canvas.clientWidth - g.labelBand);
-			this.zoom = Math.min(1.2, Math.max(0.2, avail / Math.max(1, colsW)));
-			this.panX = g.labelBand;
-			this.panY = matrixGeom(m, this.zoom, this.canvas.clientWidth).headerH;
 			this.requestDraw();
 			return;
 		}
@@ -2188,28 +2099,17 @@ export class MiniGraphView extends ItemView {
 	// left edge of column A) at screen x = headerW. That gives the upper-
 	// bound constraint panX ≤ headerW − minCol*W*zoom. Same logic for Y.
 	private clampPan(): void {
-		// Connection matrix / heatmap: these screen-space frozen-pane grids are
-		// drawn AND hit-tested across the FULL canvas width (drawMatrix/drawHeatmap
-		// use canvas.width/dpr; matrixColAt/heatmapCellAt use canvas.clientWidth) —
-		// the pinned note menu is an overlay, it does not narrow the canvas. So the
-		// clamp must compute geometry with the same full clientWidth, NOT
-		// clientWidth-panelW; otherwise the panel-narrowed width yields a smaller
-		// labelBand and clamps panX to the left of the drawn label band, hiding the
-		// first column(s) and shifting every click off by ≥1 cell (clicking the
-		// apparent "battle" diagonal lands on a different tag's cell).
+		// Heatmap: this screen-space frozen-pane grid is drawn AND hit-tested
+		// across the FULL canvas width (drawHeatmap uses canvas.width/dpr;
+		// heatmapCellAt uses canvas.clientWidth) — the pinned note menu is an
+		// overlay, it does not narrow the canvas. So the clamp must compute
+		// geometry with the same full clientWidth, NOT clientWidth-panelW;
+		// otherwise the panel-narrowed width yields a smaller labelBand and
+		// clamps panX to the left of the drawn label band, hiding the first
+		// column(s) and shifting every click off by ≥1 cell.
 		const fullW = Math.max(1, this.canvas.clientWidth);
 		const fullH = this.canvas.clientHeight;
 
-		if (this.laid.matrix) {
-			const m = this.laid.matrix;
-			const g = matrixGeom(m, this.zoom, fullW);
-			const colsW = m.cols.length * g.colScreenW;
-			const rowsH = this.matrixLines.length * g.rowScreenH; // floored pitch
-			const c = clampSpreadsheetPan(this.panX, this.panY, g.labelBand, g.headerH, colsW, rowsH, fullW, fullH);
-			this.panX = c.panX;
-			this.panY = c.panY;
-			return;
-		}
 		if (this.laid.heatmap) {
 			// Spreadsheet scroll over the square grid.
 			const h = this.laid.heatmap;
@@ -2254,7 +2154,7 @@ export class MiniGraphView extends ItemView {
 		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 		const baseAlpha = 0.05;
 
-		const isEuler = mode === "euler" || mode === "euler-true" || mode === "euler-venn" || mode === "bubblesets";
+		const isEuler = mode === "euler" || mode === "bubblesets";
 
 		// 1. showGrid: draw a subtle background grid.
 		// Exclude euler since it natively draws a strong grid. Droste draws its own
@@ -2277,8 +2177,8 @@ export class MiniGraphView extends ItemView {
 		}
 
 		// 3. showEdges: decorative faint connecting lines from corners
-		// Exclude euler/bipartite since they draw native edges.
-		if (this.settings.showEdges && !isEuler && mode !== "bipartite") {
+		// Exclude euler since it draws native edges.
+		if (this.settings.showEdges && !isEuler) {
 			ctx.strokeStyle = `rgba(0, 128, 255, ${baseAlpha})`;
 			ctx.lineWidth = 2;
 			ctx.beginPath();
@@ -2288,8 +2188,8 @@ export class MiniGraphView extends ItemView {
 		}
 
 		// 4. showNodes: small badge in top right
-		// Exclude euler/bipartite/upset/bubblesets since they natively draw nodes.
-		if (this.settings.showNodes && !isEuler && mode !== "bipartite" && mode !== "upset") {
+		// Exclude euler/upset/bubblesets since they natively draw nodes.
+		if (this.settings.showNodes && !isEuler && mode !== "upset") {
 			ctx.fillStyle = `rgba(100, 100, 100, ${baseAlpha * 10})`;
 			const tw = ctx.measureText(`${this.laid.nodes?.length ?? 0} nodes`).width;
 			ctx.fillRect(cw / dpr - tw - 20, 10, tw + 10, 20);
@@ -2313,16 +2213,10 @@ export class MiniGraphView extends ItemView {
 
 		if (this.settings.showMaturity) drawBadge("Maturity: ON", "rgba(0, 150, 0, 0.8)");
 		// Node size fallback badge for modes that don't scale cards natively
-		if (!isEuler && mode !== "bipartite" && mode !== "upset") {
+		if (!isEuler && mode !== "upset") {
 			if (this.settings.nodeRows !== 1 || this.settings.nodeCols !== 1) {
 				drawBadge(`Size: ${this.settings.nodeRows}x${this.settings.nodeCols}`, "rgba(50, 150, 200, 0.8)");
 			}
-		}
-
-		if (mode === "stream") {
-			if (this.settings.streamAxisField !== "none") drawBadge(`Axis: ${this.settings.streamAxisField}`, "rgba(100, 100, 0, 0.8)");
-			if (this.settings.streamBinning !== "value") drawBadge(`Bin: ${this.settings.streamBinning}`, "rgba(0, 100, 100, 0.8)");
-			if (this.settings.streamRowSort !== "size") drawBadge(`Sort: ${this.settings.streamRowSort}`, "rgba(100, 0, 0, 0.8)");
 		}
 
 		if (mode === "heatmap" && this.settings.heatmapJaccard) {
@@ -2408,24 +2302,6 @@ export class MiniGraphView extends ItemView {
 		// lives in screen space, not as world-positioned cards), so the
 		// hint should only fire when there's truly nothing to show —
 		// here: no UpSet columns either.
-		// Connection matrix: screen-space frozen-pane grid; no world cards.
-		if (this.laid.matrix && this.laid.matrix.rows.length > 0) {
-			drawMatrix(ctx, this.laid.matrix, {
-				zoom: this.zoom,
-				panX: this.panX,
-				panY: this.panY,
-				canvas: this.canvas,
-				dpr,
-				selectedCol: this.matrixSelectedCol,
-				minFontPx: this.settings.minFontPx,
-				lines: this.matrixLines,
-				group: this.settings.matrixGroupBySignature,
-				hoverLine: this.matrixHoverLine,
-				hoverCol: this.matrixHoverCol,
-			});
-			this.drawGlobalDisplayFallbacks(ctx, dpr, "matrix");
-			return;
-		}
 		// Intersection lattice: world-space tier grid + subset links. drawLattice
 		// applies its own dpr/zoom/pan transform; we draw and return.
 		if (this.laid.lattice && this.laid.lattice.nodes.length > 0) {
@@ -2503,36 +2379,12 @@ export class MiniGraphView extends ItemView {
 			this.drawGlobalDisplayFallbacks(ctx, dpr, "heatmap");
 			return;
 		}
-		
-		if (this.settings.viewMode === "stream" && this.laid.stream) {
-			const geom = streamGeom(this.laid.stream, this.canvas.clientWidth, this.canvas.clientHeight);
-			drawStream(ctx, this.laid, this.laid.stream, geom, this.settings.minFontPx, theme().isDark ? "dark" : "light");
-			
-			// Highlight hovered stream cell if any
-			if (this.hoveredNodeId?.startsWith("stream-cell:")) {
-				const parts = this.hoveredNodeId.split(":");
-				const r = parseInt(parts[2], 10);
-				const c = parseInt(parts[3], 10);
-				const cx = geom.x0 + c * geom.colWidth + geom.colWidth / 2;
-				const cy = geom.y0 + r * geom.rowHeight + geom.rowHeight / 2;
-				
-				ctx.strokeStyle = "#ffffff";
-				ctx.lineWidth = 2;
-				ctx.beginPath();
-				ctx.arc(cx, cy, geom.cellSize / 2 + 2, 0, Math.PI * 2);
-				ctx.stroke();
-			}
-			this.drawGlobalDisplayFallbacks(ctx, dpr, "stream");
-			return;
-		}
 		const upsetHasColumns = (this.laid.upset?.columns.length ?? 0) > 0;
-		const matrixHasRows = (this.laid.matrix?.rows.length ?? 0) > 0;
 		const heatmapHasCells = (this.laid.heatmap?.n ?? 0) > 0;
 		const latticeHasNodes = (this.laid.lattice?.nodes.length ?? 0) > 0;
 		if (
 			this.laid.nodes.length === 0 &&
 			!upsetHasColumns &&
-			!matrixHasRows &&
 			!heatmapHasCells &&
 			!latticeHasNodes
 		) {
@@ -2552,9 +2404,8 @@ export class MiniGraphView extends ItemView {
 
 		// Excel-style row/column underlay. Drawn first so enclosures, edges,
 		// trunks, and cards all sit on top. Cells follow card geometry and
-		// ignore the cluster bounding boxes by design. Bipartite is a free-form
-		// force graph (no lattice), so the grid/graticule is meaningless there.
-		if (this.settings.showGrid && !this.laid.setNodeIds && !this.laid.upset) {
+		// ignore the cluster bounding boxes by design.
+		if (this.settings.showGrid && !this.laid.upset) {
 			this.drawCardGrid(ctx);
 		}
 
@@ -2615,7 +2466,7 @@ export class MiniGraphView extends ItemView {
 			this.drawClusterLabels(ctx);
 		}
 
-		if (this.settings.showGrid && !this.laid.setNodeIds && !this.laid.upset) {
+		if (this.settings.showGrid && !this.laid.upset) {
 			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 			this.drawGridHeaders(ctx);
 		}
@@ -2871,15 +2722,6 @@ export class MiniGraphView extends ItemView {
 		const scale = this.getCardScale(baseId);
 
 
-		// Bipartite SET (tag) nodes render coloured by their tag hue so they
-		// read as set cores; NOTE nodes use the default dark card.
-		const isSet = this.laid.setNodeIds?.has(n.id) ?? false;
-		// Clustered bipartite: nodes are markers until zoomed in enough to read
-		// the title (≥ 46 screen px wide); below that, no title / no "…".
-		const clustered =
-			this.settings.viewMode === "bipartite" &&
-			this.settings.bipartiteLayout === "clustered";
-
 		// BubbleSets: clean figure — suppress Shape and Tag (title) rendering.
 		const isBubbles = this.settings.viewMode === "bubblesets";
 
@@ -2890,36 +2732,8 @@ export class MiniGraphView extends ItemView {
 			highlighted,
 			zoom: this.zoom,
 			minFontPx: this.settings.minFontPx,
-			fillHue: isSet ? clusterHue(n.memberships[0] ?? n.id) : undefined,
-			// A SET node that spans MULTIPLE clusters is a tag-core standing for
-			// the WHOLE of those sets → it depicts a UNION → horizontal stripes
-			// (isVertical=false). The per-node INTERSECTION (overlap) case is the
-			// concept-lattice node whose `signature` lists ≥2 tags — that path is
-			// drawn in draw-lattice.ts with vertical stripes. Single-membership
-			// set nodes collapse to a solid fill inside createStripePattern.
-			fillPattern: (isSet && n.memberships.length > 1)
-				? (() => {
-						const s = resolveNodeStripe(n.memberships, /*isUnionCore=*/ true);
-						// One-cycle gradient across the card bbox (not a 16px repeat) so
-						// the union bands read once across the whole node, matching
-						// enclosures and lattice nodes.
-						return createStripeGradient(
-							ctx,
-							n.x - n.width / 2,
-							n.y - n.height / 2,
-							n.width,
-							n.height,
-							s.hues,
-							s.isVertical,
-						);
-					})()
-				: undefined,
 			// Clustered notes carry their island's main-tag in hueKey → muted tint.
-			tintHue: !isSet && n.hueKey ? clusterHue(n.hueKey) : undefined,
-			// Clustered LOD: the tag-centre label has a LOWER threshold than note
-			// titles, so when zooming out the note names drop to markers first and
-			// the island's tag label is the last to disappear.
-			titleLodPx: (clustered ? (isSet ? 26 : 48) : undefined),
+			tintHue: n.hueKey ? clusterHue(n.hueKey) : undefined,
 			fmMaturity: n.fmMaturity,
 			showMaturity: this.settings.showMaturity,
 			encFillColor: this.encParams.get(n.id)?.fillColor,
@@ -2927,10 +2741,10 @@ export class MiniGraphView extends ItemView {
 			// as the VERTICAL stripe of its tag colours — NOT the single colour of
 			// its first tag (the old field-source[0] behaviour) and NOT the solid
 			// encFillColor (which the legend says is striped for ∩). Mirrors the
-			// lattice intersection-node rule. Applies to ALL note cards (no `isSet`
-			// gate) so BubbleSets/Euler/UpSet individual cards stripe too. Guarded
-			// by `colorIsTagBased` so a non-tag colour encoding keeps its solid fill.
-			multiTagStripe: this.multiTagStripeFor(ctx, n, isSet),
+			// lattice intersection-node rule. Applies to ALL note cards so
+			// BubbleSets/Euler/UpSet individual cards stripe too. Guarded by
+			// `colorIsTagBased` so a non-tag colour encoding keeps its solid fill.
+			multiTagStripe: this.multiTagStripeFor(ctx, n),
 			encOpacity: this.encParams.get(n.id)?.opacity,
 			encBorderColor: this.encParams.get(n.id)?.borderColor,
 			encShape: isBubbles ? undefined : this.encParams.get(n.id)?.shape,
@@ -2948,9 +2762,8 @@ export class MiniGraphView extends ItemView {
 	private multiTagStripeFor(
 		ctx: CanvasRenderingContext2D,
 		n: PositionedNode,
-		isSet: boolean,
 	): CanvasGradient | string | undefined {
-		if (isSet || !this.colorIsTagBased) return undefined;
+		if (!this.colorIsTagBased) return undefined;
 		const hues = membershipStripeHues(n.memberships);
 		if (hues.length <= 1) return undefined; // single-tag / untagged → solid
 		return createStripeGradient(
@@ -2977,10 +2790,9 @@ export class MiniGraphView extends ItemView {
 		// per-mode intrinsic legends intact and merely ADDING the layer info.
 		const isCloseup = this.settings.perspective === "closeup";
 		// Per-tag VISIBLE COUNT that is correct in every view mode. Euler-family
-		// stores it on `cluster.memberCount`, but node-grid modes
-		// (matrix/upset/stream/bipartite) and droste leave `laid.clusters` empty,
-		// so the count must be derived from each mode's own structure:
-		//   • matrix     → `laid.matrix.cols[].size` (notes carrying that tag)
+		// stores it on `cluster.memberCount`, but node-grid modes (upset) and
+		// droste leave `laid.clusters` empty, so the count must be derived from
+		// each mode's own structure:
 		//   • droste     → distinct gallery nodes whose tag-keys include the tag
 		//   • clusters   → `cluster.memberCount` (already post-hide/aggregate)
 		//   • node modes → `laid.nodes` whose memberships include the tag
@@ -2988,8 +2800,6 @@ export class MiniGraphView extends ItemView {
 		const tagVisibleCount = (tag: string): number => {
 			const cluster = this.laid.clusters?.find((c) => c.groupKey === tag);
 			if (cluster) return cluster.memberCount ?? 0;
-			const mcol = this.laid.matrix?.cols?.find((c) => c.key === tag);
-			if (mcol) return mcol.size ?? 0;
 			const gallery = this.laid.drosteGallery;
 			if (gallery?.cells.length) {
 				const ids = new Set<string>();
@@ -3059,15 +2869,6 @@ export class MiniGraphView extends ItemView {
 			if (!k || seen.has(k)) continue;
 			seen.add(k);
 			tags.push({ key: k, color: t.swatch(clusterHue(k), "fill"), label: cleanLabel(k) + layerSuffix(k) });
-		}
-		// MATRIX stores its rows in `laid.matrix` and leaves `laid.nodes` empty, so
-		// derive the per-tag legend entries from the matrix COLUMNS (one per tag).
-		if (this.settings.viewMode === "matrix" && this.laid.matrix?.cols?.length && !tags.length) {
-			for (const col of this.laid.matrix.cols) {
-				if (seen.has(col.key)) continue;
-				seen.add(col.key);
-				tags.push({ key: col.key, color: t.swatch(clusterHue(col.key), "fill"), label: cleanLabel(col.key) + layerSuffix(col.key, col.size) });
-			}
 		}
 		if (this.settings.viewMode === "droste" && this.laid.drosteGallery?.cells.length) {
 			const drosteSeen = new Set<string>();
@@ -3173,7 +2974,7 @@ export class MiniGraphView extends ItemView {
 		}
 		let groups: ModeLegendInput["groups"];
 		let setLayers: ModeLegendInput["setLayers"];
-		const enclosureModes = ["euler", "euler-true", "euler-venn", "bubblesets"];
+		const enclosureModes = ["euler", "bubblesets"];
 		// `groups` (the cluster enclosure swatches) stay INTRINSIC to enclosure
 		// modes — leaving the per-mode element policy unchanged.
 		if (enclosureModes.includes(this.settings.viewMode) && this.laid.clusters?.length) {
@@ -3202,7 +3003,6 @@ export class MiniGraphView extends ItemView {
 		// place, so derive the membership multiplicity from whichever source the
 		// current layout populated (mirrors tagVisibleCount):
 		//   • node modes → `laid.nodes[].memberships`
-		//   • matrix     → `laid.matrix.bits` (per-row column bitset)
 		//   • droste     → `laid.drosteGallery.nodeKeys` (cell id → tag keys)
 		// resolveSetLayer applies the single-tag superset cascade (full/partial
 		// inheritance) so single-set settings influence ∪/∩.
@@ -3215,19 +3015,6 @@ export class MiniGraphView extends ItemView {
 					const tags = n.memberships ?? [];
 					nodeTags.push(tags);
 					for (const t of tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
-				}
-			} else if (this.laid.matrix?.bits?.length) {
-				const m = this.laid.matrix;
-				for (const row of m.bits) {
-					const tags: string[] = [];
-					for (let c = 0; c < row.length; c++) {
-						if (row[c]) {
-							const t = m.cols[c].key;
-							tags.push(t);
-							tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
-						}
-					}
-					nodeTags.push(tags);
 				}
 			} else if (this.laid.drosteGallery?.cells.length) {
 				const gallery = this.laid.drosteGallery;
@@ -4352,22 +4139,6 @@ export class MiniGraphView extends ItemView {
 			const r = this.drosteHit[i];
 			if (dx >= r.x0 && dx <= r.x1 && dy >= r.y0 && dy <= r.y1) return r.id;
 		}
-		if (this.settings.viewMode === "stream" && this.laid.stream) {
-			const geom = streamGeom(this.laid.stream, this.canvas.width / window.devicePixelRatio, this.canvas.height / window.devicePixelRatio);
-			if (sx >= geom.x0 && sx <= geom.x0 + geom.w && sy >= geom.y0 && sy <= geom.y0 + geom.h) {
-				const c = Math.floor((sx - geom.x0) / geom.colWidth);
-				const r = Math.floor((sy - geom.y0) / geom.rowHeight);
-				if (c >= 0 && c < this.laid.stream.cols.length && r >= 0 && r < this.laid.stream.rows.length) {
-					// Check if cell actually exists
-					const cell = this.laid.stream.matrix.find(m => m.r === r && m.c === c);
-					if (cell) {
-						return `stream-cell:${r}:${c}`;
-					}
-				}
-			}
-			return null;
-		}
-
 		return null;
 	}
 
@@ -4387,14 +4158,6 @@ export class MiniGraphView extends ItemView {
 		ids = [...new Set(ids)];
 		this.heatmapSelected = null;
 		this.switchToCloseup(ids);
-	}
-
-	private openStreamDetail(r: number, c: number, _sx: number, _sy: number): void {
-		const s = this.laid.stream;
-		if (!s) return;
-		const cell = s.matrix.find(m => m.r === r && m.c === c);
-		if (!cell || cell.nodeIds.length === 0) return;
-		this.switchToCloseup(cell.nodeIds);
 	}
 
 	// Lattice node click (header / overview / density / Other) → Switch to
@@ -4436,49 +4199,6 @@ export class MiniGraphView extends ItemView {
 		}
 	}
 
-	// Build the visible display lines: rows bundled into signature blocks, and
-	// (in collapse mode) collapsed blocks shown as one "×N" summary line.
-	private rebuildMatrixDisplay(): void {
-		const m = this.laid.matrix;
-		if (!m) {
-			this.matrixLines = [];
-			return;
-		}
-		const group = this.settings.matrixGroupBySignature;
-		const collapse = group && this.settings.matrixCollapseGroups;
-		const lines: MatrixLine[] = [];
-		if (!group) {
-			for (let r = 0; r < m.rows.length; r++)
-				lines.push({ kind: "row", rowIdx: r, blockIdx: 0, head: false });
-			this.matrixLines = lines;
-			return;
-		}
-		for (let bi = 0; bi < m.blocks.length; bi++) {
-			const b = m.blocks[bi];
-			if (collapse && !this.matrixExpanded.has(bi)) {
-				lines.push({ kind: "summary", blockIdx: bi });
-			} else {
-				for (let k = 0; k < b.count; k++)
-					lines.push({ kind: "row", rowIdx: b.start + k, blockIdx: bi, head: k === 0 });
-			}
-		}
-		this.matrixLines = lines;
-	}
-
-	// Display-line index under the cursor (-1 = header / out of range).
-	private matrixLineAt(sy: number): number {
-		const m = this.laid.matrix;
-		if (!m) return -1;
-		return hitMatrixLine(m, this.matrixLines.length, this.zoom, this.panY, this.canvas.clientWidth, sy);
-	}
-
-	// Column index under the cursor (-1 = label band / out of range).
-	private matrixColAt(sx: number): number {
-		const m = this.laid.matrix;
-		if (!m) return -1;
-		return hitMatrixCol(m, this.zoom, this.panX, this.canvas.clientWidth, sx);
-	}
-
 	// Heatmap cell (row i, col j) under the cursor, or null if over a frozen
 	// band / out of range.
 	private heatmapCellAt(sx: number, sy: number): { i: number; j: number } | null {
@@ -4488,13 +4208,8 @@ export class MiniGraphView extends ItemView {
 	}
 
 	// Shared guard: drop a selected column whose set no longer contains it
-	// after a relayout (used for both the matrix and the UpSet selection).
+	// after a relayout (used for the UpSet selection).
 	private clearStaleSelection(): void {
-		if (
-			this.matrixSelectedCol != null &&
-			!this.laid.matrix?.cols.some((c) => c.key === this.matrixSelectedCol)
-		)
-			this.matrixSelectedCol = null;
 		if (
 			this.upsetSelectedSignatureKey != null &&
 			!this.laid.upset?.columns.some(
@@ -4535,34 +4250,6 @@ export class MiniGraphView extends ItemView {
 		const rect = this.canvas.getBoundingClientRect();
 		const sx = e.clientX - rect.left;
 		const sy = e.clientY - rect.top;
-		if (this.laid.matrix) {
-			// Crosshair: highlight the hovered line + column.
-			const li = this.matrixLineAt(sy);
-			const col = this.matrixColAt(sx);
-			if (li !== this.matrixHoverLine || col !== this.matrixHoverCol) {
-				this.matrixHoverLine = li;
-				this.matrixHoverCol = col;
-				this.requestDraw();
-			}
-			// Column header hover → tag name + count tooltip (same lifecycle as
-			// the row tip). Row hover → full file-name tooltip.
-			const g = matrixGeom(this.laid.matrix, this.zoom, this.canvas.clientWidth);
-			const line = li >= 0 ? this.matrixLines[li] : null;
-			let target: HoverTarget = null;
-			if (sy < g.headerH && col >= 0) {
-				target = { kind: "matrixCol", col };
-			} else if (line && line.kind === "row") {
-				target = { kind: "node", nodeId: this.laid.matrix.rows[line.rowIdx].id };
-			}
-			if (!sameTarget(this.hoverTarget, target)) {
-				this.cancelHover();
-				this.hoverTarget = target;
-				if (target) this.scheduleHover(target, sx, sy);
-			} else if (this.tipEl) {
-				this.positionTip(sx, sy, this.tipEl);
-			}
-			return;
-		}
 		if (this.laid.lattice) {
 			// World-space hit-test (lattice has its own per-cell hit test
 			// when zoomed into individual LOD; otherwise the whole node box).
@@ -4609,32 +4296,6 @@ export class MiniGraphView extends ItemView {
 			}
 			return;
 		}
-		if (this.settings.viewMode === "stream" && this.laid.stream) {
-			const geom = streamGeom(this.laid.stream, this.canvas.width / window.devicePixelRatio, this.canvas.height / window.devicePixelRatio);
-			let c = Math.floor((sx - geom.x0) / geom.colWidth);
-			let r = Math.floor((sy - geom.y0) / geom.rowHeight);
-			let target: HoverTarget = null;
-			let id: string | null = null;
-			if (sx >= geom.x0 && sx <= geom.x0 + geom.w && sy >= geom.y0 && sy <= geom.y0 + geom.h) {
-				if (c >= 0 && c < this.laid.stream.cols.length && r >= 0 && r < this.laid.stream.rows.length) {
-					const cell = this.laid.stream.matrix.find(m => m.r === r && m.c === c);
-					if (cell) {
-						target = { kind: "streamCell", r, c };
-						id = `stream-cell:${r}:${c}`;
-					}
-				}
-			}
-			if (!sameTarget(this.hoverTarget, target)) {
-				this.cancelHover();
-				this.hoverTarget = target;
-				this.hoveredNodeId = id;
-				if (target) this.scheduleHover(target, sx, sy);
-				this.requestDraw();
-			} else if (this.tipEl) {
-				this.positionTip(sx, sy, this.tipEl);
-			}
-			return;
-		}
 		if (this.laid.drosteGallery) {
 			// Icon Gallery: highlight the hovered cell AND show the same node hover tip
 			// (file name + folder) other view modes use. Synthetic markers ("__…") and
@@ -4655,18 +4316,6 @@ export class MiniGraphView extends ItemView {
 		const w = this.screenToWorld(sx, sy);
 		const hit = this.hitTest(w.x, w.y);
 		if (!sameTarget(this.hoverTarget, hit)) {
-			// While a set selection is pinned (bipartite), keep its highlight —
-			// only update the tooltip target, don't recompute hover highlight.
-			if (this.pinnedSet) {
-				if (this.tipEl) {
-					this.tipEl.remove();
-					this.tipEl = null;
-				}
-				this.hoverGen++;
-				this.hoverTarget = hit;
-				if (hit) this.scheduleHover(hit, sx, sy);
-				return;
-			}
 			this.cancelHover();
 			this.hoverTarget = hit;
 			this.applyHighlight(hit);
@@ -4712,9 +4361,6 @@ export class MiniGraphView extends ItemView {
 			this.tipEl = null;
 		}
 		this.hoverTarget = null;
-		// A pinned set selection (bipartite) keeps its highlight through hover
-		// cancellation (mouseleave / wheel / drag); only an explicit click clears it.
-		if (this.pinnedSet) return;
 		if (
 			this.highlightedEdgeIdx.size > 0 ||
 			this.highlightedNodes.size > 0 ||
@@ -4735,17 +4381,6 @@ export class MiniGraphView extends ItemView {
 		tip.className = "gim-hover-tip gim-tip-" + target.kind;
 		tip.setAttr("data-kind", target.kind);
 
-		if (target.kind === "matrixCol") {
-			// Connection-matrix column header: tag name + member-note count.
-			const c = this.laid.matrix?.cols[target.col];
-			if (!c) return;
-			tip.createSpan({ cls: "gim-tip-title", text: c.label });
-			tip.createSpan({ cls: "gim-tip-sub", text: `${c.size} notes` });
-			this.root.appendChild(tip);
-			this.tipEl = tip;
-			this.positionTip(sx, sy, tip);
-			return;
-		}
 		if (target.kind === "heatmapCell") {
 			// Heatmap cell: "(tag i × tag j = N shared)" — or tag size on diagonal.
 			const h = this.laid.heatmap;
@@ -4770,19 +4405,6 @@ export class MiniGraphView extends ItemView {
 			this.positionTip(sx, sy, tip);
 			return;
 		}
-		if (target.kind === "streamCell") {
-			const s = this.laid.stream;
-			if (!s || target.r >= s.rows.length || target.c >= s.cols.length) return;
-			const cell = s.matrix.find(m => m.r === target.r && m.c === target.c);
-			if (cell) {
-				tip.createSpan({ cls: "gim-tip-title", text: `${s.rows[target.r]} × ${s.cols[target.c]}` });
-				tip.createSpan({ cls: "gim-tip-sub", text: `${cell.count} notes` });
-				this.root.appendChild(tip);
-				this.tipEl = tip;
-				this.positionTip(sx, sy, tip);
-			}
-			return;
-		}
 		if (target.kind === "ghostEdge") {
 			const b = target.bridge;
 			const tagsStr = b.sharedTags.slice(0, 3).map(t => `#${t}`).join(" ");
@@ -4795,17 +4417,6 @@ export class MiniGraphView extends ItemView {
 			return;
 		}
 		if (target.kind === "node") {
-			// Bipartite SET node: no backing file — show the tag label + size.
-			if (this.laid.setNodeIds?.has(target.nodeId)) {
-				const sn = this.laid.nodes.find((n) => n.id === target.nodeId);
-				if (!sn) return;
-				tip.createSpan({ cls: "gim-tip-title", text: sn.label });
-				tip.createSpan({ cls: "gim-tip-sub", text: "tag" });
-				this.root.appendChild(tip);
-				this.tipEl = tip;
-				this.positionTip(sx, sy, tip);
-				return;
-			}
 			// Euler-nested copies carry a `${tag}\t${origPath}` id — resolve the
 			// ORIGINAL path for the file lookup + body cache.
 			const sepIdx = target.nodeId.indexOf("\t");
@@ -5043,47 +4654,6 @@ export class MiniGraphView extends ItemView {
 				this.draw();
 				return;
 			}
-			if (this.laid.matrix) {
-				const m = this.laid.matrix;
-				const g = matrixGeom(m, this.zoom, this.canvas.clientWidth);
-				if (sy < g.headerH) {
-					// Column header → toggle highlight.
-					const col = this.matrixColAt(sx);
-					if (col >= 0) {
-						this.matrixSelectedCol =
-							this.matrixSelectedCol === m.cols[col].key
-								? null
-								: m.cols[col].key;
-						this.requestDraw();
-					}
-					return;
-				}
-				const li = this.matrixLineAt(sy);
-				if (li < 0) return;
-				const line = this.matrixLines[li];
-				if (line.kind === "summary") {
-					this.matrixExpanded.add(line.blockIdx); // expand
-					this.rebuildMatrixDisplay();
-					this.requestDraw();
-					return;
-				}
-				const collapseMode =
-					this.settings.matrixGroupBySignature &&
-					this.settings.matrixCollapseGroups;
-				if (
-					collapseMode &&
-					line.head &&
-					m.blocks[line.blockIdx].count > 1 &&
-					sx < 8 + MATRIX_BADGE_W
-				) {
-					this.matrixExpanded.delete(line.blockIdx); // re-collapse
-					this.rebuildMatrixDisplay();
-					this.requestDraw();
-					return;
-				}
-				this.openFile(m.rows[line.rowIdx].id);
-				return;
-			}
 			if (this.laid.heatmap) {
 				// Cell → select + open the detail overlay listing the tag pair's
 				// intersection notes (or all notes of the tag on the diagonal).
@@ -5095,17 +4665,6 @@ export class MiniGraphView extends ItemView {
 				} else {
 					this.heatmapSelected = null;
 					this.requestDraw();
-				}
-				return;
-			}
-			if (this.settings.viewMode === "stream" && this.laid.stream) {
-				const geom = streamGeom(this.laid.stream, this.canvas.width / window.devicePixelRatio, this.canvas.height / window.devicePixelRatio);
-				if (sx >= geom.x0 && sx <= geom.x0 + geom.w && sy >= geom.y0 && sy <= geom.y0 + geom.h) {
-					const c = Math.floor((sx - geom.x0) / geom.colWidth);
-					const r = Math.floor((sy - geom.y0) / geom.rowHeight);
-					if (c >= 0 && c < this.laid.stream.cols.length && r >= 0 && r < this.laid.stream.rows.length) {
-						this.openStreamDetail(r, c, sx, sy);
-					}
 				}
 				return;
 			}
@@ -5211,45 +4770,28 @@ export class MiniGraphView extends ItemView {
 			const w = this.screenToWorld(sx, sy);
 			const hit = this.hitTest(w.x, w.y);
 			if (hit?.kind === "node") {
-				// Bipartite: SET node → toggle a pinned highlight of its
-				// neighbour notes; NOTE node → open the file.
-				if (this.laid.setNodeIds?.has(hit.nodeId)) {
-					this.pinnedSet = this.pinnedSet === hit.nodeId ? null : hit.nodeId;
-					this.applyHighlight(
-						this.pinnedSet ? { kind: "node", nodeId: this.pinnedSet } : null,
-					);
-				} else {
-					this.openFile(hit.nodeId);
-				}
+				this.openFile(hit.nodeId);
 			} else if (hit?.kind === "ghostEdge") {
 				// Open one of the notes in a new leaf (the one that is not currently focused)
 				const b = hit.bridge;
 				const currentFile = this.app.workspace.getActiveFile();
 				const targetId = (currentFile && currentFile.path === b.a) ? b.b : b.a;
 				this.openFile(targetId);
-			} else if (this.pinnedSet) {
-				// Click on empty space clears the pinned set selection.
-				this.pinnedSet = null;
-				this.applyHighlight(null);
 			}
 		});
 		c.addEventListener("mousemove", (e) => this.onPointerMove(e));
 		c.addEventListener("mouseleave", () => {
 			this.cancelHover();
-			// Droste mode tracks hover via hoveredNodeId (no matrix/lattice
+			// Droste mode tracks hover via hoveredNodeId (no lattice
 			// crosshair state) — clear it so no band stays lit after exit.
 			const drosteHovered = this.laid.drosteGallery != null && this.hoveredNodeId !== null;
 			if (drosteHovered) this.hoveredNodeId = null;
 			if (
 				drosteHovered ||
-				this.matrixHoverLine !== -1 ||
-				this.matrixHoverCol !== -1 ||
 				this.heatmapHoverRow !== -1 ||
 				this.heatmapHoverCol !== -1 ||
 				this.latticeHoverKey !== null
 			) {
-				this.matrixHoverLine = -1;
-				this.matrixHoverCol = -1;
 				this.heatmapHoverRow = -1;
 				this.heatmapHoverCol = -1;
 				this.latticeHoverKey = null;
@@ -5273,14 +4815,6 @@ export class MiniGraphView extends ItemView {
 					this.requestDraw();
 				}
 				e.stopPropagation();
-				return;
-			}
-
-			// Connection matrix: wheel scrolls the rows vertically (fixed row
-			// height); the existing drag-pan also scrolls. No zoom here.
-			if (this.laid.matrix) {
-				this.panY -= e.deltaY;
-				this.requestDraw();
 				return;
 			}
 

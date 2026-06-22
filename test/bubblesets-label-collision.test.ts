@@ -30,7 +30,6 @@ function opts(viewMode: ViewMode): LayoutOptions {
 	return {
 		clusterSpacing: 80, nodeSpacing: 16, cellW: 40, cellH: 24, minFontPx: 8,
 		clusterLabels: new Map<string, string>(), anchorPlacement: "concentric", viewMode,
-		bipartiteMaxTags: 80, bipartiteLayout: "concentric",
 	} as LayoutOptions;
 }
 
@@ -62,8 +61,8 @@ const d = makeData();
 // euler-true: labelCells are deterministic AND byte-identical across runs (the
 // bubblesets-only de-confliction pass must not touch any other mode).
 {
-	const r1 = layout(d, sizedFrom(d), opts("euler-true"));
-	const r2 = layout(d, sizedFrom(d), opts("euler-true"));
+	const r1 = layout(d, sizedFrom(d), opts("bubblesets"));
+	const r2 = layout(d, sizedFrom(d), opts("bubblesets"));
 	const c1 = (r1.labelCells ?? []) as Cell[];
 	const c2 = (r2.labelCells ?? []) as Cell[];
 	ok(c1.length === c2.length && c1.length > 0, "[euler-true] label cells deterministic count");

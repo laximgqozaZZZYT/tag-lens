@@ -27,7 +27,6 @@ function opts(viewMode: ViewMode): LayoutOptions {
 	return {
 		clusterSpacing: 80, nodeSpacing: 16, cellW: 40, cellH: 24, minFontPx: 8,
 		clusterLabels: new Map<string, string>(), anchorPlacement: "concentric", viewMode,
-		bipartiteMaxTags: 80, bipartiteLayout: "concentric",
 	} as LayoutOptions;
 }
 
@@ -59,8 +58,8 @@ const d = makeData();
 // drive placement (x/y may or may not happen to overlap by packing
 // coincidence, but the two runs must be byte-identical to each other).
 {
-	const r1 = layout(d, sizedFrom(d), opts("euler-true"));
-	const r2 = layout(d, sizedFrom(d), opts("euler-true"));
+	const r1 = layout(d, sizedFrom(d), opts("bubblesets"));
+	const r2 = layout(d, sizedFrom(d), opts("bubblesets"));
 	const x1 = mainRectOf(r1.clusters, "x");
 	const x2 = mainRectOf(r2.clusters, "x");
 	ok(x1.left === x2.left && x1.top === x2.top, "[euler-true] placement is deterministic across runs (unchanged shelfPack behavior)");

@@ -6,7 +6,7 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 // bound encoding wins over intrinsic.
 {
 	const enc = [{ title: "Color · Out-degree", kind: "categorical" as const, entries: [{ label: "1", color: "#111" }] }];
-	const specs = buildModeLegend("bipartite", { ...base, encodingSpecs: enc });
+	const specs = buildModeLegend("upset", { ...base, encodingSpecs: enc });
 	ok(specs === enc, "bound encoding returned verbatim");
 }
 // heatmap -> two gradients incl. co-occurrence; jaccard renames it; many stops.
@@ -35,12 +35,6 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 	ok(specs[1].title === "Co-occurrence", "raw mode title");
 	ok(specs[1].ramp!.minLabel === "0" && specs[1].ramp!.maxLabel === "17", "raw co-occurrence labels use coMax");
 }
-// stream -> tag key + size key.
-{
-	const specs = buildModeLegend("stream", base);
-	ok(specs[0].kind === "categorical" && specs[1].kind === "size", "tag + size");
-}
-
 // lattice uses intrinsic LOD legend (not encoding override).
 {
 	const enc = [{ title: "Color · Out-degree", kind: "categorical" as const, entries: [{ label: "1", color: "#111" }] }];
@@ -147,7 +141,7 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 		tags: [{ key: "greek", color: "#a00", label: "greek — Size 2×3 · 5 nodes · Aggregate (3-card stack)" }],
 		counts: { min: 1, max: 20 },
 	};
-	const specs = buildModeLegend("matrix", withLabel);
+	const specs = buildModeLegend("euler", withLabel);
 	ok(specs[0].entries![0].label === "greek — Size 2×3 · 5 nodes · Aggregate (3-card stack)", "tag label renders verbatim");
 	ok(specs[0].entries![0].color === "#a00", "tag colour still carried with label");
 }
@@ -253,7 +247,7 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 	);
 }
 // ALL VIEW MODES: setLayers render as their own ∪/∩ legend spec even when the
-// mode is NOT an enclosure mode (matrix/stream/upset/droste/lattice/bipartite).
+// mode is NOT an enclosure mode (upset/droste).
 // "表示する要素の方針は変えず": the mode's intrinsic specs stay intact and the
 // set-layers are an ADDED, unified spec — never folded into another legend.
 {
@@ -261,7 +255,7 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 		{ key: "__union__", label: "∪ Union — Size 1×1 · 12 nodes", color: "#0a0" },
 		{ key: "__intersection__", label: "∩ Intersection — Size 2×2 · 3 nodes · Aggregate (3-card stack)", color: "#cc0" },
 	];
-	for (const mode of ["matrix", "stream", "upset", "droste", "bipartite"] as const) {
+	for (const mode of ["upset", "droste"] as const) {
 		const input: ModeLegendInput = {
 			...base,
 			setLayers,
@@ -299,7 +293,7 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 // CLOSEUP applies to the whole enclosure family (euler / euler-true / euler-venn
 // / bubblesets): each gets the ∪/∩ folded into the groups spec.
 {
-	for (const mode of ["euler", "euler-true", "euler-venn", "bubblesets"] as const) {
+	for (const mode of ["euler", "bubblesets"] as const) {
 		const specs = buildModeLegend(mode, {
 			...base,
 			closeup: true,
@@ -342,7 +336,7 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 }
 // And for the whole enclosure family.
 {
-	for (const mode of ["euler", "euler-true", "euler-venn", "bubblesets"] as const) {
+	for (const mode of ["euler", "bubblesets"] as const) {
 		const specs = buildModeLegend(mode, {
 			encodingSpecs: [],
 			tags: [],
@@ -357,7 +351,7 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 
 // No setLayers anywhere -> no Set layers spec leaks into any mode.
 {
-	for (const mode of ["matrix", "stream", "upset", "bipartite"] as const) {
+	for (const mode of ["upset", "droste"] as const) {
 		const specs = buildModeLegend(mode, base);
 		ok(!specs.some((s) => s.title.includes("Union / Intersection layers")), `${mode}: no set-layers spec without input`);
 	}
@@ -365,12 +359,12 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 // tag overflow is no longer truncated.
 {
 	const many = { ...base, tags: Array.from({ length: 12 }, (_, i) => ({ key: "t" + i, color: "#000" })), maxItems: 8 };
-	const specs = buildModeLegend("matrix", many);
+	const specs = buildModeLegend("upset", many);
 	ok(specs[0].entries!.length === 12, "all items shown, maxItems ignored");
 }
 // anchors clear fixed bands.
 {
-	ok(legendAnchor("matrix") === "bottom-right", "matrix avoids left label band");
+	ok(legendAnchor("heatmap") === "bottom-right", "heatmap avoids left label band");
 	ok(legendAnchor("upset") === "bottom-right", "upset avoids footer corner");
 	ok(legendAnchor("euler") === "bottom-left", "euler default");
 }

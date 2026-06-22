@@ -6,11 +6,7 @@ import type { PositionedNode, ClusterRect } from "../layout/layout";
 export type HoverTarget =
 	| { kind: "node"; nodeId: string }
 	| { kind: "cluster"; group: string }
-	// Connection-matrix column header (tag) under the cursor — reuses the same
-	// tooltip lifecycle as node/cluster hover, applied to the column band.
-	| { kind: "matrixCol"; col: number }
 	| { kind: "heatmapCell"; i: number; j: number }
-	| { kind: "streamCell"; r: number; c: number }
 	// Node aggregation group
 	| { kind: "aggregationGroup"; groupKey: string; nodeIds: string[] }
 	// Bridge finder ghost edge under the cursor
