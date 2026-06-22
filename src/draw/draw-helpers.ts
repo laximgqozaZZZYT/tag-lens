@@ -2,6 +2,7 @@ import { theme, colorAlpha } from "./theme";
 import type { LaidOut, ClusterRect } from "../layout/layout";
 import type { AggregationGroup } from "../aggregation/types";
 import { clusterHue, roundedRectPath, truncateToWidth, drawTextWithHalo } from "./canvas-utils";
+import { placeOverviewLabels, type OverviewLabelInput, type MeasuredText } from "./overview-label-placement";
 import {
 	CARD_TITLE_FONT_PX,
 	CARD_BODY_FONT_PX,
@@ -394,86 +395,52 @@ export interface PlacedLabelBox {
 // enclosure, fitted to the enclosure box. Drawn in world space on top of
 // everything when the whole diagram is in view, independent of the
 // Graph-display toggles and SEPARATE from `drawClusterLabels` (the small
-// on-grid title bars). Not used in UpSet mode. Largest clusters paint first
-// so smaller (often nested) names land on top.
+// on-grid title bars). Not used in UpSet mode. Seeded with the small label
+// chips (laid.labelCells) as already-occupied space so the giant text never
+// renders on top of a chip showing the same (or a different) cluster's name.
 export function drawOverviewLabels(
 	ctx: CanvasRenderingContext2D,
 	laid: LaidOut,
 	zoom: number,
 	warningClusters?: Map<string, number>,
 ): void {
-	const cl = [...laid.clusters]
-		.filter(
-			(c) =>
-				!c.ghostSingle && c.memberCount >= 2 && c.width > 0 && c.height > 0,
-		)
-		.sort((a, b) => b.width * b.height - a.width * a.height);
-	// Greedy, largest-first. Each label tries: centred full size, then
-	// progressively smaller, then nudged up / down — taking the first spot
-	// that doesn't collide with an already-placed label. Labels that can't
-	// find a clear spot are skipped (a bigger name already covers that area).
-	const cand: Array<[number, number]> = [
-		[0.5, 1.0],
-		[0.5, 0.72],
-		[0.5, 0.52],
-		[0.3, 0.52],
-		[0.7, 0.52],
-		[0.5, 0.38],
-		[0.3, 0.38],
-		[0.7, 0.38],
-	];
-	const placed: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
-	for (const c of cl) {
-		const text = warningClusters && warningClusters.has(c.groupKey) ? `⚠ ${c.label}` : c.label;
-		if (!text) continue;
-		const cx = c.x + c.width / 2;
-		ctx.font = "800 100px sans-serif";
+	const inputs: OverviewLabelInput[] = laid.clusters
+		.filter((c) => !c.ghostSingle && c.memberCount >= 2 && c.width > 0 && c.height > 0)
+		.map((c) => ({
+			groupKey: c.groupKey,
+			text: warningClusters && warningClusters.has(c.groupKey) ? `⚠ ${c.label}` : c.label,
+			x: c.x,
+			y: c.y,
+			width: c.width,
+			height: c.height,
+		}));
+	const occupied = (laid.labelCells ?? []).map((lc) => ({
+		x1: lc.x - lc.w / 2,
+		y1: lc.y - lc.h / 2,
+		x2: lc.x + lc.w / 2,
+		y2: lc.y + lc.h / 2,
+	}));
+	ctx.font = "800 100px sans-serif";
+	const measureAt100px = (text: string): MeasuredText => {
 		const m = ctx.measureText(text);
-		const w100 = m.width || 1;
-		const h100 =
-			(m.actualBoundingBoxAscent || 74) + (m.actualBoundingBoxDescent || 20);
-		const baseFont = Math.min(
-			(c.width * 0.88 * 100) / w100,
-			(c.height * 0.6 * 100) / h100,
-		);
-		if (!(baseFont > 0)) continue;
-		let chosen: { font: number; cy: number } | null = null;
-		for (const [af, sc] of cand) {
-			const font = baseFont * sc;
-			const tw = (w100 / 100) * font;
-			const th = font;
-			const cy = c.y + c.height * af;
-			const pad = font * 0.12;
-			const box = {
-				x1: cx - tw / 2 - pad,
-				y1: cy - th / 2 - pad,
-				x2: cx + tw / 2 + pad,
-				y2: cy + th / 2 + pad,
-			};
-			let hit = false;
-			for (const p of placed) {
-				if (box.x1 < p.x2 && box.x2 > p.x1 && box.y1 < p.y2 && box.y2 > p.y1) {
-					hit = true;
-					break;
-				}
-			}
-			if (!hit) {
-				chosen = { font, cy };
-				placed.push(box);
-				break;
-			}
-		}
-		if (!chosen) continue; // no clear spot — skip to avoid overlap
-		ctx.font = `800 ${chosen.font}px sans-serif`;
+		return {
+			width: m.width || 1,
+			ascent: m.actualBoundingBoxAscent || 74,
+			descent: m.actualBoundingBoxDescent || 20,
+		};
+	};
+	const placements = placeOverviewLabels(inputs, measureAt100px, occupied);
+	for (const p of placements) {
+		ctx.font = `800 ${p.font}px sans-serif`;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
-		const hue = clusterHue(c.groupKey);
+		const hue = clusterHue(p.groupKey);
 		ctx.lineJoin = "round";
-		ctx.lineWidth = Math.max(chosen.font * 0.08, 2 / zoom);
+		ctx.lineWidth = Math.max(p.font * 0.08, 2 / zoom);
 		ctx.strokeStyle = colorAlpha(theme().canvasBg, 0.9);
-		ctx.strokeText(text, cx, chosen.cy);
+		ctx.strokeText(p.text, p.cx, p.cy);
 		ctx.fillStyle = theme().swatch(hue, "fill", 0.96);
-		ctx.fillText(text, cx, chosen.cy);
+		ctx.fillText(p.text, p.cx, p.cy);
 	}
 	ctx.textAlign = "start";
 	ctx.textBaseline = "alphabetic";

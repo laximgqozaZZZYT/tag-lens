@@ -64,6 +64,7 @@ import "./intersection-region.test";
 import "./bubblesets-degree-cascade.test";
 import "./label-collision.test";
 import "./bubblesets-label-collision.test";
+import "./overview-label-placement.test";
 import "./bubblesets-region-sizing.test";
 
 
