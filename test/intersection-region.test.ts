@@ -76,3 +76,42 @@ function rects(map: Record<string, Rect>) {
 	ok(r!.tags.length === 2, `expected cascade to degree 2 (A∩C is empty so the triple is empty), got degree ${r!.tags.length} (${JSON.stringify(r!.tags)})`);
 	ok(r!.tags[0] === "A" && r!.tags[1] === "B", `expected the larger-area pair {A,B}=2000 to win over {B,C}=1000, got ${JSON.stringify(r!.tags)}`);
 }
+
+// minSize gate: a geometrically non-degenerate but UNDERSIZED region must
+// still cascade down to a smaller-degree region that meets minSize, even
+// though it has positive area. Degree 1 remains the unconditional floor
+// regardless of minSize (guaranteed base case).
+{
+	const mainRectOf = rects({
+		A: { x: 0, y: 0, w: 100, h: 100 },
+		B: { x: 50, y: 0, w: 100, h: 100 }, // A∩B = 50x100 = 5000
+		C: { x: 90, y: 0, w: 100, h: 100 }, // A∩B∩C = 10x100 = 1000 (small)
+	});
+	// Triple region (1000) is non-degenerate but too small; require >=5000.
+	const r = resolveNodeRegion(["A", "B", "C"], mainRectOf, { w: 50, h: 50 });
+	ok(r !== null, "must resolve a region");
+	ok(r!.tags.length === 2, `expected cascade to degree 2 (triple too small for minSize), got degree ${r!.tags.length} (${JSON.stringify(r!.tags)})`);
+}
+
+// minSize satisfied at full degree -> no cascade (same case as above, but
+// with a minSize the triple region DOES meet).
+{
+	const mainRectOf = rects({
+		A: { x: 0, y: 0, w: 100, h: 100 },
+		B: { x: 50, y: 0, w: 100, h: 100 },
+		C: { x: 90, y: 0, w: 100, h: 100 }, // A∩B∩C = 10x100 = 1000
+	});
+	const r = resolveNodeRegion(["A", "B", "C"], mainRectOf, { w: 5, h: 50 });
+	ok(r !== null && r!.tags.length === 3, `expected the triple to satisfy a small minSize, got degree ${r?.tags.length}`);
+}
+
+// Degree-1 fallback is unconditional even when it fails minSize too — it
+// is the guaranteed floor, never rejected.
+{
+	const mainRectOf = rects({
+		A: { x: 0, y: 0, w: 10, h: 10 },
+		B: { x: 1000, y: 0, w: 10, h: 10 },
+	});
+	const r = resolveNodeRegion(["A", "B"], mainRectOf, { w: 9999, h: 9999 });
+	ok(r !== null && r!.tags.length === 1, `expected unconditional degree-1 fallback, got ${JSON.stringify(r)}`);
+}
