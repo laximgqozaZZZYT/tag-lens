@@ -72,3 +72,4 @@ hive-*.png
 ui-tester-log.txt
 capture-toggles.js
 update_dev_vault.py
+.worktrees/
