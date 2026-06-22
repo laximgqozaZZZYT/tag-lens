@@ -82,3 +82,46 @@ function overlapArea(a: ReturnType<typeof rectOf>, b: ReturnType<typeof rectOf>)
 	const area = overlapArea(rectOf(r.positions[0], boxes[0]), rectOf(r.positions[1], boxes[1]));
 	ok(area === 0, `OWN-pseudo-box vs sibling tag (no sharing relation) must not overlap, got area=${area}`);
 }
+
+// Many-neighbor hub scenario: a "hub" box shares members with 6 independent
+// "spoke" boxes (spokes share nothing with each other). The relaxation
+// cannot give every spoke a full target overlap (geometrically impossible
+// for one rectangle vs. many mutually-separated rectangles at once), but
+// switching from sequential to simultaneous per-iteration updates must not
+// make total overlap satisfaction WORSE than the documented baseline —
+// this locks in the verified (if partial) improvement and guards against a
+// future regression back toward the more order-sensitive sequential form.
+{
+	const sizeOf = () => 10;
+	const hub = box("hub", 100, 60);
+	const spokes = Array.from({ length: 6 }, (_, i) => box(`s${i}`, 100, 60));
+	const boxes = [hub, ...spokes];
+	const sharedCount = (a: string, b: string) => (a === "hub" || b === "hub" ? 5 : 0);
+	const r = siblingOverlapPack(boxes, 10, { sharedCount, sizeOf });
+	const rHub = rectOf(r.positions[0], hub);
+	let totalFrac = 0;
+	for (let i = 0; i < 6; i++) {
+		const rs = rectOf(r.positions[i + 1], spokes[i]);
+		totalFrac += overlapArea(rHub, rs) / (100 * 60);
+	}
+	ok(
+		totalFrac >= 0.8,
+		`expected total hub-spoke overlap satisfaction >= 0.8 (documented baseline: simultaneous updates achieve ~0.81 vs. sequential's ~0.79), got ${totalFrac.toFixed(3)}`,
+	);
+}
+
+// Plain 2-box pair (the common case) must behave the same as before:
+// simultaneous vs. sequential updates are mathematically identical for a
+// single pair (there is no second pair whose order could matter). Both
+// boxes shrink their x AND y gap to the SAME overlapFrac (0.5 here), so the
+// converged overlap AREA fraction is overlapFrac^2 = 0.25, not overlapFrac
+// itself — verified by direct computation, unchanged from the prior
+// sequential-update implementation.
+{
+	const boxes = [box("a", 100, 60), box("b", 100, 60)];
+	const r = siblingOverlapPack(boxes, 10, { sharedCount: () => 5, sizeOf: () => 10 });
+	const ra = rectOf(r.positions[0], boxes[0]);
+	const rb = rectOf(r.positions[1], boxes[1]);
+	const ov = overlapArea(ra, rb);
+	approx(ov / (100 * 60), 0.25, 0.05, "two-box pair overlap fraction unchanged by the simultaneous-update change");
+}

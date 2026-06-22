@@ -41,6 +41,8 @@ export function siblingOverlapPack(
 	const massOf = (b: SizedNode): number => Math.max(1, b.width * b.height);
 
 	for (let iter = 0; iter < ITERS; iter++) {
+		const deltaX = new Array(boxes.length).fill(0);
+		const deltaY = new Array(boxes.length).fill(0);
 		for (let i = 0; i < boxes.length; i++) {
 			for (let j = i + 1; j < boxes.length; j++) {
 				const a = boxes[i];
@@ -69,28 +71,31 @@ export function siblingOverlapPack(
 					const errY = (curY - targetY) * ATTRACT_RATE;
 					const signX = dx >= 0 ? 1 : -1;
 					const signY = dy >= 0 ? 1 : -1;
-					pa.x += signX * errX * fracA;
-					pb.x -= signX * errX * fracB;
-					pa.y += signY * errY * fracA;
-					pb.y -= signY * errY * fracB;
+					deltaX[i] += signX * errX * fracA;
+					deltaX[j] -= signX * errX * fracB;
+					deltaY[i] += signY * errY * fracA;
+					deltaY[j] -= signY * errY * fracB;
 				} else {
 					const overlapX = halfWSum + gap - Math.abs(dx);
 					const overlapY = halfHSum + gap - Math.abs(dy);
 					if (overlapX <= 0 || overlapY <= 0) continue;
 					if (overlapX < overlapY) {
 						const sign = dx >= 0 ? 1 : -1;
-						pa.x -= sign * overlapX * fracA;
-						pb.x += sign * overlapX * fracB;
+						deltaX[i] -= sign * overlapX * fracA;
+						deltaX[j] += sign * overlapX * fracB;
 					} else {
 						const sign = dy >= 0 ? 1 : -1;
-						pa.y -= sign * overlapY * fracA;
-						pb.y += sign * overlapY * fracB;
+						deltaY[i] -= sign * overlapY * fracA;
+						deltaY[j] += sign * overlapY * fracB;
 					}
 				}
 			}
 		}
+		for (let i = 0; i < boxes.length; i++) {
+			pos[i].x += deltaX[i];
+			pos[i].y += deltaY[i];
+		}
 	}
-
 	let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 	for (let i = 0; i < boxes.length; i++) {
 		const b = boxes[i];
