@@ -140,3 +140,40 @@ ok(
 	tripleSubDefensive!.h >= requiredH,
 	`triple piece height ${tripleSubDefensive!.h} must be >= packed content height ${requiredH} (packed.height=${packed.height}, gap=${gap}) — the drawn box must grow to fit the oversized card`,
 );
+
+// Host selection for degree-cascade sub-pieces must pick the SMALLEST-area
+// participating cluster, not the alphabetically-first tag — otherwise a
+// small, specific intersection's content renders in the BIGGER cluster's
+// pieces array and only gets painted when that bigger cluster's z-order
+// slot comes up, burying it under whatever smaller-but-unrelated cluster
+// happens to paint later (draw-enclosures.ts paints largest-area clusters
+// first, smallest last/on top — see its line ~46 sort).
+{
+	const data: GraphData = {
+		nodes: [
+			...Array.from({ length: 30 }, (_, i) => makeNode(`big${i}`, ["AAA_big"])),
+			...Array.from({ length: 4 }, (_, i) => makeNode(`shared${i}`, ["AAA_big", "zzz_small"])),
+		],
+		edges: [],
+	};
+	const sized = data.nodes.map((n) => ({ ...n, width: 80, height: 24 }));
+	const out = layout(data, sized, {
+		viewMode: "bubblesets",
+		cellW: 80,
+		cellH: 24,
+		nodeSpacing: 1,
+		minFontPx: 10,
+	} as any);
+	const big = out.clusters.find((c) => c.groupKey === "AAA_big")!;
+	const small = out.clusters.find((c) => c.groupKey === "zzz_small")!;
+	ok(
+		small.width * small.height < big.width * big.height,
+		`precondition failed: zzz_small must actually be the smaller cluster, got small=${small.width}x${small.height} big=${big.width}x${big.height}`,
+	);
+	const subInBig = (big.pieces ?? []).some((p) => p.kind === "sub" && p.hueKeys?.includes("zzz_small"));
+	const subInSmall = (small.pieces ?? []).some((p) => p.kind === "sub" && p.hueKeys?.includes("AAA_big"));
+	ok(
+		!subInBig && subInSmall,
+		`the intersection sub-piece must host on the smaller cluster (zzz_small), not the alphabetically-first one (AAA_big). subInBig=${subInBig} subInSmall=${subInSmall}`,
+	);
+}
