@@ -2,6 +2,8 @@
 // to actually fit their assigned nodes, not just be non-degenerate.
 import { ok } from "./assert";
 import { layout, type SizedNode, type LayoutOptions } from "../src/layout/layout";
+import { shelfPack } from "../src/layout/subgroup-packing";
+import { computeChannelDims, minFontScale } from "../src/layout/card-sizing";
 import type { GraphData, GraphNode, ViewMode } from "../src/types";
 
 function makeNode(id: string, memberships: string[]): GraphNode {
@@ -61,46 +63,80 @@ ok(
 // nominal rect (geometric edge case), the drawn piece must grow to match
 // the content — never show cards spilling outside their drawn box.
 //
-// This test constructs a scenario where shelfPack's output would exceed
-// g.rect: a triple-overlap region similar to the basic test above, but
-// with one very large outlier card mixed in to force the packed width/height
-// to exceed the resolved region rect.
+// This test constructs a scenario where shelfPack's output PROVABLY
+// exceeds the resolved region rect: a triple-overlap region (39 normal
+// cards + 1 moderately oversized card) mixed in. Rather than asserting
+// an area floor that is satisfiable whether or not the fix is applied
+// (the bug this test previously had), this test independently
+// recomputes the EXACT packed dimensions shelfPack will produce for the
+// triple piece's member nodes (same inputs, same gap layout.ts uses
+// internally) and asserts the drawn piece's w/h against that exact
+// value.
+//
+// Empirically verified (see Task 4 review fix-up): with a 95x35 outlier
+// mixed into 39 otherwise-uniform 80x24 cards, resolveNodeRegion still
+// resolves a genuine X∩Y∩Z triple region at g.rect=277x360 (same
+// resolved rect as the all-uniform case — the geometric search is blind
+// to the one oversized card), while shelfPack's packed content for
+// those same 40 cards needs ~564x424 once gap padding is added. That gap
+// between g.rect and the packed requirement is exactly what the Task 4
+// safety net (`Math.max(g.rect.w, p.width + 2*gap)`) exists to close.
+// Without the fix (`w: g.rect.w, h: g.rect.h`), the drawn piece stays at
+// 277x360 — well under the packed requirement — so the assertions below
+// fail; with the fix, they pass. (See the explicit revert/restore
+// verification recorded in task-4-report.md.)
 const dataDefensive: GraphData = {
 	nodes: [
-		...Array.from({ length: 35 }, (_, i) => makeNode(`xyz${i}`, ["X", "Y", "Z"])),
-		makeNode("xyz_big", ["X", "Y", "Z"]), // one very large card in X∩Y∩Z
-		...Array.from({ length: 2 }, (_, i) => makeNode(`x${i}`, ["X"])),
-		...Array.from({ length: 2 }, (_, i) => makeNode(`y${i}`, ["Y"])),
-		...Array.from({ length: 2 }, (_, i) => makeNode(`z${i}`, ["Z"])),
+		...Array.from({ length: 39 }, (_, i) => makeNode(`xyz${i}`, ["X", "Y", "Z"])),
+		makeNode("xyz_big", ["X", "Y", "Z"]), // one oversized card in X∩Y∩Z
+		...Array.from({ length: 4 }, (_, i) => makeNode(`x${i}`, ["X"])),
+		...Array.from({ length: 4 }, (_, i) => makeNode(`y${i}`, ["Y"])),
+		...Array.from({ length: 4 }, (_, i) => makeNode(`z${i}`, ["Z"])),
 	],
 	edges: [],
 };
 
-// Mix normal cards (80x24) with one oversized card (500x400)
+// Mix normal cards (80x24) with one oversized card (95x35). Chosen to be
+// large enough that the packed content provably exceeds g.rect, but
+// small enough that resolveNodeRegion still resolves a real triple
+// region instead of cascading down to pair-overlaps (verified by sweeping
+// outlier sizes from 80x24 up to 160x100: 95x35 sits in the stable middle
+// of the range that still produces a triple, well clear of the ~105x45
+// boundary where cascade-to-pairs begins).
 const sizedDefensive: SizedNode[] = dataDefensive.nodes.map((n) => ({
 	...n,
-	width: n.id === "xyz_big" ? 500 : 80,
-	height: n.id === "xyz_big" ? 400 : 24,
+	width: n.id === "xyz_big" ? 95 : 80,
+	height: n.id === "xyz_big" ? 35 : 24,
 }));
 
-// Additional defensive test: verify the overflow safety net is in place.
-// The original ABC test creates a triple-overlap sub-piece. With the fix,
-// the piece is grown from g.rect.w/h to Math.max(g.rect.w, p.width+2*gap) if needed.
-// This test verifies that the packed content fits within the drawn piece.
 const outDefensive = layout(dataDefensive, sizedDefensive, opts("bubblesets"));
-// The defensive test creates pairwise overlaps (XY, YZ, XZ) but not a true triple.
-// These pair-overlaps also go through the regionGroups loop when appropriate.
-// At minimum, verify that one of the pair-overlap pieces has grown to accommodate content.
-const defensiveSubPieces = outDefensive.clusters
+const tripleSubDefensive = outDefensive.clusters
 	.flatMap((c) => c.pieces ?? [])
-	.filter((p) => p.kind === "sub" && (p.hueKeys?.length ?? 0) === 2);
-// Even a pair-overlap piece should grow if its packed content exceeds g.rect.
-// A rough check: at least one pair-piece should be reasonably sized (not sliver-like).
+	.find((p) => p.kind === "sub" && (p.hueKeys?.length ?? 0) === 3);
+
+ok(!!tripleSubDefensive, "expected a triple-overlap sub-piece (X,Y,Z) to exist");
+
+// Recompute shelfPack's exact output for the 35 X∩Y∩Z members, using the
+// same gap layout.ts derives internally: gap = computeChannelDims(nodeSpacing,
+// minFontScale(minFontPx)).channelW. With nodeSpacing:1, minFontPx:10 (<=
+// CARD_TITLE_FONT_PX), this is a deterministic constant.
+const xyzMembers = dataDefensive.nodes.filter(
+	(n) => n.memberships.length === 3 && n.memberships.includes("X") && n.memberships.includes("Y") && n.memberships.includes("Z"),
+);
+const xyzSizes: SizedNode[] = xyzMembers.map((n) => {
+	const s = sizedDefensive.find((sd) => sd.id === n.id)!;
+	return { id: n.id, label: n.label, memberships: n.memberships, width: s.width, height: s.height };
+});
+const gap = computeChannelDims(opts("bubblesets").nodeSpacing, minFontScale(opts("bubblesets").minFontPx ?? 0)).channelW;
+const packed = shelfPack(xyzSizes, gap);
+const requiredW = packed.width + 2 * gap;
+const requiredH = packed.height + 2 * gap;
+
 ok(
-	defensiveSubPieces.length > 0,
-	`expected at least one pair-overlap sub-piece to exist`,
+	tripleSubDefensive!.w >= requiredW,
+	`triple piece width ${tripleSubDefensive!.w} must be >= packed content width ${requiredW} (packed.width=${packed.width}, gap=${gap}) — the drawn box must grow to fit the oversized card`,
 );
 ok(
-	defensiveSubPieces.some((p) => p.w * p.h >= 50000),
-	`defensive pair-overlap pieces should not all be slivers: ${defensiveSubPieces.map(p => `${Math.round(p.w)}x${Math.round(p.h)}`).join(", ")}`,
+	tripleSubDefensive!.h >= requiredH,
+	`triple piece height ${tripleSubDefensive!.h} must be >= packed content height ${requiredH} (packed.height=${packed.height}, gap=${gap}) — the drawn box must grow to fit the oversized card`,
 );
