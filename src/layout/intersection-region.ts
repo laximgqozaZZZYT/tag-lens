@@ -50,6 +50,7 @@ function intersectAll(
 export function resolveNodeRegion(
 	signature: string[],
 	mainRectOf: (tag: string) => { x: number; y: number; w: number; h: number } | null,
+	minSize?: { w: number; h: number },
 ): RegionResult | null {
 	const k = signature.length;
 	if (k === 0) return null;
@@ -72,6 +73,9 @@ export function resolveNodeRegion(
 		for (const combo of combos) {
 			const rect = intersectAll(combo, mainRectOf);
 			if (!rect) continue;
+			// Degree 1 is the unconditional guaranteed floor: never gated by
+			// minSize, even if undersized — there is nowhere left to cascade.
+			if (d > 1 && minSize && (rect.w < minSize.w || rect.h < minSize.h)) continue;
 			const area = rect.w * rect.h;
 			const sortedTags = [...combo].sort();
 			const key = sortedTags.join("");
