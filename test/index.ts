@@ -45,6 +45,8 @@ import "./hit-modes.test";
 import "./settings-parity.test";
 import "./attribute-propagation.test";
 import "./euler-true-stripes.test";
+import "./sibling-overlap-pack.test";
+import "./bubblesets-sibling-overlap.test";
 import "./aggregation-compute.test";
 import "./aggregation-properties.test";
 import "./bases-parser.test";
@@ -58,6 +60,9 @@ import "./bases-skip-postprocess.test";
 import "./friendly-error.test";
 import "./tag-field-suggest.test";
 import "./query-builder.test";
+import "./triple-overlap-guarantee.test";
+import "./intersection-region.test";
+import "./bubblesets-degree-cascade.test";
 
 
 summary();
