@@ -61,3 +61,47 @@ export function guaranteeTripleOverlaps(
 		}
 	}
 }
+
+// Generalization of guaranteeTripleOverlaps's eps-square trick: clamp every
+// box in `idx` toward their shared centroid so their AABB intersection
+// reaches AT LEAST targetW × targetH — not just a token non-degenerate
+// point. Used when the caller knows exactly how much area a zone's real
+// node count needs (vs. guaranteeTripleOverlaps' fixed eps, which only
+// guarantees *some* overlap exists).
+//
+// The achievable half-size is capped by the SMALLEST participating box's
+// own half-extent: no box can be asked to contain a window wider/taller
+// than itself. When capped, the resulting overlap is smaller than
+// requested but still strictly positive and maximal given the inputs —
+// genuinely unfixable beyond that without resizing the boxes themselves,
+// which is the caller's degree-cascade fallback's job, not this function's.
+export function guaranteeKWayOverlap(
+	boxes: SizedNode[],
+	positions: { x: number; y: number }[],
+	idx: number[],
+	targetW: number,
+	targetH: number,
+): void {
+	const lefts = idx.map((n) => positions[n].x - boxes[n].width / 2);
+	const rights = idx.map((n) => positions[n].x + boxes[n].width / 2);
+	const tops = idx.map((n) => positions[n].y - boxes[n].height / 2);
+	const bottoms = idx.map((n) => positions[n].y + boxes[n].height / 2);
+	const curW = Math.min(...rights) - Math.max(...lefts);
+	const curH = Math.min(...bottoms) - Math.max(...tops);
+	if (curW >= targetW && curH >= targetH) return; // already big enough — leave untouched
+
+	const px = idx.reduce((s, n) => s + positions[n].x, 0) / idx.length;
+	const py = idx.reduce((s, n) => s + positions[n].y, 0) / idx.length;
+	let halfW = Math.min(targetW / 2, ...idx.map((n) => boxes[n].width / 2));
+	let halfH = Math.min(targetH / 2, ...idx.map((n) => boxes[n].height / 2));
+	halfW = Math.max(halfW, 1e-6);
+	halfH = Math.max(halfH, 1e-6);
+	for (const n of idx) {
+		const minX = px - boxes[n].width / 2 + halfW;
+		const maxX = px + boxes[n].width / 2 - halfW;
+		const minY = py - boxes[n].height / 2 + halfH;
+		const maxY = py + boxes[n].height / 2 - halfH;
+		positions[n].x = Math.min(maxX, Math.max(minX, positions[n].x));
+		positions[n].y = Math.min(maxY, Math.max(minY, positions[n].y));
+	}
+}
