@@ -64,6 +64,7 @@ import "./triple-overlap-guarantee.test";
 import "./intersection-region.test";
 import "./bubblesets-degree-cascade.test";
 import "./label-collision.test";
+import "./bubblesets-label-collision.test";
 
 
 summary();
