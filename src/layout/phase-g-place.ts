@@ -14,6 +14,7 @@ import type { PositionedNode, SizedNode } from "./layout";
 import type { Zone } from "./zone-decomp";
 import type { RegionRect } from "./region-layout";
 import { NONE_BUCKET_KEY } from "./zone-decomp";
+import { resolveNodeRegion } from "./intersection-region";
 
 export interface PhaseGOptions {
 	slotW: number;
@@ -48,9 +49,29 @@ export function placeNodesInRegions(
 			return b.count - a.count;
 		});
 
+	const mainRectOf = (tag: string): { x: number; y: number; w: number; h: number } | null => {
+		const r = setRects.get(tag);
+		return r ? { x: r.x, y: r.y, w: r.w, h: r.h } : null;
+	};
+
 	for (const z of sortedZones) {
-		const region = intersectSetRects(z.memberships, setRects);
-		if (!region) continue;
+		// Cascade exactly like resolveNodeRegion does for the bubblesets
+		// degree-cascade scheme: try the zone's full membership signature
+		// first; if that AABB intersection doesn't exist (degenerate or a
+		// missing set), drop to every (k-1)-combination, then (k-2), … down
+		// to a single tag's own rect, which always exists. A zone must
+		// never be silently skipped just because its full-degree
+		// intersection happens to be empty.
+		const resolved =
+			z.memberships.length >= 2
+				? resolveNodeRegion(z.memberships, mainRectOf)
+				: (() => {
+						const r = mainRectOf(z.memberships[0]);
+						return r ? { tags: z.memberships, rect: r } : null;
+					})();
+		if (!resolved) continue;
+		const region = resolved.rect;
+		const resolvedDegree = resolved.tags.length;
 
 		// region をセル座標へ。
 		const colStart = Math.ceil(region.x / opts.slotW);
@@ -67,35 +88,16 @@ export function placeNodesInRegions(
 			continue;
 		}
 
-		// 行優先でセルを埋める。多重所属ゾーンは intersection rect 内に
-		// 行優先で配置。排他ゾーンは setRect 内で free cell を spiral 探索。
-		if (z.memberships.length >= 2) {
+		// 行優先でセルを埋める。多重所属ゾーン(カスケード後も次数≥2)は
+		// intersection rect 内に行優先で配置。排他ゾーン、または次数1まで
+		// カスケードされたゾーンは setRect 内で free cell を spiral 探索。
+		if (resolvedDegree >= 2) {
 			placeMultiZoneRowMajor(z.nodes, colStart, colEnd, rowStart, rowEnd, occupied, sizedById, opts, out);
 		} else {
 			placeExclusiveSpiral(z.nodes, colStart, colEnd, rowStart, rowEnd, occupied, sizedById, opts, out);
 		}
 	}
 	return out;
-}
-
-function intersectSetRects(
-	memberships: string[],
-	setRects: Map<string, RegionRect>,
-): { x: number; y: number; w: number; h: number } | null {
-	let l = -Infinity,
-		t = -Infinity,
-		r = Infinity,
-		b = Infinity;
-	for (const m of memberships) {
-		const rect = setRects.get(m);
-		if (!rect) return null;
-		l = Math.max(l, rect.x);
-		t = Math.max(t, rect.y);
-		r = Math.min(r, rect.x + rect.w);
-		b = Math.min(b, rect.y + rect.h);
-	}
-	if (r <= l || b <= t) return null;
-	return { x: l, y: t, w: r - l, h: b - t };
 }
 
 function placeMultiZoneRowMajor(
@@ -111,7 +113,8 @@ function placeMultiZoneRowMajor(
 ): void {
 	let col = colStart;
 	let row = rowStart;
-	for (const n of nodes) {
+	for (let i = 0; i < nodes.length; i++) {
+		const n = nodes[i];
 		// 既に占有されていれば次セルへ。
 		while (occupied.has(`${col},${row}`)) {
 			col++;
@@ -119,8 +122,12 @@ function placeMultiZoneRowMajor(
 				col = colStart;
 				row++;
 				if (row > rowEnd) {
-					// region 内に空きなし — spiral で外側を探す。
-					placeViaSpiral(n, col, row, occupied, sizedById, opts, out);
+					// region 内に空きなし — 現在のノード以降、全ての残りノードを
+					// spiral で外側に配置する(取り落とさない — 以前はここで
+					// 現在の1ノードだけ配置して即returnし、残りを全て捨てていた)。
+					for (let j = i; j < nodes.length; j++) {
+						placeViaSpiral(nodes[j], colStart, rowStart, occupied, sizedById, opts, out);
+					}
 					return;
 				}
 			}
@@ -133,8 +140,8 @@ function placeMultiZoneRowMajor(
 		}
 		if (row > rowEnd && col === colStart) {
 			// region 終わり。後続は spiral で。
-			for (const rest of nodes.slice(nodes.indexOf(n) + 1)) {
-				placeViaSpiral(rest, colStart, rowStart, occupied, sizedById, opts, out);
+			for (let j = i + 1; j < nodes.length; j++) {
+				placeViaSpiral(nodes[j], colStart, rowStart, occupied, sizedById, opts, out);
 			}
 			return;
 		}

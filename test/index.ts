@@ -66,6 +66,7 @@ import "./label-collision.test";
 import "./bubblesets-label-collision.test";
 import "./overview-label-placement.test";
 import "./bubblesets-region-sizing.test";
+import "./phase-g-place.test";
 
 
 summary();
