@@ -15,6 +15,7 @@ import type { Zone } from "./zone-decomp";
 import type { RegionRect } from "./region-layout";
 import { NONE_BUCKET_KEY } from "./zone-decomp";
 import { resolveNodeRegion } from "./intersection-region";
+import { shelfPack } from "./subgroup-packing";
 
 export interface PhaseGOptions {
 	slotW: number;
@@ -24,19 +25,50 @@ export interface PhaseGOptions {
 	defaultCardH: number;
 }
 
+// Cell keys ("col,row") that a continuous-coordinate box (center + size)
+// overlaps on the slotW x slotH grid. Used to seed `preOccupied` from
+// content positioned by a different packing pass that isn't grid-quantized
+// the same way this module's own emitNode() spans cells — any grid cell
+// whose [c*slotW, (c+1)*slotW) span overlaps the box's extent counts as
+// occupied, so a later placeNodesInRegions() call won't render on top of it.
+export function cellKeysForBox(
+	cx: number,
+	cy: number,
+	w: number,
+	h: number,
+	slotW: number,
+	slotH: number,
+): string[] {
+	const colFrom = Math.floor((cx - w / 2) / slotW);
+	const colTo = Math.floor((cx + w / 2 - 1e-6) / slotW);
+	const rowFrom = Math.floor((cy - h / 2) / slotH);
+	const rowTo = Math.floor((cy + h / 2 - 1e-6) / slotH);
+	const keys: string[] = [];
+	for (let c = colFrom; c <= colTo; c++) {
+		for (let r = rowFrom; r <= rowTo; r++) keys.push(`${c},${r}`);
+	}
+	return keys;
+}
+
 // メインエントリ。
 export function placeNodesInRegions(
 	zones: Zone[],
 	setRects: Map<string, RegionRect>,
 	sized: SizedNode[],
 	opts: PhaseGOptions,
+	// Cells already claimed by content this function doesn't itself place
+	// (e.g. exclusive single-tag cards positioned by a different, earlier
+	// packing pass that shares the same slotW/slotH grid). Seeding these
+	// in up front prevents this function's own placements from landing on
+	// top of them. Optional — omitting it reproduces prior behavior exactly.
+	preOccupied?: ReadonlySet<string>,
 ): PositionedNode[] {
 	const sizedById = new Map<string, SizedNode>();
 	for (const s of sized) sizedById.set(s.id, s);
 	const out: PositionedNode[] = [];
 
 	// セル単位 occupancy。"col,row" 文字列キー。
-	const occupied = new Set<string>();
+	const occupied = new Set<string>(preOccupied ?? []);
 
 	// 配置順: |memberships| 降順 → count 降順 (大きい固まりから埋める)。
 	// 多重所属を先 → 排他を後。
@@ -81,10 +113,15 @@ export function placeNodesInRegions(
 
 		if (colEnd < colStart || rowEnd < rowStart) {
 			// region が 1 セルにも満たない (= setRect が小さすぎる)。
-			// 中心セルに無理やり配置。
-			const c = Math.round((region.x + region.w / 2) / opts.slotW);
-			const r = Math.round((region.y + region.h / 2) / opts.slotH);
-			placeAtCell(z.nodes, c, r, occupied, sizedById, opts, out);
+			// グリッドへスナップせず、region の連続座標を起点にこのゾーンの
+			// 全ノードを直接シェルフパックする — 1ノード目だけ region 中心
+			// に正確に置き、残りをグリッドにスナップした spiral fallback に
+			// 委ねる方式だと、座標系の不一致で1ノード目と隣接ノードが
+			// 実際には重なってしまうことがあった(連続座標 vs グリッド量子化
+			// の混在が原因)。シェルフパック自体は常にゾーン内ノード同士の
+			// 非重なりを保証するので、region が狭くてもこのゾーンの中では
+			// 重なりが起きない。
+			placeTinyRegionShelf(z.nodes, region, occupied, sizedById, opts, out);
 			continue;
 		}
 
@@ -230,18 +267,54 @@ function placeViaSpiral(
 	}
 }
 
-function placeAtCell(
+// region が1グリッドセルにも満たない(setRect が小さすぎる)場合の配置。
+// グリッドへスナップせず、shelfPack で region の連続座標を起点に直接
+// 詰める — shelfPack は常にゾーン内ノード同士の非重なりを保証するので、
+// region が狭くてもこのゾーンの中では重なりが起きない(グリッド量子化と
+// 連続座標を混在させていた前の実装は、1ノード目だけ region 中心に正確に
+// 置き、残りをグリッドにスナップした spiral fallback に委ねていたため、
+// 座標系の不一致で隣接ノードが実際には重なってしまうことがあった)。
+function placeTinyRegionShelf(
 	nodes: GraphNode[],
-	cInit: number,
-	rInit: number,
+	region: { x: number; y: number; w: number; h: number },
 	occupied: Set<string>,
 	sizedById: Map<string, SizedNode>,
 	opts: PhaseGOptions,
 	out: PositionedNode[],
 ): void {
-	for (const n of nodes) {
-		placeViaSpiral(n, cInit, rInit, occupied, sizedById, opts, out);
-	}
+	const sizes: SizedNode[] = nodes.map((n) => {
+		const sz = sizedById.get(n.id);
+		return {
+			id: n.id,
+			label: n.label,
+			memberships: n.memberships,
+			width: sz?.width ?? opts.defaultCardW,
+			height: sz?.height ?? opts.defaultCardH,
+		};
+	});
+	const packed = shelfPack(sizes, opts.padPx);
+	nodes.forEach((n, i) => {
+		const sz = sizes[i];
+		const x = region.x + opts.padPx + packed.positions[i].x;
+		const y = region.y + opts.padPx + packed.positions[i].y;
+		for (const k of cellKeysForBox(x, y, sz.width, sz.height, opts.slotW, opts.slotH)) occupied.add(k);
+		const displayMemberships = n.memberships.includes(NONE_BUCKET_KEY)
+			? n.memberships.filter((m) => m !== NONE_BUCKET_KEY)
+			: n.memberships;
+		out.push({
+			id: n.id,
+			label: n.label,
+			memberships: displayMemberships,
+			x,
+			y,
+			width: sz.width,
+			height: sz.height,
+			mtime: n.mtime,
+			fmMaturity: n.fmMaturity,
+			ageDays: n.ageDays,
+			isPeripheral: n.isPeripheral,
+		});
+	});
 }
 
 function emitNode(
