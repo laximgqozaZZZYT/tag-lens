@@ -84,13 +84,21 @@ function overlapArea(a: ReturnType<typeof rectOf>, b: ReturnType<typeof rectOf>)
 }
 
 // Many-neighbor hub scenario: a "hub" box shares members with 6 independent
-// "spoke" boxes (spokes share nothing with each other). The relaxation
-// cannot give every spoke a full target overlap (geometrically impossible
-// for one rectangle vs. many mutually-separated rectangles at once), but
-// switching from sequential to simultaneous per-iteration updates must not
-// make total overlap satisfaction WORSE than the documented baseline —
-// this locks in the verified (if partial) improvement and guards against a
-// future regression back toward the more order-sensitive sequential form.
+// "spoke" boxes (spokes share nothing with each other, same size as the
+// hub, near-maximal overlap fraction). For this many EQUAL-sized boxes all
+// needing substantial simultaneous overlap with one shared box, some
+// pairs ending up at zero overlap is a real geometric fact, not an
+// algorithm defect: achieving a deep simultaneous overlap with the hub
+// forces a spoke's center close to the hub's, and several same-size boxes
+// clustered that close together cannot also avoid colliding each other
+// (verified independently by direct computation, not assumed). Radial
+// hub-seeding (placing spokes evenly around the hub at the exact distance
+// for their target overlap, then correcting RADIALLY rather than via the
+// generic per-axis force during relaxation — see seedHubRadially /
+// detectHub in sibling-overlap-pack.ts) raises both the total satisfaction
+// AND the per-spoke ratio for whichever spokes do succeed, compared to the
+// documented pre-radial-seeding baseline (simultaneous-update Jacobi
+// without seeding: total ~0.81, successful spokes ~0.348 each).
 {
 	const sizeOf = () => 10;
 	const hub = box("hub", 100, 60);
@@ -100,13 +108,50 @@ function overlapArea(a: ReturnType<typeof rectOf>, b: ReturnType<typeof rectOf>)
 	const r = siblingOverlapPack(boxes, 10, { sharedCount, sizeOf });
 	const rHub = rectOf(r.positions[0], hub);
 	let totalFrac = 0;
+	let bestFrac = 0;
 	for (let i = 0; i < 6; i++) {
 		const rs = rectOf(r.positions[i + 1], spokes[i]);
-		totalFrac += overlapArea(rHub, rs) / (100 * 60);
+		const f = overlapArea(rHub, rs) / (100 * 60);
+		totalFrac += f;
+		bestFrac = Math.max(bestFrac, f);
 	}
 	ok(
-		totalFrac >= 0.8,
-		`expected total hub-spoke overlap satisfaction >= 0.8 (documented baseline: simultaneous updates achieve ~0.81 vs. sequential's ~0.79), got ${totalFrac.toFixed(3)}`,
+		totalFrac >= 0.85,
+		`expected total hub-spoke overlap satisfaction >= 0.85 with radial seeding (documented pre-seeding baseline: ~0.81), got ${totalFrac.toFixed(3)}`,
+	);
+	ok(
+		bestFrac >= 0.4,
+		`expected the best-served spoke's overlap ratio >= 0.4 with radial seeding (documented pre-seeding baseline: ~0.348), got ${bestFrac.toFixed(3)}`,
+	);
+}
+
+// More realistic asymmetric scenario: the hub box is bigger than each
+// spoke (mirrors real vault data — a hub tag's box includes its own
+// exclusive members on top of every shared zone, so it's rarely the same
+// size as a single spoke). End-to-end through the real layout() pipeline
+// (test/bubblesets-region-occupancy.test.ts), where root box sizes also
+// carry label-strip and nesting padding on top of raw content size, this
+// same shape of scenario does measurably better (4 of 6 spokes >100% of
+// their ideal area) than this stripped-down unit-level check without that
+// extra padding — locking in the weaker bound here is still a real,
+// non-degenerate-sliver regression guard for this module in isolation.
+{
+	const sizeOf = (id: string) => (id === "hub" ? 40 : 10);
+	const hub = box("hub", 340, 410);
+	const spokes = Array.from({ length: 6 }, (_, i) => box(`s${i}`, 430, 410));
+	const boxes = [hub, ...spokes];
+	const sharedCount = (a: string, b: string) => (a === "hub" || b === "hub" ? 5 : 0);
+	const r = siblingOverlapPack(boxes, 10, { sharedCount, sizeOf });
+	const rHub = rectOf(r.positions[0], hub);
+	let nonTrivial = 0;
+	for (let i = 0; i < 6; i++) {
+		const rs = rectOf(r.positions[i + 1], spokes[i]);
+		const f = overlapArea(rHub, rs) / (430 * 410);
+		if (f >= 0.25) nonTrivial++;
+	}
+	ok(
+		nonTrivial >= 2,
+		`expected at least 2 of 6 spokes to achieve a real (>=25%) overlap with the hub in an asymmetric-size scenario, got ${nonTrivial}`,
 	);
 }
 

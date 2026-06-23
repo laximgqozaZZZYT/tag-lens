@@ -29,6 +29,88 @@ export interface SiblingOverlapOpts {
 	sizeOf: (id: string) => number;
 }
 
+// Minimum number of independent sharing-partners before a box counts as a
+// "hub" worth seeding radially. Below this, shelfPack's row-major seed
+// already converges fine (verified — see the visibility-density plan's
+// Task 3 investigation, which only found uneven results at higher
+// fan-out).
+const HUB_MIN_DEGREE = 3;
+
+interface HubInfo {
+	hubIdx: number;
+	spokes: number[]; // indices of boxes[] sharing with the hub
+}
+
+// Find the box with the most independent sharing-partners. Returns null
+// when no box's degree reaches HUB_MIN_DEGREE (the common, non-hub case —
+// every existing pairwise/triple scenario is unaffected by anything below).
+function detectHub(boxes: SizedNode[], opts: SiblingOverlapOpts): HubInfo | null {
+	const partnersOf: number[][] = boxes.map(() => []);
+	for (let i = 0; i < boxes.length; i++) {
+		for (let j = i + 1; j < boxes.length; j++) {
+			if (opts.sharedCount(boxes[i].id, boxes[j].id) > 0) {
+				partnersOf[i].push(j);
+				partnersOf[j].push(i);
+			}
+		}
+	}
+	let hubIdx = -1;
+	let hubDegree = 0;
+	for (let i = 0; i < boxes.length; i++) {
+		if (partnersOf[i].length > hubDegree) {
+			hubDegree = partnersOf[i].length;
+			hubIdx = i;
+		}
+	}
+	if (hubIdx < 0 || hubDegree < HUB_MIN_DEGREE) return null;
+	return { hubIdx, spokes: partnersOf[hubIdx] };
+}
+
+// The distance at which two boxes' edges JUST touch along direction
+// (cosT, sinT) — the boundary of the Minkowski sum of both half-extents.
+// NOT halfWSum*|cos|+halfHSum*|sin|, which overshoots past the true
+// touching point at any non-axis-aligned angle whenever width and height
+// differ.
+function touchDistance(cosT: number, sinT: number, halfWSum: number, halfHSum: number): number {
+	return Math.min(
+		Math.abs(cosT) > 1e-6 ? halfWSum / Math.abs(cosT) : Infinity,
+		Math.abs(sinT) > 1e-6 ? halfHSum / Math.abs(sinT) : Infinity,
+	);
+}
+
+// `shelfPack`'s row-major seed starts every box roughly along a single
+// axis. For a "hub" box that shares members independently with many
+// mutually-unrelated sibling boxes (a "spoke" pattern — sharing only with
+// the hub, not each other), that seed puts most spokes on the same side of
+// the hub with near-zero initial Y separation, so the pairwise pull-apart
+// force spends its iterations fighting over the same x-axis instead of
+// spreading spokes around the hub. Re-seeding the hub's spokes evenly
+// around it on a circle, at the distance that already achieves their
+// target overlap fraction, gives the optimizer a starting point where
+// simultaneous overlap with every spoke is actually reachable. Mutates
+// `pos` in place.
+function seedHubRadially(boxes: SizedNode[], pos: { x: number; y: number }[], opts: SiblingOverlapOpts, hub: HubInfo): void {
+	const hubBox = boxes[hub.hubIdx];
+	const hubPos = pos[hub.hubIdx];
+	const hubSize = Math.max(1, opts.sizeOf(hubBox.id));
+	hub.spokes.forEach((spokeIdx, k) => {
+		const spoke = boxes[spokeIdx];
+		const theta = (k / hub.spokes.length) * Math.PI * 2;
+		const cosT = Math.cos(theta);
+		const sinT = Math.sin(theta);
+		const halfWSum = hubBox.width / 2 + spoke.width / 2;
+		const halfHSum = hubBox.height / 2 + spoke.height / 2;
+		const sizeS = Math.max(1, opts.sizeOf(spoke.id));
+		const shared = opts.sharedCount(hubBox.id, spoke.id);
+		const overlapFrac = Math.min(MAX_OVERLAP_FRAC, shared / Math.min(hubSize, sizeS));
+		const radius = touchDistance(cosT, sinT, halfWSum, halfHSum) * (1 - overlapFrac);
+		pos[spokeIdx] = {
+			x: hubPos.x + cosT * radius,
+			y: hubPos.y + sinT * radius,
+		};
+	});
+}
+
 export function siblingOverlapPack(
 	boxes: SizedNode[],
 	gap: number,
@@ -38,6 +120,9 @@ export function siblingOverlapPack(
 	if (boxes.length <= 1) return seed;
 
 	const pos = seed.positions.map((p) => ({ x: p.x, y: p.y }));
+	const hub = detectHub(boxes, opts);
+	if (hub) seedHubRadially(boxes, pos, opts, hub);
+	const hubSpokeSet = hub ? new Set(hub.spokes) : null;
 	const massOf = (b: SizedNode): number => Math.max(1, b.width * b.height);
 
 	for (let iter = 0; iter < ITERS; iter++) {
@@ -59,7 +144,35 @@ export function siblingOverlapPack(
 				const fracB = massA / (massA + massB);
 				const shared = opts.sharedCount(a.id, b.id);
 
-				if (shared > 0) {
+				// A hub↔spoke pair (one fan-out box sharing independently
+				// with several mutually-unrelated siblings) is corrected
+				// RADIALLY (move along the hub→spoke vector to hit the
+				// target DISTANCE at the pair's CURRENT angle) rather than
+				// via the generic per-axis-independent correction below.
+				// The per-axis form treats X and Y as two unrelated 1D
+				// overlaps and pulls each toward its own half-target
+				// unconditionally — for a genuinely diagonal pair (the norm
+				// once spokes are spread radially) that squashes BOTH axes
+				// toward their target simultaneously, shrinking the actual
+				// overlap AREA well below intended (verified by direct
+				// repro). Spoke↔spoke pairs (sharing nothing) still use the
+				// separation branch below — that one only checks "are they
+				// too close," which the per-axis form already handles
+				// correctly regardless of angle.
+				if (shared > 0 && hubSpokeSet && ((i === hub!.hubIdx && hubSpokeSet.has(j)) || (j === hub!.hubIdx && hubSpokeSet.has(i)))) {
+					const sizeA = Math.max(1, opts.sizeOf(a.id));
+					const sizeB = Math.max(1, opts.sizeOf(b.id));
+					const overlapFrac = Math.min(MAX_OVERLAP_FRAC, shared / Math.min(sizeA, sizeB));
+					const dist = Math.hypot(dx, dy) || 0.0001;
+					const cosT = dx / dist;
+					const sinT = dy / dist;
+					const target = touchDistance(cosT, sinT, halfWSum, halfHSum) * (1 - overlapFrac);
+					const err = (dist - target) * ATTRACT_RATE;
+					deltaX[i] += cosT * err * fracA;
+					deltaX[j] -= cosT * err * fracB;
+					deltaY[i] += sinT * err * fracA;
+					deltaY[j] -= sinT * err * fracB;
+				} else if (shared > 0) {
 					const sizeA = Math.max(1, opts.sizeOf(a.id));
 					const sizeB = Math.max(1, opts.sizeOf(b.id));
 					const overlapFrac = Math.min(MAX_OVERLAP_FRAC, shared / Math.min(sizeA, sizeB));
@@ -92,6 +205,7 @@ export function siblingOverlapPack(
 			}
 		}
 		for (let i = 0; i < boxes.length; i++) {
+			if (hub && i === hub.hubIdx) continue; // hub stays fixed as the reference frame
 			pos[i].x += deltaX[i];
 			pos[i].y += deltaY[i];
 		}
