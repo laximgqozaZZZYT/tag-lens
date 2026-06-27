@@ -21,15 +21,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20.x"
+          cache: "npm"
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Type check
         run: npx tsc --noEmit
 
       - name: Test
         run: npm test
+
+      - name: Dead-code check (knip — unused files/deps)
+        run: npm run knip:ci
 
       - name: Build plugin
         run: npm run build

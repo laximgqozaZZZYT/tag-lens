@@ -74,7 +74,6 @@ export function computeCognitiveLoad(app: App, k: number): ComputedCognitiveLoad
 		noteTagCount.set(f.path, tags.size);
 		for (const t of tags) tagNoteCount.set(t, (tagNoteCount.get(t) ?? 0) + 1);
 	}
-	console.log("[E2E DEBUG] tagNoteCount timeline =", tagNoteCount.get("timeline"), "beat =", tagNoteCount.get("beat"));
 	const distinctTags = Math.max(1, tagNoteCount.size);
 
 	const triggered: TriggeredAlert[] = [];

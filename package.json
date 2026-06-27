@@ -14,7 +14,9 @@
 		"dev": "node esbuild.config.mjs --watch",
 		"test": "node test/run.mjs",
 		"typecheck": "tsc --noEmit",
-		"verify": "tsc --noEmit && node test/run.mjs && node esbuild.config.mjs",
+		"knip": "knip",
+		"knip:ci": "knip --include files,dependencies,unlisted",
+		"verify": "tsc --noEmit && node test/run.mjs && knip --include files,dependencies,unlisted && node esbuild.config.mjs",
 		"e2e:bubblesets": "node esbuild.config.mjs && node test/e2e/setup-e2e-vault.mjs && node test/e2e/e2e-bubblesets.mjs",
 		"deploy": "node esbuild.config.mjs && node deploy.mjs"
 	},
@@ -22,6 +24,7 @@
 		"@types/node": "^20.11.0",
 		"esbuild": "^0.21.0",
 		"fast-check": "^4.8.0",
+		"knip": "^6.21.0",
 		"obsidian": "1.5.7",
 		"typescript": "^5.4.0"
 	}
