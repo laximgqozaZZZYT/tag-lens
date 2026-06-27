@@ -213,7 +213,11 @@ export function componentEulerLayout(allNodes: BTVNode[], opts: BTVOptions): BTV
 	// cell-square block is pixel-WIDE. Fewer columns (∝ sqrt(slotH/slotW)) makes
 	// the PIXEL aspect of the whole figure roughly square.
 	const targetW = Math.max(1, Math.round(Math.sqrt(totalArea * slotH / slotW)));
-	const GAP = 2;
+	// Gap between units must exceed the box-follow margin so a tag box (its
+	// members' bbox grown ~1 cell + an outward grid-snap of up to ~1 more) can
+	// never reach a NON-member card in the neighbouring unit. 2 cells was on the
+	// boundary (caught by the invariant test); 4 clears both sides.
+	const GAP = 4;
 	let curX = 0, curY = 0, rowH = 0;
 	for (const u of units) {
 		if (curX > 0 && curX + u.wCells > targetW) {

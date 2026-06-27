@@ -73,3 +73,19 @@ ui-tester-log.txt
 capture-toggles.js
 update_dev_vault.py
 .worktrees/
+
+# One-off debug/patch/probe scripts dropped in the repo root (Kaizen cleanup).
+# Put disposable experiments in test/scratch/ instead; these patterns just stop
+# the recurring root junk (patch*.js, test-debug/actual/btv, _diag/_rundiag
+# layout probes, ad-hoc plan notes, a stray root scratch/ dir) from being
+# committed or cluttering `git status`.
+patch*.js
+test-actual.js
+test-btv.ts
+test-debug.js
+test-collision.js
+test-mainof.js
+/plan-*.md
+/_diag.ts
+/_rundiag.mjs
+/scratch/
