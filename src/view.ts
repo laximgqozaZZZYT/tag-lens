@@ -22,9 +22,9 @@ import {
 	type ClusterRect,
 } from "./layout/layout";
 import type { MiniSettings, GraphNode, GraphData, ViewMode, LensPreset } from "./types";
-import { CARD_CELL_W, CARD_CELL_H, NONE_BUCKET } from "./types";
+import { CARD_CELL_W, CARD_CELL_H } from "./types";
 
-import { clusterHue, createStripePattern, createStripeGradient, membershipStripeHues } from "./draw/canvas-utils";
+import { clusterHue, createStripeGradient, membershipStripeHues } from "./draw/canvas-utils";
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
 import { runAggregateSnap } from "./layout/aggregate-snap";
@@ -48,7 +48,6 @@ import {
 	visualScale,
 	UNION_LAYER_KEY,
 	INTERSECTION_LAYER_KEY,
-	SET_LAYER_LABEL,
 	type NodeDisplay,
 	type NodeDisplayDeps,
 } from "./visual/node-display";
@@ -70,11 +69,11 @@ import {
 	latticeNamedRowAt,
 	TIER_GUTTER as LATTICE_TIER_GUTTER,
 } from "./draw/draw-lattice";
-import { latticeNodeAt, lodFor } from "./layout/lattice-layout";
+import { latticeNodeAt } from "./layout/lattice-layout";
 import { drawCard as drawCardFn } from "./draw/draw-card";
 import { drawLegend } from "./draw/legend-layout";
-import { encodingToSpecs } from "./draw/legend-spec";
 import { buildModeLegend, legendAnchor, type ModeLegendInput } from "./draw/mode-legend";
+import { computeModeLegendInput } from "./draw/mode-legend-input";
 import {
 	hitTest as hitTestFn,
 	screenToWorld as screenToWorldFn,
@@ -2747,341 +2746,17 @@ export class MiniGraphView extends ItemView {
 	// count range + heatmap flag) from the current layout. Pure read — never
 	// mutates state, so the legend stays a display-only overlay.
 	private buildModeLegendInput(): ModeLegendInput {
-		const isBubbles = this.settings.viewMode === "bubblesets";
-		const encodingSpecs = isBubbles ? [] : encodingToSpecs(this.encLegends);
-		const t = theme();
-		const aggSet = new Set(this.settings.aggregatedLayers);
-		// LAYERS & OVERRIDES content is surfaced in EVERY view mode and perspective
-		// now (the ∪/∩ set-layers + the resolved NODE_DISPLAY suffix), keeping the
-		// per-mode intrinsic legends intact and merely ADDING the layer info.
-		const isCloseup = this.settings.perspective === "closeup";
-		// Per-tag VISIBLE COUNT that is correct in every view mode. Euler-family
-		// stores it on `cluster.memberCount`, but node-grid modes (upset) and
-		// droste leave `laid.clusters` empty, so the count must be derived from
-		// each mode's own structure:
-		//   • droste     → distinct gallery nodes whose tag-keys include the tag
-		//   • clusters   → `cluster.memberCount` (already post-hide/aggregate)
-		//   • node modes → `laid.nodes` whose memberships include the tag
-		// All sources are post-hide/post-aggregate, so each is the live count.
-		const tagVisibleCount = (tag: string): number => {
-			const cluster = this.laid.clusters?.find((c) => c.groupKey === tag);
-			if (cluster) return cluster.memberCount ?? 0;
-			const gallery = this.laid.drosteGallery;
-			if (gallery?.cells.length) {
-				const ids = new Set<string>();
-				for (const cell of gallery.cells) {
-					if ((gallery.nodeKeys.get(cell.id) ?? []).includes(tag)) ids.add(cell.id);
-				}
-				if (ids.size) return ids.size;
-			}
-			const latNodes = this.laid.lattice?.nodes;
-			if (latNodes?.length) {
-				let sum = 0;
-				for (const node of latNodes) {
-					if (node.signature?.includes(tag)) sum += node.count ?? 0;
-				}
-				if (sum > 0) return sum;
-			}
-			let n = 0;
-			for (const node of this.laid.nodes) if (node.memberships?.includes(tag)) n++;
-			return n;
-		};
-		// LAYERS & OVERRIDES content per layer, expressed with the SAME terms the
-		// Settings ▸ Encode ▸ "Layers & Overrides" UI uses, so the legend faithfully
-		// mirrors the panel:
-		//   • Node display "Size (m × n)"        → `Size R×C`
-		//   • header meta "N nodes"              → `N nodes`
-		//   • Display "Aggregate (3-card stack)" → `Aggregate (3-card stack)`
-		//   • "Inherit from" / "Full inheritance"→ `Inherit from <parent>` /
-		//                                           `Full inheritance`
-		// Parts are joined with " · " to match the panel's stacked fields. Shown in
-		// EVERY view mode + perspective. `count` lets callers pass a pre-resolved
-		// figure (e.g. the cluster's own memberCount) instead of re-deriving it;
-		// when no count is derivable the count part is safely omitted.
-		const clusterLabelFor = (groupKey: string): string =>
-			this.laid.clusters?.find((c) => c.groupKey === groupKey)?.label ?? groupKey;
-		// Inheritance descriptor matching the panel's "Inherit from" picker and the
-		// set-layer "Full inheritance (ignore own overrides)" toggle.
-		const inheritPart = (groupKey: string): string | null => {
-			const isSetLayer = groupKey === UNION_LAYER_KEY || groupKey === INTERSECTION_LAYER_KEY;
-			const parent = this.settings.inheritFrom?.[groupKey];
-			const full = isSetLayer && (this.settings.layerInheritFull?.includes(groupKey) ?? false);
-			if (full) {
-				return parent
-					? `Full inheritance from ${clusterLabelFor(parent)}`
-					: "Full inheritance";
-			}
-			if (parent) return `Inherit from ${clusterLabelFor(parent)}`;
-			return null;
-		};
-		// Build the " · "-joined "Size R×C · N nodes · …" suffix from the resolved
-		// NODE_DISPLAY (= the value the renderer + panel placeholder both use).
-		const layerSuffix = (groupKey: string, count?: number): string => {
-			const n = count ?? tagVisibleCount(groupKey);
-			const d = this.resolveLayerDisplay(groupKey);
-			const parts: string[] = [`Size ${d.nodeRows}×${d.nodeCols}`];
-			if (Number.isFinite(n)) parts.push(`${n} node${n === 1 ? "" : "s"}`);
-			if (aggSet.has(groupKey)) parts.push("Aggregate (3-card stack)");
-			const inh = inheritPart(groupKey);
-			if (inh) parts.push(inh);
-			return ` — ${parts.join(" · ")}`;
-		};
-		const seen = new Set<string>();
-		const cleanLabel = (k: string) => k.startsWith("tag=") || k.startsWith("tag:") ? k.slice(4) : k;
-
-		const tags: { key: string; color: string; label?: string }[] = [];
-		for (const n of this.laid.nodes) {
-			const k = n.memberships?.[0];
-			if (!k || seen.has(k)) continue;
-			seen.add(k);
-			tags.push({ key: k, color: t.swatch(clusterHue(k), "fill"), label: cleanLabel(k) + layerSuffix(k) });
-		}
-		if (this.settings.viewMode === "droste" && this.laid.drosteGallery?.cells.length) {
-			const drosteSeen = new Set<string>();
-			const drosteTags: { key: string; color: string; label?: string }[] = [];
-			for (const cell of this.laid.drosteGallery.cells) {
-				const keys = this.laid.drosteGallery.nodeKeys.get(cell.id) ?? [];
-				for (const k of keys) {
-					if (!k || drosteSeen.has(k)) continue;
-					drosteSeen.add(k);
-					drosteTags.push({ key: k, color: t.swatch(clusterHue(k), "fill"), label: cleanLabel(k) + layerSuffix(k) });
-				}
-			}
-			tags.splice(0, tags.length, ...drosteTags);
-		}
-		let min = Infinity, max = -Infinity;
-		for (const n of this.laid.nodes) {
-			const c = (n as { count?: number }).count ?? 1;
-			if (c < min) min = c;
-			if (c > max) max = c;
-		}
-		if (!Number.isFinite(min)) { min = 1; max = 1; }
-		const hm = this.laid.heatmap;
-		const drosteOps = this.settings.viewMode === "droste"
-			? {
-				focusColor: t.accent,
-				intersectionColor: t.swatch(45, "fill"),
-				unionColor: t.success,
-			}
-			: undefined;
-		let hmTagMin = 1;
-		let hmTagMax = 1;
-		let hmCoMax = 1;
-		if (hm && hm.tags.length > 0) {
-			hmTagMin = Math.min(...hm.tags.map((x) => x.size));
-			hmTagMax = Math.max(...hm.tags.map((x) => x.size));
-			hmCoMax = Math.max(1, hm.p95 || hm.maxOff || 1);
-		}
-		let legendMin = min;
-		let legendMax = max;
-		let latticeInput: ModeLegendInput["lattice"] | undefined;
-		if (this.settings.viewMode === "lattice" && this.laid.lattice?.nodes.length) {
-			const nodes = this.laid.lattice.nodes;
-			const counts = nodes.map((n) => n.count);
-			legendMin = Math.min(...counts);
-			legendMax = Math.max(...counts);
-			const lod = "auto";
-			const mix: NonNullable<ModeLegendInput["lattice"]>["lodMix"] = {
-				overview: 0,
-				density: 0,
-				individual: 0,
-			};
-			const classColors: NonNullable<ModeLegendInput["lattice"]>["classColors"] = {
-				overview: [],
-				density: [],
-				individual: [],
-			};
-			const seenColors: Record<"overview" | "density" | "individual", Set<string>> = {
-				overview: new Set(),
-				density: new Set(),
-				individual: new Set(),
-			};
-			for (const node of nodes) {
-				let eff = lodFor(node.count, this.zoom, {
-					latticeNodeLOD: lod,
-					latticeIndividualMax: this.settings.latticeIndividualMax,
-					latticeDensityMax: this.settings.latticeDensityMax,
-				});
-				if (eff === "individual" && 12 * this.zoom < this.settings.minFontPx * 0.5) {
-					eff = "density";
-				}
-				mix[eff] += 1;
-				const seed = node.isOther
-					? `__other__@${node.degree}`
-					: node.signature.length
-						? node.signature[0]
-						: node.key || "?";
-				const color = eff === "overview"
-					? t.swatch(clusterHue(seed), "fill", 0.95)
-					: eff === "density"
-						? t.swatch(clusterHue(seed), "fill", 0.92)
-						: t.swatch(clusterHue(seed), "fill", 0.90);
-				if (!seenColors[eff].has(color)) {
-					seenColors[eff].add(color);
-					const head = node.displayTags?.[0] ?? node.signature?.[0] ?? node.key;
-					classColors[eff].push({
-						label: node.isOther ? `Other (deg ${node.degree})` : `#${head}`,
-						color,
-					});
-				}
-			}
-			const nonZero = (["overview", "density", "individual"] as const).filter((k) => mix[k] > 0);
-			const effectiveLod: NonNullable<ModeLegendInput["lattice"]>["effectiveLod"] =
-				nonZero.length === 1 ? nonZero[0] : "mixed";
-			latticeInput = {
-				lod,
-				effectiveLod,
-				individualMax: this.settings.latticeIndividualMax,
-				densityMax: this.settings.latticeDensityMax,
-				densityCells: this.settings.latticeDensityCells,
-				lodMix: mix,
-				classColors,
-			};
-		}
-		let groups: ModeLegendInput["groups"];
-		let setLayers: ModeLegendInput["setLayers"];
-		const enclosureModes = ["euler", "bubblesets"];
-		// `groups` (the cluster enclosure swatches) stay INTRINSIC to enclosure
-		// modes — leaving the per-mode element policy unchanged.
-		if (enclosureModes.includes(this.settings.viewMode) && this.laid.clusters?.length) {
-			// `layerSuffix` already carries "· N nodes" (faithful to the panel's
-			// "N nodes" header meta), so the bare leading "(memberCount)" is dropped
-			// to avoid showing the count twice. `groupEnclosures` adds the "Group: "
-			// prefix that mirrors the panel's per-cluster tab.
-			groups = this.laid.clusters.map((c) => ({
-				key: c.groupKey,
-				label: `${c.label}${layerSuffix(c.groupKey, c.memberCount)}`,
-				color: t.swatch(clusterHue(c.groupKey), "fill"),
-			}));
-		} else if (this.settings.viewMode === "lattice") {
-			groups = [];
-			for (const k of this.clusterLabels.keys()) {
-				groups.push({
-					key: k,
-					label: `${cleanLabel(this.clusterLabels.get(k) ?? k)}${layerSuffix(k, tagVisibleCount(k))}`,
-					color: t.swatch(clusterHue(k), "fill"),
-				});
-			}
-		}
-		// ∪ / ∩ are addressable layers DISTINCT from the single-tag clusters and are
-		// surfaced in EVERY view mode. `unionN` = distinct visible notes, `interN` =
-		// notes carrying 2+ tags. Each mode keeps its visible notes in a different
-		// place, so derive the membership multiplicity from whichever source the
-		// current layout populated (mirrors tagVisibleCount):
-		//   • node modes → `laid.nodes[].memberships`
-		//   • droste     → `laid.drosteGallery.nodeKeys` (cell id → tag keys)
-		// resolveSetLayer applies the single-tag superset cascade (full/partial
-		// inheritance) so single-set settings influence ∪/∩.
-		const setMembershipCounts = (): { unionN: number; interN: number; pairwise: { t1: string; t2: string; interN: number; unionN: number }[] } | null => {
-			const nodeTags: string[][] = [];
-			const tagCounts = new Map<string, number>();
-
-			if (this.laid.nodes.length) {
-				for (const n of this.laid.nodes) {
-					const tags = n.memberships ?? [];
-					nodeTags.push(tags);
-					for (const t of tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
-				}
-			} else if (this.laid.drosteGallery?.cells.length) {
-				const gallery = this.laid.drosteGallery;
-				const counted = new Set<string>();
-				for (const cell of gallery.cells) {
-					if (counted.has(cell.id)) continue;
-					counted.add(cell.id);
-					const tags = (gallery.nodeKeys.get(cell.id) ?? []).filter((k) => k !== NONE_BUCKET);
-					nodeTags.push(tags);
-					for (const t of tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
-				}
-			} else {
-				return null;
-			}
-
-			let unionN = 0, interN = 0;
-			const pairInter = new Map<string, number>();
-
-			for (const tags of nodeTags) {
-				if (tags.length >= 1) unionN++;
-				if (tags.length >= 2) interN++;
-				const sortedTags = [...tags].sort();
-				for (let i = 0; i < sortedTags.length; i++) {
-					for (let j = i + 1; j < sortedTags.length; j++) {
-						const t1 = sortedTags[i], t2 = sortedTags[j];
-						const key = `${t1}\t${t2}`;
-						pairInter.set(key, (pairInter.get(key) ?? 0) + 1);
-					}
-				}
-			}
-
-			const pairwise: { t1: string; t2: string; interN: number; unionN: number }[] = [];
-			for (const [key, pInterN] of pairInter.entries()) {
-				const [t1, t2] = key.split("\t");
-				const c1 = tagCounts.get(t1) ?? 0;
-				const c2 = tagCounts.get(t2) ?? 0;
-				const pUnionN = c1 + c2 - pInterN;
-				pairwise.push({ t1, t2, interN: pInterN, unionN: pUnionN });
-			}
-			pairwise.sort((a, b) => b.interN - a.interN || a.t1.localeCompare(b.t1) || a.t2.localeCompare(b.t2));
-
-			return { unionN, interN, pairwise };
-		};
-		const setCounts = setMembershipCounts();
-		if (setCounts) {
-			const { unionN, interN, pairwise } = setCounts;
-			setLayers = [];
-			
-			for (const p of pairwise) {
-				const l1 = cleanLabel(this.clusterLabels.get(p.t1) ?? p.t1);
-				const l2 = cleanLabel(this.clusterLabels.get(p.t2) ?? p.t2);
-
-				const h1 = clusterHue(p.t1);
-				const h2 = clusterHue(p.t2);
-				// Striped pattern for union (horizontal) and intersection (vertical)
-				setLayers.push({
-					key: `__union__${p.t1}_${p.t2}`,
-					label: `${l1} ∪ ${l2}${layerSuffix(UNION_LAYER_KEY, p.unionN)}`,
-					color: createStripePattern([h1, h2], false),
-				});
-				setLayers.push({
-					key: `__inter__${p.t1}_${p.t2}`,
-					label: `${l1} ∩ ${l2}${layerSuffix(INTERSECTION_LAYER_KEY, p.interN)}`,
-					color: createStripePattern([h1, h2], true),
-				});
-			}
-
-			if (!pairwise.length && unionN > 0) {
-				setLayers.push({
-					key: UNION_LAYER_KEY,
-					label: `${SET_LAYER_LABEL[UNION_LAYER_KEY]}${layerSuffix(UNION_LAYER_KEY, unionN)}`,
-					color: t.swatch(140, "fill"),
-				});
-				setLayers.push({
-					key: INTERSECTION_LAYER_KEY,
-					label: `${SET_LAYER_LABEL[INTERSECTION_LAYER_KEY]}${layerSuffix(INTERSECTION_LAYER_KEY, interN)}`,
-					color: t.swatch(45, "fill"),
-				});
-			}
-		}
-		return {
-			encodingSpecs,
-			tags,
-			groups,
-			setLayers,
-			// DISPLAY-UNIT flag only: in closeup ∪/∩ are shown as an independent
-			// legend section (incl. enclosure modes) instead of being folded into
-			// the single-tag "Groups & overlap" spec. The ∪/∩ VALUES above are still
-			// the resolveSetLayer()-backed labels, so single-set settings keep
-			// cascading into ∪/∩ — only the display unit is split out.
-			closeup: isCloseup,
-			counts: { min: legendMin, max: legendMax },
-			droste: drosteOps,
-			lattice: latticeInput,
-			heatmap: {
-				jaccard: !!this.settings.heatmapJaccard,
-				tagMin: hmTagMin,
-				tagMax: hmTagMax,
-				coMax: hmCoMax,
-			},
-		};
+		// Thin wrapper: forward the view's live state into the pure builder
+		// (src/draw/mode-legend-input.ts). resolveLayerDisplay is the only
+		// behavioural callback the builder needs.
+		return computeModeLegendInput({
+			settings: this.settings,
+			laid: this.laid,
+			encLegends: this.encLegends,
+			clusterLabels: this.clusterLabels,
+			zoom: this.zoom,
+			resolveLayerDisplay: (k) => this.resolveLayerDisplay(k),
+		});
 	}
 
 	private screenToWorld(sx: number, sy: number): { x: number; y: number } {
