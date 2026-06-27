@@ -18,11 +18,15 @@
 		"typecheck:test": "tsc --noEmit -p tsconfig.test.json",
 		"knip": "knip",
 		"knip:ci": "knip",
-		"verify": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json && node test/run.mjs && knip && node esbuild.config.mjs",
+		"lint": "biome lint src test",
+		"lint:fix": "biome lint --write src test",
+		"format": "biome format --write src test",
+		"verify": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json && biome lint src test && node test/run.mjs && knip && node esbuild.config.mjs",
 		"e2e:bubblesets": "node esbuild.config.mjs && node test/e2e/setup-e2e-vault.mjs && node test/e2e/e2e-bubblesets.mjs",
 		"deploy": "node esbuild.config.mjs && node deploy.mjs"
 	},
 	"devDependencies": {
+		"@biomejs/biome": "2.5.1",
 		"@types/node": "^20.11.0",
 		"esbuild": "^0.21.0",
 		"fast-check": "^4.8.0",

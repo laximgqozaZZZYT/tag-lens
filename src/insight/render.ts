@@ -1,4 +1,4 @@
-import { App, setIcon, Modal, Notice } from "obsidian";
+import { type App, setIcon, Modal, Notice } from "obsidian";
 import type { LaidOut } from "../layout/layout";
 import type { MiniSettings } from "../types";
 import { staleClusters } from "../visual/freshness";

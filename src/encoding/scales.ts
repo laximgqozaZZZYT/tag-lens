@@ -116,7 +116,7 @@ export function prepareScale(config: ScaleConfig, rawValues: (string | number | 
 	// then resolve BOTH the legend entries and per-node apply() through this one
 	// map — so a displayed node and its legend swatch can never disagree.
 	const colorByKey = new Map<string, string>();
-	distinct.forEach((key, i) => colorByKey.set(key, palette[key] ?? categoricalColor(i)));
+	distinct.forEach((key, i) => { colorByKey.set(key, palette[key] ?? categoricalColor(i)); });
 	const outFor = (key: string): string => colorByKey.get(key) ?? palette[key] ?? autoColor(key);
 	const entries: LegendEntry[] = distinct.map((key) => ({ key, output: outFor(key) }));
 

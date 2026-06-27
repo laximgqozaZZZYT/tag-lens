@@ -19,7 +19,7 @@ ok(resolveStatusColor("   ", customColors) === null, "Whitespace returns null");
 const assigned = autoAssignColors(["to-read", "done", "Reading", " reading "]);
 
 ok(typeof assigned["to-read"] === "string" && assigned["to-read"].startsWith("#"), "Generates hex color");
-ok(assigned["reading"] === assigned["reading"], "Consistent key for reading");
+ok("reading" in assigned, "Consistent key for reading");
 ok(Object.keys(assigned).length === 3, "Only generates unique trimmed lowercase keys");
 
 const assigned2 = autoAssignColors(["to-read"]);

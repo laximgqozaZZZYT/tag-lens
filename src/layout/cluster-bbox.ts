@@ -306,10 +306,10 @@ export function computeClusterBBoxes(
 			// that, when several sub rects (or a sub rect and its parent
 			// Enforce strict grid alignment unconditionally. The iterative 
 			// collision resolver below will push overlapping edges outward by full cells.
-			let mainInsetX = 0;
-			let mainInsetY = 0;
-			let subInsetX = 0;
-			let subInsetY = 0;
+			const mainInsetX = 0;
+			const mainInsetY = 0;
+			const subInsetX = 0;
+			const subInsetY = 0;
 
 			const aabbFromCells = (
 				cells: Set<string>,

@@ -216,8 +216,8 @@ export function axisLayout(nodes: EncNode[], ctx: EncContext, opts: AxisLayoutOp
 		const anchorX = group.reduce((s, g) => s + g.ax, 0) / k;
 		const anchorY = group.reduce((s, g) => s + g.ay, 0) / k;
 
-		let targetCol = Math.floor(anchorX / opts.cell.w);
-		let targetRow = Math.floor(anchorY / opts.cell.h);
+		const targetCol = Math.floor(anchorX / opts.cell.w);
+		const targetRow = Math.floor(anchorY / opts.cell.h);
 
 		for (const item of group) {
 			const n = item.node as EncNode & { width?: number; height?: number };

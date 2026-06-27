@@ -29,6 +29,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit && npx tsc --noEmit -p tsconfig.test.json
 
+      - name: Lint (biome)
+        run: npm run lint
+
       - name: Test
         run: npm test
 

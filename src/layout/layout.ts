@@ -1,4 +1,4 @@
-import { GraphData, GraphNode, NONE_BUCKET } from "../types";
+import { type GraphData, type GraphNode, NONE_BUCKET } from "../types";
 
 import {
 	LaneRegistry,

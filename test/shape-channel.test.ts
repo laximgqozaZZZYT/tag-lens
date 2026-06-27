@@ -6,7 +6,9 @@ import type { NodeDrawParams, ScaledValue } from "../src/encoding/types";
 
 // shapeForKey is deterministic and order-independent.
 {
-	ok(shapeForKey("status") === shapeForKey("status"), "same key → same shape");
+	const shape1 = shapeForKey("status");
+	const shape2 = shapeForKey("status");
+	ok(shape1 === shape2, "same key → same shape");
 	ok(SHAPES.includes(shapeForKey("anything")), "result is always a known shape");
 	// A handful of distinct keys should spread across more than one shape.
 	const got = new Set(["a", "b", "c", "d", "e", "f", "g", "h"].map(shapeForKey));

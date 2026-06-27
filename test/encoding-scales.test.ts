@@ -50,7 +50,9 @@ import { prepareScale } from "../src/encoding/scales";
 	const s = prepareScale({ type: "categorical" }, ["a", "b", "a", null]);
 	ok(s.legend.kind === "categorical" && s.legend.entries!.length === 2, "two distinct categories (null dropped)");
 	ok(s.apply("a").category === "a" && typeof s.apply("a").output === "string", "categorical resolves key+output");
-	ok(s.apply("a").output === s.apply("a").output, "auto colour stable per key");
+	const out1 = s.apply("a").output;
+	const out2 = s.apply("a").output;
+	ok(out1 === out2, "auto colour stable per key");
 	ok(s.apply(null).missing === true, "categorical null -> missing");
 }
 // HARD INVARIANT: a displayed node's colour MUST equal its legend swatch. Both

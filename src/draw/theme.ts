@@ -87,7 +87,7 @@ export function parseColor(input: string): RGB | null {
 export function relativeLuminance({ r, g, b }: RGB): number {
 	const lin = (c: number) => {
 		const x = c / 255;
-		return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+		return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
 	};
 	return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
 }

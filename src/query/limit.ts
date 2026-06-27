@@ -1,4 +1,4 @@
-import { GraphNode } from "../types";
+import type { GraphNode } from "../types";
 
 // LIMIT section: per-cluster node display rules. Each tier consumes a
 // successive rank range from the cluster's sort order; ranks past the last

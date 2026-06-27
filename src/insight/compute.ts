@@ -1,4 +1,4 @@
-import { App } from "obsidian";
+import type { App } from "obsidian";
 import { effectiveClassification } from "../query/tag-classification";
 
 interface GlobalStats {

@@ -280,7 +280,7 @@ export function buildIcon(g: DrosteGallery, focusId: string): IconDiagram {
 		// region is non-empty.
 		if (d > 0 && !present(S)) continue;
 		const n = d + 2;
-		const cap = Math.pow(4, n) - 1; // per-set draw cap (spec 2026-06-01)
+		const cap = 4 ** n - 1; // per-set draw cap (spec 2026-06-01)
 		const mem = (excl.get(S.join(SEP)) ?? []).slice().sort((a, b) => (a.id < b.id ? -1 : 1));
 		const take = Math.min(mem.length, cap);
 		const set: IconSet = { keys: S, label: sigLabel(S), members: mem.slice(0, take), overflow: mem.length - take };
@@ -305,7 +305,7 @@ export function buildIcon(g: DrosteGallery, focusId: string): IconDiagram {
 	const toCell = (id: string) => ({ id, label: g.nodeLabel.get(id) ?? id });
 	if (linkIds.length || backIds.length) {
 		const n5 = (levels.length ? levels[levels.length - 1].n : 2) + 1;
-		const cap5 = Math.pow(4, n5) - 1;
+		const cap5 = 4 ** n5 - 1;
 		const mk = (ids: string[], label: string, hue: number): IconSet => {
 			const m = [...new Set(ids)].sort().map(toCell);
 			return { keys: [label], label, members: m.slice(0, cap5), overflow: Math.max(0, m.length - cap5), hue };

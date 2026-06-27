@@ -3,7 +3,7 @@
 // barycenter helper. (The former snapAndBuildRouteData / routeAllEdges
 // one-shot pipeline was unused and removed.)
 import type { PositionedNode } from "./layout";
-import { type RouteObstacle, type RouteRect } from "./edge-routing";
+import type { RouteObstacle, RouteRect } from "./edge-routing";
 
 // Build an `idToRect` map from the current `(x, y, width, height)` of
 // each positioned node. Pure read.
@@ -92,7 +92,7 @@ export function barycenter(
 			return w ? s / w : nRows + it;
 		});
 		colIdx.sort((a, b) => colB[a] - colB[b]);
-		colIdx.forEach((c, pos) => (colPos[c] = pos));
+		colIdx.forEach((c, pos) => { (colPos[c] = pos); });
 		// Rows ← weighted mean column position.
 		const rowB = rowCells.map((cs) => {
 			if (!cs.length) return nCols + it;
@@ -105,7 +105,7 @@ export function barycenter(
 			return w ? s / w : nCols + it;
 		});
 		rowIdx.sort((a, b) => rowB[a] - rowB[b]);
-		rowIdx.forEach((r, pos) => (rowPos[r] = pos));
+		rowIdx.forEach((r, pos) => { (rowPos[r] = pos); });
 		// Jaccard-weighted cell-spread cost (lower = tighter diagonal/blocks).
 		let cost = 0;
 		let wsum = 0;

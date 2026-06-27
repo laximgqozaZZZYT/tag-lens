@@ -40,10 +40,10 @@ function gridBorderRing(cx: number, cy: number, nSteps: number, stepCells: numbe
 	const xs: number[] = [];
 	for (let k = -nSteps; k <= nSteps; k++) xs.push(k * stepCells); // shared columns/rows
 	const slots: [number, number][] = [];
-	xs.forEach((x) => slots.push([x, -R])); // top  L→R
-	xs.slice(1, -1).forEach((y) => slots.push([R, y])); // right (skip shared corners)
-	[...xs].reverse().forEach((x) => slots.push([x, R])); // bottom R→L
-	[...xs.slice(1, -1)].reverse().forEach((y) => slots.push([-R, y])); // left
+	xs.forEach((x) => { slots.push([x, -R]); }); // top  L→R
+	xs.slice(1, -1).forEach((y) => { slots.push([R, y]); }); // right (skip shared corners)
+	[...xs].reverse().forEach((x) => { slots.push([x, R]); }); // bottom R→L
+	[...xs.slice(1, -1)].reverse().forEach((y) => { slots.push([-R, y]); }); // left
 	const N = slots.length, out: Pt[] = [];
 	for (let i = 0; i < count; i++) { const s = slots[Math.round((i * N) / count) % N]; out.push({ x: cx + s[0] * u, y: cy + s[1] * u }); }
 	return out;
@@ -78,7 +78,7 @@ function drawWrapped(ctx: CanvasRenderingContext2D, text: string, cx: number, cy
 	const lines = wrapLines(ctx, text, maxW, maxLines);
 	ctx.fillStyle = color; ctx.textAlign = "center"; ctx.textBaseline = "middle";
 	const y0 = cy - ((lines.length - 1) * lh) / 2;
-	lines.forEach((ln, i) => ctx.fillText(ln, cx, y0 + i * lh));
+	lines.forEach((ln, i) => { ctx.fillText(ln, cx, y0 + i * lh); });
 }
 
 const focusRing = () => theme().warn;

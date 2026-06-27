@@ -73,7 +73,7 @@ function buildDiscreteAxis(binding: EncodingBinding | undefined, nodes: EncNode[
 		// "missing" bucket holds nodes whose value is null (so every cell still
 		// lands somewhere — no cell is ever dropped).
 		const idxByKey = new Map<string, number>();
-		entries.forEach((e, i) => idxByKey.set(e.key, i));
+		entries.forEach((e, i) => { idxByKey.set(e.key, i); });
 		const missingIdx = entries.length; // last bucket (may be unused)
 		let usedMissing = false;
 		const bucketOf = (node: EncNode): number => {

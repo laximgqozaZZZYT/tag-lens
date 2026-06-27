@@ -266,7 +266,7 @@ function drawMatrixDots(
 ): void {
 	if (!u) return;
 	const setIdx = new Map<string, number>();
-	setRows.forEach((s, i) => setIdx.set(s.key, i));
+	setRows.forEach((s, i) => { setIdx.set(s.key, i); });
 	for (let i = 0; i < u.columns.length; i++) {
 		const col = u.columns[i];
 		const x = col.xWorld * zoom + panX;

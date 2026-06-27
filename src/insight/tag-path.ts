@@ -40,7 +40,7 @@ export function isValidTagName(tag: string): boolean {
 
 	// Reject ASCII control characters and NUL up front (defense in depth; the
 	// Unicode class below would already exclude them).
-	// eslint-disable-next-line no-control-regex -- intentionally matching ASCII control chars (NUL..US) to reject path-injection / control-char payloads in tag names
+	// biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally matching ASCII control chars (NUL..US) to reject path-injection / control-char payloads in tag names
 	if (/[\x00-\x1f]/.test(tag)) return false;
 
 	return TAG_NAME_RE.test(tag);

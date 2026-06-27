@@ -2,7 +2,7 @@
 // list of membership tags (symmetric), so cell (i,j) = |Ti ∩ Tj| and the
 // diagonal (i,i) = |Ti|. Pairwise only (2 tags) — 3-way+ intersections are the
 // UpSet job. Reuses the shared Jaccard barycenter for the tag order.
-import { GraphData } from "../types";
+import type { GraphData } from "../types";
 import type { LaidOut, LayoutOptions, HeatmapMeta } from "./layout";
 import { barycenter } from "./layout-shared";
 import { computeChannelDims, minFontScale } from "./card-sizing";
@@ -27,7 +27,7 @@ export function layoutHeatmap(data: GraphData, opts: LayoutOptions): LaidOut {
 		.filter((k) => (tagCount.get(k) ?? 0) >= minSize)
 		.sort((a, b) => tagCount.get(b)! - tagCount.get(a)! || (a < b ? -1 : 1));
 	const tagIndex = new Map<string, number>();
-	tagKeys.forEach((k, i) => tagIndex.set(k, i));
+	tagKeys.forEach((k, i) => { tagIndex.set(k, i); });
 	const nTags = tagKeys.length;
 
 	// tag → note indices (barycenter rows), note → tag indices (barycenter cols),
@@ -65,7 +65,7 @@ export function layoutHeatmap(data: GraphData, opts: LayoutOptions): LaidOut {
 	// bumped symmetrically.
 	const n = nTags;
 	const disp = new Array<number>(n);
-	order.forEach((t, pos) => (disp[t] = pos));
+	order.forEach((t, pos) => { (disp[t] = pos); });
 	const counts = new Uint32Array(n * n);
 	for (let r = 0; r < data.nodes.length; r++) {
 		const ts = noteTags[r];

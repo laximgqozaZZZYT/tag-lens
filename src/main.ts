@@ -1,5 +1,5 @@
-import { Plugin, PluginSettingTab, Setting, WorkspaceLeaf } from "obsidian";
-import { DEFAULT_SETTINGS, MiniSettings, LensPreset } from "./types";
+import { Plugin, PluginSettingTab, Setting, type WorkspaceLeaf } from "obsidian";
+import { DEFAULT_SETTINGS, type MiniSettings, type LensPreset } from "./types";
 import { applyLens } from "./interaction/lens-presets";
 import { MiniGraphView, VIEW_TYPE_MINI } from "./view";
 

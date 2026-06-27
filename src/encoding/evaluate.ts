@@ -59,7 +59,7 @@ export function evaluateEncoding(
 		const scaleCfg = b.scale ?? defaultScaleFor(field.kind);
 		const raws = nodes.map((n) => field.accessor(n, ctx)); // reads only; nodes untouched
 		const scale = prepareScale(scaleCfg, raws);
-		nodes.forEach((n, i) => channel.apply(ensure(n.id), scale.apply(raws[i]), ctx));
+		nodes.forEach((n, i) => { channel.apply(ensure(n.id), scale.apply(raws[i]), ctx); });
 		legends.push({ channelId: b.channelId, fieldId: b.fieldId, fieldLabel: field.label, legend: scale.legend });
 	}
 

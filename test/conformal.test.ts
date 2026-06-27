@@ -21,7 +21,7 @@ for (const twistDir of [1, -1] as const) {
 		const z0 = drosteForward(u, v, Q);
 		const z1 = drosteForward(u, v + 2 * Math.PI, Q);
 		const ratio = Math.hypot(z1.re, z1.im) / Math.hypot(z0.re, z0.im);
-		approx(ratio, Math.pow(Q.k, twistDir), 1e-9,
+		approx(ratio, Q.k ** twistDir, 1e-9,
 			`scale ×k per loop (twist=${twistDir}, u=${u}, v=${v})`);
 		// Angle closure: arg advances by exactly 2π over one loop (Re(γ)=1).
 		const a0 = Math.atan2(z0.im, z0.re);

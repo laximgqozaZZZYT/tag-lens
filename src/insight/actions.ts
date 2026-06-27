@@ -1,4 +1,4 @@
-import { App, Notice } from "obsidian";
+import { type App, Notice } from "obsidian";
 import { isValidTagName } from "./tag-path";
 
 export async function applyGolderClassification(

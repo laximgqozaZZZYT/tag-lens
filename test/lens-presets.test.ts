@@ -1,6 +1,6 @@
 import { ok } from "./assert";
 import { captureLens, applyLens, upsertPreset, removePreset, validatePresetName, capturePreset } from "../src/interaction/lens-presets";
-import { DEFAULT_SETTINGS, MiniSettings } from "../src/types";
+import { DEFAULT_SETTINGS, type MiniSettings } from "../src/types";
 import type { EncodingBinding } from "../src/encoding/types";
 
 // captureLens copies arrays deeply

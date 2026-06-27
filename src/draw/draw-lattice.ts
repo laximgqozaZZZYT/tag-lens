@@ -306,7 +306,7 @@ function drawSubsetLinks(
 	wBottom: number,
 ): void {
 	const indexByKey = new Map<string, number>();
-	meta.nodes.forEach((n, i) => indexByKey.set(n.key, i));
+	meta.nodes.forEach((n, i) => { indexByKey.set(n.key, i); });
 
 	// 1. Dim back layer — every link, low alpha, thin.
 	ctx.strokeStyle = linkDimRgba();

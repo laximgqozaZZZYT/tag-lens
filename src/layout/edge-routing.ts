@@ -1,4 +1,4 @@
-import { GraphEdge } from "../types";
+import type { GraphEdge } from "../types";
 
 // Card rectangle used by the router. Mirrors the internal Rect in layout
 // — kept in a shared module so edge-routing doesn't import from layout

@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFile, debounce, setIcon, Notice, Menu, MarkdownView } from "obsidian";
+import { ItemView, type WorkspaceLeaf, TFile, debounce, setIcon, Notice, Menu, MarkdownView } from "obsidian";
 import { exportCanvasDims } from "./visual/image-export";
 import { renderInsightTab } from "./insight/render";
 import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
@@ -2302,6 +2302,7 @@ export class MiniGraphView extends ItemView {
 				panY: this.panY,
 				hoverId: this.hoveredNodeId,
 				focusId: this.settings.drosteFocus,
+				// biome-ignore lint/suspicious/noAssignInExpressions: assign-and-pass the live hit-region array so the draw path fills the same ref we read back on hit-testing
 				hitRegions: (this.drosteHit = []),
 				// Pass the live hidden set so the draw path skips unchecked cells
 				// immediately on requestDraw() — no rebuild required (matches
@@ -2970,7 +2971,7 @@ export class MiniGraphView extends ItemView {
 		// resolveSetLayer applies the single-tag superset cascade (full/partial
 		// inheritance) so single-set settings influence ∪/∩.
 		const setMembershipCounts = (): { unionN: number; interN: number; pairwise: { t1: string; t2: string; interN: number; unionN: number }[] } | null => {
-			let nodeTags: string[][] = [];
+			const nodeTags: string[][] = [];
 			const tagCounts = new Map<string, number>();
 
 			if (this.laid.nodes.length) {

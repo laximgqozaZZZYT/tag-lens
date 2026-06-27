@@ -51,7 +51,7 @@ export function parseBaseStructure(obj: unknown, filePath: string): BaseTable {
 	const views: BaseView[] = [];
 	const rawViews = root["views"];
 	if (Array.isArray(rawViews)) {
-		rawViews.forEach((v, i) => views.push(parseView(v, i)));
+		rawViews.forEach((v, i) => { views.push(parseView(v, i)); });
 	}
 
 	return { filePath, name, views, formulas };
