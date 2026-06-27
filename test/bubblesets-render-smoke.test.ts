@@ -16,37 +16,9 @@ import { drawBubbleSetsEnclosures } from "../src/draw/draw-bubblesets";
 import { drawClusterLabels } from "../src/draw/draw-helpers";
 import { drawCard } from "../src/draw/draw-card";
 import { setTheme, defaultTheme } from "../src/draw/theme";
+import { recordingCtx } from "./recording-ctx";
 
 setTheme(defaultTheme()); // headless: theme() must not need getComputedStyle
-
-interface Rec {
-	fillRect: number; strokeRect: number; fillText: number; strokeText: number; fill: number; stroke: number;
-}
-// A canvas 2D context stand-in that COUNTS the draw ops the smoke test asserts
-// on, and no-ops everything else the draw code touches (paths, transforms,
-// gradients, dashes). measureText returns a deterministic width so text layout
-// is reproducible without a DOM.
-function recordingCtx(): { ctx: CanvasRenderingContext2D; rec: Rec } {
-	const rec: Rec = { fillRect: 0, strokeRect: 0, fillText: 0, strokeText: 0, fill: 0, stroke: 0 };
-	const grad = { addColorStop() {} };
-	const c = {
-		fillStyle: "" as unknown, strokeStyle: "" as unknown, lineWidth: 1, font: "",
-		textAlign: "start", textBaseline: "alphabetic", globalAlpha: 1, lineJoin: "miter", miterLimit: 10,
-		save() {}, restore() {}, beginPath() {}, closePath() {}, moveTo() {}, lineTo() {},
-		arc() {}, arcTo() {}, ellipse() {}, rect() {}, roundRect() {}, clip() {},
-		quadraticCurveTo() {}, bezierCurveTo() {}, translate() {}, scale() {}, rotate() {},
-		setTransform() {}, resetTransform() {}, setLineDash() {}, getLineDash() { return [] as number[]; },
-		createLinearGradient() { return grad; }, createPattern() { return null; },
-		drawImage() {}, clearRect() {},
-		fill() { rec.fill++; }, stroke() { rec.stroke++; },
-		fillRect() { rec.fillRect++; }, strokeRect() { rec.strokeRect++; },
-		fillText() { rec.fillText++; }, strokeText() { rec.strokeText++; },
-		measureText(t: string) {
-			return { width: (t ? t.length : 0) * 6, actualBoundingBoxAscent: 7, actualBoundingBoxDescent: 2 } as TextMetrics;
-		},
-	};
-	return { ctx: c as unknown as CanvasRenderingContext2D, rec };
-}
 
 function opts(): LayoutOptions {
 	return {
