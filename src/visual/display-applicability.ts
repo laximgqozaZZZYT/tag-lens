@@ -19,6 +19,6 @@ export type DisplayToggleKey =
 // every card toggle and per-card overlay applies.
 
 
-export function displayToggleApplies(mode: ViewMode, key: DisplayToggleKey): boolean {
+export function displayToggleApplies(_mode: ViewMode, _key: DisplayToggleKey): boolean {
 	return true;
 }

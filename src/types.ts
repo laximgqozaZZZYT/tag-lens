@@ -421,12 +421,6 @@ export const DEFAULT_SETTINGS: MiniSettings = {
 export const NONE_BUCKET = "(none)";
 
 // Heatmap ORDER_BY criteria — added to the standard criterion dropdown in
-// heatmap mode only. "co-occurrence" = Jaccard seriation (related tags cluster
-// on the diagonal); "size" = by tag size. Maps to heatmapCriterion.
-export const HEATMAP_ORDER_CRITERIA: Array<{ value: string; text: string }> = [
-	{ value: "co-occurrence", text: "co-occurrence" },
-	{ value: "size", text: "size" },
-];
 
 // Card text geometry. Title and body lines use different sizes/weights.
 export const CARD_RADIUS_PX = 4;

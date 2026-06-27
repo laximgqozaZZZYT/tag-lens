@@ -22,7 +22,7 @@ import {
 export function computeAggregationGroups(
 	nodes: PositionedNode[],
 	settings: MiniSettings,
-	viewMode: ViewMode
+	_viewMode: ViewMode
 ): AggregationState {
 	const groups = new Map<string, AggregationGroup>();
 	const nodeToGroup = new Map<string, string>();

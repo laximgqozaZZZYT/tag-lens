@@ -1,4 +1,3 @@
-import { AbstractInputSuggest, type App } from "obsidian";
 
 // Beginner-friendly typeahead for the SQL-like WHERE / GROUP_BY text inputs.
 // It is a BEST-EFFORT input aid layered on top of the existing free-text box:
@@ -113,42 +112,4 @@ function rankMatches(pool: string[], q: string, limit: number): string[] {
 
 function dedupe(arr: string[]): string[] {
 	return [...new Set(arr)];
-}
-
-// ── Vault source collection ─────────────────────────────────────────────────
-// Walks markdown files via the public metadataCache. Mirrors the lightweight
-// tag-collection approach to avoid pulling heavy graph-build modules
-// into the lightweight UI layers.
-export function collectSuggestSources(app: App): SuggestSources {
-	const tags = new Set<string>();
-	const fields = new Set<string>();
-	const files = app.vault.getMarkdownFiles();
-	for (const f of files) {
-		const cache = app.metadataCache.getFileCache(f);
-		if (!cache) continue;
-		if (cache.tags) {
-			for (const t of cache.tags) tags.add(stripHash(t.tag));
-		}
-		const fm = cache.frontmatter;
-		if (fm && typeof fm === "object") {
-			for (const key of Object.keys(fm)) {
-				if (key === "position") continue; // internal cache artefact
-				fields.add(key);
-			}
-			const fmTags = (fm as Record<string, unknown>).tags;
-			if (Array.isArray(fmTags)) {
-				for (const t of fmTags) tags.add(stripHash(String(t)));
-			} else if (typeof fmTags === "string") {
-				tags.add(stripHash(fmTags));
-			}
-		}
-	}
-	return {
-		tags: [...tags].filter((t) => t.length > 0).sort(),
-		fields: [...fields].sort(),
-	};
-}
-
-function stripHash(t: string): string {
-	return t.startsWith("#") ? t.slice(1) : t;
 }

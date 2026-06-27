@@ -1,33 +1,9 @@
-// Shared layout post-processing for Euler + UpSet view modes.
-//
-// Both pipelines reach a point where:
-//   1. Cards have been positioned in world space.
-//   2. They need to be SNAPPED to the slot lattice so the channels
-//      between cells are clean.
-//   3. Routing obstacles (per-card cell footprints) + an idToRect
-//      map (per-card rect) must be built for `routeZ`.
-//   4. `GraphEdge[]` must be aggregated + routed via `routeZ` through
-//      the channel lattice with `LaneRegistry` separation.
-//
-// Euler historically did this inline with extra cluster overlap
-// suppression; UpSet did its own subset of the same logic. Both now
-// call into `snapAndBuildRouteData` (steps 2–3) and `routeAllEdges`
-// (step 4) so the wiring + grid alignment are guaranteed identical.
-import type { GraphEdge } from "../types";
-import type { PositionedNode, PositionedEdge } from "./layout";
-import { snapCardsToGrid } from "./cell-snap";
-import {
-	LaneRegistry,
-	aggregateEdges,
-	routeZ,
-	type RouteObstacle,
-	type RouteRect,
-} from "./edge-routing";
-
-interface SnapAndRouteData {
-	idToRect: Map<string, RouteRect>;
-	routeObstacles: RouteObstacle[];
-}
+// Shared layout helpers for Euler + UpSet view modes: build a per-card
+// idToRect map and the per-card cell-footprint routing obstacles, plus the
+// barycenter helper. (The former snapAndBuildRouteData / routeAllEdges
+// one-shot pipeline was unused and removed.)
+import type { PositionedNode } from "./layout";
+import { type RouteObstacle, type RouteRect } from "./edge-routing";
 
 // Build an `idToRect` map from the current `(x, y, width, height)` of
 // each positioned node. Pure read.
@@ -66,62 +42,6 @@ export function buildRouteObstacles(
 	return out;
 }
 
-// One-shot pipeline for callers that haven't done the snap themselves
-// (= UpSet). Mutates `positionedNodes` via `snapCardsToGrid` then
-// returns the routing data derived from the snapped positions.
-function snapAndBuildRouteData(
-	positionedNodes: PositionedNode[],
-	slotW: number,
-	slotH: number,
-): SnapAndRouteData {
-	const idToRect = buildIdToRect(positionedNodes);
-	snapCardsToGrid(positionedNodes, slotW, slotH, idToRect);
-	const routeObstacles = buildRouteObstacles(positionedNodes, slotW, slotH);
-	return { idToRect, routeObstacles };
-}
-
-// Step 4: aggregate + route every edge through the channel lattice.
-// Used directly by UpSet (no cluster grouping); Euler uses
-// `aggregateEdges` itself for the pair-group / intra-cluster logic
-// and only calls `routeOnePair` per surviving edge.
-function routeAllEdges(
-	graphEdges: GraphEdge[],
-	idToRect: Map<string, RouteRect>,
-	routeObstacles: RouteObstacle[],
-	slotW: number,
-	slotH: number,
-	channelW: number,
-	channelH: number,
-): PositionedEdge[] {
-	const aggregated = aggregateEdges(graphEdges, idToRect);
-	const lanes = new LaneRegistry();
-	const edges: PositionedEdge[] = [];
-	for (const e of aggregated) {
-		const a = idToRect.get(e.source);
-		const b = idToRect.get(e.target);
-		if (!a || !b) continue;
-		edges.push({
-			source: e.source,
-			target: e.target,
-			weight: e.weight,
-			path: routeZ(
-				a,
-				b,
-				lanes,
-				slotW,
-				slotH,
-				channelW,
-				channelH,
-				routeObstacles,
-				e.source,
-				e.target,
-			),
-			bundled: false,
-			bundleCount: 1,
-		});
-	}
-	return edges;
-}
 
 // Bipartite barycenter seriation. Alternately reorders columns by the mean
 // position of their member rows and rows by the mean position of their member

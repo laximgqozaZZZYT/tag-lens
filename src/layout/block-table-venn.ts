@@ -296,7 +296,6 @@ function blockTableVennCore(
 	//   row0 = max(A, A∩B, B); row1 = max(A∩C, A∩B∩C, B∩C); row2 = C-only.
 	const row0H = Math.max(bA.rows, bAB.rows, bB.rows);
 	const row1H = Math.max(bAC.rows, bABC.rows, bBC.rows);
-	const row2H = bC.rows;
 
 	const GAP_X = 3;
 	const GAP_Y = 4;

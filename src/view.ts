@@ -335,10 +335,6 @@ export class MiniGraphView extends ItemView {
 		}
 		return out;
 	}
-	private whereError = "";
-	private groupByError = "";
-	private havingError = "";
-	private limitError = "";
 	private displayMode: Map<string, "full" | "brief"> = new Map();
 	private degreeMap: Map<string, number> = new Map();
 	// Visual Encoding output (computed per rebuild): per-node draw params + legends.
@@ -1165,9 +1161,6 @@ export class MiniGraphView extends ItemView {
 			}
 		}
 
-		this.whereError = "";
-		this.groupByError = "";
-		this.havingError = "";
 		this.highlightedHavingClusters.clear();
 		this.clusterLabels = clusterLabels;
 

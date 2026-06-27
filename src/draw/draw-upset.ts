@@ -53,7 +53,7 @@ interface UpsetWorldLayout {
 function computeUpsetActiveSets(
 	laid: LaidOut,
 	canvasW: number,
-	canvasH: number,
+	_canvasH: number,
 	footerTopY: number,
 	zoom: number,
 	panX: number,

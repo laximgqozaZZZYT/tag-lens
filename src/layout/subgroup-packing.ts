@@ -1,14 +1,5 @@
-import type { GraphNode } from "../types";
 import type { SizedNode } from "./layout";
 
-// Sub-group = a maximal set of nodes that share an IDENTICAL membership
-// signature. Single-membership clusters produce a sub-group per
-// membership; multi-tag combinations produce one sub-group per unique
-// combination.
-interface SubGroup {
-	memberships: string[]; // sorted
-	nodes: GraphNode[];
-}
 
 export function isSubset<T>(small: Set<T>, big: Set<T>): boolean {
 	if (small.size > big.size) return false;

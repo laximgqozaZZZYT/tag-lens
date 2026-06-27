@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { collectSuggestSources, type SuggestSources } from "./tag-field-suggest";
+import { type SuggestSources } from "./tag-field-suggest";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Visual builder for WHERE / GROUP_BY rows.

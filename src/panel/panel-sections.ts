@@ -40,12 +40,3 @@ export function renderToggleSection<
 // Saved Lenses
 // ────────────────────────────────────────────────────────────────────
 
-interface PresetSectionDeps {
-	settings: MiniSettings;
-	save: () => void;
-	rerender: () => void;
-	rebuild: () => void;
-	applyPreset: (presetName: string) => void;
-	savePreset: (name: string) => void;
-	removePreset: (name: string) => void;
-}

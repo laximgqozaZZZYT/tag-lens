@@ -80,7 +80,7 @@ export function removePreset(presets: LensPreset[], name: string): LensPreset[] 
  * Validates a preset name.
  * Returns an error message if invalid, or null if valid.
  */
-export function validatePresetName(name: string, existing: LensPreset[]): string | null {
+export function validatePresetName(name: string, _existing: LensPreset[]): string | null {
 	const trimmed = name.trim();
 	if (trimmed.length === 0) {
 		return "Preset name cannot be empty.";
