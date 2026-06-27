@@ -32,17 +32,6 @@ export function membershipStripeHues(memberships: string[] | undefined): number[
 	return hues;
 }
 
-// Which set-operation a striped node depicts, and therefore its stripe
-// ORIENTATION. The renderer maps:
-//   • intersection (∩) → VERTICAL bars  (a node sitting in the OVERLAP of ≥2
-//     clusters — the well-defined per-node intersection case)
-//   • union (∪)        → HORIZONTAL bars (a node that stands for the WHOLE of
-//     one-or-more sets, i.e. a tag-core / set node that is the union of its
-//     members)
-// This keeps the node fills consistent with the closeup legend, where ∪ layers
-// already draw horizontal and ∩ layers vertical.
-export type SetKind = "intersection" | "union";
-
 export interface NodeStripe {
 	hues: number[];
 	isVertical: boolean; // true → ∩ vertical · false → ∪ horizontal
@@ -66,20 +55,6 @@ export function resolveNodeStripe(
 ): NodeStripe {
 	const hues = memberships.map((m) => clusterHue(m));
 	return { hues, isVertical: !isUnionCore };
-}
-
-// Excel-style column header letters: 0 → "A", 25 → "Z", 26 → "AA",
-// 27 → "AB", ...
-export function colLetters(c: number): string {
-	if (c < 0) return "";
-	let n = c + 1;
-	let s = "";
-	while (n > 0) {
-		const rem = (n - 1) % 26;
-		s = String.fromCharCode(65 + rem) + s;
-		n = Math.floor((n - 1) / 26);
-	}
-	return s;
 }
 
 // Stable hue (0-359) derived from a cluster's groupKey. Uses a tiny
@@ -254,13 +229,6 @@ export function floorWorldFontPx(
 ): number {
 	if (zoom <= 0) return intendedWorldPx;
 	return Math.max(intendedWorldPx, minScreenPx / zoom);
-}
-
-export function floorScreenFontPx(
-	intendedScreenPx: number,
-	minScreenPx: number,
-): number {
-	return Math.max(intendedScreenPx, minScreenPx);
 }
 
 // Two cluster hues can land arbitrarily close together on the wheel (or even

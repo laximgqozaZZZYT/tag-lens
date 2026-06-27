@@ -12,7 +12,7 @@ import { NONE_BUCKET } from "../types";
 //   ② nodes whose membership set EXACTLY equals T (incl. N)
 //   ③ those nodes as ONE T-enclosure frame
 //   ④ groups whose signature is a PROPER SUBSET of T (zoom-out)
-export interface DrosteShape {
+interface DrosteShape {
 	id: string;
 	role: 1 | 2 | 3 | 4;
 	kind: "card" | "frame"; // card = node (filled); frame = group enclosure (stroked)
@@ -51,7 +51,7 @@ export interface DrosteLayoutOpts {
 	cols?: number; // cap on ② cards and ④ subset frames before "+N"
 }
 
-export const DROSTE_UBASE = 0.04; // inner u offset (tight central core)
+const DROSTE_UBASE = 0.04; // inner u offset (tight central core)
 const TWO_PI = 2 * Math.PI;
 
 // Source(x,y) → strip ζ=(u,v). X→angle (full circle), Y→radial band; uH chosen so
@@ -200,8 +200,8 @@ export interface DrosteGallery {
 	axes?: { x?: AxisSpec; y?: AxisSpec };
 }
 
-export interface IconSet { keys: string[]; label: string; members: { id: string; label: string }[]; overflow: number; hue?: number; }
-export interface IconLevel { n: number; sets: IconSet[]; kind?: "tag" | "link"; } // n: 2=②, 3=③₁, … ; ⑤ = kind "link"
+interface IconSet { keys: string[]; label: string; members: { id: string; label: string }[]; overflow: number; hue?: number; }
+interface IconLevel { n: number; sets: IconSet[]; kind?: "tag" | "link"; } // n: 2=②, 3=③₁, … ; ⑤ = kind "link"
 export interface IconDiagram { focusId: string; focusLabel: string; tKeys: string[]; levels: IconLevel[]; }
 
 // Build the gallery index over the FULL graph. Cheap: one pass to bucket nodes by
@@ -319,5 +319,5 @@ export function buildIcon(g: DrosteGallery, focusId: string): IconDiagram {
 }
 
 // ⑤ link/backlink colours (distinct from the tag palette).
-export const LINK_HUE = 190; // link = cyan
-export const BACKLINK_HUE = 25; // backlink = orange
+const LINK_HUE = 190; // link = cyan
+const BACKLINK_HUE = 25; // backlink = orange

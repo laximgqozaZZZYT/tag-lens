@@ -22,7 +22,7 @@ import { collectSuggestSources, type SuggestSources } from "./tag-field-suggest"
 // preserved verbatim and never lost or rewritten.
 // ────────────────────────────────────────────────────────────────────────────
 
-export type SimpleKind =
+type SimpleKind =
 	| "tag-has" // tag:#value
 	| "tag-not" // -tag:#value
 	| "tag-any" // tag:?
@@ -182,12 +182,6 @@ function addScalar(set: Set<string>, v: unknown): void {
 	if (s.length > 0) set.add(s);
 }
 
-// Convenience: gather everything the builder UI needs from the live app in one
-// call. Thin wrapper so the renderer stays declarative.
-export function collectBuilderSources(app: App): BuilderSources {
-	return buildBuilderSources(collectSuggestSources(app));
-}
-
 // Gather the distinct values of EVERY builder-simple frontmatter field, capped
 // per field, so the picker can offer "field: value" candidates without a second
 // vault pass per keystroke. Returns a field → values[] map (values pre-capped).
@@ -289,7 +283,7 @@ export function tagPickerRowLabel(raw: string): TagPickerRowLabel {
 // plus a primary label + a muted type hint for the popover. Pure — no DOM/app.
 // ────────────────────────────────────────────────────────────────────────────
 
-export type PickerCandidateKind = "tag" | "property" | "tag-split" | "field-split";
+type PickerCandidateKind = "tag" | "property" | "tag-split" | "field-split";
 
 export interface PickerCandidate {
 	kind: PickerCandidateKind;
@@ -310,7 +304,7 @@ export interface PickerCandidate {
 export const PROPERTY_VALUE_CANDIDATE_CAP = 10;
 
 // Overall popover cap (mirrors the tag-only suggester's previous slice(0, 20)).
-export const PICKER_CANDIDATE_CAP = 20;
+const PICKER_CANDIDATE_CAP = 20;
 
 // Build the full, UNFILTERED candidate pool from vault sources + the per-field
 // value map. Ordering inside the pool is: auto-split-all-tags, then tag values,

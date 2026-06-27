@@ -6,7 +6,7 @@ import type { NodeShape } from "../encoding/shapes";
 import type { LegendKind, LegendSpec } from "./legend-spec";
 import { shapeMarkerPath } from "./draw-shape";
 
-export interface LegendItem {
+interface LegendItem {
 	label: string;
 	color?: string | CanvasPattern;
 	shape?: NodeShape;
@@ -16,7 +16,7 @@ export interface LegendItem {
 	x: number;
 	y: number;
 }
-export interface LegendSection {
+interface LegendSection {
 	title: string;
 	kind: LegendKind;
 	items: LegendItem[];

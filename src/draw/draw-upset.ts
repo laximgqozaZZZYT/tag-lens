@@ -44,13 +44,13 @@ export function upsetFooterHeight(canvasH: number, activeRowCount: number): numb
 	return Math.max(min, Math.min(cap, need));
 }
 
-export interface UpsetWorldLayout {
+interface UpsetWorldLayout {
 	activeSets: Array<{ key: string; label: string; size: number }>;
 }
 
 // Determine which sets are "active" — i.e. have at least one member
 // card currently inside the canvas viewport (X AND Y).
-export function computeUpsetActiveSets(
+function computeUpsetActiveSets(
 	laid: LaidOut,
 	canvasW: number,
 	canvasH: number,

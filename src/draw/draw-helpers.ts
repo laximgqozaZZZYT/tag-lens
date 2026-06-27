@@ -2,7 +2,6 @@ import { theme, colorAlpha } from "./theme";
 import type { LaidOut, ClusterRect } from "../layout/layout";
 import type { AggregationGroup } from "../aggregation/types";
 import { clusterHue, roundedRectPath, truncateToWidth, drawTextWithHalo } from "./canvas-utils";
-import { placeOverviewLabels, type OverviewLabelInput, type MeasuredText } from "./overview-label-placement";
 import {
 	CARD_TITLE_FONT_PX,
 	CARD_BODY_FONT_PX,
@@ -389,61 +388,6 @@ export interface PlacedLabelBox {
 	text: string;
 	anchorX: number;
 	anchorY: number;
-}
-
-// Overview-only auxiliary labels: one BIG cluster name centred in each
-// enclosure, fitted to the enclosure box. Drawn in world space on top of
-// everything when the whole diagram is in view, independent of the
-// Graph-display toggles and SEPARATE from `drawClusterLabels` (the small
-// on-grid title bars). Not used in UpSet mode. Seeded with the small label
-// chips (laid.labelCells) as already-occupied space so the giant text never
-// renders on top of a chip showing the same (or a different) cluster's name.
-export function drawOverviewLabels(
-	ctx: CanvasRenderingContext2D,
-	laid: LaidOut,
-	zoom: number,
-	warningClusters?: Map<string, number>,
-): void {
-	const inputs: OverviewLabelInput[] = laid.clusters
-		.filter((c) => !c.ghostSingle && c.memberCount >= 2 && c.width > 0 && c.height > 0)
-		.map((c) => ({
-			groupKey: c.groupKey,
-			text: warningClusters && warningClusters.has(c.groupKey) ? `⚠ ${c.label}` : c.label,
-			x: c.x,
-			y: c.y,
-			width: c.width,
-			height: c.height,
-		}));
-	const occupied = (laid.labelCells ?? []).map((lc) => ({
-		x1: lc.x - lc.w / 2,
-		y1: lc.y - lc.h / 2,
-		x2: lc.x + lc.w / 2,
-		y2: lc.y + lc.h / 2,
-	}));
-	ctx.font = "800 100px sans-serif";
-	const measureAt100px = (text: string): MeasuredText => {
-		const m = ctx.measureText(text);
-		return {
-			width: m.width || 1,
-			ascent: m.actualBoundingBoxAscent || 74,
-			descent: m.actualBoundingBoxDescent || 20,
-		};
-	};
-	const placements = placeOverviewLabels(inputs, measureAt100px, occupied);
-	for (const p of placements) {
-		ctx.font = `800 ${p.font}px sans-serif`;
-		ctx.textAlign = "center";
-		ctx.textBaseline = "middle";
-		const hue = clusterHue(p.groupKey);
-		ctx.lineJoin = "round";
-		ctx.lineWidth = Math.max(p.font * 0.08, 2 / zoom);
-		ctx.strokeStyle = colorAlpha(theme().canvasBg, 0.9);
-		ctx.strokeText(p.text, p.cx, p.cy);
-		ctx.fillStyle = theme().swatch(hue, "fill", 0.96);
-		ctx.fillText(p.text, p.cx, p.cy);
-	}
-	ctx.textAlign = "start";
-	ctx.textBaseline = "alphabetic";
 }
 
 export function drawClusterLabels(

@@ -25,7 +25,7 @@ export interface MenuNote {
 //                   (c) inline cache.tags. Leading '#' stripped, hierarchy kept, deduped.
 //   • frontmatter — every frontmatter key (except the internal `position`)
 //                   flattened to an array of string values.
-export function noteSearchMeta(
+function noteSearchMeta(
 	app: App,
 	path: string,
 	memberships: string[],

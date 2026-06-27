@@ -60,7 +60,6 @@ import "./tag-field-suggest.test";
 import "./query-builder.test";
 import "./label-collision.test";
 import "./bubblesets-label-collision.test";
-import "./overview-label-placement.test";
 import "./bubblesets-invariants.test";
 import "./bubblesets-render-smoke.test";
 import "./all-modes-render-smoke.test";

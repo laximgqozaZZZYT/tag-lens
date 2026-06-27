@@ -7,7 +7,7 @@ import { validatePresetName } from "./lens-presets";
 export const PRESET_SCHEMA = "tag-lens/presets";
 export const PRESET_SCHEMA_VERSION = 1;
 
-export interface PresetBundle {
+interface PresetBundle {
 	schema: string;
 	version: number;
 	presets: LensPreset[];

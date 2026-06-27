@@ -3,9 +3,9 @@
 // (fmStatus / fmMaturity / mtime / ageDays / memberships) plus ctx lookups.
 import type { EncNode, EncContext, FieldSource } from "./types";
 
-export const fieldSourceRegistry: FieldSource[] = [];
+const fieldSourceRegistry: FieldSource[] = [];
 
-export function registerFieldSource(f: FieldSource): void {
+function registerFieldSource(f: FieldSource): void {
 	const i = fieldSourceRegistry.findIndex((x) => x.id === f.id);
 	if (i >= 0) fieldSourceRegistry[i] = f;
 	else fieldSourceRegistry.push(f);
@@ -13,7 +13,7 @@ export function registerFieldSource(f: FieldSource): void {
 
 // Dynamic field generator: one source per frontmatter key, made on demand so the
 // registry doesn't need to enumerate every key in the vault.
-export function frontmatterField(key: string): FieldSource {
+function frontmatterField(key: string): FieldSource {
 	return {
 		id: `frontmatter:${key}`,
 		label: key,

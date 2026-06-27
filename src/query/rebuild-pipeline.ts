@@ -1,4 +1,4 @@
-import type { GraphData, GraphEdge, GraphNode, MiniSettings } from "../types";
+import type { GraphData, GraphEdge, MiniSettings } from "../types";
 import { computeParentOf, computeTrulyAgg } from "../layout/aggregate-util";
 import { nodeIsHidden } from "../interaction/note-menu";
 
@@ -43,7 +43,7 @@ export function computeDegreeMaps(edges: GraphEdge[]): DegreeMaps {
 // source OR target is filtered out. Uses a predicate instead of a
 // Set so callers can pass a Map (`displayMode.has(id)`) directly
 // without wrapping it in `new Set(modes.keys())`.
-export function filterEdgesByAlive(
+function filterEdgesByAlive(
 	edges: GraphEdge[],
 	isAlive: (id: string) => boolean,
 ): GraphEdge[] {
@@ -117,7 +117,3 @@ export function buildAdjacency(
 	});
 	return adj;
 }
-
-// Re-export GraphNode so view.ts can import the pipeline + node type
-// together without two import lines.
-export type { GraphNode };

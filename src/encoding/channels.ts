@@ -6,9 +6,9 @@ import type { VisualChannel } from "./types";
 import { shapeForKey } from "./shapes";
 import { sequentialColorRamp } from "../draw/legend-spec";
 
-export const channelRegistry: VisualChannel[] = [];
+const channelRegistry: VisualChannel[] = [];
 
-export function registerChannel(c: VisualChannel): void {
+function registerChannel(c: VisualChannel): void {
 	const i = channelRegistry.findIndex((x) => x.id === c.id);
 	if (i >= 0) channelRegistry[i] = c;
 	else channelRegistry.push(c);

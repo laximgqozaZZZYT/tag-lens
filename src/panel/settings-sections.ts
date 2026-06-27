@@ -121,103 +121,9 @@ export function renderNodeDisplaySection(
 	mIn.addEventListener("change", applySize);
 	nIn.addEventListener("change", applySize);
 
-
 }
 
-export function renderLatticeSection(parent: HTMLElement, deps: GenericSectionDeps): void {
-	const section = parent.createDiv({ cls: "gim-panel-section" });
-	section.createEl("h4", { text: "Lattice" });
-
-	const lodRow = section.createDiv({ cls: "gim-row" });
-	lodRow.createSpan({ text: "Node LOD" });
-	const lodSel = lodRow.createEl("select");
-	const lodOpts: Array<[string, string]> = [
-		["auto", "Auto (zoom-based)"],
-		["overview", "Overview"],
-		["density", "Density"],
-		["individual", "Individual"],
-	];
-	for (const [v, label] of lodOpts) {
-		const o = lodSel.createEl("option", { text: label });
-		o.value = v;
-		if (deps.settings.latticeNodeLOD === v) o.selected = true;
-	}
-	lodSel.addEventListener("change", () => {
-		deps.settings.latticeNodeLOD = lodSel.value as MiniSettings["latticeNodeLOD"];
-		deps.save();
-		deps.rebuild();
-	});
-
-	const minRow = section.createDiv({ cls: "gim-row" });
-	minRow.createSpan({ text: "Min intersection size" });
-	const minIn = minRow.createEl("input", {
-		type: "number",
-		attr: { min: "1", step: "1" },
-	});
-	minIn.value = String(deps.settings.latticeMinNodeSize);
-	minIn.setCssStyles({ width: "60px" });
-	minIn.addEventListener("change", () => {
-		const v = Math.max(1, Math.floor(Number(minIn.value) || 1));
-		deps.settings.latticeMinNodeSize = v;
-		minIn.value = String(v);
-		deps.save();
-		deps.rebuild();
-	});
-
-	const capRow = section.createDiv({ cls: "gim-row" });
-	capRow.createSpan({ text: "Max nodes per tier" });
-	const capIn = capRow.createEl("input", {
-		type: "number",
-		attr: { min: "1", step: "1" },
-	});
-	capIn.value = String(deps.settings.latticeMaxNodesPerTier);
-	capIn.setCssStyles({ width: "60px" });
-	capIn.addEventListener("change", () => {
-		const v = Math.max(1, Math.floor(Number(capIn.value) || 1));
-		deps.settings.latticeMaxNodesPerTier = v;
-		capIn.value = String(v);
-		deps.save();
-		deps.rebuild();
-	});
-
-	const namedRow = section.createDiv({ cls: "gim-row" });
-	namedRow.createSpan({ text: "Max names per node" });
-	const namedIn = namedRow.createEl("input", {
-		type: "number",
-		attr: { min: "1", step: "1" },
-	});
-	namedIn.value = String(deps.settings.latticeNamedMax);
-	namedIn.setCssStyles({ width: "60px" });
-	namedIn.addEventListener("change", () => {
-		const v = Math.max(1, Math.floor(Number(namedIn.value) || 1));
-		deps.settings.latticeNamedMax = v;
-		namedIn.value = String(v);
-		deps.save();
-		deps.rebuild();
-	});
-
-	const linkRow = section.createEl("label", { cls: "gim-toggle-row" });
-	const linkCb = linkRow.createEl("input", { type: "checkbox" });
-	linkCb.checked = deps.settings.latticeShowSubsetLinks;
-	linkCb.addEventListener("change", () => {
-		deps.settings.latticeShowSubsetLinks = linkCb.checked;
-		deps.save();
-		deps.requestDraw?.();
-	});
-	linkRow.createSpan({ text: "Show subset links" });
-
-	const topRow = section.createEl("label", { cls: "gim-toggle-row" });
-	const topCb = topRow.createEl("input", { type: "checkbox" });
-	topCb.checked = deps.settings.latticeSpecificTop;
-	topCb.addEventListener("change", () => {
-		deps.settings.latticeSpecificTop = topCb.checked;
-		deps.save();
-		deps.rebuild();
-	});
-	topRow.createSpan({ text: "Most-specific tier on top" });
-}
-
-export function renderViewModeOption(
+function renderViewModeOption(
 	container: HTMLElement,
 	opt: (typeof VIEW_MODES)[number],
 	deps: GenericSectionDeps,
@@ -360,53 +266,6 @@ export interface GenericSectionDeps {
 	refreshSettingsTab?: () => void;
 }
 
-export function renderHeatmapOrderBySection(parent: HTMLElement, deps: GenericSectionDeps): void {
-	const section = parent.createDiv({ cls: "gim-panel-section" });
-	const header = section.createDiv({ cls: "gim-panel-section-header" });
-	header.createEl("h4", { text: "Sort tags by" });
-	const row = section.createDiv({ cls: "gim-order-row" });
-	const fieldSel = row.createEl("select", { cls: "gim-order-field" });
-	for (const o of HEATMAP_ORDER_CRITERIA) {
-		const opt = fieldSel.createEl("option", { value: o.value, text: o.text });
-		if (o.value === deps.settings.heatmapCriterion) opt.selected = true;
-	}
-	fieldSel.addEventListener("change", () => {
-		deps.settings.heatmapCriterion = fieldSel.value as "co-occurrence" | "size";
-		deps.save();
-		deps.rebuild();
-	});
-	const dirSel = row.createEl("select", { cls: "gim-order-dir" });
-	for (const d of ["asc", "desc"] as const) {
-		const opt = dirSel.createEl("option", { value: d, text: d });
-		if (deps.settings.heatmapSortDir === d) opt.selected = true;
-	}
-	dirSel.addEventListener("change", () => {
-		deps.settings.heatmapSortDir = dirSel.value as "asc" | "desc";
-		deps.save();
-		deps.rebuild();
-	});
-
-	const jaccardRow = section.createEl("label", { cls: "gim-toggle-row" });
-	const jaccardCb = jaccardRow.createEl("input", { type: "checkbox" });
-	jaccardCb.checked = deps.settings.heatmapJaccard;
-	jaccardCb.addEventListener("change", () => {
-		deps.settings.heatmapJaccard = jaccardCb.checked;
-		deps.save();
-		deps.requestDraw?.();
-	});
-	jaccardRow.createSpan({ text: "Jaccard similarity color scale" });
-
-	const gapRow = section.createEl("label", { cls: "gim-toggle-row" });
-	const gapCb = gapRow.createEl("input", { type: "checkbox" });
-	gapCb.checked = deps.settings.gapFinder;
-	gapCb.addEventListener("change", () => {
-		deps.settings.gapFinder = gapCb.checked;
-		deps.save();
-		deps.rebuild();
-	});
-	gapRow.createSpan({ text: "Highlight gaps" });
-}
-
 export function renderHeatmapMinTagControl(section: HTMLElement, deps: GenericSectionDeps): void {
 	const row = section.createDiv({ cls: "gim-order-row" });
 	row.createSpan({ text: "Min tag size", cls: "gim-order-field" });
@@ -434,4 +293,3 @@ export function renderHeatmapDisplayToggles(section: HTMLElement, deps: GenericS
 	});
 	row.createSpan({ text: "Jaccard color scale" });
 }
-

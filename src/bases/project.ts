@@ -12,7 +12,7 @@
 //     menus keep working untouched.
 
 import type { GraphData, GraphNode } from "../types";
-import type { BaseIndex, BaseRelation, BaseTable } from "./types";
+import type { BaseIndex, BaseTable } from "./types";
 
 export type BaseEdgeKind = "link" | "shared-tag" | "shared-property";
 
@@ -142,7 +142,3 @@ export function projectBaseIndexToGraph(index: BaseIndex, opts: ProjectOpts): Pr
 
 	return { data: { nodes, edges }, clusterLabels };
 }
-
-// Re-export the relation kind for callers building the edgeKinds set without
-// importing the relation type directly.
-export type { BaseRelation };

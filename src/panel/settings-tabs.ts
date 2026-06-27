@@ -38,7 +38,7 @@ export function renderSettingsViewTab(el: HTMLElement, deps: ViewTabDeps): void 
 
 // Sort tab removed as LIMIT and ORDER_BY are deprecated
 
-export interface FilterTabDeps {
+interface FilterTabDeps {
 	settings: MiniSettings;
 	save: () => void;
 	rebuild: () => void;
@@ -50,7 +50,7 @@ export interface FilterTabDeps {
 	app?: App;
 }
 
-export function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): void {
+function renderSettingsFilterTab(el: HTMLElement, deps: FilterTabDeps): void {
 	const isHeatmap = deps.settings.viewMode === "heatmap";
 
 	renderBasesSection(el, deps);

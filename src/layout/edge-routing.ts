@@ -51,7 +51,7 @@ export class LaneRegistry {
 
 // Symmetric lane spreader: 0, +1, −1, +2, −2 ... Used to fan parallel
 // wires out within a channel without leaving the channel rim.
-export function laneShiftSpread(lane: number): number {
+function laneShiftSpread(lane: number): number {
 	if (lane === 0) return 0;
 	return lane % 2 === 1 ? Math.ceil(lane / 2) : -Math.ceil(lane / 2);
 }

@@ -16,7 +16,7 @@
 //   factor; text is emitted with its own transform attribute so its font-size
 //   stays in local units.
 
-export type Matrix = [number, number, number, number, number, number]; // a,b,c,d,e,f
+type Matrix = [number, number, number, number, number, number]; // a,b,c,d,e,f
 
 export interface TextMetricsLike {
 	width: number;

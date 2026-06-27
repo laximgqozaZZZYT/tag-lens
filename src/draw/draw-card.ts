@@ -18,13 +18,6 @@ import {
 import { shapeMarkerPath } from "./draw-shape";
 import type { NodeShape } from "../encoding/shapes";
 
-// Wrapped + truncated body lines for a card. Computed once by
-// `cardFor()` / measureCard, then cached under the (id, mode, scale)
-// composite key.
-export interface CardBodyCacheEntry {
-	bodyLines: string[];
-}
-
 export interface DrawCardOptions {
 	scale: number;
 	bodyLines: string[];

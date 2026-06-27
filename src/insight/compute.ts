@@ -1,14 +1,14 @@
 import { App } from "obsidian";
 import { effectiveClassification } from "../query/tag-classification";
 
-export interface GlobalStats {
+interface GlobalStats {
 	totalNotes: number;
 	totalFolders: number;
 	totalLinks: number;
 	distinctTags: number;
 }
 
-export interface TriggeredAlert {
+interface TriggeredAlert {
 	id: string;
 	label: string;
 	severity: "CRITICAL" | "WARNING" | "INFO";

@@ -653,7 +653,7 @@ export function advancedSearch(notes: NoteRef[], query: string): NoteRef[] {
 // Order is deterministic: by kind priority (tag < field < note) then alpha.
 // Empty token → []. Caps: tag/field ~8, merged bare ~10.
 
-export type SuggestKind = "tag" | "field" | "note";
+type SuggestKind = "tag" | "field" | "note";
 export interface Suggestion {
 	text: string;
 	kind: SuggestKind;

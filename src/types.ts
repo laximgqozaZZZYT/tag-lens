@@ -27,7 +27,7 @@ export interface GraphData {
 	edges: GraphEdge[];
 }
 
-export interface Offset {
+interface Offset {
 	dx: number;
 	dy: number;
 }
@@ -437,10 +437,6 @@ export const CARD_BODY_LINE_HEIGHT_PX = 12;
 export const CARD_PAD_X = 8;
 export const CARD_PAD_Y = 6;
 export const CARD_TITLE_BODY_GAP = 4;
-export const CARD_MIN_W = 80;
-export const CARD_MAX_W = 240;
-export const CARD_BODY_CHARS_MIN = 0;
-export const CARD_BODY_CHARS_MAX = 400;
 
 // Single-cell pixel dimensions for the global grid. A card with nodeRows = 1
 // and nodeCols = 1 occupies exactly one cell at this size; multi-cell cards

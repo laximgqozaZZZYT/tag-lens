@@ -24,7 +24,7 @@ import {
 	type RouteRect,
 } from "./edge-routing";
 
-export interface SnapAndRouteData {
+interface SnapAndRouteData {
 	idToRect: Map<string, RouteRect>;
 	routeObstacles: RouteObstacle[];
 }
@@ -69,7 +69,7 @@ export function buildRouteObstacles(
 // One-shot pipeline for callers that haven't done the snap themselves
 // (= UpSet). Mutates `positionedNodes` via `snapCardsToGrid` then
 // returns the routing data derived from the snapped positions.
-export function snapAndBuildRouteData(
+function snapAndBuildRouteData(
 	positionedNodes: PositionedNode[],
 	slotW: number,
 	slotH: number,
@@ -84,7 +84,7 @@ export function snapAndBuildRouteData(
 // Used directly by UpSet (no cluster grouping); Euler uses
 // `aggregateEdges` itself for the pair-group / intra-cluster logic
 // and only calls `routeOnePair` per surviving edge.
-export function routeAllEdges(
+function routeAllEdges(
 	graphEdges: GraphEdge[],
 	idToRect: Map<string, RouteRect>,
 	routeObstacles: RouteObstacle[],

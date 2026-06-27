@@ -5,7 +5,7 @@ import type { App } from "obsidian";
 import { stripTabPrefix, type NoteRef } from "../interaction/note-menu";
 
 // Only the edge fields the Link Preview needs (PositionedEdge is assignable).
-export interface DataTableEdge {
+interface DataTableEdge {
 	source: string;
 	target: string;
 }

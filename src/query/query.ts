@@ -5,7 +5,7 @@
 // bound to A and one bound to B. Each instance becomes a separate cluster
 // membership downstream, enabling Euler-diagram-style overlap rendering.
 
-export type Atom =
+type Atom =
 	| { kind: "tag"; value: string; depth?: number } // tag name (no #) or "?"; depth = nested level (tagN:)
 	| { kind: "fm"; field: string; value: string } // literal or "?"
 	| { kind: "tag_fm"; field: string; value: string }; // e.g. tag.category:Infrastructure
@@ -314,12 +314,4 @@ export function evalQuery(ast: QueryAst, f: FileFacts): EvalResult {
 
 export function isMatched(r: EvalResult): boolean {
 	return r.instances.length > 0;
-}
-
-// Substitute `$<field>` or `$tag.<field>` placeholders in a label string with bound values.
-// Unknown placeholders are left as-is.
-export function substituteLabel(template: string, bindings: Map<string, string>): string {
-	return template.replace(/\$([A-Za-z_][A-Za-z0-9_.-]*)/g, (m: string, name: string) => {
-		return bindings.get(name) ?? m;
-	});
 }

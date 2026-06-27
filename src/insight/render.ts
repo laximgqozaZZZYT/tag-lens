@@ -89,7 +89,7 @@ export function renderInsightTab(host: HTMLElement, deps: InsightDeps): void {
 	renderSub();
 }
 
-export function renderInsightOverview(host: HTMLElement, deps: InsightDeps, computed: ComputedCognitiveLoad): void {
+function renderInsightOverview(host: HTMLElement, deps: InsightDeps, computed: ComputedCognitiveLoad): void {
 	const { score, globalStats } = computed;
 	const band = score < 40 ? { c: "var(--color-green)", b: "var(--color-green)", t: "Low" }
 		: score < 80 ? { c: "var(--color-yellow)", b: "var(--color-yellow)", t: "Moderate" }
@@ -130,7 +130,7 @@ export function renderInsightOverview(host: HTMLElement, deps: InsightDeps, comp
 	refresh.addEventListener("click", () => { renderInsightTab(host.parentElement!, deps); });
 }
 
-export function renderInsightAlerts(host: HTMLElement, deps: InsightDeps, computed: ComputedCognitiveLoad): void {
+function renderInsightAlerts(host: HTMLElement, deps: InsightDeps, computed: ComputedCognitiveLoad): void {
 	const { triggered } = computed;
 	// ── Alerts (active only) ──
 	if (triggered.length === 0) {
@@ -312,7 +312,7 @@ export function renderInsightAlerts(host: HTMLElement, deps: InsightDeps, comput
 	renderBatch();
 }
 
-export function renderInsightSuggest(host: HTMLElement, deps: InsightDeps): void {
+function renderInsightSuggest(host: HTMLElement, deps: InsightDeps): void {
 	host.empty();
 	
 	const suggestions = computeTagSuggestions(deps.app);

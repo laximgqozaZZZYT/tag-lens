@@ -4,7 +4,7 @@
 
 // Canonical classification keys. MUST stay in sync with the TYPE_LABELS /
 // TYPE_DESCRIPTIONS maps in view.ts (the dropdown + info modal).
-export const GOLDER_TYPES = [
+const GOLDER_TYPES = [
 	"what_it_is",
 	"what_it_contains",
 	"who_owns_it",
@@ -30,11 +30,11 @@ export function effectiveClassification(persisted: unknown, suggestion: string):
 
 // ── Note Maturity ────────────────────────────────────────────────────────────
 // Note maturity categories based on Zettelkasten principles.
-export const NOTE_MATURITY = ["fleeting", "literature", "permanent"] as const;
+const NOTE_MATURITY = ["fleeting", "literature", "permanent"] as const;
 
 export type NoteMaturity = (typeof NOTE_MATURITY)[number];
 
-export function isNoteMaturity(v: unknown): v is NoteMaturity {
+function isNoteMaturity(v: unknown): v is NoteMaturity {
 	return typeof v === "string" && (NOTE_MATURITY as readonly string[]).includes(v);
 }
 

@@ -7,8 +7,8 @@ import type { HoverTarget } from "./hit-test";
 // mouse drift. Offsets push the tooltip down-right of the cursor by
 // default and flip to up-left when it would overflow the canvas edge.
 export const HOVER_DELAY_MS = 350;
-export const TOOLTIP_OFFSET_X = 14;
-export const TOOLTIP_OFFSET_Y = -8;
+const TOOLTIP_OFFSET_X = 14;
+const TOOLTIP_OFFSET_Y = -8;
 
 // Equality check on a HoverTarget. Two targets are "the same" when
 // they refer to the same node id OR the same cluster groupKey. Used to
@@ -39,7 +39,7 @@ export interface HighlightState {
 	hoveredNodeId: string | null;
 }
 
-export function emptyHighlight(): HighlightState {
+function emptyHighlight(): HighlightState {
 	return {
 		highlightedNodes: new Set(),
 		highlightedClusters: new Set(),

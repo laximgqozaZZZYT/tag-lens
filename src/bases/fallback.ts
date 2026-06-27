@@ -61,7 +61,7 @@ function collectTags(cache: CachedMetadata | null): string[] {
 
 // Count distinct tags across the vault, deduplicating per note so a note that
 // repeats a tag inline + in frontmatter counts once. Returns [tag, noteCount].
-export function countVaultTags(app: App): Array<[string, number]> {
+function countVaultTags(app: App): Array<[string, number]> {
 	const counts = new Map<string, number>();
 	for (const f of app.vault.getMarkdownFiles()) {
 		const cache = app.metadataCache.getFileCache(f);
@@ -119,7 +119,7 @@ export function buildFallbackContent(tags: readonly string[]): string {
 // "has none of {X…}", so a "(none)" view would be brittle; we simply omit them
 // (they still appear once the user creates their own tag-bearing base). When the
 // vault has zero tags we fall back to the single match-all `All notes` view.
-export function buildFallbackContentForVault(app: App): string {
+function buildFallbackContentForVault(app: App): string {
 	const counts = countVaultTags(app);
 	const kept = topTags(counts);
 	const content = buildFallbackContent(kept);

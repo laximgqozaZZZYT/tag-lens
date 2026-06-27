@@ -2,5 +2,6 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": ["src/main.ts", "test/index.ts", "test/e2e/*.mjs"],
   "project": ["src/**/*.ts", "test/**/*.ts"],
-  "ignore": ["test/obsidian.mock.ts"]
+  "ignore": ["test/obsidian.mock.ts"],
+  "ignoreBinaries": ["obsidian"]
 }

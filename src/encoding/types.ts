@@ -37,7 +37,7 @@ export interface FieldSource {
 }
 
 // Scale config (semantics implemented in P1 scales.ts).
-export type ScaleType = "linear" | "log" | "quantile" | "ordinal" | "categorical";
+type ScaleType = "linear" | "log" | "quantile" | "ordinal" | "categorical";
 export interface ScaleConfig {
 	type: ScaleType;
 	domain?: [number, number] | "auto"; // quantitative

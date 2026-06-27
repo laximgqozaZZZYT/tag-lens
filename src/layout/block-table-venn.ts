@@ -39,7 +39,7 @@ export interface BTVResult {
 	positions: Map<string, { x: number; y: number }>;
 }
 
-export function nodeSignature(
+function nodeSignature(
 	memberships: string[],
 	isEnclosureOf: (wrapper: string, view: string) => boolean,
 	noneBucket: string,

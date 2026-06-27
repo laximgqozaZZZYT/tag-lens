@@ -20,7 +20,7 @@ export interface NodeDisplay {
 	nodeCols: number;
 }
 
-export interface NodeDisplayOverride {
+interface NodeDisplayOverride {
 	nodeRows?: number;
 	nodeCols?: number;
 }

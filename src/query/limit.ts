@@ -7,15 +7,6 @@ export type LimitRule =
 	| { kind: "limit"; n: number }
 	| { kind: "brief"; n: number };
 
-export function parseLimitRow(s: string): LimitRule {
-	const t = s.trim();
-	const limitM = t.match(/^limit\s+(\d+)$/i);
-	if (limitM) return { kind: "limit", n: parseInt(limitM[1], 10) };
-	const briefM = t.match(/^brief\s+(\d+)$/i);
-	if (briefM) return { kind: "brief", n: parseInt(briefM[1], 10) };
-	throw new Error(`LIMIT row: expected "limit N" or "brief N", got: "${s}"`);
-}
-
 // Apply tier rules per cluster. Each cluster sorts its members by the
 // order rule (default: name asc), then `limit` / `brief` rows consume
 // successive rank ranges. Anything past the last tier is implicitly

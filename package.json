@@ -15,8 +15,8 @@
 		"test": "node test/run.mjs",
 		"typecheck": "tsc --noEmit",
 		"knip": "knip",
-		"knip:ci": "knip --include files,dependencies,unlisted",
-		"verify": "tsc --noEmit && node test/run.mjs && knip --include files,dependencies,unlisted && node esbuild.config.mjs",
+		"knip:ci": "knip",
+		"verify": "tsc --noEmit && node test/run.mjs && knip && node esbuild.config.mjs",
 		"e2e:bubblesets": "node esbuild.config.mjs && node test/e2e/setup-e2e-vault.mjs && node test/e2e/e2e-bubblesets.mjs",
 		"deploy": "node esbuild.config.mjs && node deploy.mjs"
 	},

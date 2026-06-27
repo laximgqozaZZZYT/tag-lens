@@ -5,7 +5,7 @@
 import { clusterHue } from "../draw/canvas-utils";
 import type { ScaleConfig, ScaledValue } from "./types";
 
-export interface LegendEntry {
+interface LegendEntry {
 	key: string;
 	output: string;
 }
@@ -24,7 +24,7 @@ export interface PreparedScale {
 // Per-key auto colour (same key -> same colour). Kept as a defensive fallback for
 // keys not present when the scale was prepared; reuses clusterHue which is tuned
 // for TAG NAMES and clusters for short/numeric keys — see categoricalColor.
-export function autoColor(key: string): string {
+function autoColor(key: string): string {
 	return `hsl(${Math.round(clusterHue(key))}, 65%, 55%)`;
 }
 
@@ -37,7 +37,7 @@ const GOLDEN_ANGLE = 137.50776405003785;
 // hue-near neighbours (large N) separable. The categorical scale assigns these by
 // the key's position in the distinct-value list, so the legend and the nodes that
 // share that one map always correspond.
-export function categoricalColor(i: number): string {
+function categoricalColor(i: number): string {
 	const hue = Math.round(((i * GOLDEN_ANGLE) % 360 + 360) % 360);
 	const light = [56, 48, 64][i % 3];
 	return `hsl(${hue}, 65%, ${light}%)`;

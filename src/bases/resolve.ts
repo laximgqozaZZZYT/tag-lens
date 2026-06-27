@@ -152,7 +152,7 @@ export function resolveElements(
 	return out;
 }
 
-export function elementKey(tablePath: string, viewName: string, notePath: string): string {
+function elementKey(tablePath: string, viewName: string, notePath: string): string {
 	return `${tablePath}::${viewName}::${notePath}`;
 }
 
