@@ -878,7 +878,7 @@ const advNotes: NoteRef[] = [
 
 	const subKey = buildFolderPathKey(areaKey, "Sub");
 	ok(subKey === "Area/Sub", "state-preservation: nested 'Area/Sub' key is correct");
-	ok(ft.folders.get("Area")?.folders.has("Sub"), "state-preservation: tree has 'Area/Sub' nested folder");
+	ok(ft.folders.get("Area")!.folders.has("Sub"), "state-preservation: tree has 'Area/Sub' nested folder");
 
 	// Verify that the keys in an expanded-set snapshot correctly identify the right tree nodes.
 	const expandedPaths = new Set(["Area", "Area/Sub"]);

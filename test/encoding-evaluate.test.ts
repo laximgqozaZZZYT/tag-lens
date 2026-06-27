@@ -24,17 +24,17 @@ const bind = (channelId: string, fieldId: string, extra: Partial<EncodingBinding
 {
 	const testCtx = { ...ctx, frontmatterOf: (id: string) => id === "a" ? { status: "done" } : id === "b" ? { status: "wip" } : undefined };
 	const r = evaluateEncoding(nodes(), [bind("color", "frontmatter:status")], testCtx);
-	ok(typeof r.params.get("a").fillColor === "string", "a gets a status colour");
-	ok(typeof r.params.get("b").fillColor === "string", "b gets a status colour");
-	ok(r.params.get("a").fillColor !== r.params.get("b").fillColor, "different statuses -> different colours");
-	ok(r.params.get("c").fillColor === undefined, "node without status gets no colour (missing)");
+	ok(typeof r.params.get("a")!.fillColor === "string", "a gets a status colour");
+	ok(typeof r.params.get("b")!.fillColor === "string", "b gets a status colour");
+	ok(r.params.get("a")!.fillColor !== r.params.get("b")!.fillColor, "different statuses -> different colours");
+	ok(r.params.get("c")!.fillColor === undefined, "node without status gets no colour (missing)");
 	ok(r.legends.length === 1 && r.legends[0].legend.kind === "categorical", "categorical legend emitted");
 }
 
 // color <- ageDays (quantitative): every node coloured along the ramp
 {
 	const r = evaluateEncoding(nodes(), [bind("color", "ageDays")], ctx);
-	ok(["a", "b", "c"].every((id) => typeof r.params.get(id).fillColor === "string"), "all nodes coloured by ageDays");
+	ok(["a", "b", "c"].every((id) => typeof r.params.get(id)!.fillColor === "string"), "all nodes coloured by ageDays");
 	ok(r.legends[0].legend.kind === "quantitative" && r.legends[0].legend.max === 100, "quantitative legend domain");
 }
 
@@ -69,6 +69,6 @@ const bind = (channelId: string, fieldId: string, extra: Partial<EncodingBinding
 {
 	const fmCtx: EncContext = { nowMs: 0, frontmatterOf: (id) => (id === "a" ? { priority: "high" } : undefined) };
 	const r = evaluateEncoding(nodes(), [bind("color", "frontmatter:priority")], fmCtx);
-	ok(typeof r.params.get("a").fillColor === "string", "frontmatter:priority colours node a");
-	ok(r.params.get("b").fillColor === undefined, "node lacking the frontmatter key is missing");
+	ok(typeof r.params.get("a")!.fillColor === "string", "frontmatter:priority colours node a");
+	ok(r.params.get("b")!.fillColor === undefined, "node lacking the frontmatter key is missing");
 }

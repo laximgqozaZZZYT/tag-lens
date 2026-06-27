@@ -74,7 +74,7 @@ const sample: LensPreset[] = [
 {
 	const existing: LensPreset[] = [
 		{ name: "A", query: { ...captureLens(DEFAULT_SETTINGS), viewMode: "euler" } },
-		{ name: "B", query: { ...captureLens(DEFAULT_SETTINGS), viewMode: "matrix" } },
+		{ name: "B", query: { ...captureLens(DEFAULT_SETTINGS), viewMode: "heatmap" } },
 	];
 	const incoming: LensPreset[] = [
 		{ name: "B", query: { ...captureLens(DEFAULT_SETTINGS), viewMode: "heatmap" } }, // overwrite

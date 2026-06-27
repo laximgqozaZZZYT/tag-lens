@@ -3,7 +3,7 @@ export class TFile {}
 // Minimal stub so modules importing AbstractInputSuggest can be loaded under
 // test. The pure suggestion logic (extractEditingToken / computeSuggestions) is
 // tested directly; the DOM-bound subclass methods are never invoked here.
-export class AbstractInputSuggest<T> {
+export class AbstractInputSuggest {
 	constructor(_app: unknown, _inputEl: unknown) {}
 	open(): void {}
 	close(): void {}

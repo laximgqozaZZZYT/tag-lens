@@ -14,19 +14,6 @@ import type { MiniSettings } from "../src/types";
 // Generate a valid attribute name
 const arbAttributeName = fc.constantFrom("status", "maturity", "age");
 
-// Generate a valid attribute value based on attribute type
-function arbAttributeValue(attrName: string): fc.Arbitrary<string> {
-	switch (attrName) {
-		case "status":
-			return fc.constantFrom("active", "done", "pending", "blocked", "archived");
-		case "maturity":
-			return fc.constantFrom("seedling", "budding", "evergreen", "permanent");
-		case "age":
-			return fc.constantFrom("today", "this-week", "this-month", "recent", "this-year", "old");
-		default:
-			return fc.constant("unknown");
-	}
-}
 
 // Generate a valid set key (membership)
 const arbSetKey = fc.oneof(

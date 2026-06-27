@@ -10,8 +10,6 @@ const ALL_KEYS: DisplayToggleKey[] = [
 	"showEdges",
 	"showGrid",
 	"showMaturity",
-	"freshnessOverlay",
-	"statusField",
 ];
 
 const ALL_MODES = [

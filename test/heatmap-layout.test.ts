@@ -25,6 +25,7 @@ function opts(over: Partial<LayoutOptions> = {}): LayoutOptions {
 		minFontPx: 8,
 		cellW: 80,
 		cellH: 24,
+		...over,
 		// Remaining LayoutOptions fields are unused by layoutHeatmap.
 	} as unknown as LayoutOptions;
 }

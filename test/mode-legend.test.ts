@@ -172,8 +172,8 @@ const base: ModeLegendInput = { encodingSpecs: [], tags: [{ key: "greek", color:
 	ok(specs.length === 2, "droste includes tag + set-ops legends");
 	ok(specs[0].kind === "categorical" && specs[0].title === "Color · Tag", "droste tag key");
 	ok(specs[1].title === "Gallery key", "droste set-ops title");
-	ok(specs[1].entries?.some((e) => e.label.includes("Intersection") && e.color === "#ccaa22"), "intersection color legend");
-	ok(specs[1].entries?.some((e) => e.label.includes("Union") && e.color === "#33bb88"), "union color legend");
+	ok(specs[1].entries!.some((e) => e.label.includes("Intersection") && e.color === "#ccaa22"), "intersection color legend");
+	ok(specs[1].entries!.some((e) => e.label.includes("Union") && e.color === "#33bb88"), "union color legend");
 }
 // CLOSEUP enclosure mode: ∪/∩ are listed ALONGSIDE the single-tag "Groups & overlap"
 // spec, acting as a single unified cluster legend. The independent section

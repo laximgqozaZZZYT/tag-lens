@@ -78,7 +78,7 @@ import type { EncodingBinding } from "../src/encoding/types";
 
 // ── F1-2: encoding capture/apply (backward compatible) ──
 const enc = (): EncodingBinding[] => [
-	{ channelId: "color", fieldId: "degree", enabled: true, scale: { kind: "quantitative" } as EncodingBinding["scale"] },
+	{ channelId: "color", fieldId: "degree", enabled: true, scale: { kind: "quantitative" } as unknown as EncodingBinding["scale"] },
 ];
 
 // capturePreset bundles query + a DEEP-COPIED encoding snapshot.

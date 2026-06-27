@@ -30,7 +30,7 @@ const OPTS = { width: 300, height: 200, cell: { w: 10, h: 10 } };
 {
 	const r = axisLayout(nodes(), ctx, { ...OPTS, bindingX: bind("tag") });
 	ok(r.axes.x?.kind === "categorical" && r.axes.x.bands?.length === 2, "two categorical bands (x, y)");
-	ok(r.axes.x.bands![0].key === "x" && r.axes.x.bands![1].key === "y", "bands in encounter order");
+	ok(r.axes.x!.bands![0].key === "x" && r.axes.x!.bands![1].key === "y", "bands in encounter order");
 	// a and c (tag x) are left of b (tag y)
 	ok(r.positions.get("a")!.x < r.positions.get("b")!.x, "tag 'x' band is left of tag 'y' band");
 	ok(r.positions.get("c")!.x < r.positions.get("b")!.x, "node c (tag x) also in left band");
@@ -45,7 +45,7 @@ const OPTS = { width: 300, height: 200, cell: { w: 10, h: 10 } };
 {
 	const r = axisLayout(nodes(), ctx, { ...OPTS, bindingX: undefined, bindingY: { ...bind("ageDays", "linear"), channelId: "axisY" } });
 	ok(r.axes.y?.kind === "quantitative" && r.axes.y.min === 0 && r.axes.y.max === 100, "quantitative domain [0,100]");
-	ok((r.axes.y.ticks?.length ?? 0) === 6, "6 gridline ticks");
+	ok((r.axes.y!.ticks?.length ?? 0) === 6, "6 gridline ticks");
 	const ya = r.positions.get("a")!.y, yb = r.positions.get("b")!.y, yc = r.positions.get("c")!.y;
 	ok(ya < yb && yb < yc, "ageDays maps monotonically along Y");
 	approx(ya, 5, 1e-9, "ageDays 0 -> y 5");
