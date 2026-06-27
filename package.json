@@ -14,6 +14,7 @@
 		"dev": "node esbuild.config.mjs --watch",
 		"test": "node test/run.mjs",
 		"typecheck": "tsc --noEmit",
+		"typecheck:test": "tsc --noEmit -p tsconfig.test.json",
 		"knip": "knip",
 		"knip:ci": "knip",
 		"verify": "tsc --noEmit && node test/run.mjs && knip && node esbuild.config.mjs",
