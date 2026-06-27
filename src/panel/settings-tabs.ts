@@ -124,11 +124,12 @@ function renderBasesSection(el: HTMLElement, deps: FilterTabDeps): void {
 	const input = section.createEl("input", { type: "text", cls: "gim-base-suggest-input" });
 	input.setAttribute("placeholder", "Search .base files…");
 	input.setCssStyles({ width: "100%", marginBottom: "6px" });
-	if (deps.app) {
+	const app = deps.app;
+	if (app) {
 		new BaseFileSuggest(
-			deps.app,
+			app,
 			input,
-			() => scanBaseFiles(deps.app!),
+			() => scanBaseFiles(app),
 			(path) => deps.settings.selectedBases.includes(path),
 			(file) => {
 				deps.settings.selectedBases = addBaseFileToSelected(

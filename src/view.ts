@@ -457,7 +457,9 @@ export class MiniGraphView extends ItemView {
 		this.canvas.setCssStyles({ height: "100%" });
 		this.canvas.setCssStyles({ display: "block" });
 		this.canvas.setCssStyles({ cursor: "grab" });
-		this.ctx = this.canvas.getContext("2d")!;
+		const ctx2d = this.canvas.getContext("2d");
+		if (!ctx2d) throw new Error("Tag Lens: 2D canvas context unavailable");
+		this.ctx = ctx2d;
 
 		// Marquee controller wires canvas + root + the view's coordinate /
 		// fitToRect / hover-cancel callbacks so the controller has zero
@@ -4502,6 +4504,9 @@ export class MiniGraphView extends ItemView {
 				const rect = c.getBoundingClientRect();
 				const sy = e.clientY - rect.top;
 				const dy = sy - this.legendScrollDrag.startY;
+				// Invariant: legendScrollDrag is only ever set while the legend
+				// panel is laid out, which is the same path that assigns
+				// legendPanelRect — so it is non-null whenever we get here.
 				const pr = this.legendPanelRect!;
 				const trackTop = this.exportDprMul === 1 ? 20 : 4;
 				const trackH = pr.h - trackTop - 4;
