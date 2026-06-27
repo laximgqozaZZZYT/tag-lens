@@ -59,33 +59,89 @@ function clampInside(
 	return { x, y };
 }
 
-// Candidate CENTRES for a label, in preference order. The first is always the
-// desired (current top-left strip) position; the rest fan out to the other
-// corners, the horizontal edge midpoints, then the box centre as a last
-// interior resort. All are clamped inside the box by the caller.
-function candidates(inp: LabelPlacementInput): Array<{ x: number; y: number }> {
+// Candidate CENTRES for a label, in preference order.
+//
+// INSIDE candidates come first: the desired (top-left strip) position, then a
+// row of five evenly-spread anchors along the box's top edge, the same five
+// along the bottom edge, and the box centre as the last interior resort. Five
+// horizontal anchors per edge (vs. the old left/centre/right three) matter when
+// several big cross-cutting boxes share nearly the same rect — e.g. `_all`,
+// `paradiso` and `timeline` all spanning every node have IDENTICAL boxes, so
+// their labels must spread along the shared edge rather than stack.
+//
+// OUTSIDE candidates come last (flagged `outside`): a vertical LADDER of rows
+// stepping progressively ABOVE the box top and BELOW the box bottom. A box
+// buried inside a dense overlap (e.g. `sequence`, 2 nodes, or any inner view
+// whose title strip sits over a SIBLING box's cards) has no clear interior
+// spot — every interior position is covered by cards or another label — so it
+// must climb out of the node cloud entirely. One row was not enough: an inner
+// box's first row up is still inside the parent's cards, so the ladder keeps
+// going (up to `LADDER_ROWS` rows each way) until it clears all cards. The
+// caller clamps these on X only (keeping the label horizontally over its box)
+// and leaves Y free. INSIDE candidates always win when any is clear, so a box
+// with room to spare never sends its label outside (keeps
+// test/label-collision.test.ts's "stays inside its box" invariant for the
+// non-degenerate cases). Rows alternate up/down so labels prefer the nearest
+// clear band rather than all stacking on one side.
+const LADDER_ROWS = 40;
+interface Candidate {
+	x: number;
+	y: number;
+	outside?: boolean;
+}
+function candidates(inp: LabelPlacementInput): Candidate[] {
 	const { box, w, h } = inp;
-	const stripY = inp.y; // the desired top strip centre Y, relative to box top
-	const yOffset = stripY - box.y; // how far below the box top the strip sits
+	const yOffset = inp.y - box.y; // how far below the box top the strip sits
 	const topY = box.y + yOffset;
-	const botY = box.y + box.h - yOffset;
-	const leftX = box.x + w / 2;
-	const rightX = box.x + box.w - w / 2;
-	const midX = box.x + box.w / 2;
-	const midY = box.y + box.h / 2;
-	return [
-		{ x: inp.x, y: inp.y }, // desired (top-left strip)
-		{ x: rightX, y: topY }, // top-right
-		{ x: leftX, y: botY }, // bottom-left
-		{ x: rightX, y: botY }, // bottom-right
-		{ x: midX, y: topY }, // top-centre
-		{ x: midX, y: botY }, // bottom-centre
-		{ x: midX, y: midY }, // box centre (last resort)
-	];
+	// LEFT-ANCHORED: the label is pinned to the box's TOP-LEFT corner (per the
+	// user's spec "labels fixed top-left"). When two labels would collide we do
+	// NOT slide them sideways along the edge anymore — we step the loser
+	// straight UP, stacking labels in a left-aligned column above the cloud.
+	// The single inside anchor is the desired top-left strip; everything else
+	// is the vertical ladder. The caller then GROWS each box upward to contain
+	// its final (possibly lifted) label, so the label always reads as that
+	// box's own top-left title and the boxes end up vertically staggered.
+	const leftX = box.x + w / 2; // left-aligned anchor X (cell centre at box left)
+	// Desired = the caller's top-left strip (already pinned there by box-follow).
+	const inside: Candidate[] = [{ x: inp.x, y: inp.y }];
+	// Vertical ladder, LEFT-ALIGNED: step straight up (then, as a last resort,
+	// down) from the top-left strip, one label-height per rung, so colliding
+	// labels stack in a tidy left column rather than fanning across the edge.
+	const step = h * 1.1;
+	const outside: Candidate[] = [];
+	for (let k = 1; k <= LADDER_ROWS; k++) {
+		outside.push({ x: leftX, y: topY - k * step, outside: true });
+	}
+	for (let k = 1; k <= LADDER_ROWS; k++) {
+		outside.push({ x: leftX, y: box.y + box.h + h * 0.7 + (k - 1) * step, outside: true });
+	}
+	return [...inside, ...outside];
+}
+
+// Clamp a CENTRE so an w×h cell stays horizontally inside `box`; Y is kept as-is
+// (used for the outside escape candidates, which intentionally sit above/below).
+function clampX(
+	cx: number,
+	cy: number,
+	w: number,
+	box: { x: number; y: number; w: number; h: number },
+): { x: number; y: number } {
+	const minX = box.x + w / 2;
+	const maxX = box.x + box.w - w / 2;
+	const x = maxX >= minX ? Math.min(Math.max(cx, minX), maxX) : box.x + box.w / 2;
+	return { x, y: cy };
 }
 
 export function placeClusterLabels(
 	inputs: LabelPlacementInput[],
+	// Node-card rectangles (or any other content) the labels must also avoid.
+	// Seeded as pre-placed obstacles so a label never lands on top of a card —
+	// the desired top-strip position is already card-free (box-follow reserves
+	// the strip above the cards), so most labels stay put; only labels forced
+	// to move (mutual collisions) skip card-covered candidates and prefer the
+	// card-free top strip or the above/below-box escapes. Optional — omitting
+	// it reproduces the prior label-vs-label-only behavior exactly.
+	occupied: Aabb[] = [],
 ): Array<{ x: number; y: number }> {
 	const n = inputs.length;
 	const result: Array<{ x: number; y: number }> = new Array(n);
@@ -97,33 +153,50 @@ export function placeClusterLabels(
 		.map((_, i) => i)
 		.sort((a, b) => inputs[b].box.w * inputs[b].box.h - inputs[a].box.w * inputs[a].box.h);
 
-	const placed: Aabb[] = [];
+	// Labels avoid each other AND the seeded obstacles (cards). Obstacles are
+	// never themselves moved; they only repel labels.
+	const labelBoxes: Aabb[] = [];
+	const collides = (box: Aabb): boolean =>
+		labelBoxes.some((p) => intersects(box, p)) || occupied.some((p) => intersects(box, p));
 	for (const i of order) {
 		const inp = inputs[i];
 		const cands = candidates(inp);
 		let chosen: { x: number; y: number } | null = null;
 		for (const cand of cands) {
-			const c = clampInside(cand.x, cand.y, inp.w, inp.h, inp.box);
+			const c = cand.outside
+				? clampX(cand.x, cand.y, inp.w, inp.box)
+				: clampInside(cand.x, cand.y, inp.w, inp.h, inp.box);
 			const box = aabbOf(c.x, c.y, inp.w, inp.h);
-			let hit = false;
-			for (const p of placed) {
-				if (intersects(box, p)) {
-					hit = true;
-					break;
-				}
-			}
-			if (!hit) {
+			if (!collides(box)) {
 				chosen = c;
-				placed.push(box);
+				labelBoxes.push(box);
 				break;
 			}
 		}
 		if (!chosen) {
-			// No clear candidate — fall back to the desired position (clamped),
-			// best effort. Still record it so later (even smaller) labels try to
-			// avoid it.
-			chosen = clampInside(inp.x, inp.y, inp.w, inp.h, inp.box);
-			placed.push(aabbOf(chosen.x, chosen.y, inp.w, inp.h));
+			// No fixed candidate was clear — GUARANTEE separation by scanning
+			// straight up from the box top until a card- and label-free slot is
+			// found. The space above the whole node cloud is always clear, so
+			// this terminates; the label ends up stacked above its box rather
+			// than overlapping anything. (Replaces the old "fall back to the
+			// desired position even though it collides" behavior — that was the
+			// source of the residual label-on-label / label-on-card overlaps.)
+			const x = inp.box.x + inp.w / 2; // left-aligned
+			const stepUp = inp.h * 0.55;
+			let y = inp.box.y - inp.h * 0.7;
+			for (let g = 0; g < 4000; g++) {
+				const b = aabbOf(x, y, inp.w, inp.h);
+				if (!collides(b)) {
+					chosen = { x, y };
+					labelBoxes.push(b);
+					break;
+				}
+				y -= stepUp;
+			}
+			if (!chosen) {
+				chosen = clampInside(inp.x, inp.y, inp.w, inp.h, inp.box);
+				labelBoxes.push(aabbOf(chosen.x, chosen.y, inp.w, inp.h));
+			}
 		}
 		result[i] = chosen;
 	}

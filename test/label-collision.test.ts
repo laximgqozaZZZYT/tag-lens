@@ -69,7 +69,12 @@ function overlap(a: ReturnType<typeof aabb>, b: ReturnType<typeof aabb>): boolea
 	ok(out[1].x === 1040 && out[1].y === 1008, "disjoint B keeps desired centre");
 }
 
-// Every chosen label cell stays fully inside its own cluster box.
+// Three identical-box labels all wanting the same top-left strip must end up
+// MUTUALLY non-overlapping. Per the current spec labels are pinned to the
+// box top-LEFT and the losers STACK straight up (left-aligned column) — they
+// are deliberately allowed to sit above the box (the caller then grows the box
+// up to contain them), so the invariant we assert is "no two labels overlap"
+// and "all share the same left X", NOT "stays inside the box".
 {
 	const inp: LabelPlacementInput[] = [
 		{ key: "a", x: 30, y: 7, w: 50, h: 14, box: { x: 0, y: 0, w: 220, h: 140 } },
@@ -77,12 +82,18 @@ function overlap(a: ReturnType<typeof aabb>, b: ReturnType<typeof aabb>): boolea
 		{ key: "c", x: 30, y: 7, w: 50, h: 14, box: { x: 0, y: 0, w: 220, h: 140 } },
 	];
 	const out = placeClusterLabels(inp);
-	for (let i = 0; i < inp.length; i++) {
-		const c = aabb(out[i], inp[i].w, inp[i].h);
-		const bx = inp[i].box;
-		const inside =
-			c.x1 >= bx.x - 0.01 && c.y1 >= bx.y - 0.01 &&
-			c.x2 <= bx.x + bx.w + 0.01 && c.y2 <= bx.y + bx.h + 0.01;
-		ok(inside, `label ${inp[i].key} must stay inside its box, got ${JSON.stringify(c)} in ${JSON.stringify(bx)}`);
+	for (let i = 0; i < out.length; i++) {
+		for (let j = i + 1; j < out.length; j++) {
+			const a = aabb(out[i], inp[i].w, inp[i].h);
+			const b = aabb(out[j], inp[j].w, inp[j].h);
+			ok(!overlap(a, b), `labels ${inp[i].key}/${inp[j].key} must not overlap, got ${JSON.stringify({ a, b })}`);
+		}
 	}
+	// Lifted labels stack in a left column: their X spread stays tight (within
+	// one label width of each other), i.e. they don't fan across the top edge.
+	const xs = out.map((o) => o.x);
+	ok(
+		Math.max(...xs) - Math.min(...xs) <= 50,
+		`stacked labels must stay left-aligned (tight X spread), got ${xs.map((x) => x.toFixed(1)).join(",")}`,
+	);
 }

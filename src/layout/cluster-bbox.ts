@@ -10,6 +10,7 @@ export interface ClusterBBoxOptions {
 	channelW: number;
 	channelH: number;
 	clusterSpacing: number;
+	bubble?: boolean;
 }
 
 // Per-cluster member id set. Used both by the nesting-depth detector
@@ -46,7 +47,11 @@ export function computeNestingDepth(
 		for (const y of clusterKeys) {
 			if (x === y) continue;
 			const ys = memberSets.get(y)!;
-			if (ys.size < xs.size && isSubset(ys, xs)) depth++;
+			if (ys.size < xs.size && isSubset(ys, xs)) {
+				depth++;
+			} else if (ys.size === xs.size && isSubset(ys, xs)) {
+				if (x < y) depth++;
+			}
 		}
 		out.set(x, depth);
 	}
@@ -950,7 +955,8 @@ export function computeClusterBBoxes(
 	}
 
 	const clusters: ClusterRect[] = [];
-	for (const key of clusterKeys) {
+	for (let i = 0; i < clusterKeys.length; i++) {
+		const key = clusterKeys[i];
 		const range = rangeMap.get(key);
 		if (!range) continue;
 		const nest = nestingDepth.get(key) ?? 0;
@@ -1011,15 +1017,13 @@ export function computeClusterBBoxes(
 			//
 			// SUB pieces (= 外局) are pulled inward by a small inset so
 			// that, when several sub rects (or a sub rect and its parent
-			// main rect) share a grid line, their outlines don't collapse
-			// into one indistinguishable border. Per user spec
-			// (2026-05-26, refined): use the channel QUARTER-line — i.e.
-			// half-way between the main centre-line and the card edge —
-			// so the sub border has clear breathing room on both sides
-			// (won't fuse with the main centre-line, won't rub against
-			// the card stroke).
-			const subInsetX = channelW / 4;
-			const subInsetY = channelH / 4;
+			// Enforce strict grid alignment unconditionally. The iterative 
+			// collision resolver below will push overlapping edges outward by full cells.
+			let mainInsetX = 0;
+			let mainInsetY = 0;
+			let subInsetX = 0;
+			let subInsetY = 0;
+
 			const aabbFromCells = (
 				cells: Set<string>,
 				inset: number,
@@ -1045,7 +1049,7 @@ export function computeClusterBBoxes(
 			};
 			const pieces: Array<{ x: number; y: number; w: number; h: number; kind: "main" | "sub" }> = [];
 			if (mainCells.size > 0) {
-				pieces.push({ ...aabbFromCells(mainCells, 0, 0), kind: "main" });
+				pieces.push({ ...aabbFromCells(mainCells, mainInsetX, mainInsetY), kind: "main" });
 			}
 			for (const cells of extrasByMain.values()) {
 				if (cells.size === 0) continue;
@@ -1078,6 +1082,67 @@ export function computeClusterBBoxes(
 		}
 		clusters.push(rect);
 	}
+
+	// Edge Collision Resolution (方眼に必ず添え、重なった辺は一マス外側へ)
+	// Iteratively push overlapping collinear edges outward, regardless of parent/child.
+	let moved = true;
+	let iterations = 0;
+	while (moved && iterations++ < 50) {
+		moved = false;
+		const allPieces = clusters.flatMap((c) => c.pieces ?? []);
+		for (let i = 0; i < allPieces.length; i++) {
+			for (let j = i + 1; j < allPieces.length; j++) {
+				const a = allPieces[i];
+				const b = allPieces[j];
+				const areaA = a.w * a.h;
+				const areaB = b.w * b.h;
+				// Expand the larger box to create a concentric wrapping effect
+				const target = areaA > areaB ? a : b;
+
+				// Left vs Left
+				if (a.x === b.x && Math.max(a.y, b.y) < Math.min(a.y + a.h, b.y + b.h)) {
+					target.x -= slotW;
+					target.w += slotW;
+					moved = true;
+				}
+				// Right vs Right
+				if (a.x + a.w === b.x + b.w && Math.max(a.y, b.y) < Math.min(a.y + a.h, b.y + b.h)) {
+					target.w += slotW;
+					moved = true;
+				}
+				// Top vs Top
+				if (a.y === b.y && Math.max(a.x, b.x) < Math.min(a.x + a.w, b.x + b.w)) {
+					target.y -= slotH;
+					target.h += slotH;
+					moved = true;
+				}
+				// Bottom vs Bottom
+				if (a.y + a.h === b.y + b.h && Math.max(a.x, b.x) < Math.min(a.x + a.w, b.x + b.w)) {
+					target.h += slotH;
+					moved = true;
+				}
+			}
+		}
+	}
+
+	// Update cluster bounding boxes to reflect expanded pieces
+	for (const c of clusters) {
+		if (!c.pieces) continue;
+		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+		for (const p of c.pieces) {
+			if (p.x < minX) minX = p.x;
+			if (p.y < minY) minY = p.y;
+			if (p.x + p.w > maxX) maxX = p.x + p.w;
+			if (p.y + p.h > maxY) maxY = p.y + p.h;
+		}
+		if (minX <= maxX) {
+			c.x = minX;
+			c.y = minY;
+			c.width = maxX - minX;
+			c.height = maxY - minY;
+		}
+	}
+
 	return { clusters, memberSets, nestingDepth };
 }
 

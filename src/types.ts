@@ -445,5 +445,10 @@ export const CARD_BODY_CHARS_MAX = 400;
 // Single-cell pixel dimensions for the global grid. A card with nodeRows = 1
 // and nodeCols = 1 occupies exactly one cell at this size; multi-cell cards
 // scale these uniformly by (rows, cols).
-export const CARD_CELL_W = 120;
-export const CARD_CELL_H = 32;
+// Enlarged 2.25× from the original 120×32 (same 15:4 aspect ratio) so a card's
+// title (filename) is legible at the whole-diagram fit zoom: the inter-card
+// channel has a FIXED 24px floor (computeChannelDims), so growing the card
+// raises the card-to-gap ratio, which means each card occupies more screen
+// pixels at fit zoom rather than being cancelled out by a proportional gap.
+export const CARD_CELL_W = 270;
+export const CARD_CELL_H = 72;

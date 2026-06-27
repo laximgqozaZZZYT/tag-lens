@@ -452,6 +452,12 @@ export function drawClusterLabels(
 	zoom: number,
 	minFontPx: number = 0,
 	warningClusters?: Map<string, number>,
+	// When false, the label CENTRE is NOT clamped back inside its cluster box.
+	// BubbleSets passes false: its layout-time de-confliction (label-collision.ts)
+	// intentionally pushes a crowded label OUT of the box — above the node cloud —
+	// to avoid overlapping cards or other labels, and clamping it back in here
+	// would undo exactly that, re-stacking the labels on top of each other.
+	clampToBox: boolean = true,
 ): PlacedLabelBox[] {
 	// Labels live in the grid cells the LAYOUT reserved for them
 	// (`laid.labelCells` — one empty cell per cluster, kept clear of nodes
@@ -487,8 +493,10 @@ export function drawClusterLabels(
 		if (c && c.width > 0 && c.height > 0) {
 			cw = Math.min(cw, c.width);
 			ch = Math.min(ch, c.height);
-			cx = Math.min(Math.max(cx, c.x + cw / 2), c.x + c.width - cw / 2);
-			cy = Math.min(Math.max(cy, c.y + ch / 2), c.y + c.height - ch / 2);
+			if (clampToBox) {
+				cx = Math.min(Math.max(cx, c.x + cw / 2), c.x + c.width - cw / 2);
+				cy = Math.min(Math.max(cy, c.y + ch / 2), c.y + c.height - ch / 2);
+			}
 		}
 		// Size the font to FILL the reserved ~4×4 cell box: take the largest
 		// font that fits both the box width and height. A readability floor

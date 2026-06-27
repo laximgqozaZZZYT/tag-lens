@@ -110,6 +110,7 @@ const sizedDefensive: SizedNode[] = dataDefensive.nodes.map((n) => ({
 }));
 
 const outDefensive = layout(dataDefensive, sizedDefensive, opts("bubblesets"));
+
 const tripleSubDefensive = outDefensive.clusters
 	.flatMap((c) => c.pieces ?? [])
 	.find((p) => p.kind === "sub" && (p.hueKeys?.length ?? 0) === 3);

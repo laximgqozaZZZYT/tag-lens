@@ -34,7 +34,6 @@ import {
 	drawClusterLabels as drawClusterLabelsFn,
 	drawAggregateStack as drawAggregateStackFn,
 	drawJunihitoeStack as drawJunihitoeStackFn,
-	drawOverviewLabels as drawOverviewLabelsFn,
 } from "./draw/draw-helpers";
 import {
 	computeMemberSets,
@@ -53,7 +52,8 @@ import {
 	type NodeDisplay,
 	type NodeDisplayDeps,
 } from "./visual/node-display";
-import { drawEnclosures } from "./draw/draw-enclosures";
+import { drawEulerEnclosures } from "./draw/draw-enclosures";
+import { drawBubbleSetsEnclosures } from "./draw/draw-bubblesets";
 import { drawBaseEdges, drawAccentEdges, drawGhostEdges } from "./draw/draw-edges";
 import {
 	drawUpsetFooter,
@@ -1456,6 +1456,7 @@ export class MiniGraphView extends ItemView {
 				channelW: this.laid.channelW,
 				channelH: this.laid.channelH,
 				clusterSpacing: this.settings.clusterSpacing,
+				bubble: this.settings.viewMode === "bubblesets",
 			});
 			this.laid.clusters = clusters;
 		}
@@ -1913,46 +1914,6 @@ export class MiniGraphView extends ItemView {
 		this.requestDraw();
 	}
 
-	// True when the whole diagram is on screen (zoomed out to roughly fit).
-	// Recomputed each draw; gates the big centre auxiliary labels.
-	private overviewActive = false;
-
-	private isOverview(): boolean {
-		if (
-			this.laid.upset ||
-			this.laid.heatmap ||
-			this.laid.lattice
-		)
-			return false;
-		if (this.laid.clusters.length === 0 && this.laid.nodes.length === 0)
-			return false;
-		let minX = Infinity;
-		let minY = Infinity;
-		let maxX = -Infinity;
-		let maxY = -Infinity;
-		for (const c of this.laid.clusters) {
-			minX = Math.min(minX, c.x);
-			minY = Math.min(minY, c.y);
-			maxX = Math.max(maxX, c.x + c.width);
-			maxY = Math.max(maxY, c.y + c.height);
-		}
-		for (const n of this.laid.nodes) {
-			minX = Math.min(minX, n.x - n.width / 2);
-			minY = Math.min(minY, n.y - n.height / 2);
-			maxX = Math.max(maxX, n.x + n.width / 2);
-			maxY = Math.max(maxY, n.y + n.height / 2);
-		}
-		const w = maxX - minX;
-		const h = maxY - minY;
-		if (!isFinite(w) || w <= 0 || h <= 0) return false;
-		const panelW = this.pinnedMenuWidth();
-		const visW = Math.max(1, this.canvas.clientWidth - panelW);
-		const visH = Math.max(1, this.canvas.clientHeight);
-		const fitZoom = Math.min(visW / w, visH / h);
-		// Show the overview labels while at (or near) the whole-diagram zoom.
-		return this.zoom <= fitZoom * 1.8;
-	}
-
 	private fitToView(): void {
 		// UpSet: cards sit in the MAIN area above the screen-space
 		// footer. Fit them into (canvas.height - footerH) so the cards
@@ -2399,7 +2360,6 @@ export class MiniGraphView extends ItemView {
 			);
 			return;
 		}
-		this.overviewActive = this.isOverview();
 		ctx.setTransform(dpr * this.zoom, 0, 0, dpr * this.zoom, dpr * this.panX, dpr * this.panY);
 
 		// Excel-style row/column underlay. Drawn first so enclosures, edges,
@@ -2527,15 +2487,25 @@ export class MiniGraphView extends ItemView {
 			const hn = this.hoveredNodeId
 				? this.laid.nodes.find((n) => n.id === this.hoveredNodeId)
 				: null;
-			drawEnclosures(
-				ctx,
-				this.laid.clusters,
-				this.highlightedClusters,
-				undefined,
-				this.zoom,
-				hn ? { x: hn.x, y: hn.y } : null,
-				this.settings.viewMode === "bubblesets",
-			);
+			if (this.settings.viewMode === "bubblesets") {
+				drawBubbleSetsEnclosures(
+					ctx,
+					this.laid.clusters,
+					this.highlightedClusters,
+					undefined,
+					this.zoom,
+					hn ? { x: hn.x, y: hn.y } : null,
+				);
+			} else {
+				drawEulerEnclosures(
+					ctx,
+					this.laid.clusters,
+					this.highlightedClusters,
+					undefined,
+					this.zoom,
+					hn ? { x: hn.x, y: hn.y } : null,
+				);
+			}
 		}
 
 		if (this.settings.showEdges && !this.laid.upset) {
@@ -2615,13 +2585,10 @@ export class MiniGraphView extends ItemView {
 			}
 		}
 
-		// Overview auxiliary labels: a big centred name per enclosure, shown
-		// whenever the whole diagram is in view — independent of the Graph-
-		// display toggles, and separate from the on-grid title bars. Not in
-		// UpSet mode.
-		if (this.overviewActive && !this.laid.upset) {
-			drawOverviewLabelsFn(ctx, this.laid, this.zoom, undefined);
-		}
+		// Overview auxiliary labels (the big centred name per enclosure)
+		// removed per user request: the giant watermark text collided with
+		// cards and with the small on-grid title bars. The on-grid title
+		// bars (drawClusterLabels) remain the single source of cluster names.
 	}
 
 	// Slot lattice with VISIBLE channels (= the user's 隘路). Each card cell
@@ -2660,6 +2627,9 @@ export class MiniGraphView extends ItemView {
 			this.zoom,
 			this.settings.minFontPx,
 			undefined,
+			// BubbleSets de-conflicts labels OUT of their boxes at layout time;
+			// don't clamp them back in (that re-creates the overlaps).
+			this.settings.viewMode !== "bubblesets",
 		);
 	}
 
