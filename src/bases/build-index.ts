@@ -111,7 +111,7 @@ function buildFacts(app: App): Map<string, FileFacts> {
 		const dest = app.metadataCache.getFirstLinkpathDest(t, "");
 		if (dest) {
 			const c = app.metadataCache.getFileCache(dest);
-			if (c && c.frontmatter) tagProperties[t] = c.frontmatter as Record<string, unknown>;
+			if (c?.frontmatter) tagProperties[t] = c.frontmatter as Record<string, unknown>;
 		}
 	}
 

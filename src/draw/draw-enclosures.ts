@@ -44,7 +44,7 @@ export function drawEulerEnclosures(
 	for (const c of sortedClusters) {
 		const hue = clusterHue(c.groupKey);
 		const isHigh = highlightedClusters.has(c.groupKey);
-		const isWarn = warningClusters && warningClusters.has(c.groupKey);
+		const isWarn = warningClusters?.has(c.groupKey);
 		const baseTint = 0.32;
 		ctx.fillStyle = isHigh
 			? colorAlpha(theme().warn, 0.40)
@@ -96,7 +96,7 @@ export function drawEulerEnclosures(
 	for (const c of sortedClusters) {
 		const hue = clusterHue(c.groupKey);
 		const isHigh = highlightedClusters.has(c.groupKey);
-		const isWarn = warningClusters && warningClusters.has(c.groupKey);
+		const isWarn = warningClusters?.has(c.groupKey);
 		ctx.strokeStyle = isHigh
 			? theme().warn
 			: isWarn

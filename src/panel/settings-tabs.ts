@@ -271,7 +271,7 @@ export function renderSettingsDisplayTab(el: HTMLElement, deps: DisplayTabDeps):
 		jaccardIn.value = String(deps.settings.ghostEdgeMinJaccard);
 		jaccardIn.addEventListener("change", () => {
 			const v = parseFloat(jaccardIn.value);
-			if (!isNaN(v) && v >= 0 && v <= 1) {
+			if (!Number.isNaN(v) && v >= 0 && v <= 1) {
 				deps.settings.ghostEdgeMinJaccard = v;
 				deps.save();
 				deps.rebuild();

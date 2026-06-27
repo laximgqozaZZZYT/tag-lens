@@ -61,7 +61,7 @@ const UNBOUND: DiscreteAxis = {
 };
 
 function buildDiscreteAxis(binding: EncodingBinding | undefined, nodes: EncNode[], ctx: EncContext): DiscreteAxis {
-	if (!binding || !binding.enabled) return UNBOUND;
+	if (!binding?.enabled) return UNBOUND;
 	const field = resolveFieldSource(binding.fieldId);
 	if (!field) return UNBOUND;
 	const raws = nodes.map((n) => field.accessor(n, ctx));

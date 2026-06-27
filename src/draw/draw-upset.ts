@@ -289,7 +289,7 @@ function drawMatrixDots(
 			if (y < topY) topY = y;
 			if (y > botY) botY = y;
 		}
-		if (isFinite(topY) && botY > topY) {
+		if (Number.isFinite(topY) && botY > topY) {
 			ctx.strokeStyle = highlighted
 				? HIGHLIGHT
 				: colorAlpha(theme().textMuted, 0.85);

@@ -557,7 +557,7 @@ export class MiniGraphView extends ItemView {
 		}
 		
 		// ガード3: マークダウンファイル以外は処理対象外
-		if (!file || file.extension !== 'md') return; 
+		if (file?.extension !== 'md') return; 
 
 		// ガード4: パフォーマンス最適化。Tag LensのView自体が現在非表示（裏のタブ、または折りたたまれている）なら計算をスキップ
 		if (!this.containerEl.getClientRects().length) return;
@@ -579,7 +579,7 @@ export class MiniGraphView extends ItemView {
 	private async updateViewContextToElement(activePath: string) {
 		// メモリ上のグラフデータ（キャッシュ）の存在チェック。存在しない場合は処理をスキップ
 		const currentGraphData: GraphData | null = this.drosteData; 
-		if (!currentGraphData || !currentGraphData.nodes) return;
+		if (!currentGraphData?.nodes) return;
 
 		const activeFile = this.app.vault.getAbstractFileByPath(activePath);
 		if (!(activeFile instanceof TFile)) return;
@@ -609,7 +609,7 @@ export class MiniGraphView extends ItemView {
 			}
 
 			// HasLink の判定 (双方向リンクチェック)
-			const hasLinkFromActive = (resolvedLinks[activePath] && resolvedLinks[activePath][node.id]) ? 1 : 0;
+			const hasLinkFromActive = (resolvedLinks[activePath]?.[node.id]) ? 1 : 0;
 			const hasLinkToActive = (resolvedLinks[node.id] && resolvedLinks[node.id][activePath]) ? 1 : 0;
 			const hasLink = (hasLinkFromActive || hasLinkToActive) ? 1 : 0;
 
@@ -2023,7 +2023,7 @@ export class MiniGraphView extends ItemView {
 			maxX = Math.max(maxX, n.x + n.width / 2);
 			maxY = Math.max(maxY, n.y + n.height / 2);
 		}
-		if (!isFinite(minX)) return;
+		if (!Number.isFinite(minX)) return;
 		// The settings panel overlays the right side of the canvas without
 		// pushing it, so subtract its width from the effective fit area and
 		// centre against the visible half.
@@ -2855,7 +2855,7 @@ export class MiniGraphView extends ItemView {
 			if (c < min) min = c;
 			if (c > max) max = c;
 		}
-		if (!isFinite(min)) { min = 1; max = 1; }
+		if (!Number.isFinite(min)) { min = 1; max = 1; }
 		const hm = this.laid.heatmap;
 		const drosteOps = this.settings.viewMode === "droste"
 			? {

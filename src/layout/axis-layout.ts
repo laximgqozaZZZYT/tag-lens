@@ -67,7 +67,7 @@ function buildAxis(
 	cellPitch: number,
 	measureText?: (text: string, fontPx: number) => number,
 ): Axis1D {
-	if (!binding || !binding.enabled) return { extent, coordOf: () => null, cellOf: () => "" };
+	if (!binding?.enabled) return { extent, coordOf: () => null, cellOf: () => "" };
 	const field = resolveFieldSource(binding.fieldId);
 	if (!field) return { extent, coordOf: () => null, cellOf: () => "" };
 	const raws = nodes.map((n) => field.accessor(n, ctx));

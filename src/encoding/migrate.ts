@@ -16,7 +16,7 @@ export interface LegacyEncodingSettings {
 
 export function synthesizeEncodingFromLegacy(s: LegacyEncodingSettings): EncodingBinding[] {
 	const out: EncodingBinding[] = [];
-	if (s.statusField && s.statusField.trim()) {
+	if (s.statusField?.trim()) {
 		out.push({
 			channelId: "border",
 			fieldId: "frontmatter:" + s.statusField,

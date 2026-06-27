@@ -59,7 +59,7 @@ export function computeTrulyAgg(
 			for (const o of n.memberships) {
 				if (o === m) continue;
 				const oParents = parentOf.get(o);
-				if (oParents && oParents.has(m)) {
+				if (oParents?.has(m)) {
 					isParentOfOther = true;
 					break;
 				}

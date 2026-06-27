@@ -57,7 +57,7 @@ function isQuantType(t: ScaleConfig["type"]): boolean {
 export function prepareScale(config: ScaleConfig, rawValues: (string | number | null)[]): PreparedScale {
 	if (isQuantType(config.type)) {
 		const nums = rawValues
-			.filter((v): v is number => typeof v === "number" && isFinite(v))
+			.filter((v): v is number => typeof v === "number" && Number.isFinite(v))
 			.sort((a, b) => a - b);
 		let min = nums.length ? nums[0] : 0;
 		let max = nums.length ? nums[nums.length - 1] : 1;
@@ -94,7 +94,7 @@ export function prepareScale(config: ScaleConfig, rawValues: (string | number | 
 
 		return {
 			apply: (raw) =>
-				typeof raw === "number" && isFinite(raw) ? { t: norm(raw) } : { missing: true },
+				typeof raw === "number" && Number.isFinite(raw) ? { t: norm(raw) } : { missing: true },
 			legend: { kind: "quantitative", min, max, reversed: reverse },
 		};
 	}

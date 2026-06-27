@@ -422,7 +422,7 @@ export function drawClusterLabels(
 		// fall back to the owning cluster's "name (count)". A cell with neither
 		// is skipped.
 		const baseText = cell.text ?? (c ? `${c.label} (${c.memberCount})` : "");
-		const text = warningClusters && warningClusters.has(cell.key) ? `⚠ ${baseText}` : baseText;
+		const text = warningClusters?.has(cell.key) ? `⚠ ${baseText}` : baseText;
 		if (!text) continue;
 		// Clamp the label to the cluster's FINAL bbox (it may have been
 		// post-processed after layout, e.g. inheritance expansion). Shrink

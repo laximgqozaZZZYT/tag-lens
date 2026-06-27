@@ -61,7 +61,7 @@ const rampStops = (f: (t: number) => string): string[] =>
 	Array.from({ length: 11 }, (_, i) => f(i / 10));
 
 const fmt = (n: number): string => {
-	if (!isFinite(n)) return "—";
+	if (!Number.isFinite(n)) return "—";
 	const r = Math.round(n * 100) / 100;
 	return Object.is(r, -0) ? "0" : String(r);
 };

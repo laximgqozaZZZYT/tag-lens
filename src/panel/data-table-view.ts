@@ -71,7 +71,7 @@ export function renderDataTableView(
 		tdStatus.setCssStyles({ padding: "6px" });
 
 		let statusStr = "";
-		if (n.frontmatter && n.frontmatter["status"]) {
+		if (n.frontmatter?.["status"]) {
 			statusStr = n.frontmatter["status"].join(", ");
 		}
 		if (statusStr) {

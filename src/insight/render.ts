@@ -427,7 +427,7 @@ function renderInsightSuggest(host: HTMLElement, deps: InsightDeps): void {
 		btnConvert.setCssStyles({ fontSize: "10px", padding: "2px 6px", cursor: "pointer" });
 		btnConvert.addEventListener("click", () => {
 			new PromptModal(deps.app, `Convert #${s.tag} to a nested tag. Enter parent path (e.g. "Programming"):`, (parent) => {
-				if (parent && parent.trim()) {
+				if (parent?.trim()) {
 					convertToNestedTag(deps.app, s.tag, parent.trim())
 						.then(() => renderInsightSuggest(host, deps))
 						.catch((e: Error) => new Notice(`Error: ${e.message}`));
