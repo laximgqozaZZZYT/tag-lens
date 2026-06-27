@@ -1,0 +1,11 @@
+#!/bin/sh
+# Pre-push quality gate. Runs the full verify pipeline — tsc (src + test),
+# the test suite, knip (dead code/deps), and the build — so broken code can
+# never reach the remote: the gate runs LOCALLY before push, not only after
+# in CI. Auto-enabled by the `prepare` npm script (sets core.hooksPath).
+# Emergency bypass: `git push --no-verify`.
+echo "[pre-push] npm run verify (tsc src+test, tests, knip, build)…"
+npm run verify || {
+	echo "[pre-push] verify FAILED — push aborted. Fix the above, or bypass with: git push --no-verify" >&2
+	exit 1
+}

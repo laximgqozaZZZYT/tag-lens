@@ -11,6 +11,7 @@
 	},
 	"scripts": {
 		"build": "node esbuild.config.mjs",
+		"prepare": "git config core.hooksPath .githooks",
 		"dev": "node esbuild.config.mjs --watch",
 		"test": "node test/run.mjs",
 		"typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
