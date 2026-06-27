@@ -62,6 +62,7 @@ import "./label-collision.test";
 import "./bubblesets-label-collision.test";
 import "./overview-label-placement.test";
 import "./bubblesets-invariants.test";
+import "./bubblesets-render-smoke.test";
 
 
 summary();
