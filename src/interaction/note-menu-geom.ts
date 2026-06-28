@@ -496,3 +496,15 @@ export function noteMenuLeftGripStyle(): Partial<CSSStyleDeclaration> {
 		cursor: "ew-resize", zIndex: "61", background: "transparent",
 	};
 }
+
+// Static chrome for the bottom-right corner resize handle: an invisible 16×16
+// transparent hit target docked in the SE corner with an nwse-resize cursor,
+// stacked above the body so the drag is always grabbable. No state branch; the
+// drag wiring (resize-from-corner + rect persist) stays in the view. Mirrors
+// noteMenuLeftGripStyle.
+export function noteMenuBottomRightGripStyle(): Partial<CSSStyleDeclaration> {
+	return {
+		position: "absolute", right: "0", bottom: "0", width: "16px", height: "16px",
+		cursor: "nwse-resize", zIndex: "61", background: "transparent",
+	};
+}

@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -288,6 +288,14 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(g.position === "absolute" && g.left === "0" && g.top === "0" && g.bottom === "0", "grip: docked down the left border");
 	ok(g.width === "6px" && g.cursor === "ew-resize", "grip: 6px ew-resize strip");
 	ok(g.zIndex === "61" && g.background === "transparent", "grip: above body, transparent");
+}
+
+// noteMenuBottomRightGripStyle: the SE-corner invisible resize hit target.
+{
+	const g = noteMenuBottomRightGripStyle();
+	ok(g.position === "absolute" && g.right === "0" && g.bottom === "0", "br grip: docked in the bottom-right corner");
+	ok(g.width === "16px" && g.height === "16px" && g.cursor === "nwse-resize", "br grip: 16x16 nwse-resize target");
+	ok(g.zIndex === "61" && g.background === "transparent", "br grip: above body, transparent");
 }
 
 // noteMenuTreeRowStyle: per-kind Tree-pane row + label chrome.
