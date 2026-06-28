@@ -392,3 +392,14 @@ export function noteMenuSuggestStyle(): {
 		glyph: { width: "10px", flex: "0 0 auto", textAlign: "center" },
 	};
 }
+
+// Static chrome for the pinned panel's left-edge resize handle: a thin
+// transparent strip docked down the left border with an ew-resize cursor,
+// stacked above the body so the drag is always grabbable. No state branch; the
+// drag wiring (widen-on-drag-left + canvas re-reserve) stays in the view.
+export function noteMenuLeftGripStyle(): Partial<CSSStyleDeclaration> {
+	return {
+		position: "absolute", left: "0", top: "0", bottom: "0", width: "6px",
+		cursor: "ew-resize", zIndex: "61", background: "transparent",
+	};
+}

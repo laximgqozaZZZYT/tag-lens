@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuNotesHint, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuNotesHint, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -280,4 +280,12 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(s.row.padding === "3px 8px" && s.row.cursor === "pointer", "row: padded, pointer");
 	ok(s.row.whiteSpace === "nowrap" && s.row.overflow === "hidden" && s.row.textOverflow === "ellipsis", "row: single-line ellipsis");
 	ok(s.glyph.width === "10px" && s.glyph.flex === "0 0 auto" && s.glyph.textAlign === "center", "glyph: fixed-width centred (colour applied per-kind)");
+}
+
+// noteMenuLeftGripStyle: the pinned panel's thin transparent left-edge resize strip.
+{
+	const g = noteMenuLeftGripStyle();
+	ok(g.position === "absolute" && g.left === "0" && g.top === "0" && g.bottom === "0", "grip: docked down the left border");
+	ok(g.width === "6px" && g.cursor === "ew-resize", "grip: 6px ew-resize strip");
+	ok(g.zIndex === "61" && g.background === "transparent", "grip: above body, transparent");
 }

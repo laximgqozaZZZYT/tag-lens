@@ -292,6 +292,12 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         returning `{row, glyph}` static layout records; the per-kind glyph colour (from
         `suggestionKindStyle`) is applied on top by the view, and the hover/mousedown
         wiring stays inline. No state branch. — 7a5f831
+  - [x] pinned left-edge resize-grip chrome → `noteMenuLeftGripStyle()`
+        (`src/interaction/note-menu-geom.ts`) + a case in `test/note-menu-geom.test.ts`.
+        The inline `setCssStyles` block for the pinned panel's `lgrip` (the thin
+        transparent ew-resize strip down the left border) in `ensureNoteMenu` is now a
+        thin application of a pure builder returning the static style record; the
+        widen-on-drag-left + canvas re-reserve wiring stays in the view. No state branch.
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
