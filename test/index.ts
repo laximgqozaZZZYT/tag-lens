@@ -40,6 +40,7 @@ import "./spreadsheet-pan.test";
 import "./insight-alerts.test";
 import "./tag-path.test";
 import "./note-menu-geom.test";
+import "./view-shell-style.test";
 import "./settings-sub-tabs.test";
 import "./view-mode-picker.test";
 import "./jaccard-input.test";

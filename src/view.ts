@@ -113,6 +113,7 @@ import {
 	settingsSubTabs,
 	type SettingsSubTab,
 } from "./panel/settings-tabs";
+import { viewRootStyle, viewCanvasStyle } from "./view-shell-style";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes } from "./panel/menu-notes";
 import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVault } from "./panel/export-image";
@@ -453,9 +454,7 @@ export class MiniGraphView extends ItemView {
 	async onOpen(): Promise<void> {
 		const root = this.containerEl.children[1] as HTMLElement;
 		root.empty();
-		root.setCssStyles({ padding: "0" });
-		root.setCssStyles({ overflow: "hidden" });
-		root.setCssStyles({ position: "relative" });
+		root.setCssStyles(viewRootStyle());
 		this.root = root;
 
 		// Resolve Obsidian's theme colours into concrete strings for the canvas
@@ -463,10 +462,7 @@ export class MiniGraphView extends ItemView {
 		setTheme(resolveTheme(root));
 
 		this.canvas = root.createEl("canvas");
-		this.canvas.setCssStyles({ width: "100%" });
-		this.canvas.setCssStyles({ height: "100%" });
-		this.canvas.setCssStyles({ display: "block" });
-		this.canvas.setCssStyles({ cursor: "grab" });
+		this.canvas.setCssStyles(viewCanvasStyle());
 		const ctx2d = this.canvas.getContext("2d");
 		if (!ctx2d) throw new Error("Tag Lens: 2D canvas context unavailable");
 		this.ctx = ctx2d;
