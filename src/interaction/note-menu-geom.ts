@@ -276,3 +276,22 @@ export function noteMenuBodyPanelStyle(
 	}
 	return { display, flexDirection: "column", flex: "1 1 auto", minHeight: "0" };
 }
+
+// Container CSS for the Tree pane's bulk Select-all / Deselect-all row. Two static
+// layout blocks:
+//   bar — the row holding the two buttons (small gap, top margin).
+//   btn — one bulk button: a small muted secondary-background pill.
+// Neither branches on state. Pure builder — applied via setCssStyles().
+export function noteMenuBulkBarStyle(): {
+	bar: Partial<CSSStyleDeclaration>;
+	btn: Partial<CSSStyleDeclaration>;
+} {
+	return {
+		bar: { display: "flex", gap: "6px", marginTop: "4px" },
+		btn: {
+			fontSize: "10px", padding: "2px 6px", cursor: "pointer",
+			background: "var(--background-secondary)", border: "1px solid var(--background-modifier-border)",
+			borderRadius: "3px", color: "var(--text-muted)", lineHeight: "1.4",
+		},
+	};
+}

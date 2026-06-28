@@ -127,7 +127,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -3132,18 +3132,13 @@ export class MiniGraphView extends ItemView {
 		// same key the per-row checkboxes use. Does NOT call rebuild(); a plain
 		// requestDraw() is enough because the draw() skipNode filter re-reads
 		// hiddenNodes fresh every frame.
+		const bulkBarStyle = noteMenuBulkBarStyle();
 		const bulkBar = treeTab.createDiv();
-		bulkBar.setCssStyles({
-			display: "flex", gap: "6px", marginTop: "4px",
-		});
+		bulkBar.setCssStyles(bulkBarStyle.bar);
 		const mkBulkBtn = (label: string, handler: () => void): void => {
 			const btn = bulkBar.createEl("button");
 			btn.textContent = label;
-			btn.setCssStyles({
-				fontSize: "10px", padding: "2px 6px", cursor: "pointer",
-				background: "var(--background-secondary)", border: "1px solid var(--background-modifier-border)",
-				borderRadius: "3px", color: "var(--text-muted)", lineHeight: "1.4",
-			});
+			btn.setCssStyles(bulkBarStyle.btn);
 			// Prevent the button click from starting a header move-drag.
 			btn.addEventListener("mousedown", (ev) => ev.stopPropagation());
 			btn.addEventListener("click", (ev) => {

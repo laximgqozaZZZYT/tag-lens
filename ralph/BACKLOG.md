@@ -252,6 +252,12 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         the show/hide side effects (renderDataLogicBody/renderSettingsBody/renderInsightTab,
         table/json re-render) stay in the view. Test locks "exactly the active pane
         visible, flex-vs-block per pane kind". — 9db684e
+  - [x] Tree-pane bulk Select/Deselect-all chrome → `noteMenuBulkBarStyle()`
+        (`src/interaction/note-menu-geom.ts`) + a case in `test/note-menu-geom.test.ts`.
+        Returns `{bar, btn}` static layout records (the 6px-gap flex row + the small
+        muted secondary-bg button pill); the inline `bulkBar`/`mkBulkBtn` `setCssStyles`
+        blocks in `ensureNoteMenu` are now thin applications. No state branch; the
+        bulk handlers (`bulkSetHidden` + save/draw) stay in the view. — 1100dba
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list

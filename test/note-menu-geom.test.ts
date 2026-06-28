@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -220,4 +220,15 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(tb.table === "block" && tb.logic === "none" && tb.tree === "none" && tb.json === "none", "table active → block, others none");
 	const j = noteMenuDataSubTabDisplay("json");
 	ok(j.json === "block" && j.logic === "none" && j.tree === "none" && j.table === "none", "json active → block, others none");
+}
+
+// noteMenuBulkBarStyle: two static layout blocks — the row (small gap, top margin)
+// and one bulk button (small muted secondary-background pill).
+{
+	const b = noteMenuBulkBarStyle();
+	ok(b.bar.display === "flex" && b.bar.gap === "6px" && b.bar.marginTop === "4px", "bar: 6px-gap flex row, 4px top");
+	ok(b.btn.fontSize === "10px" && b.btn.padding === "2px 6px" && b.btn.cursor === "pointer", "btn: small clickable pill");
+	ok(b.btn.background === "var(--background-secondary)" && b.btn.color === "var(--text-muted)", "btn: muted secondary bg");
+	ok(b.btn.border === "1px solid var(--background-modifier-border)" && b.btn.borderRadius === "3px", "btn: bordered, rounded");
+	ok(b.btn.lineHeight === "1.4", "btn: line-height");
 }
