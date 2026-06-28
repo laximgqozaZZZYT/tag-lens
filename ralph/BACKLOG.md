@@ -326,6 +326,12 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         (used at `view.ts:3027`/`3083`); collapsed into the same single application. One
         merged `setCssStyles` == two sequential ones, behaviour-identical. Last
         duplicated tab-hover block gone. — 25e416c
+  - [x] bottom-right resize-grip chrome → `noteMenuBottomRightGripStyle()`
+        (`src/interaction/note-menu-geom.ts`) + a case in `test/note-menu-geom.test.ts`.
+        The inline `setCssStyles` block for the SE-corner invisible 16×16 resize hit
+        target in `ensureNoteMenu` is now a thin application of a pure builder returning
+        the static style record (mirrors `noteMenuLeftGripStyle`); the resize-from-corner
+        + rect-persist wiring stays in the view. No state branch. — 590fb21
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
