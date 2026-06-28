@@ -70,6 +70,7 @@ import {
 	TIER_GUTTER as LATTICE_TIER_GUTTER,
 } from "./draw/draw-lattice";
 import { computeLatticeDrawInput } from "./draw/lattice-draw-input";
+import { computeDrosteDrawInput } from "./draw/droste-draw-input";
 import { latticeNodeAt } from "./layout/lattice-layout";
 import { drawCard as drawCardFn } from "./draw/draw-card";
 import { drawLegend } from "./draw/legend-layout";
@@ -2286,7 +2287,8 @@ export class MiniGraphView extends ItemView {
 		}
 		// Containment lens = Icon Gallery: every node's icon diagram, tiled, pan/zoomed.
 		if (this.laid.drosteGallery && this.laid.drosteGallery.cells.length > 0) {
-			drawDroste(ctx, {
+			drawDroste(ctx, computeDrosteDrawInput({
+				settings: this.settings,
 				canvas: this.canvas,
 				dpr,
 				gallery: this.laid.drosteGallery,
@@ -2295,14 +2297,9 @@ export class MiniGraphView extends ItemView {
 				panX: this.panX,
 				panY: this.panY,
 				hoverId: this.hoveredNodeId,
-				focusId: this.settings.drosteFocus,
 				// biome-ignore lint/suspicious/noAssignInExpressions: assign-and-pass the live hit-region array so the draw path fills the same ref we read back on hit-testing
 				hitRegions: (this.drosteHit = []),
-				// Pass the live hidden set so the draw path skips unchecked cells
-				// immediately on requestDraw() — no rebuild required (matches
-				// the skipNode path used by all other view modes).
-				hiddenSet: new Set(this.settings.hiddenNodes),
-			});
+			}));
 			this.drawGlobalDisplayFallbacks(ctx, dpr, "droste");
 			return;
 		}
