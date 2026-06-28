@@ -45,3 +45,46 @@ export function clampPinnedWidth(settingsWidth: number | undefined, containerWid
 		Math.max(NOTE_MENU_MIN.width, Math.floor((containerWidth || 320) * 0.8)),
 	);
 }
+
+// Panel-container CSS for the note-navigator. Two looks, no DOM:
+//   pinned   — docked to the right edge: full height, fixed width, square corners,
+//              a left border only (like a standard docked side panel).
+//   floating — a positioned box at `rect` with rounded corners + drop shadow.
+// Pure builder: returns the style record the view applies via setCssStyles().
+export function noteMenuPanelStyle(
+	pinned: boolean,
+	rect: MenuRect,
+	pinnedWidth: number,
+): Partial<CSSStyleDeclaration> {
+	const common: Partial<CSSStyleDeclaration> = {
+		position: "absolute",
+		display: "flex", flexDirection: "column", overflow: "hidden",
+		background: "var(--background-secondary)",
+		zIndex: "60", font: "12px sans-serif", color: "var(--text-normal)",
+	};
+	if (pinned) {
+		return {
+			...common,
+			left: "", right: "0", top: "0", bottom: "0", height: "", width: `${pinnedWidth}px`,
+			border: "none", borderLeft: "1px solid var(--background-modifier-border)", borderRadius: "0",
+			boxShadow: "-4px 0 16px rgba(0,0,0,0.5)",
+		};
+	}
+	return {
+		...common,
+		left: `${rect.left}px`, top: `${rect.top}px`, right: "", bottom: "",
+		width: `${rect.width}px`, height: `${rect.height}px`,
+		border: "1px solid var(--background-modifier-border)", borderRadius: "6px",
+		boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+	};
+}
+
+// Header (title row + tab bar) CSS for the note-navigator. When floating the
+// header IS the drag handle (cursor:move); when pinned the panel is docked so it
+// can't be moved (cursor:default). Pure builder — applied via setCssStyles().
+export function noteMenuHeadStyle(pinned: boolean): Partial<CSSStyleDeclaration> {
+	return {
+		padding: "6px 8px", borderBottom: "1px solid var(--background-modifier-border)", fontWeight: "600",
+		cursor: pinned ? "default" : "move", userSelect: "none", flex: "0 0 auto",
+	};
+}

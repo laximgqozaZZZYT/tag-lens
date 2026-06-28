@@ -125,7 +125,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -2935,35 +2935,11 @@ export class MiniGraphView extends ItemView {
 		const pinned = !!this.settings.noteMenuPinned;
 		// Docked width when pinned (clamped to ≤80% of the container).
 		const pinnedW = clampPinnedWidth(this.settings.noteMenuPinnedWidth, container.width);
-		if (pinned) {
-			// Dock to the RIGHT edge: full height, fixed width, square corners, a
-			// left border only — the canvas reserves `this.pinnedMenuWidth()` so the
-			// figure isn't covered (like a standard docked side panel).
-			panel.setCssStyles({
-				position: "absolute",
-				left: "", right: "0", top: "0", bottom: "0", height: "", width: `${pinnedW}px`,
-				display: "flex", flexDirection: "column", overflow: "hidden",
-				background: "var(--background-secondary)",
-				border: "none", borderLeft: "1px solid var(--background-modifier-border)", borderRadius: "0",
-				boxShadow: "-4px 0 16px rgba(0,0,0,0.5)", zIndex: "60", font: "12px sans-serif", color: "var(--text-normal)",
-			});
-		} else {
-			panel.setCssStyles({
-				position: "absolute",
-				left: `${rect.left}px`, top: `${rect.top}px`, right: "", bottom: "",
-				width: `${rect.width}px`, height: `${rect.height}px`,
-				display: "flex", flexDirection: "column", overflow: "hidden",
-				background: "var(--background-secondary)", border: "1px solid var(--background-modifier-border)", borderRadius: "6px",
-				boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "60", font: "12px sans-serif", color: "var(--text-normal)",
-			});
-		}
+		// Pinned docks to the RIGHT edge so the canvas reserves `this.pinnedMenuWidth()`
+		// and the figure isn't covered; floating is a positioned box at `rect`.
+		panel.setCssStyles(noteMenuPanelStyle(pinned, rect, pinnedW));
 		const head = panel.createDiv();
-		// When floating, the header IS the drag handle (cursor:move); when pinned
-		// the panel is docked so it can't be moved (cursor:default).
-		head.setCssStyles({
-			padding: "6px 8px", borderBottom: "1px solid var(--background-modifier-border)", fontWeight: "600",
-			cursor: pinned ? "default" : "move", userSelect: "none", flex: "0 0 auto",
-		});
+		head.setCssStyles(noteMenuHeadStyle(pinned));
 		// Header verb is mode-appropriate: droste focuses, other modes either
 		// locate the card on canvas or open the file.
 		const verb = isDroste ? "focus" : "locate/open";

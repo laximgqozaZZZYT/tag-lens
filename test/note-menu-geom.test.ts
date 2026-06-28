@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -60,4 +60,34 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(clampPinnedWidth(50, 1000) === NOTE_MENU_MIN.width, "floored to min width");
 	ok(clampPinnedWidth(undefined, 1000) === 320, "default 320 when unset");
 	ok(clampPinnedWidth(320, 0) === 256, "0 container → 80% of the 320 fallback (got " + clampPinnedWidth(320, 0) + ")");
+}
+
+// noteMenuPanelStyle: pinned docks to the right edge (fixed width, square left border);
+// floating is a positioned box at the rect with rounded corners.
+{
+	const rect: MenuRect = { left: 12, top: 34, width: 300, height: 400 };
+	const pinned = noteMenuPanelStyle(true, rect, 256);
+	ok(pinned.position === "absolute", "pinned is absolutely positioned");
+	ok(pinned.right === "0" && pinned.left === "" && pinned.top === "0" && pinned.bottom === "0", "pinned docks right, full height");
+	ok(pinned.width === "256px", "pinned width = pinnedWidth px");
+	ok(pinned.height === "" , "pinned height unset (full-height via top/bottom)");
+	ok(pinned.border === "none" && pinned.borderLeft === "1px solid var(--background-modifier-border)", "pinned: left border only");
+	ok(pinned.borderRadius === "0", "pinned: square corners");
+
+	const floating = noteMenuPanelStyle(false, rect, 256);
+	ok(floating.left === "12px" && floating.top === "34px" && floating.right === "" && floating.bottom === "", "floating positioned at rect");
+	ok(floating.width === "300px" && floating.height === "400px", "floating sized to rect");
+	ok(floating.border === "1px solid var(--background-modifier-border)" && floating.borderRadius === "6px", "floating: full border + rounded");
+	ok(floating.boxShadow === "0 4px 16px rgba(0,0,0,0.5)", "floating drop shadow");
+	// Shared chrome on both looks.
+	ok(pinned.background === "var(--background-secondary)" && floating.background === "var(--background-secondary)", "shared background");
+	ok(pinned.zIndex === "60" && floating.zIndex === "60", "shared z-index");
+}
+
+// noteMenuHeadStyle: cursor is the only difference — move when floating (drag handle),
+// default when pinned (docked, immovable).
+{
+	ok(noteMenuHeadStyle(false).cursor === "move", "floating header is a drag handle");
+	ok(noteMenuHeadStyle(true).cursor === "default", "pinned header is not draggable");
+	ok(noteMenuHeadStyle(true).flex === "0 0 auto", "header does not stretch");
 }
