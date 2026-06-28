@@ -40,10 +40,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         Returns null when suppressed (toggle off / UpSet); `kind` selects the
         bubblesets-vs-euler painter (both share one arg shape) so `drawBodyTile`
         is now a thin `paint = kind === … ? drawBubbleSets… : drawEuler…` dispatch. — 64a13f2
-  - [ ] edges (ghost/base/accent) + node-card loops inside `drawBodyTile` are
-        the remaining inline assembly. They read live `this.*` state heavily
-        (`drawCard`, aggregation maps); next: peel off the edge-skip predicate
-        and/or a node-draw-list builder, one seam per iteration.
+  - [x] edges (ghost/base/accent) gating → `computeEdgeDrawPlan`
+        (`src/draw/edge-draw-plan.ts`) + `test/edge-draw-plan.test.ts`. The three
+        inline `if` conditions in `drawBodyTile` now read a `{drawGhost, drawBase,
+        drawAccent}` plan; the view keeps the actual draw*Edges calls + live args. — 04e0e72
+  - [ ] node-card loops inside `drawBodyTile` are the remaining inline assembly:
+        two `for (n of laid.nodes)` passes (base, then highlighted) plus the
+        junihitoe/aggregate-stack loops. They read live `this.*` heavily
+        (`drawCard`, aggregation maps); next: peel off a node-draw-list builder
+        that partitions nodes into base/highlighted (skipping highlighted+skipNode+
+        aggregated), one seam per iteration.
 
 - [ ] **BubbleSets visibility & density.** A written 3-task plan exists at
       `docs/superpowers/plans/2026-06-22-bubblesets-visibility-and-density.md`
