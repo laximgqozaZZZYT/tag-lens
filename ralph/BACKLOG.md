@@ -118,10 +118,18 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         Returns `{pin, close}` descriptors (each `{style, ariaLabel, icon?}`); the pin
         icon/colour/label flip with `pinned`, close is static. The view applies the
         styles/attrs (`setCssStyles`/`setIcon`/`setAttr`) and keeps all event wiring.
+  - [x] body-panel container chrome → `noteMenuBodyPanelStyle(kind, display)`
+        (`src/interaction/note-menu-geom.ts`) + cases in `test/note-menu-geom.test.ts`.
+        The 7 inline base-style blocks for the body panes (dataTabWrap/treeTab as
+        `"column"`; logicTab/tableTab/jsonTab/settingsTab/insightTab as `"scroll"`)
+        are now thin applications of the pure builder; `display` carries the initial
+        show/hide state. `bodyWrap` stays inline (distinct overflow:hidden); the
+        per-tab display toggles in showDSubTab/showTab stay in the view.
   - [ ] next seams to peel (pure builders, one per iteration): the title-row
-        container styles (titleRow flex layout + headBtns row) are still inline, but
-        they're static (no `pinned` branch) so lower-value. Better targets: the tab
-        strip descriptor list (TABS/D_SUBS arrays) or the Settings-panel form-row
+        container styles (titleRow flex layout + headBtns row) and the two tab-bar
+        chrome blocks (tabBar / dataSubBar `setCssStyles`) are still inline but
+        static (no state branch), so lower-value. Better targets: the tab strip
+        descriptor lists (TABS/D_SUBS arrays) or the Settings-panel form-row
         builders. Investigate which has the cleanest pure seam.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper

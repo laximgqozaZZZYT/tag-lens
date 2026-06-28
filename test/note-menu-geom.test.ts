@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuBodyPanelStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -125,4 +125,24 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(p.close.ariaLabel === "Close menu" && f.close.ariaLabel === "Close menu", "close label static");
 	ok(p.close.icon === undefined, "close has no lucide icon (uses × glyph)");
 	ok(p.close.style.fontWeight === "700" && p.close.style.fontSize === "16px", "close glyph styling");
+}
+
+// noteMenuBodyPanelStyle: scroll panes get overflow:auto + content padding; column
+// wrappers nest further panes (flexDirection:column, no scroll/padding). Both fill
+// the remaining height; `display` carries the show/hide state.
+{
+	const scroll = noteMenuBodyPanelStyle("scroll", "block");
+	ok(scroll.display === "block", "scroll: display flows through");
+	ok(scroll.overflow === "auto" && scroll.padding === "4px 6px 8px", "scroll: scrollable + padded");
+	ok(scroll.flex === "1 1 auto" && scroll.minHeight === "0", "scroll: fills remaining height");
+	ok(scroll.flexDirection === undefined, "scroll: no flex-direction");
+
+	const hidden = noteMenuBodyPanelStyle("scroll", "none");
+	ok(hidden.display === "none", "scroll hidden: display none");
+
+	const column = noteMenuBodyPanelStyle("column", "none");
+	ok(column.display === "none", "column: display flows through");
+	ok(column.flexDirection === "column", "column: stacks children");
+	ok(column.flex === "1 1 auto" && column.minHeight === "0", "column: fills remaining height");
+	ok(column.overflow === undefined && column.padding === undefined, "column: no scroll/padding (nests panes)");
 }

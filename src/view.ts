@@ -125,7 +125,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuBodyPanelStyle } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -2979,27 +2979,27 @@ export class MiniGraphView extends ItemView {
 		bodyWrap.setCssStyles({ display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: "0", overflow: "hidden" });
 		
 		const dataTabWrap = bodyWrap.createDiv({ cls: "gim-menu-data-wrap" });
-		dataTabWrap.setCssStyles({ display: "none", flexDirection: "column", flex: "1 1 auto", minHeight: "0" });
-		
+		dataTabWrap.setCssStyles(noteMenuBodyPanelStyle("column", "none"));
+
 		const dataSubBar = dataTabWrap.createDiv();
 		dataSubBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", borderBottom: "1px solid var(--background-modifier-border)", padding: "4px 6px 0" });
-		
+
 		const logicTab = dataTabWrap.createDiv({ cls: "gim-menu-data-logic" });
-		logicTab.setCssStyles({ display: "block", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
-		
+		logicTab.setCssStyles(noteMenuBodyPanelStyle("scroll", "block"));
+
 		const treeTab = dataTabWrap.createDiv({ cls: "gim-menu-data-tree" });
-		treeTab.setCssStyles({ display: "none", flexDirection: "column", flex: "1 1 auto", minHeight: "0" });
+		treeTab.setCssStyles(noteMenuBodyPanelStyle("column", "none"));
 
 		const tableTab = dataTabWrap.createDiv({ cls: "gim-menu-data-table" });
-		tableTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
+		tableTab.setCssStyles(noteMenuBodyPanelStyle("scroll", "none"));
 
 		const jsonTab = dataTabWrap.createDiv({ cls: "gim-menu-data-json" });
-		jsonTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
+		jsonTab.setCssStyles(noteMenuBodyPanelStyle("scroll", "none"));
 
 		const settingsTab = bodyWrap.createDiv({ cls: "gim-menu-settings" });
-		settingsTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
+		settingsTab.setCssStyles(noteMenuBodyPanelStyle("scroll", "none"));
 		const insightTab = bodyWrap.createDiv();
-		insightTab.setCssStyles({ display: "none", overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" });
+		insightTab.setCssStyles(noteMenuBodyPanelStyle("scroll", "none"));
 
 		// -- Data Sub-tabs: Logic | Tree | Table --
 		type DataSubTab = "logic" | "tree" | "table" | "json";

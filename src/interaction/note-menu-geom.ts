@@ -147,3 +147,21 @@ export function noteMenuTitleButtons(pinned: boolean): {
 		},
 	};
 }
+
+// Base container CSS for a note-navigator body panel. Two shapes:
+//   scroll — a scrollable tab pane (overflow:auto + content padding).
+//   column — a flex-column wrapper that nests further panes (no scroll/padding).
+// Both fill the remaining panel height (flex:1 1 auto, minHeight:0). `display`
+// carries the show/hide state ("none" when hidden; the pane's own block/flex when
+// active). Pure builder — applied via setCssStyles().
+export type NoteMenuBodyPanelKind = "scroll" | "column";
+
+export function noteMenuBodyPanelStyle(
+	kind: NoteMenuBodyPanelKind,
+	display: string,
+): Partial<CSSStyleDeclaration> {
+	if (kind === "scroll") {
+		return { display, overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" };
+	}
+	return { display, flexDirection: "column", flex: "1 1 auto", minHeight: "0" };
+}
