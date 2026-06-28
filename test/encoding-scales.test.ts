@@ -81,6 +81,31 @@ import { prepareScale } from "../src/encoding/scales";
 	const b = prepareScale({ type: "categorical" }, ["x", "y", "z"]).legend.entries!.map((e) => e.output);
 	ok(a.join("|") === b.join("|"), "categorical palette is deterministic");
 }
+// categorical reverse: flips the auto-colour INDEX (last category gets first
+// colour) while legend key ORDER is unchanged, and the legend↔node invariant holds.
+{
+	const keys = ["a", "b", "c", "d"];
+	const fwd = prepareScale({ type: "categorical" }, keys);
+	const rev = prepareScale({ type: "categorical", reverse: true }, keys);
+	ok(rev.legend.reversed === true, "categorical legend marks reversed");
+	// key order preserved in both directions
+	ok(rev.legend.entries!.map((e) => e.key).join(",") === keys.join(","), "reverse keeps legend key order");
+	// first category now wears the last category's forward colour (and vice-versa)
+	ok(rev.apply("a").output === fwd.apply("d").output, "reverse: first key gets last colour");
+	ok(rev.apply("d").output === fwd.apply("a").output, "reverse: last key gets first colour");
+	// HARD INVARIANT still holds under reverse
+	for (const e of rev.legend.entries!) {
+		ok(rev.apply(e.key).output === e.output, `reversed node colour for ${e.key} matches its swatch`);
+	}
+}
+// categorical reverse + palette: keyed overrides are index-independent, so they
+// win in BOTH directions (reverse only reorders the auto-assigned colours).
+{
+	const s = prepareScale({ type: "categorical", reverse: true, palette: { x: "#ffffff" } }, ["x", "y", "z"]);
+	ok(s.apply("x").output === "#ffffff", "palette override survives reverse");
+	const xEntry = s.legend.entries!.find((e) => e.key === "x");
+	ok(xEntry?.output === "#ffffff", "reversed legend honours the palette override");
+}
 // categorical palette override wins over auto (and still corresponds in legend)
 {
 	const s = prepareScale({ type: "categorical", palette: { done: "#ffffff" } }, ["done", "wip"]);

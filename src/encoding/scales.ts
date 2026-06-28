@@ -114,9 +114,16 @@ export function prepareScale(config: ScaleConfig, rawValues: (string | number | 
 
 	// Assign a distinct colour to each category BY INDEX (palette overrides win),
 	// then resolve BOTH the legend entries and per-node apply() through this one
-	// map — so a displayed node and its legend swatch can never disagree.
+	// map — so a displayed node and its legend swatch can never disagree. `reverse`
+	// flips the auto-colour INDEX (last category gets the first colour) while the
+	// legend's key order and any palette overrides (keyed, not indexed) stay put.
+	const reverse = !!config.reverse;
+	const n = distinct.length;
 	const colorByKey = new Map<string, string>();
-	distinct.forEach((key, i) => { colorByKey.set(key, palette[key] ?? categoricalColor(i)); });
+	distinct.forEach((key, i) => {
+		const idx = reverse ? n - 1 - i : i;
+		colorByKey.set(key, palette[key] ?? categoricalColor(idx));
+	});
 	const outFor = (key: string): string => colorByKey.get(key) ?? palette[key] ?? autoColor(key);
 	const entries: LegendEntry[] = distinct.map((key) => ({ key, output: outFor(key) }));
 
@@ -126,6 +133,6 @@ export function prepareScale(config: ScaleConfig, rawValues: (string | number | 
 			const key = String(raw);
 			return { category: key, output: outFor(key) };
 		},
-		legend: { kind: "categorical", entries },
+		legend: { kind: "categorical", entries, reversed: reverse },
 	};
 }
