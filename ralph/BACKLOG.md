@@ -298,6 +298,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         transparent ew-resize strip down the left border) in `ensureNoteMenu` is now a
         thin application of a pure builder returning the static style record; the
         widen-on-drag-left + canvas re-reserve wiring stays in the view. No state branch. — 1b3207e
+  - [x] Tree-pane row chrome → `noteMenuTreeRowStyle(kind, depth, baseBg?)` /
+        `NoteMenuTreeRowKind` (`src/interaction/note-menu-geom.ts`) + a case in
+        `test/note-menu-geom.test.ts`. The three near-duplicate row style blocks in
+        `ensureNoteMenu` (leaf note row / collapsible folder row / "(all)" subtree
+        header) now read `{row, label}` from one pure builder; `padding` precedes
+        `paddingLeft` so the depth indent survives. The leaf highlight colour, hover
+        background swaps, and checkbox/expand wiring stay in the view. — 7a1747e
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
