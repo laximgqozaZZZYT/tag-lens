@@ -126,7 +126,7 @@ import {
 	positionTip as positionTipFn,
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
-import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
+import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
@@ -3151,11 +3151,7 @@ export class MiniGraphView extends ItemView {
 		};
 		mkBulkBtn("Select all", () => {
 			// Show all: remove every listed note's hide-key from hiddenNodes.
-			for (const n of nodes) {
-				const k = hideKey(n);
-				const idx = this.settings.hiddenNodes.indexOf(k);
-				if (idx >= 0) this.settings.hiddenNodes.splice(idx, 1);
-			}
+			this.settings.hiddenNodes = bulkSetHidden(this.settings.hiddenNodes, nodes.map(hideKey), false);
 			void this.save();
 			this.requestDraw();
 			// Redraw the menu so checkboxes reflect the new state without rebuilding
@@ -3164,12 +3160,7 @@ export class MiniGraphView extends ItemView {
 		});
 		mkBulkBtn("Deselect all", () => {
 			// Hide all: add every listed note's hide-key to hiddenNodes (dedup).
-			for (const n of nodes) {
-				const k = hideKey(n);
-				if (!this.settings.hiddenNodes.includes(k)) {
-					this.settings.hiddenNodes.push(k);
-				}
-			}
+			this.settings.hiddenNodes = bulkSetHidden(this.settings.hiddenNodes, nodes.map(hideKey), true);
 			void this.save();
 			this.requestDraw();
 			this.noteMenuRedraw?.();

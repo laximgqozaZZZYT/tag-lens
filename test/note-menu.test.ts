@@ -21,6 +21,7 @@ import {
 	UNTAGGED_BUCKET,
 	hideKey,
 	nodeIsHidden,
+	bulkSetHidden,
 	collectDescendantNoteKeys,
 	folderCheckState,
 	buildFolderPathKey,
@@ -604,6 +605,37 @@ const advNotes: NoteRef[] = [
 	const byId = new Set(["tagA\tnotes/MyNote.md"]);
 	ok(nodeIsHidden("tagA\tnotes/MyNote.md", byId), "nodeIsHidden: legacy raw-id entry matches exact id");
 	ok(!nodeIsHidden("tagB\tnotes/MyNote.md", byId), "nodeIsHidden: raw-id entry does NOT hide the other copy");
+}
+
+// bulkSetHidden: the Select-all / Deselect-all transform on `hiddenNodes`.
+{
+	// Deselect all (hide=true): append every key not already present, de-duped,
+	// preserving original order then push order.
+	ok(
+		JSON.stringify(bulkSetHidden(["x.md"], ["a.md", "b.md"], true)) ===
+			JSON.stringify(["x.md", "a.md", "b.md"]),
+		"bulkSetHidden hide: appends new keys after existing in push order",
+	);
+	ok(
+		JSON.stringify(bulkSetHidden(["a.md"], ["a.md", "b.md"], true)) ===
+			JSON.stringify(["a.md", "b.md"]),
+		"bulkSetHidden hide: skips keys already present (dedup)",
+	);
+	// Select all (hide=false): remove every listed key, keeping the rest in order.
+	ok(
+		JSON.stringify(bulkSetHidden(["a.md", "x.md", "b.md"], ["a.md", "b.md"], false)) ===
+			JSON.stringify(["x.md"]),
+		"bulkSetHidden show: removes listed keys, preserves remaining order",
+	);
+	ok(
+		JSON.stringify(bulkSetHidden(["x.md"], ["a.md"], false)) === JSON.stringify(["x.md"]),
+		"bulkSetHidden show: removing an absent key is a no-op",
+	);
+	// Purity: the input array is never mutated.
+	const input = ["a.md"];
+	bulkSetHidden(input, ["b.md"], true);
+	bulkSetHidden(input, ["a.md"], false);
+	ok(JSON.stringify(input) === JSON.stringify(["a.md"]), "bulkSetHidden: input array is not mutated");
 }
 
 // LAYOUT-LEVEL CHECK (DOM-less): a PATH in the hidden set removes EVERY on-canvas

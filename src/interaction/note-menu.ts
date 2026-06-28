@@ -224,6 +224,22 @@ export function hideKey(note: NoteRef): string {
 	return stripTabPrefix(note.id);
 }
 
+// Bulk Select-all / Deselect-all over the note-menu's current note set: returns
+// the NEXT `hiddenNodes` array (pure — no mutation of the input). `hide=true`
+// (Deselect all) appends every key not already present, preserving the original
+// push order and de-duplicating; `hide=false` (Select all) removes every key.
+// Because the per-checkbox path keys are added de-duped, removing all occurrences
+// is equivalent to the legacy first-occurrence-per-node splice.
+export function bulkSetHidden(current: string[], keys: string[], hide: boolean): string[] {
+	if (hide) {
+		const out = current.slice();
+		for (const k of keys) if (!out.includes(k)) out.push(k);
+		return out;
+	}
+	const remove = new Set(keys);
+	return current.filter((k) => !remove.has(k));
+}
+
 // Is an on-canvas node id hidden by `hiddenSet`? Matches either the FULL id
 // (legacy per-card entries) OR the note's PATH (our path-keyed checkboxes), so
 // that one path entry hides every `${tag}\t${path}` copy of the note in
