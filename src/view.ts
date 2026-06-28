@@ -69,6 +69,7 @@ import {
 	latticeNamedRowAt,
 	TIER_GUTTER as LATTICE_TIER_GUTTER,
 } from "./draw/draw-lattice";
+import { computeLatticeDrawInput } from "./draw/lattice-draw-input";
 import { latticeNodeAt } from "./layout/lattice-layout";
 import { drawCard as drawCardFn } from "./draw/draw-card";
 import { drawLegend } from "./draw/legend-layout";
@@ -2260,24 +2261,16 @@ export class MiniGraphView extends ItemView {
 		// Intersection lattice: world-space tier grid + subset links. drawLattice
 		// applies its own dpr/zoom/pan transform; we draw and return.
 		if (this.laid.lattice && this.laid.lattice.nodes.length > 0) {
-			drawLattice(ctx, this.laid.lattice, {
+			drawLattice(ctx, this.laid.lattice, computeLatticeDrawInput({
+				settings: this.settings,
+				canvas: this.canvas,
+				dpr,
 				zoom: this.zoom,
 				panX: this.panX,
 				panY: this.panY,
-				canvas: this.canvas,
-				dpr,
-				minFontPx: this.settings.minFontPx,
-				settings: {
-					latticeNodeLOD: "auto",
-					latticeIndividualMax: this.settings.latticeIndividualMax,
-					latticeDensityMax: this.settings.latticeDensityMax,
-					latticeDensityCells: this.settings.latticeDensityCells,
-					latticeShowSubsetLinks: this.settings.latticeShowSubsetLinks,
-				},
 				selectedKey: this.latticeSelectedKey,
 				hoverKey: this.latticeHoverKey,
 				namedKeys: this.latticeNamedKeys,
-				namedMax: this.settings.latticeNamedMax,
 				// Closure: id → file basename via the live vault. Falls back
 				// to a path-tail strip inside draw-lattice when omitted, so
 				// unit tests / probes still work without a vault.
@@ -2287,7 +2280,7 @@ export class MiniGraphView extends ItemView {
 					const f = this.app.vault.getAbstractFileByPath(path);
 					return f instanceof TFile ? f.basename : path;
 				},
-			});
+			}));
 			this.drawGlobalDisplayFallbacks(ctx, dpr, "lattice");
 			return;
 		}

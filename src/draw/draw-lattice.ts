@@ -34,7 +34,7 @@ import {
 } from "../layout/lattice-layout";
 import { theme } from "./theme";
 
-interface DrawLatticeOpts {
+export interface DrawLatticeOpts {
 	zoom: number;
 	panX: number;
 	panY: number;

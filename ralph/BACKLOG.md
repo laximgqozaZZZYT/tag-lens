@@ -20,6 +20,12 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
       to a pure `drawX` (drawLattice/drawDroste/…). Extract the per-mode input
       assembly into pure builders (same pattern as `buildModeLegendInput`) so `draw()`
       becomes a small mode→builder→drawX dispatch. Decompose: one mode per iteration.
+  - [x] lattice → `computeLatticeDrawInput` (`src/draw/lattice-draw-input.ts`) +
+        `test/lattice-draw-input.test.ts`; `DrawLatticeOpts` now exported.
+  - [ ] droste → `computeDrosteDrawInput` (note: `hitRegions`/`hiddenSet` are live
+        callbacks — keep the `this.drosteHit = []` assignment in the view wrapper).
+  - [ ] heatmap → `computeHeatmapDrawInput` (pure pass-through of settings + gaps +
+        hover/selected state; `DrawOpts` in `draw-heatmap.ts` needs exporting).
 
 - [ ] **BubbleSets visibility & density.** A written 3-task plan exists at
       `docs/superpowers/plans/2026-06-22-bubblesets-visibility-and-density.md`
