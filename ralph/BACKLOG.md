@@ -251,7 +251,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         returning `{data,settings,insight}` / `{logic,tree,table,json}` display strings;
         the show/hide side effects (renderDataLogicBody/renderSettingsBody/renderInsightTab,
         table/json re-render) stay in the view. Test locks "exactly the active pane
-        visible, flex-vs-block per pane kind".
+        visible, flex-vs-block per pane kind". — 9db684e
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
