@@ -113,6 +113,21 @@ export function noteMenuHeadStyle(pinned: boolean): Partial<CSSStyleDeclaration>
 	};
 }
 
+// Container CSS for the note-navigator title row. Two static layout blocks:
+//   row  — the row itself: name on the left, the button group on the right
+//          (space-between), vertically centred.
+//   btns — the right-aligned icon-button group (pin + close), no shrink.
+// Neither branches on state. Pure builder — applied via setCssStyles().
+export function noteMenuTitleRowStyle(): {
+	row: Partial<CSSStyleDeclaration>;
+	btns: Partial<CSSStyleDeclaration>;
+} {
+	return {
+		row: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" },
+		btns: { display: "flex", alignItems: "center", gap: "2px", flex: "0 0 auto" },
+	};
+}
+
 // Descriptor for one title-row icon button: the style record the view applies
 // via setCssStyles(), the accessible label, and (pin only) the lucide icon name.
 export type NoteMenuTitleButton = {

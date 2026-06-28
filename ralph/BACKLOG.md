@@ -125,8 +125,12 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         are now thin applications of the pure builder; `display` carries the initial
         show/hide state. `bodyWrap` stays inline (distinct overflow:hidden); the
         per-tab display toggles in showDSubTab/showTab stay in the view. — 44b0950
-  - [ ] next seams to peel (pure builders, one per iteration): the title-row
-        container styles (titleRow flex layout + headBtns row) and the two tab-bar
+  - [x] title-row container chrome → `noteMenuTitleRowStyle()`
+        (`src/interaction/note-menu-geom.ts`) + a case in `test/note-menu-geom.test.ts`.
+        Returns `{row, btns}` static layout records (the row's space-between flex +
+        the right-aligned no-shrink button group); the two inline `setCssStyles`
+        blocks for titleRow/headBtns are now thin applications. No state branch.
+  - [ ] next seams to peel (pure builders, one per iteration): the two tab-bar
         chrome blocks (tabBar / dataSubBar `setCssStyles`) are still inline but
         static (no state branch), so lower-value. Better targets: the tab strip
         descriptor lists (TABS/D_SUBS arrays) or the Settings-panel form-row

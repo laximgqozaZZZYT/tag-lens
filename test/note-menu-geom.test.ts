@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuBodyPanelStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -125,6 +125,16 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(p.close.ariaLabel === "Close menu" && f.close.ariaLabel === "Close menu", "close label static");
 	ok(p.close.icon === undefined, "close has no lucide icon (uses × glyph)");
 	ok(p.close.style.fontWeight === "700" && p.close.style.fontSize === "16px", "close glyph styling");
+}
+
+// noteMenuTitleRowStyle: two static layout blocks — the row (space-between, name
+// left / buttons right, centred) and the right-aligned button group (no shrink).
+{
+	const t = noteMenuTitleRowStyle();
+	ok(t.row.display === "flex" && t.row.justifyContent === "space-between", "row: space-between flex");
+	ok(t.row.alignItems === "center" && t.row.gap === "8px", "row: centred, 8px gap");
+	ok(t.btns.display === "flex" && t.btns.alignItems === "center", "btns: centred flex");
+	ok(t.btns.gap === "2px" && t.btns.flex === "0 0 auto", "btns: 2px gap, no shrink");
 }
 
 // noteMenuBodyPanelStyle: scroll panes get overflow:auto + content padding; column

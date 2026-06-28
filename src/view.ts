@@ -125,7 +125,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuBodyPanelStyle } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -2944,11 +2944,12 @@ export class MiniGraphView extends ItemView {
 		// locate the card on canvas or open the file.
 		const verb = isDroste ? "focus" : "locate/open";
 		// Title row: name on the left, pin + × on the right.
+		const titleRowStyle = noteMenuTitleRowStyle();
 		const titleRow = head.createDiv();
-		titleRow.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" });
+		titleRow.setCssStyles(titleRowStyle.row);
 		titleRow.createSpan({ text: "Tag Lens" });
 		const headBtns = titleRow.createDiv();
-		headBtns.setCssStyles({ display: "flex", alignItems: "center", gap: "2px", flex: "0 0 auto" });
+		headBtns.setCssStyles(titleRowStyle.btns);
 		const titleBtns = noteMenuTitleButtons(pinned);
 
 		// Pin/unpin: dock the menu to the right edge (standard pin affordance).
