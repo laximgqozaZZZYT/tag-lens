@@ -143,7 +143,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         the single source of truth for both the `activeMenuTab`/`dataSubTab` field
         types and the rendered button keys/labels. The three manual `mkTab(...)`
         calls collapse into one `for (… of TABS) mkTab(key, label)` loop; all event
-        wiring stays in the view.
+        wiring stays in the view. — 1b65735
   - [ ] next seams to peel (pure builders, one per iteration): the Settings-panel
         form-row builders remain inline (`renderSettingsBody`). Investigate the
         cleanest pure seam there.
