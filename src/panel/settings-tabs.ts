@@ -3,6 +3,7 @@ import { renderViewModeSection } from "./settings-sections";
 import { ghostJaccardInput, parseGhostJaccard } from "./jaccard-input";
 import { basesEdgeKinds } from "./bases-edge-kinds";
 import { basesToggleRows } from "./bases-toggle-rows";
+import { inheritFromOptions } from "./inherit-from-options";
 import { bridgeGhostEdgeToggle, legendToggle } from "./settings-toggle-rows";
 import { setIcon, AbstractInputSuggest, type App, type TFile } from "obsidian";
 import { scanBaseFiles } from "../bases/parser";
@@ -635,12 +636,10 @@ function renderSetLayerTab(el: HTMLElement, setKey: string, deps: EncodeTabDeps,
 	const inhRow = togs.createDiv({ cls: "gim-order-row" });
 	inhRow.createSpan({ text: "Inherit from", cls: "gim-order-field" });
 	const inhSel = inhRow.createEl("select", { cls: "gim-order-dir" });
-	const noneOpt = inhSel.createEl("option", { value: "", text: "(none)" });
 	const current = deps.settings.inheritFrom[setKey] ?? "";
-	if (current === "") noneOpt.selected = true;
-	for (const other of deps.laid.clusters) {
-		const opt = inhSel.createEl("option", { value: other.groupKey, text: other.label });
-		if (other.groupKey === current) opt.selected = true;
+	for (const o of inheritFromOptions(deps.laid.clusters, current)) {
+		const opt = inhSel.createEl("option", { value: o.value, text: o.text });
+		if (o.selected) opt.selected = true;
 	}
 	inhSel.addEventListener("change", () => {
 		if (inhSel.value === "") delete deps.settings.inheritFrom[setKey];
@@ -727,16 +726,10 @@ function renderLayerTab(el: HTMLElement, groupKey: string, deps: EncodeTabDeps):
 	const inhRow = togs.createDiv({ cls: "gim-order-row" });
 	inhRow.createSpan({ text: "Inherit from", cls: "gim-order-field" });
 	const inhSel = inhRow.createEl("select", { cls: "gim-order-dir" });
-	const noneOpt = inhSel.createEl("option", { value: "", text: "(none)" });
 	const current = deps.settings.inheritFrom[groupKey] ?? "";
-	if (current === "") noneOpt.selected = true;
-	for (const other of deps.laid.clusters) {
-		if (other.groupKey === groupKey) continue;
-		const opt = inhSel.createEl("option", {
-			value: other.groupKey,
-			text: other.label,
-		});
-		if (other.groupKey === current) opt.selected = true;
+	for (const o of inheritFromOptions(deps.laid.clusters, current, groupKey)) {
+		const opt = inhSel.createEl("option", { value: o.value, text: o.text });
+		if (o.selected) opt.selected = true;
 	}
 	inhSel.addEventListener("change", () => {
 		if (inhSel.value === "") {

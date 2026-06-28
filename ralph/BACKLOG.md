@@ -222,10 +222,20 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         descriptor. The override-delete (layer) / keep-current (global) side effects + DOM
         wiring stay in the view. Mirrors the `min-font-input` / `heatmap-min-tag-input`
         extractions. — 2db1b78
-  - [ ] next seams to peel (pure builders, one per iteration): scan the remaining
-        Settings form-row builders in `settings-sections.ts` / `settings-tabs.ts` for
-        inline parse/clamp/descriptor blocks not yet extracted. Keep handler side
-        effects in the view; extract descriptors/clamps only.
+  - [x] "Inherit from" `<select>` option list → `inheritFromOptions(clusters, current,
+        excludeKey?)` / `InheritFromOption` (`src/panel/inherit-from-options.ts`) +
+        `test/inherit-from-options.test.ts`. The two near-duplicate option-list builders
+        in `renderSetLayerTab` (no exclusion) and `renderLayerTab` (excludes self) now
+        share one pure builder returning `{value,text,selected}[]` including the leading
+        `(none)` option; the `createEl("option")` + change-handler wiring stay in the
+        view. Test locks the (none)-first order, single-selection rule, and self-exclusion.
+  - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
+        blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
+        (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
+        is done. Remaining inline structure in these files is checkbox/radio/text rows
+        whose only logic is a single settings-field toggle — extract only if a genuine
+        duplicate descriptor list emerges (mirror `basesToggleRows`). Otherwise pivot to
+        the `ensureNoteMenu` body-builder seams or F2.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under

@@ -48,6 +48,7 @@ import "./heatmap-min-tag-input.test";
 import "./node-size-input.test";
 import "./bases-edge-kinds.test";
 import "./bases-toggle-rows.test";
+import "./inherit-from-options.test";
 import "./settings-toggle-rows.test";
 import "./zoom-math.test";
 import "./hit-modes.test";
