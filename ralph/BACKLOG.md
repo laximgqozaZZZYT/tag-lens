@@ -63,11 +63,28 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         loops (junihitoe + aggregate) now go through pure builders.
         **P2 complete** — every `draw()` mode/sub-loop now has a pure input builder. — adb45ab
 
-- [ ] **BubbleSets visibility & density.** A written 3-task plan exists at
-      `docs/superpowers/plans/2026-06-22-bubblesets-visibility-and-density.md`
-      (currently untracked — `git add` it as the first sub-step). Execute its Task 1
-      → 2 → 3, one task per iteration, honouring its "do not change public signatures"
-      constraint and its baseline assertion count.
+- [x] **BubbleSets visibility & density** — **OBSOLETE, no code change.** The 3-task
+      plan at `docs/superpowers/plans/2026-06-22-bubblesets-visibility-and-density.md`
+      targets code that no longer exists. Verified against the current tree:
+      - Task 1 (degree-cascade `hostTag` selection in `layout.ts`): the whole
+        degree-cascade region placement was removed — see the comment at
+        `src/layout/layout.ts:1107` ("dead and has been removed"). `hostTag` and
+        `test/bubblesets-region-sizing.test.ts` are gone.
+      - Task 2 (`drawOverviewLabels` in `draw-helpers.ts`): no such symbol remains;
+        only a stale doc-comment reference in `src/layout/label-collision.ts:10`.
+      - Task 3 (`siblingOverlapPack` in `src/layout/sibling-overlap-pack.ts`): the
+        whole file is deleted.
+      Commit `de09d1a` ("Kaizen: …dead-pipeline + junk cleanup", 2026-06-27) rewrote
+      bubblesets onto `componentEulerLayout` + box-follow recompute and deleted the
+      old sibling-overlap / degree-cascade pipeline (9 modules + 7 tests), making all
+      three plan tasks moot. Note that Task 3 had in fact already been implemented
+      earlier (`f6dfe51`, then `06ceaea`) before the cleanup removed it.
+      **Follow-up (NOT verified — needs fresh investigation):** if the original visual
+      symptoms still recur on the new layout — small specific intersections buried
+      under a larger cluster's fill, or a tag name appearing twice (chip + giant
+      watermark) — they must be re-diagnosed against `componentEulerLayout` /
+      `draw-enclosures.ts` / `label-collision.ts`, not this stale plan. File a new
+      backlog item with a fresh repro if observed in-app.
 
 - [ ] **N2 — `registerView` re-enable robustness.** Rapid plugin disable/enable re-runs
       `registerView` → "existing view type" console error (`src/main.ts` onload).
