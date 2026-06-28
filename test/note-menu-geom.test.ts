@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -155,4 +155,21 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(column.flexDirection === "column", "column: stacks children");
 	ok(column.flex === "1 1 auto" && column.minHeight === "0", "column: fills remaining height");
 	ok(column.overflow === undefined && column.padding === undefined, "column: no scroll/padding (nests panes)");
+}
+
+// noteMenuTabBarStyle: the top bar has a small top gap + 11px text and no wrap;
+// the sub bar wraps onto rows and is padded in from the edge. Both share the
+// same bottom divider and are flex rows.
+{
+	const top = noteMenuTabBarStyle("top");
+	ok(top.display === "flex" && top.gap === "2px", "top: flex row, 2px gap");
+	ok(top.marginTop === "8px" && top.fontSize === "11px", "top: top gap + 11px text");
+	ok(top.borderBottom === "1px solid var(--background-modifier-border)", "top: bottom divider");
+	ok(top.flexWrap === undefined && top.padding === undefined, "top: no wrap / no padding");
+
+	const sub = noteMenuTabBarStyle("sub");
+	ok(sub.display === "flex" && sub.flexWrap === "wrap", "sub: wrapping flex row");
+	ok(sub.gap === "1px" && sub.padding === "4px 6px 0", "sub: 1px gap, padded edge");
+	ok(sub.borderBottom === "1px solid var(--background-modifier-border)", "sub: bottom divider");
+	ok(sub.marginTop === undefined && sub.fontSize === undefined, "sub: no top gap / inherits font");
 }

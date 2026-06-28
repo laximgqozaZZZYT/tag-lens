@@ -130,11 +130,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         Returns `{row, btns}` static layout records (the row's space-between flex +
         the right-aligned no-shrink button group); the two inline `setCssStyles`
         blocks for titleRow/headBtns are now thin applications. No state branch.
-  - [ ] next seams to peel (pure builders, one per iteration): the two tab-bar
-        chrome blocks (tabBar / dataSubBar `setCssStyles`) are still inline but
-        static (no state branch), so lower-value. Better targets: the tab strip
+  - [x] tab-bar chrome → `noteMenuTabBarStyle(kind)`
+        (`src/interaction/note-menu-geom.ts`) + a case in `test/note-menu-geom.test.ts`.
+        The two static inline `setCssStyles` blocks for the top-level tab bar
+        (`"top"`: top gap + 11px text, no wrap) and the Data sub-tab bar
+        (`"sub"`: flexWrap + padded edge) are now thin applications; both share the
+        bottom divider. No state branch.
+  - [ ] next seams to peel (pure builders, one per iteration): the tab strip
         descriptor lists (TABS/D_SUBS arrays) or the Settings-panel form-row
-        builders. Investigate which has the cleanest pure seam.
+        builders remain inline. Investigate which has the cleanest pure seam.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under

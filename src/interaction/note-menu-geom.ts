@@ -163,6 +163,29 @@ export function noteMenuTitleButtons(pinned: boolean): {
 	};
 }
 
+// Container CSS for one of the note-navigator's two tab bars. Two shapes:
+//   top — the top-level Data/Settings/Insight bar in the header: the underline
+//         divider that the active tab's accent sits on (marginBottom:-1px on the
+//         buttons lines them up), with a small top gap below the title row.
+//   sub — the Data sub-tab bar: wraps onto multiple rows (flexWrap) and is padded
+//         in from the pane edge; same bottom divider.
+// Neither branches on state. Pure builder — applied via setCssStyles().
+export type NoteMenuTabBarKind = "top" | "sub";
+
+export function noteMenuTabBarStyle(kind: NoteMenuTabBarKind): Partial<CSSStyleDeclaration> {
+	const divider = "1px solid var(--background-modifier-border)";
+	if (kind === "top") {
+		return {
+			display: "flex", gap: "2px", marginTop: "8px",
+			fontWeight: "400", fontSize: "11px", borderBottom: divider,
+		};
+	}
+	return {
+		display: "flex", flexWrap: "wrap", gap: "1px",
+		borderBottom: divider, padding: "4px 6px 0",
+	};
+}
+
 // Base container CSS for a note-navigator body panel. Two shapes:
 //   scroll — a scrollable tab pane (overflow:auto + content padding).
 //   column — a flex-column wrapper that nests further panes (no scroll/padding).

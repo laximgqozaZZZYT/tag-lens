@@ -125,7 +125,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -2971,7 +2971,7 @@ export class MiniGraphView extends ItemView {
 		// Underline-style tabs: the bar carries the divider line that the active
 		// tab's accent underline sits on (marginBottom:-1px lines them up), so the
 		// active tab reads as connected to the body below.
-		tabBar.setCssStyles({ display: "flex", gap: "2px", marginTop: "8px", fontWeight: "400", fontSize: "11px", borderBottom: "1px solid var(--background-modifier-border)" });
+		tabBar.setCssStyles(noteMenuTabBarStyle("top"));
 		tabBar.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		// Don't let a double-click on the tab bar toggle the header's minimize.
 		tabBar.addEventListener("dblclick", (ev) => ev.stopPropagation());
@@ -2983,7 +2983,7 @@ export class MiniGraphView extends ItemView {
 		dataTabWrap.setCssStyles(noteMenuBodyPanelStyle("column", "none"));
 
 		const dataSubBar = dataTabWrap.createDiv();
-		dataSubBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", borderBottom: "1px solid var(--background-modifier-border)", padding: "4px 6px 0" });
+		dataSubBar.setCssStyles(noteMenuTabBarStyle("sub"));
 
 		const logicTab = dataTabWrap.createDiv({ cls: "gim-menu-data-logic" });
 		logicTab.setCssStyles(noteMenuBodyPanelStyle("scroll", "block"));
