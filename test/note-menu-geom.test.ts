@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -231,4 +231,13 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(b.btn.background === "var(--background-secondary)" && b.btn.color === "var(--text-muted)", "btn: muted secondary bg");
 	ok(b.btn.border === "1px solid var(--background-modifier-border)" && b.btn.borderRadius === "3px", "btn: bordered, rounded");
 	ok(b.btn.lineHeight === "1.4", "btn: line-height");
+}
+
+// noteMenuGroupBarStyle: the muted group-by radio row + one inline-flex radio label.
+{
+	const g = noteMenuGroupBarStyle();
+	ok(g.bar.display === "flex" && g.bar.gap === "10px" && g.bar.marginTop === "4px", "bar: 10px-gap flex row, 4px top");
+	ok(g.bar.fontSize === "11px" && g.bar.color === "var(--text-muted)" && g.bar.cursor === "default", "bar: muted 11px, default cursor");
+	ok(g.label.display === "inline-flex" && g.label.alignItems === "center" && g.label.gap === "3px", "label: inline-flex centered 3px gap");
+	ok(g.label.cursor === "pointer" && g.label.userSelect === "none", "label: pointer, no select");
 }

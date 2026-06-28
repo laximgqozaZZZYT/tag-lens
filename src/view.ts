@@ -127,7 +127,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -3101,15 +3101,13 @@ export class MiniGraphView extends ItemView {
 		// tree (by note path, default) and the TAG tree (by GROUP_BY membership
 		// keys). The chosen grouping survives rebuilds (this.noteMenuGroupBy) and
 		// reloads (settings.noteMenuGroupBy). Changing it re-renders the tree.
+		const groupBarStyle = noteMenuGroupBarStyle();
 		const groupBar = treeTab.createDiv();
-		groupBar.setCssStyles({
-			display: "flex", gap: "10px", marginTop: "4px", fontWeight: "400",
-			fontSize: "11px", color: "var(--text-muted)", cursor: "default",
-		});
+		groupBar.setCssStyles(groupBarStyle.bar);
 		const groupName = "gim-notemenu-group";
 		const mkGroupRadio = (value: "folder" | "tag", labelText: string): void => {
 			const lab = groupBar.createEl("label");
-			lab.setCssStyles({ display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer", userSelect: "none" });
+			lab.setCssStyles(groupBarStyle.label);
 			const radio = lab.createEl("input", { attr: { type: "radio", name: groupName, value } });
 			radio.checked = this.noteMenuGroupBy === value;
 			lab.createSpan({ text: labelText });

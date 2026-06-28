@@ -295,3 +295,19 @@ export function noteMenuBulkBarStyle(): {
 		},
 	};
 }
+
+// Tree-pane "group by Folder / Tag" radio bar chrome: the muted 10px-gap flex row
+// and one inline-flex radio label (pointer cursor, no text selection). Both are
+// static layout records (no state branch); the radio/event wiring stays in the view.
+export function noteMenuGroupBarStyle(): {
+	bar: Partial<CSSStyleDeclaration>;
+	label: Partial<CSSStyleDeclaration>;
+} {
+	return {
+		bar: {
+			display: "flex", gap: "10px", marginTop: "4px", fontWeight: "400",
+			fontSize: "11px", color: "var(--text-muted)", cursor: "default",
+		},
+		label: { display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer", userSelect: "none" },
+	};
+}
