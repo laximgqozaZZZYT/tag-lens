@@ -319,7 +319,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         last-import/bundled-load status block in `renderDataJsonBody` (summary line
         flips warning↔muted on `errors.length`; per-error + "…and N more." lines
         static) are now thin applications of pure builders; the slice/loop + DOM
-        creation stay in the view. The `hasErrors` branch is the only logic. — PENDING
+        creation stay in the view. The `hasErrors` branch is the only logic. — b3c8bd8
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
