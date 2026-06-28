@@ -156,7 +156,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         padding/fontSize (already params); collapsed it into a thin
         `noteMenuTabButtonStyle(on, { padding: "4px 8px", fontSize: "10.5px" })` call,
         killing the last duplicated underline-tab style block. No behaviour change
-        (same fields/values); already test-covered at `test/note-menu-geom.test.ts`.
+        (same fields/values); already test-covered at `test/note-menu-geom.test.ts`. — 5cdc35e
   - [ ] next seams to peel (pure builders, one per iteration): the Settings form-row
         builders inside `renderSettingsViewTab`/`renderSettingsDisplayTab`/
         `renderSettingsEncodeTab` (`settings-tabs.ts`) remain — investigate seams there.
