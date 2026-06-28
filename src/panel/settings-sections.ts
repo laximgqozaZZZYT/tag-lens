@@ -1,6 +1,7 @@
 import type { MiniSettings } from "../types";
 import { VIEW_MODES, isCloseup } from "../types";
 import type { NodeDisplay } from "../visual/node-display";
+import { clampHeatmapMinTag, heatmapMinTagInput } from "./heatmap-min-tag-input";
 import { clampMinFont, minFontInput } from "./min-font-input";
 import { partitionViewModePicker } from "./view-mode-picker";
 
@@ -270,12 +271,11 @@ export interface GenericSectionDeps {
 export function renderHeatmapMinTagControl(section: HTMLElement, deps: GenericSectionDeps): void {
 	const row = section.createDiv({ cls: "gim-order-row" });
 	row.createSpan({ text: "Min tag size", cls: "gim-order-field" });
-	const inp = row.createEl("input", { type: "number" });
-	inp.min = "1";
+	const inp = row.createEl("input", { type: "number", attr: heatmapMinTagInput().attr });
 	inp.setCssStyles({ width: "56px" });
 	inp.value = String(deps.settings.heatmapMinTagSize);
 	inp.addEventListener("change", () => {
-		const v = Math.max(1, Math.floor(Number(inp.value) || 1));
+		const v = clampHeatmapMinTag(inp.value);
 		deps.settings.heatmapMinTagSize = v;
 		inp.value = String(v);
 		deps.save();

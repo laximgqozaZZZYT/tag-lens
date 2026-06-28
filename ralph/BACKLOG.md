@@ -207,11 +207,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         (`settings-sections.ts`) now read from pure builders; bounds round-trip
         through the clamp in the test. Mirrors the `jaccard-input` extraction
         (clamp-not-reject: junk → 0, out-of-range snaps to nearest bound). — 8ce2ec9
+  - [x] Heatmap Min-tag clamp/descriptor → `clampHeatmapMinTag(raw)` /
+        `heatmapMinTagInput()` (`src/panel/heatmap-min-tag-input.ts`) +
+        `test/heatmap-min-tag-input.test.ts`. The inline `Math.max(1, floor(Number(...)
+        || 1))` clamp + `min="1"` attr in `renderHeatmapMinTagControl`
+        (`settings-sections.ts`) now read from pure builders; the min bound
+        round-trips through the clamp in the test. Mirrors the `min-font-input`
+        extraction (clamp-not-reject, no upper bound: junk / below-1 → 1). — 1c51fd7
   - [ ] next seams to peel (pure builders, one per iteration): the remaining Settings
-        form-row builders — e.g. `renderHeatmapMinTagControl`'s `Math.max(1, floor(...))`
-        clamp + `min:"1"` attr (`settings-sections.ts`), and the
-        `renderNodeDisplaySection` size-row parse/clamp. Keep handler side effects in
-        the view; extract descriptors/clamps only.
+        form-row builders — e.g. the `renderNodeDisplaySection` size-row parse/clamp.
+        Keep handler side effects in the view; extract descriptors/clamps only.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under
