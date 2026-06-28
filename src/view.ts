@@ -127,7 +127,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -3007,10 +3007,11 @@ export class MiniGraphView extends ItemView {
 		};
 		const showDSubTab = (key: DataSubTab): void => {
 			this.dataSubTab = key;
-			logicTab.setCssStyles({ display: key === "logic" ? "block" : "none" });
-			treeTab.setCssStyles({ display: key === "tree" ? "flex" : "none" });
-			tableTab.setCssStyles({ display: key === "table" ? "block" : "none" });
-			jsonTab.setCssStyles({ display: key === "json" ? "block" : "none" });
+			const disp = noteMenuDataSubTabDisplay(key);
+			logicTab.setCssStyles({ display: disp.logic });
+			treeTab.setCssStyles({ display: disp.tree });
+			tableTab.setCssStyles({ display: disp.table });
+			jsonTab.setCssStyles({ display: disp.json });
 			if (key === "table") {
 				// Re-render table tab when activated
 				renderDataTableView(tableTab, nodes, { app: this.app, edges: this.laid.edges });
@@ -3050,9 +3051,10 @@ export class MiniGraphView extends ItemView {
 		};
 		const showTab = (key: MenuTab): void => {
 			this.activeMenuTab = key;
-			dataTabWrap.setCssStyles({ display: key === "data" ? "flex" : "none" });
-			settingsTab.setCssStyles({ display: key === "settings" ? "block" : "none" });
-			insightTab.setCssStyles({ display: key === "insight" ? "block" : "none" });
+			const disp = noteMenuTopTabDisplay(key);
+			dataTabWrap.setCssStyles({ display: disp.data });
+			settingsTab.setCssStyles({ display: disp.settings });
+			insightTab.setCssStyles({ display: disp.insight });
 			
 			if (key === "data") this.renderDataLogicBody(logicTab);
 			else this.dataHostEl = null;

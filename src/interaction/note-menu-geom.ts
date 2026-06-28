@@ -203,6 +203,39 @@ export function noteMenuDataSubTabs(): { key: NoteMenuDataSubTab; label: string 
 	];
 }
 
+// Per-pane CSS `display` values for the three top-level body panes given the
+// active tab. The Data wrapper is a flex-column (visible = "flex"); Settings and
+// Insight are scroll panes (visible = "block"); inactive panes are "none". Pure
+// builder — the view applies each value via setCssStyles().
+export function noteMenuTopTabDisplay(active: NoteMenuTab): {
+	data: string;
+	settings: string;
+	insight: string;
+} {
+	return {
+		data: active === "data" ? "flex" : "none",
+		settings: active === "settings" ? "block" : "none",
+		insight: active === "insight" ? "block" : "none",
+	};
+}
+
+// Per-pane CSS `display` values for the four Data sub-tab panes given the active
+// sub-tab. The Tree pane is a flex-column (visible = "flex"); Logic/Table/JSON are
+// block panes; inactive panes are "none". Pure builder — applied via setCssStyles().
+export function noteMenuDataSubTabDisplay(active: NoteMenuDataSubTab): {
+	logic: string;
+	tree: string;
+	table: string;
+	json: string;
+} {
+	return {
+		logic: active === "logic" ? "block" : "none",
+		tree: active === "tree" ? "flex" : "none",
+		table: active === "table" ? "block" : "none",
+		json: active === "json" ? "block" : "none",
+	};
+}
+
 // Container CSS for one of the note-navigator's two tab bars. Two shapes:
 //   top — the top-level Data/Settings/Insight bar in the header: the underline
 //         divider that the active tab's accent sits on (marginBottom:-1px on the

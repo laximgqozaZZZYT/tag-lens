@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -196,4 +196,28 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	const sub = noteMenuDataSubTabs();
 	ok(sub.map((t) => t.key).join(",") === "logic,tree,table,json", "data sub-tabs: key order");
 	ok(sub.map((t) => t.label).join(",") === "Logic,Tree,Table,JSON", "data sub-tabs: labels");
+}
+
+// noteMenuTopTabDisplay: exactly the active pane is visible; the Data wrapper
+// reveals as "flex" (it nests sub-panes), Settings/Insight as "block".
+{
+	const d = noteMenuTopTabDisplay("data");
+	ok(d.data === "flex" && d.settings === "none" && d.insight === "none", "data active → flex, others none");
+	const s = noteMenuTopTabDisplay("settings");
+	ok(s.settings === "block" && s.data === "none" && s.insight === "none", "settings active → block, others none");
+	const i = noteMenuTopTabDisplay("insight");
+	ok(i.insight === "block" && i.data === "none" && i.settings === "none", "insight active → block, others none");
+}
+
+// noteMenuDataSubTabDisplay: exactly the active sub-pane is visible; the Tree pane
+// reveals as "flex" (it nests its own list), Logic/Table/JSON as "block".
+{
+	const l = noteMenuDataSubTabDisplay("logic");
+	ok(l.logic === "block" && l.tree === "none" && l.table === "none" && l.json === "none", "logic active → block, others none");
+	const t = noteMenuDataSubTabDisplay("tree");
+	ok(t.tree === "flex" && t.logic === "none" && t.table === "none" && t.json === "none", "tree active → flex, others none");
+	const tb = noteMenuDataSubTabDisplay("table");
+	ok(tb.table === "block" && tb.logic === "none" && tb.tree === "none" && tb.json === "none", "table active → block, others none");
+	const j = noteMenuDataSubTabDisplay("json");
+	ok(j.json === "block" && j.logic === "none" && j.tree === "none" && j.table === "none", "json active → block, others none");
 }

@@ -243,6 +243,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `mkTab`) now apply one pure builder returning just the two hint props; the
         `!== active` guard + mouseleave→`styleDSubs`/`styleTabs` restore stay in the
         view. Behaviour-identical (one merged setCssStyles == two sequential ones). — 2ccf3f8
+  - [x] pane display maps → `noteMenuTopTabDisplay(active)` /
+        `noteMenuDataSubTabDisplay(active)` (`src/interaction/note-menu-geom.ts`) +
+        cases in `test/note-menu-geom.test.ts`. The two inline `display: key === …`
+        per-pane ternary blocks in `showTab` (data→flex / settings+insight→block) and
+        `showDSubTab` (tree→flex / logic+table+json→block) now read from pure builders
+        returning `{data,settings,insight}` / `{logic,tree,table,json}` display strings;
+        the show/hide side effects (renderDataLogicBody/renderSettingsBody/renderInsightTab,
+        table/json re-render) stay in the view. Test locks "exactly the active pane
+        visible, flex-vs-block per pane kind".
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
