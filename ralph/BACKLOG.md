@@ -16,7 +16,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
 
 ### Medium
 
-- [ ] **P2 — make `view.ts` `draw()` a thin dispatcher.** Each mode already delegates
+- [x] **P2 — make `view.ts` `draw()` a thin dispatcher.** Each mode already delegates
       to a pure `drawX` (drawLattice/drawDroste/…). Extract the per-mode input
       assembly into pure builders (same pattern as `buildModeLegendInput`) so `draw()`
       becomes a small mode→builder→drawX dispatch. Decompose: one mode per iteration.
@@ -54,12 +54,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         Gating (showNodes / non-empty groups / non-empty nodes), card size from
         `nodes[0]`, and the per-group "high iff any member highlighted" rule now live
         in the builder; the view keeps the `drawJunihitoeStack` calls. — f974229
-  - [ ] aggregate stacks → `computeAggregateStackList`: the remaining inline loop
-        iterates `laid.clusters`, reads `aggregateCount.get(cluster.groupKey)`
-        (skips falsy counts) and `highlightedClusters.has(groupKey)` for `isHigh`,
-        with the same `nodes[0].{width,height}` card size + showNodes/non-empty
-        gating. Peel it off next (same pattern), leaving the `drawAggregateStack`
-        calls in the view.
+  - [x] aggregate stacks → `computeAggregateStackList`
+        (`src/draw/aggregate-stack-list.ts`) + `test/aggregate-stack-list.test.ts`.
+        Builder iterates `laid.clusters`, reads `aggregateCount.get(groupKey)`
+        (skips falsy counts), `highlightedClusters.has(groupKey)` for `isHigh`, with
+        `nodes[0].{width,height}` card size + showNodes/non-empty-count/non-empty-nodes
+        gating; the view keeps the `drawAggregateStack` calls. All `draw()` stack
+        loops (junihitoe + aggregate) now go through pure builders.
+        **P2 complete** — every `draw()` mode/sub-loop now has a pure input builder. — adb45ab
 
 - [ ] **BubbleSets visibility & density.** A written 3-task plan exists at
       `docs/superpowers/plans/2026-06-22-bubblesets-visibility-and-density.md`

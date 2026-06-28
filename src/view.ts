@@ -75,6 +75,7 @@ import { computeEnclosureDrawInput } from "./draw/enclosure-draw-input";
 import { computeEdgeDrawPlan } from "./draw/edge-draw-plan";
 import { computeHeatmapDrawInput } from "./draw/heatmap-draw-input";
 import { computeUpsetDrawInput } from "./draw/upset-draw-input";
+import { computeAggregateStackList } from "./draw/aggregate-stack-list";
 import { computeJunihitoeStackList } from "./draw/junihitoe-stack-list";
 import { computeNodeDrawList } from "./draw/node-draw-list";
 import { latticeNodeAt } from "./layout/lattice-layout";
@@ -2546,19 +2547,15 @@ export class MiniGraphView extends ItemView {
 			this.drawJunihitoeStack(ctx, s.group, s.cardW, s.cardH, s.isHigh);
 		}
 
-		if (
-			this.settings.showNodes &&
-			this.aggregateCount.size > 0 &&
-			this.laid.nodes.length > 0
-		) {
-			const cardW = this.laid.nodes[0].width;
-			const cardH = this.laid.nodes[0].height;
-			for (const cluster of this.laid.clusters) {
-				const count = this.aggregateCount.get(cluster.groupKey);
-				if (!count) continue;
-				const isHigh = this.highlightedClusters.has(cluster.groupKey);
-				this.drawAggregateStack(ctx, cluster, cardW, cardH, count, isHigh);
-			}
+		const aggregateStacks = computeAggregateStackList({
+			showNodes: this.settings.showNodes,
+			nodes: this.laid.nodes,
+			clusters: this.laid.clusters,
+			aggregateCount: this.aggregateCount,
+			highlightedClusters: this.highlightedClusters,
+		});
+		for (const s of aggregateStacks) {
+			this.drawAggregateStack(ctx, s.cluster, s.cardW, s.cardH, s.count, s.isHigh);
 		}
 
 		if (edgePlan.drawAccent) {
