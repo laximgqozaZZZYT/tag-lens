@@ -53,7 +53,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         (`src/draw/junihitoe-stack-list.ts`) + `test/junihitoe-stack-list.test.ts`.
         Gating (showNodes / non-empty groups / non-empty nodes), card size from
         `nodes[0]`, and the per-group "high iff any member highlighted" rule now live
-        in the builder; the view keeps the `drawJunihitoeStack` calls. — PENDING
+        in the builder; the view keeps the `drawJunihitoeStack` calls. — f974229
   - [ ] aggregate stacks → `computeAggregateStackList`: the remaining inline loop
         iterates `laid.clusters`, reads `aggregateCount.get(cluster.groupKey)`
         (skips falsy counts) and `highlightedClusters.has(groupKey)` for `isHigh`,
