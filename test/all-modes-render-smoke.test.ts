@@ -122,7 +122,8 @@ function runLayout(viewMode: ViewMode): LaidOut {
 }
 
 // ── upset (matrix footer + cards above) ──
-// view.ts draw(): drawUpsetFooter(ctx, laid, clientW, clientH, dpr, zoom, panX, panY, selKey, minFontPx).
+// view.ts draw(): drawUpsetFooter(ctx, laid, computeUpsetDrawInput({...})) →
+// DrawUpsetOpts { canvasW, canvasH, dpr, zoom, panX, panY, selectedSignatureKey, minFontPx }.
 // UpSet leaves laid.nodes empty by design; the figure lives in laid.upset.columns.
 {
 	const out = runLayout("upset");
@@ -131,7 +132,16 @@ function runLayout(viewMode: ViewMode): LaidOut {
 	const { ctx, rec } = recordingCtx();
 	let threw: string | null = null;
 	try {
-		drawUpsetFooter(ctx, out, CANVAS_W, CANVAS_H, DPR, ZOOM, PAN, PAN, null, 10);
+		drawUpsetFooter(ctx, out, {
+			canvasW: CANVAS_W,
+			canvasH: CANVAS_H,
+			dpr: DPR,
+			zoom: ZOOM,
+			panX: PAN,
+			panY: PAN,
+			selectedSignatureKey: null,
+			minFontPx: 10,
+		});
 	} catch (e) {
 		threw = e instanceof Error ? (e.stack ?? e.message) : String(e);
 	}

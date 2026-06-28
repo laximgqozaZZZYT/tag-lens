@@ -28,8 +28,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
   - [x] heatmap → `computeHeatmapDrawInput` (`src/draw/heatmap-draw-input.ts`) +
         `test/heatmap-draw-input.test.ts`; `DrawOpts` in `draw-heatmap.ts` exported as
         `DrawHeatmapOpts`. All three modes (lattice/droste/heatmap) now go through
-        pure builders. Remaining `draw()` dispatch modes (upset, bubblesets, default
-        node graph) still inline their option assembly — decompose next.
+        pure builders.
+  - [x] upset → `computeUpsetDrawInput` (`src/draw/upset-draw-input.ts`) +
+        `test/upset-draw-input.test.ts`; `drawUpsetFooter` now takes a `DrawUpsetOpts`
+        object (was 10 positional args) — canvasW/H come from `canvas.clientWidth/Height`
+        in the builder. Smoke-test call site updated. Remaining `draw()` modes
+        (bubblesets, default node graph) inline their assembly inside the world-map
+        tiling body loop (`drawBodyTile`), which is more entangled — decompose next.
 
 - [ ] **BubbleSets visibility & density.** A written 3-task plan exists at
       `docs/superpowers/plans/2026-06-22-bubblesets-visibility-and-density.md`

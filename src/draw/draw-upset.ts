@@ -82,18 +82,26 @@ function computeUpsetActiveSets(
 	return { activeSets };
 }
 
+// Per-frame inputs the UpSet footer renderer reads off the view. Plain
+// pass-through of canvas geometry + zoom/pan + selection (same shape as the
+// other modes' Draw*Opts); assembled by computeUpsetDrawInput.
+export interface DrawUpsetOpts {
+	canvasW: number;
+	canvasH: number;
+	dpr: number;
+	zoom: number;
+	panX: number;
+	panY: number;
+	selectedSignatureKey: string | null;
+	minFontPx: number;
+}
+
 export function drawUpsetFooter(
 	ctx: CanvasRenderingContext2D,
 	laid: LaidOut,
-	canvasW: number,
-	canvasH: number,
-	dpr: number,
-	zoom: number,
-	panX: number,
-	panY: number,
-	selectedSignatureKey: string | null,
-	minFontPx: number = 0,
+	opts: DrawUpsetOpts,
 ): void {
+	const { canvasW, canvasH, dpr, zoom, panX, panY, selectedSignatureKey, minFontPx } = opts;
 	const u = laid.upset;
 	if (!u) return;
 	// First pass uses an estimated footer height to compute active

@@ -72,6 +72,7 @@ import {
 import { computeLatticeDrawInput } from "./draw/lattice-draw-input";
 import { computeDrosteDrawInput } from "./draw/droste-draw-input";
 import { computeHeatmapDrawInput } from "./draw/heatmap-draw-input";
+import { computeUpsetDrawInput } from "./draw/upset-draw-input";
 import { latticeNodeAt } from "./layout/lattice-layout";
 import { drawCard as drawCardFn } from "./draw/draw-card";
 import { drawLegend } from "./draw/legend-layout";
@@ -2421,14 +2422,15 @@ export class MiniGraphView extends ItemView {
 			drawUpsetFooter(
 				ctx,
 				this.laid,
-				this.canvas.clientWidth,
-				this.canvas.clientHeight,
-				dpr,
-				this.zoom,
-				this.panX,
-				this.panY,
-				this.upsetSelectedSignatureKey,
-				this.settings.minFontPx,
+				computeUpsetDrawInput({
+					settings: this.settings,
+					canvas: this.canvas,
+					dpr,
+					zoom: this.zoom,
+					panX: this.panX,
+					panY: this.panY,
+					selectedSignatureKey: this.upsetSelectedSignatureKey,
+				}),
 			);
 		}
 
