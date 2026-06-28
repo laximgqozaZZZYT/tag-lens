@@ -320,6 +320,12 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         flips warning↔muted on `errors.length`; per-error + "…and N more." lines
         static) are now thin applications of pure builders; the slice/loop + DOM
         creation stay in the view. The `hasErrors` branch is the only logic. — b3c8bd8
+  - [x] settings sub-tab hover dedup → `renderSettingsBody`'s mouseenter handler still
+        ran the two inline `setCssStyles` calls (muted color + faint borderBottomColor)
+        byte-identical to the already-extracted, test-covered `noteMenuTabHoverStyle()`
+        (used at `view.ts:3027`/`3083`); collapsed into the same single application. One
+        merged `setCssStyles` == two sequential ones, behaviour-identical. Last
+        duplicated tab-hover block gone. — 25e416c
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
