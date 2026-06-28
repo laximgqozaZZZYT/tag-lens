@@ -41,6 +41,7 @@ import "./insight-alerts.test";
 import "./tag-path.test";
 import "./note-menu-geom.test";
 import "./settings-sub-tabs.test";
+import "./view-mode-picker.test";
 import "./zoom-math.test";
 import "./hit-modes.test";
 import "./settings-parity.test";

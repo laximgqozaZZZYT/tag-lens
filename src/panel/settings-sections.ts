@@ -1,6 +1,7 @@
 import type { MiniSettings } from "../types";
-import { VIEW_MODES, isPanorama, isCloseup } from "../types";
+import { VIEW_MODES, isCloseup } from "../types";
 import type { NodeDisplay } from "../visual/node-display";
+import { partitionViewModePicker } from "./view-mode-picker";
 
 export interface MinFontSectionDeps {
 	settings: MiniSettings;
@@ -207,8 +208,10 @@ export function renderViewModeSection(parent: HTMLElement, deps: GenericSectionD
 	const section = parent.createDiv({ cls: "gim-panel-section" });
 	section.createEl("h4", { text: "View mode" });
 
+	const { closeup, panoramaStable, experimental, expSelected } =
+		partitionViewModePicker(VIEW_MODES, deps.settings.viewMode);
+
 	// Close-up: per-node detail views (currently Icon Gallery only).
-	const closeup = VIEW_MODES.filter((o) => isCloseup(o));
 	if (closeup.length > 0) {
 		const closeupHeader = section.createDiv({ cls: "gim-viewmode-perspective-header" });
 		closeupHeader.setCssStyles({ margin: "4px 0 2px", fontSize: "11px", color: "var(--text-muted)", fontWeight: "600" });
@@ -218,7 +221,6 @@ export function renderViewModeSection(parent: HTMLElement, deps: GenericSectionD
 	}
 
 	// Panorama: vault-wide structural overview modes (non-experimental).
-	const panoramaStable = VIEW_MODES.filter((o) => isPanorama(o) && !o.experimental);
 	if (panoramaStable.length > 0) {
 		const panoramaHeader = section.createDiv({ cls: "gim-viewmode-perspective-header" });
 		panoramaHeader.setCssStyles({ margin: "8px 0 2px", fontSize: "11px", color: "var(--text-muted)", fontWeight: "600" });
@@ -228,9 +230,7 @@ export function renderViewModeSection(parent: HTMLElement, deps: GenericSectionD
 	}
 
 	// Experimental (beta): collapsible, regardless of perspective.
-	const experimental = VIEW_MODES.filter((o) => o.experimental);
 	if (experimental.length === 0) return;
-	const expSelected = experimental.some((o) => o.id === deps.settings.viewMode);
 
 	const header = section.createDiv({ cls: "gim-viewmode-exp-header" });
 	header.setCssStyles({

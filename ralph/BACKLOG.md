@@ -157,9 +157,18 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `noteMenuTabButtonStyle(on, { padding: "4px 8px", fontSize: "10.5px" })` call,
         killing the last duplicated underline-tab style block. No behaviour change
         (same fields/values); already test-covered at `test/note-menu-geom.test.ts`. — 5cdc35e
+  - [x] View-mode picker partitioning → `partitionViewModePicker(modes, currentMode)`
+        (`src/panel/view-mode-picker.ts`) + `test/view-mode-picker.test.ts`. The three
+        inline `VIEW_MODES.filter(...)` calls (closeup / panorama-stable / experimental)
+        plus the `expSelected` initial-expand flag in `renderViewModeSection`
+        (`settings-sections.ts`) are now a single thin call to a pure builder; the DOM
+        section/header/option-loop wiring stays in the view. `isPanorama` import dropped
+        from `settings-sections.ts` (now only used in the builder). — 14158ba
   - [ ] next seams to peel (pure builders, one per iteration): the Settings form-row
         builders inside `renderSettingsViewTab`/`renderSettingsDisplayTab`/
-        `renderSettingsEncodeTab` (`settings-tabs.ts`) remain — investigate seams there.
+        `renderSettingsEncodeTab` (`settings-tabs.ts`) remain — notably the Bridge-finder
+        section's inline toggle + clamped-number Jaccard row (`settings-tabs.ts:268-298`),
+        and `renderBasesDisplaySection`'s edge-kind/cluster/prefix toggle list.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under
