@@ -29,7 +29,7 @@ export function heatmapGeom(
 	};
 }
 
-interface DrawOpts {
+export interface DrawHeatmapOpts {
 	zoom: number;
 	panX: number;
 	panY: number;
@@ -47,7 +47,7 @@ interface DrawOpts {
 export function drawHeatmap(
 	ctx: CanvasRenderingContext2D,
 	h: HeatmapMeta,
-	o: DrawOpts,
+	o: DrawHeatmapOpts,
 ): void {
 	const dpr = o.dpr ?? (window.devicePixelRatio || 1);
 	const visW = o.canvas.width / dpr;

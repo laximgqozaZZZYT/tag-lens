@@ -66,6 +66,7 @@ import "./bubblesets-render-smoke.test";
 import "./all-modes-render-smoke.test";
 import "./lattice-draw-input.test";
 import "./droste-draw-input.test";
+import "./heatmap-draw-input.test";
 import "./view-line-ratchet.test";
 
 

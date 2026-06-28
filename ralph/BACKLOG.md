@@ -25,8 +25,11 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
   - [x] droste → `computeDrosteDrawInput` (`src/draw/droste-draw-input.ts`) +
         `test/droste-draw-input.test.ts`; the `this.drosteHit = []` assign-and-pass
         stays in the view wrapper, `hiddenSet` is built from settings in the builder. — 61898d2
-  - [ ] heatmap → `computeHeatmapDrawInput` (pure pass-through of settings + gaps +
-        hover/selected state; `DrawOpts` in `draw-heatmap.ts` needs exporting).
+  - [x] heatmap → `computeHeatmapDrawInput` (`src/draw/heatmap-draw-input.ts`) +
+        `test/heatmap-draw-input.test.ts`; `DrawOpts` in `draw-heatmap.ts` exported as
+        `DrawHeatmapOpts`. All three modes (lattice/droste/heatmap) now go through
+        pure builders. Remaining `draw()` dispatch modes (upset, bubblesets, default
+        node graph) still inline their option assembly — decompose next.
 
 - [ ] **BubbleSets visibility & density.** A written 3-task plan exists at
       `docs/superpowers/plans/2026-06-22-bubblesets-visibility-and-density.md`

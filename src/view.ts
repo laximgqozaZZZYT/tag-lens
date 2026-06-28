@@ -71,6 +71,7 @@ import {
 } from "./draw/draw-lattice";
 import { computeLatticeDrawInput } from "./draw/lattice-draw-input";
 import { computeDrosteDrawInput } from "./draw/droste-draw-input";
+import { computeHeatmapDrawInput } from "./draw/heatmap-draw-input";
 import { latticeNodeAt } from "./layout/lattice-layout";
 import { drawCard as drawCardFn } from "./draw/draw-card";
 import { drawLegend } from "./draw/legend-layout";
@@ -2305,23 +2306,20 @@ export class MiniGraphView extends ItemView {
 		}
 		// Tag co-occurrence heatmap: screen-space frozen-pane cell grid.
 		if (this.laid.heatmap && this.laid.heatmap.n > 0) {
-			drawHeatmap(ctx, this.laid.heatmap, {
+			drawHeatmap(ctx, this.laid.heatmap, computeHeatmapDrawInput({
+				settings: this.settings,
+				canvas: this.canvas,
+				dpr,
 				zoom: this.zoom,
 				panX: this.panX,
 				panY: this.panY,
-				canvas: this.canvas,
-				dpr,
-				minFontPx: this.settings.minFontPx,
-				jaccard: this.settings.heatmapJaccard,
-				// gapFinder toggles the dashed "missing intersection" overlay;
 				// this.currentGaps is computed in rebuild() via findGaps when the
-				// toggle is on (empty otherwise).
-				gapFinder: this.settings.gapFinder,
+				// gapFinder toggle is on (empty otherwise).
 				gaps: this.currentGaps,
 				selected: this.heatmapSelected,
 				hoverRow: this.heatmapHoverRow,
 				hoverCol: this.heatmapHoverCol,
-			});
+			}));
 			this.drawGlobalDisplayFallbacks(ctx, dpr, "heatmap");
 			return;
 		}
