@@ -1,6 +1,6 @@
 import type { MiniSettings } from "../types";
 import { renderViewModeSection } from "./settings-sections";
-import { parseGhostJaccard } from "./jaccard-input";
+import { ghostJaccardInput, parseGhostJaccard } from "./jaccard-input";
 import { basesEdgeKinds } from "./bases-edge-kinds";
 import { basesToggleRows } from "./bases-toggle-rows";
 import { bridgeGhostEdgeToggle, legendToggle } from "./settings-toggle-rows";
@@ -284,10 +284,11 @@ export function renderSettingsDisplayTab(el: HTMLElement, deps: DisplayTabDeps):
 		});
 		ghostRow.createSpan({ text: ghost.label });
 		
+		const jaccardDesc = ghostJaccardInput();
 		const jaccardRow = bridgeSection.createDiv({ cls: "gim-setting-row" });
 		jaccardRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", paddingLeft: "24px" });
-		jaccardRow.createSpan({ text: "Min Jaccard similarity:" });
-		const jaccardIn = jaccardRow.createEl("input", { type: "number", cls: "gim-number-input", attr: { step: "0.05", min: "0", max: "1" } });
+		jaccardRow.createSpan({ text: jaccardDesc.label });
+		const jaccardIn = jaccardRow.createEl("input", { type: "number", cls: "gim-number-input", attr: jaccardDesc.attr });
 		jaccardIn.setCssStyles({ width: "60px" });
 		jaccardIn.value = String(deps.settings.ghostEdgeMinJaccard);
 		jaccardIn.addEventListener("change", () => {

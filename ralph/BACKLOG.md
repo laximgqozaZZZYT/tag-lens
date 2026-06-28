@@ -192,11 +192,18 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         reset + requestDraw for legend) stay inline in the view. Test locks each
         key/label against `DEFAULT_SETTINGS` (both real boolean fields). Mirrors the
         `basesToggleRows`/`basesEdgeKinds` extractions. — 765a147
+  - [x] Min-Jaccard number-input descriptor → `ghostJaccardInput()` /
+        `GhostJaccardInputDescriptor` (`src/panel/jaccard-input.ts`, next to its
+        parser) + cases in `test/jaccard-input.test.ts`. The inline `"Min Jaccard
+        similarity:"` label + `{step:"0.05",min:"0",max:"1"}` attrs in
+        `renderSettingsDisplayTab` now read from the pure descriptor; step/min/max
+        bounds mirror `parseGhostJaccard`'s closed [0,1] range (test round-trips the
+        min/max strings through the parser). The DOM + change-handler wiring stay in
+        the view. — 5fc9be4
   - [ ] next seams to peel (pure builders, one per iteration): the remaining Settings
         form-row builders inside `renderSettingsDisplayTab`/`renderSettingsEncodeTab`
-        (`settings-tabs.ts`) — e.g. the Min-Jaccard number row (label/step/min/max
-        descriptor) and the `renderNodeDisplaySection`/`renderMinFontSection` form
-        rows. Keep handler side effects in the view; extract descriptors only.
+        (`settings-tabs.ts`) — e.g. the `renderNodeDisplaySection`/`renderMinFontSection`
+        form rows. Keep handler side effects in the view; extract descriptors only.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under

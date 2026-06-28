@@ -3,7 +3,7 @@
 // closed [0, 1] range; everything else rejects (→ null) so the view keeps the
 // current setting and resets the input box.
 import { ok } from "./assert";
-import { parseGhostJaccard } from "../src/panel/jaccard-input";
+import { ghostJaccardInput, parseGhostJaccard } from "../src/panel/jaccard-input";
 
 // In-range values (including the 0 and 1 boundaries) are accepted as-is.
 {
@@ -25,4 +25,16 @@ import { parseGhostJaccard } from "../src/panel/jaccard-input";
 	ok(parseGhostJaccard("1.5") === null, "above 1 rejected");
 	ok(parseGhostJaccard("") === null, "empty string rejected");
 	ok(parseGhostJaccard("abc") === null, "non-numeric rejected");
+}
+
+// The number-input descriptor: static label + step/min/max attributes whose
+// bounds mirror parseGhostJaccard's closed [0, 1] accept range.
+{
+	const d = ghostJaccardInput();
+	ok(d.label === "Min Jaccard similarity:", "descriptor label");
+	ok(d.attr.step === "0.05", "descriptor step");
+	ok(d.attr.min === "0", "descriptor min mirrors lower bound");
+	ok(d.attr.max === "1", "descriptor max mirrors upper bound");
+	// The min/max bounds match what parseGhostJaccard accepts/rejects.
+	ok(parseGhostJaccard(d.attr.min) === 0 && parseGhostJaccard(d.attr.max) === 1, "bounds round-trip through the parser");
 }
