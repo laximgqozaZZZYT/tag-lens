@@ -312,7 +312,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         labels, the read-only/paste textareas, the Copy/Save · Import/Bundled button
         rows) are now thin applications of pure builders; only the label margin and
         textarea height differ between the two occurrences of each, so those are params.
-        The DOM creation + click/mousedown wiring stays in the view. — PENDING
+        The DOM creation + click/mousedown wiring stays in the view. — 30422cd
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
