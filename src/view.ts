@@ -129,7 +129,7 @@ import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
-import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
+import { buildViewStateBundle, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
 import { hitHeatmapCell } from "./interaction/hit-modes";
 
@@ -842,32 +842,14 @@ export class MiniGraphView extends ItemView {
 		title.setCssStyles(noteMenuJsonTitleStyle());
 
 		// ── Export ──
-		const { lensPresets, ...settingsWithoutPresets } = this.settings;
-		const presetCount = lensPresets.length;
+		const presetCount = this.settings.lensPresets.length;
 		const nodeCount = this.laid?.nodes?.length || 0;
 		const expLabel = host.createDiv({ text: `Export View State (${nodeCount} node${nodeCount === 1 ? "" : "s"}, ${presetCount} preset${presetCount === 1 ? "" : "s"})` });
 		expLabel.setCssStyles(noteMenuJsonLabelStyle("4px 0 2px"));
 
-		const exportNodes = (this.laid?.nodes || []).map((n) => {
-			// Strip derived/volatile fields (ageDays, mtime) from each node before
-			// export; they are recomputed on import. Shallow-copy then delete the
-			// two keys (instead of a rest-omit destructure) so no unused binding
-			// is left behind, while the exported object is identical to the old
-			// `...rest` result.
-			const rest: Partial<typeof n> = { ...n };
-			delete rest.ageDays;
-			delete rest.mtime;
-			return rest;
-		});
-
-		const exportData = {
-			schema: "tag-lens/presets",
-			version: 1,
-			nodes: exportNodes,
-			settings: settingsWithoutPresets,
-			presets: lensPresets,
-		};
-		const json = JSON.stringify(exportData, null, 2);
+		// Node-stripping + schema/version wrapping + lensPresets split now live in
+		// the pure buildViewStateBundle (preset-io); the view just serializes it.
+		const json = JSON.stringify(buildViewStateBundle(this.laid?.nodes || [], this.settings), null, 2);
 		const ta = host.createEl("textarea");
 		ta.value = json;
 		ta.readOnly = true;

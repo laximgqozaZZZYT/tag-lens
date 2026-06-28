@@ -1,7 +1,7 @@
 // F1-1 — pure (de)serialization for Lens/Encoding presets. No DOM, no settings
 // mutation, never throws on bad input: parsePresets collects errors and returns
 // whatever valid presets it could recover. The UI layer (Data ▸ JSON) drives it.
-import type { LensPreset } from "../types";
+import type { GraphNode, LensPreset, MiniSettings } from "../types";
 import { validatePresetName } from "./lens-presets";
 
 export const PRESET_SCHEMA = "tag-lens/presets";
@@ -11,6 +11,37 @@ interface PresetBundle {
 	schema: string;
 	version: number;
 	presets: LensPreset[];
+}
+
+// The richer "View State" export bundle (Data ▸ JSON ▸ Export). Carries the
+// current node set + settings alongside the presets, unlike serializePresets.
+export interface ViewStateBundle {
+	schema: string;
+	version: number;
+	nodes: Partial<GraphNode>[];
+	settings: Omit<MiniSettings, "lensPresets">;
+	presets: LensPreset[];
+}
+
+// Build the View State export bundle. Volatile/derived per-node fields (ageDays,
+// mtime) are stripped — they are recomputed on import — and lensPresets is split
+// out of settings into `presets` so the bundle re-imports through the same preset
+// path. Pure: the inputs are never mutated.
+export function buildViewStateBundle(nodes: GraphNode[], settings: MiniSettings): ViewStateBundle {
+	const { lensPresets, ...settingsWithoutPresets } = settings;
+	const exportNodes = nodes.map((n) => {
+		const rest: Partial<GraphNode> = { ...n };
+		delete rest.ageDays;
+		delete rest.mtime;
+		return rest;
+	});
+	return {
+		schema: PRESET_SCHEMA,
+		version: PRESET_SCHEMA_VERSION,
+		nodes: exportNodes,
+		settings: settingsWithoutPresets,
+		presets: lensPresets,
+	};
 }
 
 // Query fields that MUST be arrays / a string for a preset to be applyLens-safe.

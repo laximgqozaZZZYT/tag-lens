@@ -1,9 +1,9 @@
 // F1-1 — pure preset (de)serialization. Round-trip fidelity + tolerant parsing.
 import { ok } from "./assert";
-import { serializePresets, parsePresets, presetFileName, mergePresets, PRESET_SCHEMA, PRESET_SCHEMA_VERSION } from "../src/interaction/preset-io";
+import { serializePresets, parsePresets, presetFileName, mergePresets, buildViewStateBundle, PRESET_SCHEMA, PRESET_SCHEMA_VERSION } from "../src/interaction/preset-io";
 import { captureLens } from "../src/interaction/lens-presets";
 import { DEFAULT_SETTINGS } from "../src/types";
-import type { LensPreset } from "../src/types";
+import type { GraphNode, LensPreset } from "../src/types";
 
 const sample: LensPreset[] = [
 	{ name: "Alpha", query: { ...captureLens(DEFAULT_SETTINGS), viewMode: "lattice", selectedBases: ["a"] } },
@@ -102,4 +102,24 @@ const sample: LensPreset[] = [
 	const { presets, errors } = parsePresets(withEnc);
 	ok(errors.length === 0 && presets.length === 1, "encoding-bearing preset parses");
 	ok(Array.isArray((presets[0] as { encoding?: unknown[] }).encoding), "encoding array preserved");
+}
+
+// buildViewStateBundle: schema/version wrapping, node-stripping, preset split.
+{
+	const nodes: GraphNode[] = [
+		{ id: "a", label: "A", memberships: ["t"], mtime: 123, ageDays: 4, score: 2 },
+		{ id: "b", label: "B", memberships: ["t"] },
+	];
+	const settings = { ...DEFAULT_SETTINGS, lensPresets: sample };
+	const bundle = buildViewStateBundle(nodes, settings);
+	ok(bundle.schema === PRESET_SCHEMA, "schema tag present");
+	ok(bundle.version === PRESET_SCHEMA_VERSION, "version present");
+	ok(bundle.presets === sample, "lensPresets split out as presets");
+	ok(!("lensPresets" in bundle.settings), "lensPresets removed from settings");
+	ok(bundle.nodes.length === 2, "all nodes carried");
+	ok(!("mtime" in bundle.nodes[0]) && !("ageDays" in bundle.nodes[0]), "volatile node fields stripped");
+	ok(bundle.nodes[0].score === 2 && bundle.nodes[0].id === "a", "other node fields kept");
+	// Inputs untouched (shallow copies).
+	ok(nodes[0].mtime === 123 && nodes[0].ageDays === 4, "input node not mutated");
+	ok("lensPresets" in settings, "input settings not mutated");
 }
