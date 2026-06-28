@@ -150,7 +150,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         call to a pure builder, and the exported `SettingsSubTab` type is the single
         source of truth for both the `settingsSubTab` field type and the rendered
         button keys/labels (mirrors the note-menu `noteMenuTopTabs`/`noteMenuDataSubTabs`
-        extraction). The `styleSubs`/button/event wiring stays in the view.
+        extraction). The `styleSubs`/button/event wiring stays in the view. — 47ae01f
   - [ ] next seams to peel (pure builders, one per iteration): `renderSettingsBody`'s
         `styleSubs` inline `setCssStyles` block is identical to `noteMenuTabButtonStyle`
         except padding/fontSize (already params) — collapse it into a thin
