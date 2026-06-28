@@ -279,6 +279,12 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         single pure builder returning `{glyph, color}` per kind (tag #/accent,
         field ⊳/purple, note ·/muted); the `openSuggest` glyph-span render reads it.
         No state branch; suggestion query/event wiring stays in the view. — 0e19a40
+  - [x] note-count hint → `noteMenuNotesHint(count, isDroste)`
+        (`src/interaction/note-menu-geom.ts`) + a case in `test/note-menu-geom.test.ts`.
+        The Result-pane hint inlined the verb branch (droste→focus / else→locate/open)
+        + the faint 10px chrome; now a pure builder returning `{text, style}`, the view
+        just creates the div and applies them. The now-single-use `verb` const + comment
+        are gone. — 4c28f89
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
