@@ -144,7 +144,7 @@ export function placeClusterLabels(
 	occupied: Aabb[] = [],
 ): Array<{ x: number; y: number }> {
 	const n = inputs.length;
-	const result: Array<{ x: number; y: number }> = new Array(n);
+	const result = new Array<{ x: number; y: number }>(n);
 	if (n === 0) return result;
 
 	// Process largest box area first: a bigger enclosure's label is more

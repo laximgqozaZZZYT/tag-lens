@@ -3,7 +3,7 @@
 	"name": "Tag Lens",
 	"version": "0.3.30",
 	"minAppVersion": "1.5.0",
-	"description": "Visualize tag–note relationships in your Obsidian Bases vault. Explore multi-way overlaps with a co-occurrence heatmap, intersection lattice, and BubbleSets; dive into individual notes with the Icon Gallery.",
+	"description": "Visualize tag–note relationships in your Bases vault. Explore multi-way overlaps with a co-occurrence heatmap, intersection lattice, and BubbleSets; dive into individual notes with the Icon Gallery.",
 	"author": "laximgqozaZZZYT",
 	"authorUrl": "https://github.com/laximgqozaZZZYT",
 	"isDesktopOnly": false
