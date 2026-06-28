@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -172,4 +172,17 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(sub.gap === "1px" && sub.padding === "4px 6px 0", "sub: 1px gap, padded edge");
 	ok(sub.borderBottom === "1px solid var(--background-modifier-border)", "sub: bottom divider");
 	ok(sub.marginTop === undefined && sub.fontSize === undefined, "sub: no top gap / inherits font");
+}
+
+// noteMenuTopTabs / noteMenuDataSubTabs: descriptor lists drive both the button
+// render order/labels and (via the key type) the persisted field values. Lock the
+// keys + labels + order so a rename can't silently desync the strip from state.
+{
+	const top = noteMenuTopTabs();
+	ok(top.map((t) => t.key).join(",") === "data,settings,insight", "top tabs: key order");
+	ok(top.map((t) => t.label).join(",") === "Data,Settings,Insight", "top tabs: labels");
+
+	const sub = noteMenuDataSubTabs();
+	ok(sub.map((t) => t.key).join(",") === "logic,tree,table,json", "data sub-tabs: key order");
+	ok(sub.map((t) => t.label).join(",") === "Logic,Tree,Table,JSON", "data sub-tabs: labels");
 }

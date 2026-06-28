@@ -125,7 +125,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -284,7 +284,7 @@ export class MiniGraphView extends ItemView {
 	private noteMenuErrorLogged = false;
 	// Which top-level tab the unified menu shows. In-memory only — opening via the toolbar
 	// gear always resets to "notes"; a manual switch survives graph rebuilds.
-	private activeMenuTab: "data" | "settings" | "insight" = "data";
+	private activeMenuTab: NoteMenuTab = "data";
 	// Sensitivity coefficient K for the Insight tab's cognitive-load thresholds
 	// (1.0–5.0). In-memory; survives rebuilds, adjustable via the tab's slider.
 	private clInsightK = 2.0;
@@ -389,7 +389,7 @@ export class MiniGraphView extends ItemView {
 	// Which Settings sub-tab is shown: View / Filter / Sort / Display / Layers.
 	// In-memory, preserved across graph rebuilds. Default View.
 	private settingsSubTab: "view" | "display" | "encode" = "view";
-	private dataSubTab: "logic" | "tree" | "table" | "json" = "logic";
+	private dataSubTab: NoteMenuDataSubTab = "logic";
 	private insightSubTab: "overview" | "alerts" | "suggest" = "overview";
 	// UpSet mode: signature key (= `signature.join("|")`) of the column
 	// currently selected by the user (highlighted in the matrix; drives
@@ -3002,14 +3002,9 @@ export class MiniGraphView extends ItemView {
 		const insightTab = bodyWrap.createDiv();
 		insightTab.setCssStyles(noteMenuBodyPanelStyle("scroll", "none"));
 
-		// -- Data Sub-tabs: Logic | Tree | Table --
-		type DataSubTab = "logic" | "tree" | "table" | "json";
-		const D_SUBS: { key: DataSubTab; label: string }[] = [
-			{ key: "logic", label: "Logic" },
-			{ key: "tree", label: "Tree" },
-			{ key: "table", label: "Table" },
-			{ key: "json", label: "JSON" },
-		];
+		// -- Data Sub-tabs: Logic | Tree | Table | JSON (descriptors from note-menu-geom) --
+		type DataSubTab = NoteMenuDataSubTab;
+		const D_SUBS = noteMenuDataSubTabs();
 		const dSubBtns = new Map<string, HTMLElement>();
 		const styleDSubs = (): void => {
 			for (const { key } of D_SUBS) {
@@ -3051,11 +3046,11 @@ export class MiniGraphView extends ItemView {
 		}
 		showDSubTab(this.dataSubTab);
 
-		type MenuTab = "data" | "settings" | "insight";
-		const TABS: MenuTab[] = ["data", "settings", "insight"];
+		type MenuTab = NoteMenuTab;
+		const TABS = noteMenuTopTabs();
 		const tabBtns: Partial<Record<MenuTab, HTMLElement>> = {};
 		const styleTabs = (): void => {
-			for (const key of TABS) {
+			for (const { key } of TABS) {
 				const b = tabBtns[key];
 				if (!b) continue;
 				const on = this.activeMenuTab === key;
@@ -3104,9 +3099,7 @@ export class MiniGraphView extends ItemView {
 			});
 			b.addEventListener("mouseleave", () => styleTabs());
 		};
-		mkTab("data", "Data");
-		mkTab("settings", "Settings");
-		mkTab("insight", "Insight");
+		for (const { key, label } of TABS) mkTab(key, label);
 		// Note-count + click hint, shown at the top of the Result pane.
 		const notesHint = treeTab.createDiv({ text: `${nodes.length} notes — click to ${verb}` });
 		notesHint.setCssStyles({ fontSize: "10px", color: "var(--text-faint)", padding: "4px 8px 0" });

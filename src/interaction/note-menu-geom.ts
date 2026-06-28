@@ -163,6 +163,35 @@ export function noteMenuTitleButtons(pinned: boolean): {
 	};
 }
 
+// The note-navigator's two tab strips, as data. The top-level bar switches the
+// whole body (Data / Settings / Insight); the Data pane's sub-bar switches the
+// Data sub-view (Logic / Tree / Table / JSON). The keys double as the persisted
+// `activeMenuTab` / `dataSubTab` field values, so they are the single source of
+// truth for both the field types and the rendered button order/labels.
+export type NoteMenuTab = "data" | "settings" | "insight";
+export type NoteMenuDataSubTab = "logic" | "tree" | "table" | "json";
+
+// Top-level tab descriptors (key + button label), in render order. Pure builder —
+// the view creates one button per entry and wires the click/hover handlers.
+export function noteMenuTopTabs(): { key: NoteMenuTab; label: string }[] {
+	return [
+		{ key: "data", label: "Data" },
+		{ key: "settings", label: "Settings" },
+		{ key: "insight", label: "Insight" },
+	];
+}
+
+// Data sub-tab descriptors (key + button label), in render order. Pure builder —
+// the view creates one button per entry and wires the click/hover handlers.
+export function noteMenuDataSubTabs(): { key: NoteMenuDataSubTab; label: string }[] {
+	return [
+		{ key: "logic", label: "Logic" },
+		{ key: "tree", label: "Tree" },
+		{ key: "table", label: "Table" },
+		{ key: "json", label: "JSON" },
+	];
+}
+
 // Container CSS for one of the note-navigator's two tab bars. Two shapes:
 //   top — the top-level Data/Settings/Insight bar in the header: the underline
 //         divider that the active tab's accent sits on (marginBottom:-1px on the

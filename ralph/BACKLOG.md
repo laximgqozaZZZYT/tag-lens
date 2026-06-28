@@ -136,9 +136,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         (`"top"`: top gap + 11px text, no wrap) and the Data sub-tab bar
         (`"sub"`: flexWrap + padded edge) are now thin applications; both share the
         bottom divider. No state branch.
-  - [ ] next seams to peel (pure builders, one per iteration): the tab strip
-        descriptor lists (TABS/D_SUBS arrays) or the Settings-panel form-row
-        builders remain inline. Investigate which has the cleanest pure seam.
+  - [x] tab-strip descriptor lists → `noteMenuTopTabs()` / `noteMenuDataSubTabs()`
+        (`src/interaction/note-menu-geom.ts`) + cases in `test/note-menu-geom.test.ts`.
+        The inline `TABS`/`D_SUBS` literal arrays are now thin calls to pure
+        builders, and the new `NoteMenuTab`/`NoteMenuDataSubTab` exported types are
+        the single source of truth for both the `activeMenuTab`/`dataSubTab` field
+        types and the rendered button keys/labels. The three manual `mkTab(...)`
+        calls collapse into one `for (… of TABS) mkTab(key, label)` loop; all event
+        wiring stays in the view.
+  - [ ] next seams to peel (pure builders, one per iteration): the Settings-panel
+        form-row builders remain inline (`renderSettingsBody`). Investigate the
+        cleanest pure seam there.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under
