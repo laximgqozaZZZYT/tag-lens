@@ -45,6 +45,7 @@ import "./view-mode-picker.test";
 import "./jaccard-input.test";
 import "./min-font-input.test";
 import "./heatmap-min-tag-input.test";
+import "./node-size-input.test";
 import "./bases-edge-kinds.test";
 import "./bases-toggle-rows.test";
 import "./settings-toggle-rows.test";

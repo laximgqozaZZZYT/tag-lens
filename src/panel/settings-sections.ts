@@ -3,6 +3,7 @@ import { VIEW_MODES, isCloseup } from "../types";
 import type { NodeDisplay } from "../visual/node-display";
 import { clampHeatmapMinTag, heatmapMinTagInput } from "./heatmap-min-tag-input";
 import { clampMinFont, minFontInput } from "./min-font-input";
+import { nodeSizeInput, parseNodeSize } from "./node-size-input";
 import { partitionViewModePicker } from "./view-mode-picker";
 
 export interface MinFontSectionDeps {
@@ -78,14 +79,12 @@ export function renderNodeDisplaySection(
 	// "Size (m × n)". For layer scope, empty value means "use inherited".
 	const sizeRow = section.createDiv({ cls: "gim-order-row" });
 	sizeRow.createSpan({ text: "Size (m × n)", cls: "gim-order-field" });
-	const mIn = sizeRow.createEl("input", { type: "number" });
+	const sizeAttr = nodeSizeInput().attr;
+	const mIn = sizeRow.createEl("input", { type: "number", attr: sizeAttr });
 	const nIn = (() => {
 		sizeRow.createSpan({ text: "×" });
-		return sizeRow.createEl("input", { type: "number" });
+		return sizeRow.createEl("input", { type: "number", attr: sizeAttr });
 	})();
-	mIn.min = nIn.min = "1";
-	mIn.max = nIn.max = "8";
-	mIn.step = nIn.step = "1";
 	mIn.setCssStyles({ width: "50px" });
 	nIn.setCssStyles({ width: "50px" });
 	if (scope) {
@@ -99,13 +98,13 @@ export function renderNodeDisplaySection(
 		nIn.value = String(deps.settings.nodeCols);
 	}
 	const applySize = (): void => {
-		const m = parseInt(mIn.value, 10);
-		const n = parseInt(nIn.value, 10);
 		if (scope) {
 			const ov = overrideFor();
-			if (Number.isFinite(m) && m >= 1 && m <= 8) ov.nodeRows = m;
+			const m = parseNodeSize(mIn.value, 8);
+			const n = parseNodeSize(nIn.value, 8);
+			if (m !== null) ov.nodeRows = m;
 			else delete ov.nodeRows;
-			if (Number.isFinite(n) && n >= 1 && n <= 8) ov.nodeCols = n;
+			if (n !== null) ov.nodeCols = n;
 			else delete ov.nodeCols;
 			if (
 				ov.nodeRows === undefined &&
@@ -114,8 +113,10 @@ export function renderNodeDisplaySection(
 				delete deps.settings.nodeDisplayOverrides[scope.groupKey];
 			}
 		} else {
-			if (Number.isFinite(m) && m >= 1 && m <= 12) deps.settings.nodeRows = m;
-			if (Number.isFinite(n) && n >= 1 && n <= 12) deps.settings.nodeCols = n;
+			const m = parseNodeSize(mIn.value, 12);
+			const n = parseNodeSize(nIn.value, 12);
+			if (m !== null) deps.settings.nodeRows = m;
+			if (n !== null) deps.settings.nodeCols = n;
 		}
 		deps.clearCardCache();
 		deps.save();
