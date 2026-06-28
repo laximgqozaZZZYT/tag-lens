@@ -311,3 +311,35 @@ export function noteMenuGroupBarStyle(): {
 		label: { display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer", userSelect: "none" },
 	};
 }
+
+// Tree-pane search-box chrome: the relatively-positioned wrapper, the text input,
+// the absolutely-positioned autocomplete dropdown, and the scrollable tree body
+// below it. Four static layout records:
+//   wrap    — relative anchor for the absolute suggBox (small margins, no grow).
+//   input   — the full-width search field (panel-bg, bordered).
+//   suggBox — the dropdown pinned under the input (hidden by default; the view
+//             flips display when there are matches).
+//   body    — the tree scroll area, growing/shrinking with the panel height.
+// None branch on state. Pure builder — applied via setCssStyles().
+export function noteMenuSearchStyle(): {
+	wrap: Partial<CSSStyleDeclaration>;
+	input: Partial<CSSStyleDeclaration>;
+	suggBox: Partial<CSSStyleDeclaration>;
+	body: Partial<CSSStyleDeclaration>;
+} {
+	return {
+		wrap: { position: "relative", margin: "6px 8px", flex: "0 0 auto" },
+		input: {
+			display: "block", width: "100%", boxSizing: "border-box", padding: "4px 6px",
+			background: "var(--background-primary)", border: "1px solid var(--background-modifier-border)",
+			borderRadius: "4px", color: "var(--text-normal)",
+		},
+		suggBox: {
+			position: "absolute", left: "0", right: "0", top: "100%", marginTop: "2px",
+			background: "var(--background-secondary)", border: "1px solid var(--background-modifier-border)", borderRadius: "4px",
+			boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "70", overflow: "auto", maxHeight: "240px",
+			display: "none",
+		},
+		body: { overflow: "auto", padding: "4px 6px 8px", flex: "1 1 auto", minHeight: "0" },
+	};
+}

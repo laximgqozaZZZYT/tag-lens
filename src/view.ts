@@ -127,7 +127,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -3160,27 +3160,23 @@ export class MiniGraphView extends ItemView {
 			this.requestDraw();
 			this.noteMenuRedraw?.();
 		});
-		// Search input for filtering the tree.
+		// Search input for filtering the tree. Static chrome from a pure builder.
+		const searchStyle = noteMenuSearchStyle();
 		const searchWrap = treeTab.createDiv();
-		searchWrap.setCssStyles({ position: "relative", margin: "6px 8px", flex: "0 0 auto" });
+		searchWrap.setCssStyles(searchStyle.wrap);
 		const search = searchWrap.createEl("input", { attr: { type: "text", placeholder: "Search: word, #tag, key:value" } });
-		search.setCssStyles({ display: "block", width: "100%", boxSizing: "border-box", padding: "4px 6px", background: "var(--background-primary)", border: "1px solid var(--background-modifier-border)", borderRadius: "4px", color: "var(--text-normal)" });
+		search.setCssStyles(searchStyle.input);
 		// Restore the search query that was active before this rebuild (if any).
 		// This preserves the user's typed text across vault-change-triggered rebuilds.
 		if (this.noteMenuSearchQuery) search.value = this.noteMenuSearchQuery;
 		// Suggestion (autocomplete) dropdown — absolutely positioned under the input,
 		// same panel styling, zIndex above the body. Hidden until there are matches.
 		const suggBox = searchWrap.createDiv();
-		suggBox.setCssStyles({
-			position: "absolute", left: "0", right: "0", top: "100%", marginTop: "2px",
-			background: "var(--background-secondary)", border: "1px solid var(--background-modifier-border)", borderRadius: "4px",
-			boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "70", overflow: "auto", maxHeight: "240px",
-			display: "none",
-		});
+		suggBox.setCssStyles(searchStyle.suggBox);
 		const body = treeTab.createDiv({ cls: "gim-tree-scroll" });
 		// flex:1 1 auto + minHeight:0 → the tree scroll area grows/shrinks with the
 		// panel height (set above / on resize) instead of a fixed maxHeight.
-		body.setCssStyles({ overflow: "auto", padding: "4px 6px 8px", flex: "1 1 auto", minHeight: "0" });
+		body.setCssStyles(searchStyle.body);
 		// FLOATING: header-drag MOVE + bottom-right RESIZE + double-click MINIMIZE.
 		// PINNED: none of those (it's docked) — a left-edge handle resizes width.
 		if (!pinned) {

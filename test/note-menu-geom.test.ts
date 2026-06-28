@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -240,4 +240,16 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(g.bar.fontSize === "11px" && g.bar.color === "var(--text-muted)" && g.bar.cursor === "default", "bar: muted 11px, default cursor");
 	ok(g.label.display === "inline-flex" && g.label.alignItems === "center" && g.label.gap === "3px", "label: inline-flex centered 3px gap");
 	ok(g.label.cursor === "pointer" && g.label.userSelect === "none", "label: pointer, no select");
+}
+
+// noteMenuSearchStyle: the tree-pane search wrapper / input / dropdown / body chrome.
+{
+	const s = noteMenuSearchStyle();
+	ok(s.wrap.position === "relative" && s.wrap.margin === "6px 8px" && s.wrap.flex === "0 0 auto", "wrap: relative anchor, no grow");
+	ok(s.input.display === "block" && s.input.width === "100%" && s.input.boxSizing === "border-box", "input: full-width block");
+	ok(s.input.background === "var(--background-primary)" && s.input.color === "var(--text-normal)", "input: panel bg + normal text");
+	ok(s.input.border === "1px solid var(--background-modifier-border)" && s.input.borderRadius === "4px", "input: bordered, rounded");
+	ok(s.suggBox.position === "absolute" && s.suggBox.top === "100%" && s.suggBox.display === "none", "suggBox: pinned under input, hidden by default");
+	ok(s.suggBox.zIndex === "70" && s.suggBox.maxHeight === "240px" && s.suggBox.overflow === "auto", "suggBox: above body, capped scroll");
+	ok(s.body.overflow === "auto" && s.body.flex === "1 1 auto" && s.body.minHeight === "0", "body: grows/shrinks with panel");
 }

@@ -264,6 +264,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         inline-flex radio label); the inline `groupBar`/`mkGroupRadio` `setCssStyles`
         blocks in `ensureNoteMenu` are now thin applications. No state branch; the
         Folder/Tag radio + change handlers stay in the view. — 66a1fd0
+  - [x] Tree-pane search-box chrome → `noteMenuSearchStyle()`
+        (`src/interaction/note-menu-geom.ts`) + a case in `test/note-menu-geom.test.ts`.
+        Returns `{wrap, input, suggBox, body}` static layout records (the relative
+        wrapper, the full-width bordered input, the absolutely-positioned hidden
+        autocomplete dropdown, the growing tree scroll body); the four inline
+        `setCssStyles` blocks for searchWrap/search/suggBox/body in `ensureNoteMenu`
+        are now thin applications. No state branch; query restore + suggestion/event
+        wiring stay in the view.
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
