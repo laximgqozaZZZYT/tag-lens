@@ -164,11 +164,18 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         (`settings-sections.ts`) are now a single thin call to a pure builder; the DOM
         section/header/option-loop wiring stays in the view. `isPanorama` import dropped
         from `settings-sections.ts` (now only used in the builder). — 14158ba
-  - [ ] next seams to peel (pure builders, one per iteration): the Settings form-row
-        builders inside `renderSettingsViewTab`/`renderSettingsDisplayTab`/
-        `renderSettingsEncodeTab` (`settings-tabs.ts`) remain — notably the Bridge-finder
-        section's inline toggle + clamped-number Jaccard row (`settings-tabs.ts:268-298`),
-        and `renderBasesDisplaySection`'s edge-kind/cluster/prefix toggle list.
+  - [x] Bridge-finder Jaccard parse/clamp → `parseGhostJaccard(raw)`
+        (`src/panel/jaccard-input.ts`) + `test/jaccard-input.test.ts`. The inline
+        `parseFloat` + `!NaN && 0..1` accept/reject rule in `renderSettingsDisplayTab`
+        is now a thin call to a pure parser that returns the value on accept or `null`
+        to reject (→ keep current + reset input); the toggle/input DOM + save/rebuild
+        wiring stay in the view. Behaviour-identical (same parseFloat semantics, same
+        closed [0,1] range, same reset-on-reject). — 578728e
+  - [ ] next seams to peel (pure builders, one per iteration): the remaining Settings
+        form-row builders inside `renderSettingsDisplayTab`/`renderSettingsEncodeTab`
+        (`settings-tabs.ts`) — notably `renderBasesDisplaySection`'s edge-kind/cluster/
+        prefix toggle list (extract the `edgeKinds` descriptor array as a pure builder,
+        mirroring `noteMenuTopTabs`), and the Bridge-finder "Show ghost edges" toggle row.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under

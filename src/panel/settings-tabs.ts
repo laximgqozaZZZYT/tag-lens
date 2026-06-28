@@ -1,5 +1,6 @@
 import type { MiniSettings } from "../types";
 import { renderViewModeSection } from "./settings-sections";
+import { parseGhostJaccard } from "./jaccard-input";
 import { setIcon, AbstractInputSuggest, type App, type TFile } from "obsidian";
 import { scanBaseFiles } from "../bases/parser";
 import { addBaseFileToSelected, removeBaseFileFromSelected } from "../bases/selection";
@@ -286,8 +287,8 @@ export function renderSettingsDisplayTab(el: HTMLElement, deps: DisplayTabDeps):
 		jaccardIn.setCssStyles({ width: "60px" });
 		jaccardIn.value = String(deps.settings.ghostEdgeMinJaccard);
 		jaccardIn.addEventListener("change", () => {
-			const v = parseFloat(jaccardIn.value);
-			if (!Number.isNaN(v) && v >= 0 && v <= 1) {
+			const v = parseGhostJaccard(jaccardIn.value);
+			if (v !== null) {
 				deps.settings.ghostEdgeMinJaccard = v;
 				deps.save();
 				deps.rebuild();
