@@ -393,6 +393,53 @@ export function noteMenuSuggestStyle(): {
 	};
 }
 
+// Static chrome for a Tree-pane row + its ellipsised label. Three kinds:
+//  - "leaf":   a note row (cursor pointer, rounded, dynamic `baseBg` highlight);
+//              its label has no cursor (the row-click focus lives on the row).
+//  - "folder": a collapsible folder/group/combo row (muted, bold); its label
+//              carries the expand/collapse cursor.
+//  - "all":    the tag-tree "(all)" subtree header (faint, bold, italic, indented
+//              one checkbox-width further); its label carries the cursor too.
+// `padding` is emitted BEFORE `paddingLeft` so the depth indent is not overwritten
+// (object key order is the apply order — same gotcha as the inline blocks).
+// The per-row dynamics that vary at paint time (leaf highlight colour, hover
+// background swaps) stay in the view.
+export type NoteMenuTreeRowKind = "leaf" | "folder" | "all";
+
+export function noteMenuTreeRowStyle(
+	kind: NoteMenuTreeRowKind,
+	depth: number,
+	baseBg = "",
+): { row: Partial<CSSStyleDeclaration>; label: Partial<CSSStyleDeclaration> } {
+	if (kind === "leaf") {
+		return {
+			row: {
+				display: "flex", alignItems: "center", padding: "2px 4px",
+				paddingLeft: `${6 + depth * 12}px`, cursor: "pointer", borderRadius: "3px",
+				whiteSpace: "nowrap", overflow: "hidden", background: baseBg,
+			},
+			label: { flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+		};
+	}
+	if (kind === "all") {
+		return {
+			row: {
+				display: "flex", alignItems: "center", padding: "2px 4px",
+				paddingLeft: `${26 + depth * 12}px`, color: "var(--text-faint)",
+				fontWeight: "600", fontStyle: "italic",
+			},
+			label: { flex: "1 1 auto", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+		};
+	}
+	return {
+		row: {
+			display: "flex", alignItems: "center", padding: "2px 4px",
+			paddingLeft: `${6 + depth * 12}px`, color: "var(--text-muted)", fontWeight: "600",
+		},
+		label: { flex: "1 1 auto", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+	};
+}
+
 // Static chrome for the pinned panel's left-edge resize handle: a thin
 // transparent strip docked down the left border with an ew-resize cursor,
 // stacked above the body so the drag is always grabbable. No state branch; the

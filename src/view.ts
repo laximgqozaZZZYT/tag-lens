@@ -127,7 +127,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuNotesHint, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -3309,9 +3309,8 @@ export class MiniGraphView extends ItemView {
 			const row = container.createDiv();
 			const highlightId = this.currentMenuHighlightId();
 			const baseBg = id === highlightId ? "#2d6cdf55" : "";
-			// padding must come BEFORE paddingLeft — Object.assign applies properties
-			// left-to-right; putting padding last would overwrite the depth indent.
-			row.setCssStyles({ display: "flex", alignItems: "center", padding: "2px 4px", paddingLeft: `${6 + depth * 12}px`, cursor: "pointer", borderRadius: "3px", whiteSpace: "nowrap", overflow: "hidden", background: baseBg });
+			const leafStyle = noteMenuTreeRowStyle("leaf", depth, baseBg);
+			row.setCssStyles(leafStyle.row);
 			// Per-note visibility checkbox. CHECKED ⇔ the note is NOT hidden. The
 			// state is GLOBAL per note (driven by hiddenNodes, keyed by PATH) so a
 			// note appearing in multiple tag groups shows the same state everywhere.
@@ -3339,7 +3338,7 @@ export class MiniGraphView extends ItemView {
 			checkboxRefreshers.push(() => { setCbState(cb, hiddenSetNow().has(noteKey) ? "unchecked" : "checked"); });
 			// The label carries the row-click behaviour (focus/locate/open) + ellipsis.
 			const lbl = row.createSpan({ text: label });
-			lbl.setCssStyles({ flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
+			lbl.setCssStyles(leafStyle.label);
 			if (id === highlightId) lbl.setCssStyles({ color: "var(--color-yellow)" });
 			row.addEventListener("mouseenter", () => { row.setCssStyles({ background: "var(--background-modifier-border)" }); });
 			row.addEventListener("mouseleave", () => { row.setCssStyles({ background: baseBg }); });
@@ -3359,17 +3358,11 @@ export class MiniGraphView extends ItemView {
 			const allPath = buildFolderPathKey(parentPath, "(all)");
 			const row = container.createDiv();
 			row.dataset.menupath = allPath;
-			row.setCssStyles({
-				display: "flex", alignItems: "center",
-				padding: "2px 4px", paddingLeft: `${26 + depth * 12}px`,
-				color: "var(--text-faint)", fontWeight: "600", fontStyle: "italic",
-			});
+			const allStyle = noteMenuTreeRowStyle("all", depth);
+			row.setCssStyles(allStyle.row);
 			// (all) has NO checkbox — only a collapsible label
 			const lbl = row.createSpan({ text: `\u25b8 (all)` });
-			lbl.setCssStyles({
-				flex: "1 1 auto", cursor: "pointer",
-				overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-			});
+			lbl.setCssStyles(allStyle.label);
 			const kids = container.createDiv();
 			kids.setCssStyles({ display: "none" });
 			let built = false;
@@ -3407,8 +3400,8 @@ export class MiniGraphView extends ItemView {
 				// Stamp the stable path key so removeNoteMenu() can record which
 				// folders were open and ensureNoteMenu() can re-open them.
 				row.dataset.menupath = folderPath;
-				// padding before paddingLeft — same order as leafRow (see comment there).
-				row.setCssStyles({ display: "flex", alignItems: "center", padding: "2px 4px", paddingLeft: `${6 + depth * 12}px`, color: "var(--text-muted)", fontWeight: "600" });
+				const folderStyle = noteMenuTreeRowStyle("folder", depth);
+				row.setCssStyles(folderStyle.row);
 				// Folder/group/combo checkbox — TRI-STATE over its descendant notes:
 				// checked = all visible, unchecked = all hidden, indeterminate = mixed.
 				// Toggling cascades to EVERY descendant note (check-all / uncheck-all).
@@ -3438,7 +3431,7 @@ export class MiniGraphView extends ItemView {
 				// Live-refresh this group's tri-state after any toggle elsewhere.
 				checkboxRefreshers.push(applyFolderState);
 				const lbl = row.createSpan({ text: `▸ ${display}` });
-				lbl.setCssStyles({ flex: "1 1 auto", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
+				lbl.setCssStyles(folderStyle.label);
 				const kids = container.createDiv();
 				kids.setCssStyles({ display: "none" });
 				let built = false;

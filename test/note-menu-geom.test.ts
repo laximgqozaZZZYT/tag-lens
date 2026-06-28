@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuNotesHint, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -288,4 +288,26 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(g.position === "absolute" && g.left === "0" && g.top === "0" && g.bottom === "0", "grip: docked down the left border");
 	ok(g.width === "6px" && g.cursor === "ew-resize", "grip: 6px ew-resize strip");
 	ok(g.zIndex === "61" && g.background === "transparent", "grip: above body, transparent");
+}
+
+// noteMenuTreeRowStyle: per-kind Tree-pane row + label chrome.
+{
+	const leaf = noteMenuTreeRowStyle("leaf", 2, "#2d6cdf55");
+	ok(leaf.row.cursor === "pointer" && leaf.row.borderRadius === "3px", "leaf: pointer, rounded");
+	ok(leaf.row.background === "#2d6cdf55", "leaf: dynamic highlight background passed through");
+	ok(leaf.row.paddingLeft === `${6 + 2 * 12}px`, "leaf: depth indent (6 + depth*12)");
+	// padding must precede paddingLeft so the indent is not overwritten.
+	const leafKeys = Object.keys(leaf.row);
+	ok(leafKeys.indexOf("padding") < leafKeys.indexOf("paddingLeft"), "leaf: padding emitted before paddingLeft");
+	ok(leaf.label.flex === "1 1 auto" && leaf.label.textOverflow === "ellipsis" && !("cursor" in leaf.label), "leaf label: ellipsis, no cursor (row-click)");
+
+	const folder = noteMenuTreeRowStyle("folder", 0);
+	ok(folder.row.color === "var(--text-muted)" && folder.row.fontWeight === "600", "folder: muted, bold");
+	ok(folder.row.paddingLeft === "6px" && !("borderRadius" in folder.row), "folder: base indent, no rounding");
+	ok(folder.label.cursor === "pointer", "folder label: expand/collapse cursor");
+
+	const all = noteMenuTreeRowStyle("all", 1);
+	ok(all.row.color === "var(--text-faint)" && all.row.fontStyle === "italic", "all: faint, italic");
+	ok(all.row.paddingLeft === `${26 + 1 * 12}px`, "all: extra checkbox-width indent (26 + depth*12)");
+	ok(all.label.cursor === "pointer", "all label: collapse cursor");
 }
