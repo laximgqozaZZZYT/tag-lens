@@ -1,6 +1,7 @@
 import type { MiniSettings } from "../types";
 import { renderViewModeSection } from "./settings-sections";
 import { parseGhostJaccard } from "./jaccard-input";
+import { basesEdgeKinds } from "./bases-edge-kinds";
 import { setIcon, AbstractInputSuggest, type App, type TFile } from "obsidian";
 import { scanBaseFiles } from "../bases/parser";
 import { addBaseFileToSelected, removeBaseFileFromSelected } from "../bases/selection";
@@ -311,12 +312,7 @@ function renderBasesDisplaySection(el: HTMLElement, deps: DisplayTabDeps): void 
 	const hint = section.createDiv({ text: "Which relations become edges in Bases mode." });
 	hint.setCssStyles({ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" });
 
-	const edgeKinds: Array<{ key: "basesLinkEdges" | "basesSharedTagEdges" | "basesSharedPropEdges"; label: string }> = [
-		{ key: "basesLinkEdges", label: "Internal links" },
-		{ key: "basesSharedTagEdges", label: "Shared tags" },
-		{ key: "basesSharedPropEdges", label: "Shared property" },
-	];
-	for (const { key, label } of edgeKinds) {
+	for (const { key, label } of basesEdgeKinds()) {
 		const row = section.createEl("label", { cls: "gim-toggle-row" });
 		const cb = row.createEl("input", { type: "checkbox" });
 		cb.checked = deps.settings[key];

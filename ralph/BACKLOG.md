@@ -171,11 +171,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         to reject (→ keep current + reset input); the toggle/input DOM + save/rebuild
         wiring stay in the view. Behaviour-identical (same parseFloat semantics, same
         closed [0,1] range, same reset-on-reject). — 578728e
+  - [x] Bases "Show Edges" edge-kind descriptor list → `basesEdgeKinds()` / `BasesEdgeKind`
+        (`src/panel/bases-edge-kinds.ts`) + `test/bases-edge-kinds.test.ts`. The inline
+        `edgeKinds` literal array (key↔label mapping) in `renderBasesDisplaySection` is now
+        a thin call to a pure builder; the toggle-row DOM + save/rebuild wiring stay in the
+        view. Test locks key/label/order against `DEFAULT_SETTINGS` (each key is a real
+        boolean field). Mirrors the `noteMenuTopTabs`/`settingsSubTabs` extractions. — PENDING
   - [ ] next seams to peel (pure builders, one per iteration): the remaining Settings
         form-row builders inside `renderSettingsDisplayTab`/`renderSettingsEncodeTab`
-        (`settings-tabs.ts`) — notably `renderBasesDisplaySection`'s edge-kind/cluster/
-        prefix toggle list (extract the `edgeKinds` descriptor array as a pure builder,
-        mirroring `noteMenuTopTabs`), and the Bridge-finder "Show ghost edges" toggle row.
+        (`settings-tabs.ts`) — the `renderBasesDisplaySection` cluster/prefix toggle rows
+        (could share one toggle-row descriptor builder), and the Bridge-finder "Show ghost
+        edges" toggle row.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under
