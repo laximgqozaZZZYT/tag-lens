@@ -110,6 +110,8 @@ import {
 	renderSettingsDisplayTab,
 	renderSettingsEncodeTab,
 	renderFilterBodyTab,
+	settingsSubTabs,
+	type SettingsSubTab,
 } from "./panel/settings-tabs";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes } from "./panel/menu-notes";
@@ -388,7 +390,7 @@ export class MiniGraphView extends ItemView {
 	private activeTab: string = "__all__";
 	// Which Settings sub-tab is shown: View / Filter / Sort / Display / Layers.
 	// In-memory, preserved across graph rebuilds. Default View.
-	private settingsSubTab: "view" | "display" | "encode" = "view";
+	private settingsSubTab: SettingsSubTab = "view";
 	private dataSubTab: NoteMenuDataSubTab = "logic";
 	private insightSubTab: "overview" | "alerts" | "suggest" = "overview";
 	// UpSet mode: signature key (= `signature.join("|")`) of the column
@@ -725,12 +727,7 @@ export class MiniGraphView extends ItemView {
 		const subBar = host.createDiv();
 		subBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", marginBottom: "6px", borderBottom: "1px solid var(--background-modifier-border)" });
 		const content = host.createDiv({ cls: "gim-panel-content" });
-		type SubKey = "view" | "display" | "encode";
-		const SUBS: { key: SubKey; label: string }[] = [
-			{ key: "view", label: "View" },
-			{ key: "display", label: "Display" },
-			{ key: "encode", label: "Encode" },
-		];
+		const SUBS = settingsSubTabs();
 		const subBtns = new Map<string, HTMLElement>();
 		const styleSubs = (): void => {
 			for (const { key } of SUBS) {

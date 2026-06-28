@@ -24,6 +24,22 @@ import {
 	type NodeDisplay,
 } from "../visual/node-display";
 
+// The Settings panel's sub-tab strip, as data. Each key selects which renderer
+// fills the body (View → renderSettingsViewTab, Display → renderSettingsDisplayTab,
+// Encode → renderSettingsEncodeTab); the keys double as the persisted
+// `settingsSubTab` field values, so this is the single source of truth for both
+// the field type and the rendered button order/labels. Pure builder — the view
+// creates one button per entry and wires the click/hover handlers.
+export type SettingsSubTab = "view" | "display" | "encode";
+
+export function settingsSubTabs(): { key: SettingsSubTab; label: string }[] {
+	return [
+		{ key: "view", label: "View" },
+		{ key: "display", label: "Display" },
+		{ key: "encode", label: "Encode" },
+	];
+}
+
 export interface ViewTabDeps {
 	settings: MiniSettings;
 	save: () => void;

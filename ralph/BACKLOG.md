@@ -144,9 +144,20 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         types and the rendered button keys/labels. The three manual `mkTab(...)`
         calls collapse into one `for (… of TABS) mkTab(key, label)` loop; all event
         wiring stays in the view. — 1b65735
-  - [ ] next seams to peel (pure builders, one per iteration): the Settings-panel
-        form-row builders remain inline (`renderSettingsBody`). Investigate the
-        cleanest pure seam there.
+  - [x] Settings sub-tab descriptor list → `settingsSubTabs()` / `SettingsSubTab`
+        (`src/panel/settings-tabs.ts`) + `test/settings-sub-tabs.test.ts`. The inline
+        `SubKey` type + `SUBS` literal array in `renderSettingsBody` are now a thin
+        call to a pure builder, and the exported `SettingsSubTab` type is the single
+        source of truth for both the `settingsSubTab` field type and the rendered
+        button keys/labels (mirrors the note-menu `noteMenuTopTabs`/`noteMenuDataSubTabs`
+        extraction). The `styleSubs`/button/event wiring stays in the view.
+  - [ ] next seams to peel (pure builders, one per iteration): `renderSettingsBody`'s
+        `styleSubs` inline `setCssStyles` block is identical to `noteMenuTabButtonStyle`
+        except padding/fontSize (already params) — collapse it into a thin
+        `noteMenuTabButtonStyle(on, { padding: "4px 8px", fontSize: "10.5px" })` call to
+        kill the duplicated underline-tab style. After that, the Settings form-row
+        builders inside `renderSettingsViewTab`/`renderSettingsDisplayTab`/
+        `renderSettingsEncodeTab` (`settings-tabs.ts`) remain — investigate seams there.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under
