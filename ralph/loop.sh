@@ -63,6 +63,13 @@ for ((i = 1; i <= MAX_ITERS; i++)); do
   [[ "$before" == "$after" ]] \
     && echo "ralph: iteration $i made no commit (blocked or idle)." | tee -a "$log" \
     || echo "ralph: iteration $i committed $after." | tee -a "$log"
+
+  # Usage/session limit: stop the batch immediately instead of burning the rest
+  # of the cap on no-ops. The next scheduled run resumes from the clean tree.
+  if grep -qiE "hit your (session|usage) limit|usage limit reached|rate limit|reset(s)? at" "$log"; then
+    echo "ralph: usage/session limit reached — ending this batch; next run resumes." | tee -a "$log"
+    break
+  fi
 done
 
 echo "ralph: loop finished on '$BRANCH'. Review with: git log --oneline $(git rev-parse --abbrev-ref '@{u}' 2>/dev/null || echo main).."$BRANCH""
