@@ -64,6 +64,7 @@ import "./bubblesets-label-collision.test";
 import "./bubblesets-invariants.test";
 import "./bubblesets-render-smoke.test";
 import "./all-modes-render-smoke.test";
+import "./view-line-ratchet.test";
 
 
 summary();

@@ -12,14 +12,6 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
 
 ### Small / additive (do these first to build momentum)
 
-- [ ] **R5′ — settings type-rot guard test.** Add a pure test asserting the key sets
-      of `MiniSettings` and `DEFAULT_SETTINGS` are identical, so a field added to one
-      but not the other fails CI. Additive, no source change. (`test/…settings-shape.test.ts`)
-
-- [ ] **P4 — `view.ts` line-count ratchet.** Add a tiny guard (a test, or a step in
-      `verify`) that fails if `src/view.ts` exceeds its current line count. Locks in
-      every future extraction. Record the baseline number in the test.
-
 - [ ] **P1 — cognitive-complexity baseline (measure, don't enforce yet).** Turn on
       Biome `complexity/noExcessiveCognitiveComplexity` in **report/warn** mode (not
       error) and capture the current offender count somewhere durable
@@ -63,6 +55,12 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
 ## Done
 
 (loop appends `- [x] <item> — <short-hash>` here)
+
+- [x] **R5′ — settings type-rot guard test.** Already covered by
+      `test/settings-parity.test.ts` (no-undefined defaults + JSON round-trip +
+      inventory key-set lock on `DEFAULT_SETTINGS`). No new work needed.
+- [x] **P4 — `view.ts` line-count ratchet.** `test/view-line-ratchet.test.ts`
+      fails if `src/view.ts` exceeds baseline 4478 (ratchet only goes down). — 4045e0e
 
 ## Blockers
 
