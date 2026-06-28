@@ -344,6 +344,21 @@ export function noteMenuSearchStyle(): {
 	};
 }
 
+// Tree-pane note-count hint shown at the top of the Result pane. The verb is
+// mode-appropriate: droste focuses a card, every other mode locates/opens the
+// file. Pure builder — returns the faint hint text + its static chrome; the view
+// just creates the div and applies them.
+export function noteMenuNotesHint(count: number, isDroste: boolean): {
+	text: string;
+	style: Partial<CSSStyleDeclaration>;
+} {
+	const verb = isDroste ? "focus" : "locate/open";
+	return {
+		text: `${count} notes — click to ${verb}`,
+		style: { fontSize: "10px", color: "var(--text-faint)", padding: "4px 8px 0" },
+	};
+}
+
 // Glyph + accent colour for an autocomplete suggestion row, keyed by its kind
 // (tag / field / note). Pure presentation map — the suggestion dropdown in
 // ensureNoteMenu reads this for the leading glyph span; centralises what used to

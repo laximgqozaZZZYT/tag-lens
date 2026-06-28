@@ -127,7 +127,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuNotesHint, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -2931,9 +2931,6 @@ export class MiniGraphView extends ItemView {
 		panel.setCssStyles(noteMenuPanelStyle(pinned, rect, pinnedW));
 		const head = panel.createDiv();
 		head.setCssStyles(noteMenuHeadStyle(pinned));
-		// Header verb is mode-appropriate: droste focuses, other modes either
-		// locate the card on canvas or open the file.
-		const verb = isDroste ? "focus" : "locate/open";
 		// Title row: name on the left, pin + × on the right.
 		const titleRowStyle = noteMenuTitleRowStyle();
 		const titleRow = head.createDiv();
@@ -3094,8 +3091,9 @@ export class MiniGraphView extends ItemView {
 		};
 		for (const { key, label } of TABS) mkTab(key, label);
 		// Note-count + click hint, shown at the top of the Result pane.
-		const notesHint = treeTab.createDiv({ text: `${nodes.length} notes — click to ${verb}` });
-		notesHint.setCssStyles({ fontSize: "10px", color: "var(--text-faint)", padding: "4px 8px 0" });
+		const notesHintDesc = noteMenuNotesHint(nodes.length, isDroste);
+		const notesHint = treeTab.createDiv({ text: notesHintDesc.text });
+		notesHint.setCssStyles(notesHintDesc.style);
 		// ── Grouping selector (Folder / Tag) ────────────────────────────────────
 		// A small radio group in the header switches the tree between the FOLDER
 		// tree (by note path, default) and the TAG tree (by GROUP_BY membership
