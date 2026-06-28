@@ -22,8 +22,9 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
       becomes a small mode→builder→drawX dispatch. Decompose: one mode per iteration.
   - [x] lattice → `computeLatticeDrawInput` (`src/draw/lattice-draw-input.ts`) +
         `test/lattice-draw-input.test.ts`; `DrawLatticeOpts` now exported.
-  - [ ] droste → `computeDrosteDrawInput` (note: `hitRegions`/`hiddenSet` are live
-        callbacks — keep the `this.drosteHit = []` assignment in the view wrapper).
+  - [x] droste → `computeDrosteDrawInput` (`src/draw/droste-draw-input.ts`) +
+        `test/droste-draw-input.test.ts`; the `this.drosteHit = []` assign-and-pass
+        stays in the view wrapper, `hiddenSet` is built from settings in the builder. — 61898d2
   - [ ] heatmap → `computeHeatmapDrawInput` (pure pass-through of settings + gaps +
         hover/selected state; `DrawOpts` in `draw-heatmap.ts` needs exporting).
 
