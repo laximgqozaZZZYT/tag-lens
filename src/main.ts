@@ -9,11 +9,20 @@ export default class GraphIslandMiniPlugin extends Plugin {
 	private views: MiniGraphView[] = [];
 
 	onload(): void {
-		this.registerView(VIEW_TYPE_MINI, (leaf) => {
-			const v = new MiniGraphView(leaf, this.settings, () => this.saveSettings());
-			this.views.push(v);
-			return v;
-		});
+		// A rapid plugin disable→enable can re-run onload before Obsidian has
+		// finished tearing down the previous registration, making registerView
+		// throw "View type already registered". The stale registration is
+		// harmless (the next reload replaces it), so swallow that one race
+		// rather than letting it surface as a console error.
+		try {
+			this.registerView(VIEW_TYPE_MINI, (leaf) => {
+				const v = new MiniGraphView(leaf, this.settings, () => this.saveSettings());
+				this.views.push(v);
+				return v;
+			});
+		} catch (e) {
+			if (!(e instanceof Error) || !/already registered/i.test(e.message)) throw e;
+		}
 		void this.init();
 	}
 

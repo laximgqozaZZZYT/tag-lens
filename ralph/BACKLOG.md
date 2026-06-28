@@ -86,9 +86,11 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
       `draw-enclosures.ts` / `label-collision.ts`, not this stale plan. File a new
       backlog item with a fresh repro if observed in-app.
 
-- [ ] **N2 — `registerView` re-enable robustness.** Rapid plugin disable/enable re-runs
+- [x] **N2 — `registerView` re-enable robustness.** Rapid plugin disable/enable re-runs
       `registerView` → "existing view type" console error (`src/main.ts` onload).
-      Benign but a robustness gap; guard the re-registration.
+      Guarded the `onload` registration in a try/catch that rethrows anything other
+      than the benign "already registered" race (no public viewRegistry-introspection
+      API is typed, so catch is the proportionate guard). — e2ab0fd
 
 ### Large (decompose — do last, one sub-step per iteration)
 
