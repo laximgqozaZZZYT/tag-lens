@@ -124,7 +124,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `"column"`; logicTab/tableTab/jsonTab/settingsTab/insightTab as `"scroll"`)
         are now thin applications of the pure builder; `display` carries the initial
         show/hide state. `bodyWrap` stays inline (distinct overflow:hidden); the
-        per-tab display toggles in showDSubTab/showTab stay in the view.
+        per-tab display toggles in showDSubTab/showTab stay in the view. — 44b0950
   - [ ] next seams to peel (pure builders, one per iteration): the title-row
         container styles (titleRow flex layout + headBtns row) and the two tab-bar
         chrome blocks (tabBar / dataSubBar `setCssStyles`) are still inline but
