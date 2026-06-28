@@ -271,7 +271,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         autocomplete dropdown, the growing tree scroll body); the four inline
         `setCssStyles` blocks for searchWrap/search/suggBox/body in `ensureNoteMenu`
         are now thin applications. No state branch; query restore + suggestion/event
-        wiring stay in the view.
+        wiring stay in the view. — 79eec8e
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
