@@ -242,7 +242,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `b.setCssStyles({borderBottomColor})`, one in the Data sub-bar loop, one in
         `mkTab`) now apply one pure builder returning just the two hint props; the
         `!== active` guard + mouseleave→`styleDSubs`/`styleTabs` restore stay in the
-        view. Behaviour-identical (one merged setCssStyles == two sequential ones).
+        view. Behaviour-identical (one merged setCssStyles == two sequential ones). — 2ccf3f8
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
