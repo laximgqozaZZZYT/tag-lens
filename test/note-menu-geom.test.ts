@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -252,4 +252,14 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(s.suggBox.position === "absolute" && s.suggBox.top === "100%" && s.suggBox.display === "none", "suggBox: pinned under input, hidden by default");
 	ok(s.suggBox.zIndex === "70" && s.suggBox.maxHeight === "240px" && s.suggBox.overflow === "auto", "suggBox: above body, capped scroll");
 	ok(s.body.overflow === "auto" && s.body.flex === "1 1 auto" && s.body.minHeight === "0", "body: grows/shrinks with panel");
+}
+
+// suggestionKindStyle: glyph + accent colour per suggestion kind (tag/field/note).
+{
+	const tag = suggestionKindStyle("tag");
+	ok(tag.glyph === "#" && tag.color === "var(--text-accent)", "tag: # / accent");
+	const field = suggestionKindStyle("field");
+	ok(field.glyph === "⊳" && field.color === "var(--color-purple)", "field: ⊳ / purple");
+	const note = suggestionKindStyle("note");
+	ok(note.glyph === "·" && note.color === "var(--text-muted)", "note: · / muted");
 }

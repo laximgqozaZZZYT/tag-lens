@@ -1,7 +1,7 @@
 // Pure geometry for the note-navigator panel (extracted from view.ts ensureNoteMenu).
 // These helpers decide WHERE and HOW BIG the panel is — no DOM, no `this`, fully
 // testable. The DOM application (setCssStyles) stays in view.ts as a thin wrapper.
-import { clampRect, type MenuRect } from "./note-menu";
+import { clampRect, type MenuRect, type Suggestion } from "./note-menu";
 
 // Minimum floating-panel size. Shared by the rect resolver, the drag/resize
 // handlers, and the pinned-width clamp so they can never disagree.
@@ -342,4 +342,20 @@ export function noteMenuSearchStyle(): {
 		},
 		body: { overflow: "auto", padding: "4px 6px 8px", flex: "1 1 auto", minHeight: "0" },
 	};
+}
+
+// Glyph + accent colour for an autocomplete suggestion row, keyed by its kind
+// (tag / field / note). Pure presentation map — the suggestion dropdown in
+// ensureNoteMenu reads this for the leading glyph span; centralises what used to
+// be two inline `Record<Suggestion["kind"], …>` literals so the glyph↔colour↔kind
+// mapping has a single source of truth.
+export function suggestionKindStyle(kind: Suggestion["kind"]): { glyph: string; color: string } {
+	switch (kind) {
+		case "tag":
+			return { glyph: "#", color: "var(--text-accent)" };
+		case "field":
+			return { glyph: "⊳", color: "var(--color-purple)" };
+		default:
+			return { glyph: "·", color: "var(--text-muted)" };
+	}
 }

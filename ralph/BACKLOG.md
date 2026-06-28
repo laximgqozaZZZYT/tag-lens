@@ -272,6 +272,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `setCssStyles` blocks for searchWrap/search/suggBox/body in `ensureNoteMenu`
         are now thin applications. No state branch; query restore + suggestion/event
         wiring stay in the view. — 79eec8e
+  - [x] suggestion-kind glyph/colour map → `suggestionKindStyle(kind)`
+        (`src/interaction/note-menu-geom.ts`) + cases in `test/note-menu-geom.test.ts`.
+        The two inline `Record<Suggestion["kind"], string>` literals (`kindGlyph` /
+        `kindColor`) in `ensureNoteMenu`'s suggestion-dropdown machinery are now a
+        single pure builder returning `{glyph, color}` per kind (tag #/accent,
+        field ⊳/purple, note ·/muted); the `openSuggest` glyph-span render reads it.
+        No state branch; suggestion query/event wiring stays in the view. — PENDING
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
