@@ -68,6 +68,7 @@ import "./lattice-draw-input.test";
 import "./droste-draw-input.test";
 import "./heatmap-draw-input.test";
 import "./upset-draw-input.test";
+import "./enclosure-draw-input.test";
 import "./view-line-ratchet.test";
 
 

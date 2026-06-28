@@ -71,6 +71,7 @@ import {
 } from "./draw/draw-lattice";
 import { computeLatticeDrawInput } from "./draw/lattice-draw-input";
 import { computeDrosteDrawInput } from "./draw/droste-draw-input";
+import { computeEnclosureDrawInput } from "./draw/enclosure-draw-input";
 import { computeHeatmapDrawInput } from "./draw/heatmap-draw-input";
 import { computeUpsetDrawInput } from "./draw/upset-draw-input";
 import { latticeNodeAt } from "./layout/lattice-layout";
@@ -2468,29 +2469,28 @@ export class MiniGraphView extends ItemView {
 		// (screen space), so the body-tile loop has nothing to do
 		// for it here. The footer itself is drawn after this loop at
 		// the end of draw().
-		if (this.settings.showEnclosures && !this.laid.upset) {
-			const hn = this.hoveredNodeId
-				? this.laid.nodes.find((n) => n.id === this.hoveredNodeId)
-				: null;
-			if (this.settings.viewMode === "bubblesets") {
-				drawBubbleSetsEnclosures(
-					ctx,
-					this.laid.clusters,
-					this.highlightedClusters,
-					undefined,
-					this.zoom,
-					hn ? { x: hn.x, y: hn.y } : null,
-				);
-			} else {
-				drawEulerEnclosures(
-					ctx,
-					this.laid.clusters,
-					this.highlightedClusters,
-					undefined,
-					this.zoom,
-					hn ? { x: hn.x, y: hn.y } : null,
-				);
-			}
+		const encl = computeEnclosureDrawInput({
+			settings: this.settings,
+			upset: !!this.laid.upset,
+			clusters: this.laid.clusters,
+			nodes: this.laid.nodes,
+			highlightedClusters: this.highlightedClusters,
+			zoom: this.zoom,
+			hoveredNodeId: this.hoveredNodeId,
+		});
+		if (encl) {
+			const paint =
+				encl.kind === "bubblesets"
+					? drawBubbleSetsEnclosures
+					: drawEulerEnclosures;
+			paint(
+				ctx,
+				encl.clusters,
+				encl.highlightedClusters,
+				encl.warningClusters,
+				encl.zoom,
+				encl.hoverPos,
+			);
 		}
 
 		if (this.settings.showEdges && !this.laid.upset) {

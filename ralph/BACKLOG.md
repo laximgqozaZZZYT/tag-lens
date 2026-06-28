@@ -35,6 +35,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         in the builder. Smoke-test call site updated. Remaining `draw()` modes
         (bubblesets, default node graph) inline their assembly inside the world-map
         tiling body loop (`drawBodyTile`), which is more entangled — decompose next. — ecad63b
+  - [x] cluster enclosures (bubblesets/euler) → `computeEnclosureDrawInput`
+        (`src/draw/enclosure-draw-input.ts`) + `test/enclosure-draw-input.test.ts`.
+        Returns null when suppressed (toggle off / UpSet); `kind` selects the
+        bubblesets-vs-euler painter (both share one arg shape) so `drawBodyTile`
+        is now a thin `paint = kind === … ? drawBubbleSets… : drawEuler…` dispatch.
+  - [ ] edges (ghost/base/accent) + node-card loops inside `drawBodyTile` are
+        the remaining inline assembly. They read live `this.*` state heavily
+        (`drawCard`, aggregation maps); next: peel off the edge-skip predicate
+        and/or a node-draw-list builder, one seam per iteration.
 
 - [ ] **BubbleSets visibility & density.** A written 3-task plan exists at
       `docs/superpowers/plans/2026-06-22-bubblesets-visibility-and-density.md`
