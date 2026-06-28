@@ -789,7 +789,7 @@ export class MiniGraphView extends ItemView {
 			const b = subBar.createEl("button", { text: label });
 			subBtns.set(key, b);
 			b.addEventListener("click", () => { this.settingsSubTab = key; styleSubs(); renderSub(); });
-			b.addEventListener("mouseenter", () => { if (this.settingsSubTab !== key) { b.setCssStyles({ color: "var(--text-muted)" }); b.setCssStyles({ borderBottomColor: "var(--background-modifier-border)" }); } });
+			b.addEventListener("mouseenter", () => { if (this.settingsSubTab !== key) b.setCssStyles(noteMenuTabHoverStyle()); });
 			b.addEventListener("mouseleave", () => styleSubs());
 		}
 		styleSubs();
