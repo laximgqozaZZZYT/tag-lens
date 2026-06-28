@@ -60,9 +60,20 @@ for ((i = 1; i <= MAX_ITERS; i++)); do
   fi
 
   after="$(git rev-parse HEAD)"
-  [[ "$before" == "$after" ]] \
-    && echo "ralph: iteration $i made no commit (blocked or idle)." | tee -a "$log" \
-    || echo "ralph: iteration $i committed $after." | tee -a "$log"
+  if [[ "$before" == "$after" ]]; then
+    echo "ralph: iteration $i made no commit (blocked or idle)." | tee -a "$log"
+  else
+    echo "ralph: iteration $i committed $after." | tee -a "$log"
+    # Every committed change is mirrored into the dev vault's same-named plugin.
+    # `npm run deploy` rebuilds from the committed source and copies main.js/
+    # manifest.json/styles.css into $TAG_LENS_VAULT (default the 開発 vault). A
+    # deploy failure is logged but never aborts the loop — the commit stands.
+    if npm run deploy >>"$log" 2>&1; then
+      echo "ralph: deployed $(git rev-parse --short HEAD) to the dev vault." | tee -a "$log"
+    else
+      echo "ralph: WARNING — deploy failed (commit stands); see $log." | tee -a "$log"
+    fi
+  fi
 
   # Usage/session limit: stop the batch immediately instead of burning the rest
   # of the cap on no-ops. The next scheduled run resumes from the clean tree.

@@ -69,6 +69,11 @@ crontab -l | grep -A2 TAG-LENS-RALPH   # inspect the entry; edit/remove with `cr
 3. Implement it (preferring pure-module-plus-test over editing giant `view.ts` methods).
 4. `npm run verify` — **commit only when green**; otherwise revert and log a `BLOCKER:`.
 5. Update `BACKLOG.md` (check off done, append follow-ups).
+6. **Deploy:** every iteration that produced a commit runs `npm run deploy`, mirroring
+   the freshly-built plugin (`main.js`/`manifest.json`/`styles.css`) into the dev
+   vault's same-named `tag-lens` plugin folder (`$TAG_LENS_VAULT`, default the 開発
+   vault). Reload Obsidian to see the change. A deploy failure is logged but never
+   aborts the loop — the commit always stands.
 
 ## Safety model
 
