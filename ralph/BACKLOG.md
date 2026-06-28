@@ -39,7 +39,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         (`src/draw/enclosure-draw-input.ts`) + `test/enclosure-draw-input.test.ts`.
         Returns null when suppressed (toggle off / UpSet); `kind` selects the
         bubblesets-vs-euler painter (both share one arg shape) so `drawBodyTile`
-        is now a thin `paint = kind === … ? drawBubbleSets… : drawEuler…` dispatch.
+        is now a thin `paint = kind === … ? drawBubbleSets… : drawEuler…` dispatch. — 64a13f2
   - [ ] edges (ghost/base/accent) + node-card loops inside `drawBodyTile` are
         the remaining inline assembly. They read live `this.*` state heavily
         (`drawCard`, aggregation maps); next: peel off the edge-skip predicate
