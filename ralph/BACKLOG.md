@@ -200,10 +200,18 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         bounds mirror `parseGhostJaccard`'s closed [0,1] range (test round-trips the
         min/max strings through the parser). The DOM + change-handler wiring stay in
         the view. — 5fc9be4
+  - [x] Min-font clamp/descriptor → `clampMinFont(raw)` / `minFontInput()`
+        (`src/panel/min-font-input.ts`) + `test/min-font-input.test.ts`. The inline
+        `Math.max(0, Math.min(48, Math.floor(Number(v)||0)))` floor-clamp + the
+        `{min:"0",max:"48",step:"1"}` number-input attrs in `renderMinFontSection`
+        (`settings-sections.ts`) now read from pure builders; bounds round-trip
+        through the clamp in the test. Mirrors the `jaccard-input` extraction
+        (clamp-not-reject: junk → 0, out-of-range snaps to nearest bound). — 8ce2ec9
   - [ ] next seams to peel (pure builders, one per iteration): the remaining Settings
-        form-row builders inside `renderSettingsDisplayTab`/`renderSettingsEncodeTab`
-        (`settings-tabs.ts`) — e.g. the `renderNodeDisplaySection`/`renderMinFontSection`
-        form rows. Keep handler side effects in the view; extract descriptors only.
+        form-row builders — e.g. `renderHeatmapMinTagControl`'s `Math.max(1, floor(...))`
+        clamp + `min:"1"` attr (`settings-sections.ts`), and the
+        `renderNodeDisplaySection` size-row parse/clamp. Keep handler side effects in
+        the view; extract descriptors/clamps only.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under

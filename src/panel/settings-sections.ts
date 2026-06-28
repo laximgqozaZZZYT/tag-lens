@@ -1,6 +1,7 @@
 import type { MiniSettings } from "../types";
 import { VIEW_MODES, isCloseup } from "../types";
 import type { NodeDisplay } from "../visual/node-display";
+import { clampMinFont, minFontInput } from "./min-font-input";
 import { partitionViewModePicker } from "./view-mode-picker";
 
 export interface MinFontSectionDeps {
@@ -15,7 +16,7 @@ export function renderMinFontSection(parent: HTMLElement, deps: MinFontSectionDe
 	const wrap = section.createDiv({ cls: "gim-min-font-row" });
 	const input = wrap.createEl("input", {
 		type: "number",
-		attr: { min: "0", max: "48", step: "1" },
+		attr: minFontInput().attr,
 	});
 	input.value = String(deps.settings.minFontPx);
 	input.setCssStyles({ width: "60px" });
@@ -27,7 +28,7 @@ export function renderMinFontSection(parent: HTMLElement, deps: MinFontSectionDe
 	hint.setCssStyles({ color: "var(--text-muted, #7a8aa0)" });
 	hint.setCssStyles({ fontSize: "11px" });
 	input.addEventListener("change", () => {
-		const v = Math.max(0, Math.min(48, Math.floor(Number(input.value) || 0)));
+		const v = clampMinFont(input.value);
 		input.value = String(v);
 		if (deps.settings.minFontPx === v) return;
 		deps.settings.minFontPx = v;
