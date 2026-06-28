@@ -258,6 +258,12 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         muted secondary-bg button pill); the inline `bulkBar`/`mkBulkBtn` `setCssStyles`
         blocks in `ensureNoteMenu` are now thin applications. No state branch; the
         bulk handlers (`bulkSetHidden` + save/draw) stay in the view. — 1100dba
+  - [x] Tree-pane group-by radio bar chrome → `noteMenuGroupBarStyle()`
+        (`src/interaction/note-menu-geom.ts`) + a case in `test/note-menu-geom.test.ts`.
+        Returns `{bar, label}` static layout records (the muted 10px-gap flex row + the
+        inline-flex radio label); the inline `groupBar`/`mkGroupRadio` `setCssStyles`
+        blocks in `ensureNoteMenu` are now thin applications. No state branch; the
+        Folder/Tag radio + change handlers stay in the view. — 66a1fd0
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
