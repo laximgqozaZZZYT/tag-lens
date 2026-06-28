@@ -313,6 +313,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         rows) are now thin applications of pure builders; only the label margin and
         textarea height differ between the two occurrences of each, so those are params.
         The DOM creation + click/mousedown wiring stays in the view. — 30422cd
+  - [x] Data ▸ JSON tab title + status chrome → `noteMenuJsonTitleStyle()` /
+        `noteMenuJsonStatusStyle(hasErrors)` (`src/interaction/note-menu-geom.ts`) +
+        cases in `test/note-menu-geom.test.ts`. The static section heading and the
+        last-import/bundled-load status block in `renderDataJsonBody` (summary line
+        flips warning↔muted on `errors.length`; per-error + "…and N more." lines
+        static) are now thin applications of pure builders; the slice/loop + DOM
+        creation stay in the view. The `hasErrors` branch is the only logic. — PENDING
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list

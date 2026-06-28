@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -328,4 +328,17 @@ import type { MenuRect } from "../src/interaction/note-menu";
 
 	const row = noteMenuJsonButtonRowStyle();
 	ok(row.display === "flex" && row.gap === "6px" && row.marginTop === "4px", "json button row: flex, 6px gap, 4px top");
+
+	const title = noteMenuJsonTitleStyle();
+	ok(title.fontWeight === "600" && title.fontSize === "12px" && title.marginBottom === "6px", "json title: 12px bold, 6px below");
+
+	// Status block: the summary line flips to a warning colour only when there
+	// are errors; the per-error/overflow lines are static.
+	const clean = noteMenuJsonStatusStyle(false);
+	const dirty = noteMenuJsonStatusStyle(true);
+	ok(clean.status.color === "var(--text-muted)", "json status: clean = muted");
+	ok(dirty.status.color === "var(--text-warning, var(--text-muted))", "json status: errors = warning");
+	ok(clean.status.fontSize === "10.5px" && clean.status.marginTop === "8px", "json status: 10.5px, 8px top");
+	ok(dirty.errorLine.color === "var(--text-error, var(--text-muted))" && dirty.errorLine.paddingLeft === "6px", "json status: error line = error colour, indented");
+	ok(dirty.more.color === "var(--text-muted)" && dirty.more.fontSize === "10px", "json status: more line = muted 10px");
 }

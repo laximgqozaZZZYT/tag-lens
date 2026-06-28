@@ -127,7 +127,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -839,7 +839,7 @@ export class MiniGraphView extends ItemView {
 		this.jsonHostEl = host;
 		host.empty();
 		const title = host.createDiv({ text: "Presets — JSON import / export" });
-		title.setCssStyles({ fontWeight: "600", fontSize: "12px", marginBottom: "6px" });
+		title.setCssStyles(noteMenuJsonTitleStyle());
 
 		// ── Export ──
 		const { lensPresets, ...settingsWithoutPresets } = this.settings;
@@ -920,15 +920,16 @@ export class MiniGraphView extends ItemView {
 
 		// ── Status (last import / bundled-load) ──
 		if (status) {
+			const statusStyle = noteMenuJsonStatusStyle(status.errors.length > 0);
 			const st = host.createDiv({ text: status.msg });
-			st.setCssStyles({ fontSize: "10.5px", marginTop: "8px", color: status.errors.length ? "var(--text-warning, var(--text-muted))" : "var(--text-muted)" });
+			st.setCssStyles(statusStyle.status);
 			for (const e of status.errors.slice(0, 20)) {
 				const line = host.createDiv({ text: `• ${e}` });
-				line.setCssStyles({ fontSize: "10px", color: "var(--text-error, var(--text-muted))", paddingLeft: "6px" });
+				line.setCssStyles(statusStyle.errorLine);
 			}
 			if (status.errors.length > 20) {
 				const more = host.createDiv({ text: `…and ${status.errors.length - 20} more.` });
-				more.setCssStyles({ fontSize: "10px", color: "var(--text-muted)", paddingLeft: "6px" });
+				more.setCssStyles(statusStyle.more);
 			}
 		}
 	}

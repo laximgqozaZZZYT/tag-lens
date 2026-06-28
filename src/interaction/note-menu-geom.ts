@@ -461,6 +461,31 @@ export function noteMenuJsonButtonRowStyle(): Partial<CSSStyleDeclaration> {
 	return { display: "flex", gap: "6px", marginTop: "4px" };
 }
 
+// JSON tab section heading ("Presets — JSON import / export"): a small bold
+// title with a bottom gap. Static; the DOM creation stays in the view.
+export function noteMenuJsonTitleStyle(): Partial<CSSStyleDeclaration> {
+	return { fontWeight: "600", fontSize: "12px", marginBottom: "6px" };
+}
+
+// JSON tab status block (last import / bundled-load outcome). The summary line
+// flips to a warning colour when the import produced errors; the per-error and
+// overflow ("…and N more.") lines are static. The hasErrors branch is the only
+// logic, so it lives here; the slice/loop + DOM creation stay in the view.
+export function noteMenuJsonStatusStyle(hasErrors: boolean): {
+	status: Partial<CSSStyleDeclaration>;
+	errorLine: Partial<CSSStyleDeclaration>;
+	more: Partial<CSSStyleDeclaration>;
+} {
+	return {
+		status: {
+			fontSize: "10.5px", marginTop: "8px",
+			color: hasErrors ? "var(--text-warning, var(--text-muted))" : "var(--text-muted)",
+		},
+		errorLine: { fontSize: "10px", color: "var(--text-error, var(--text-muted))", paddingLeft: "6px" },
+		more: { fontSize: "10px", color: "var(--text-muted)", paddingLeft: "6px" },
+	};
+}
+
 // Static chrome for the pinned panel's left-edge resize handle: a thin
 // transparent strip docked down the left border with an ew-resize cursor,
 // stacked above the body so the drag is always grabbable. No state branch; the
