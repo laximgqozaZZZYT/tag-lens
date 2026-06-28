@@ -278,7 +278,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `kindColor`) in `ensureNoteMenu`'s suggestion-dropdown machinery are now a
         single pure builder returning `{glyph, color}` per kind (tag #/accent,
         field ⊳/purple, note ·/muted); the `openSuggest` glyph-span render reads it.
-        No state branch; suggestion query/event wiring stays in the view. — PENDING
+        No state branch; suggestion query/event wiring stays in the view. — 0e19a40
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
