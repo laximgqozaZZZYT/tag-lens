@@ -332,6 +332,12 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         target in `ensureNoteMenu` is now a thin application of a pure builder returning
         the static style record (mirrors `noteMenuLeftGripStyle`); the resize-from-corner
         + rect-persist wiring stays in the view. No state branch. — 590fb21
+  - [x] Data ▸ JSON Export bundle → `buildViewStateBundle(nodes, settings)` /
+        `ViewStateBundle` (`src/interaction/preset-io.ts`, next to `serializePresets`)
+        + cases in `test/preset-io.test.ts`. The inline node-stripping (volatile
+        `ageDays`/`mtime`), schema/version wrapping, and `lensPresets`→`presets` split
+        in `renderDataJsonBody` are now a pure builder; the view just JSON-serializes
+        it. Behaviour-identical (same constants/fields, inputs untouched). — 5a8214a
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
