@@ -177,11 +177,19 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         a thin call to a pure builder; the toggle-row DOM + save/rebuild wiring stay in the
         view. Test locks key/label/order against `DEFAULT_SETTINGS` (each key is a real
         boolean field). Mirrors the `noteMenuTopTabs`/`settingsSubTabs` extractions. — 52d9a17
+  - [x] Bases cluster/prefix toggle rows → `basesToggleRows()` / `BasesToggleRow`
+        (`src/panel/bases-toggle-rows.ts`) + `test/bases-toggle-rows.test.ts`. The two
+        byte-identical inline clusterRow/prefixRow blocks in `renderBasesDisplaySection`
+        (differing only in settings key + label) are now a single thin render loop over a
+        pure descriptor list; test locks key/label/order against `DEFAULT_SETTINGS` (each
+        key a real boolean field). Mirrors the `basesEdgeKinds` extraction. — 186b1e7
   - [ ] next seams to peel (pure builders, one per iteration): the remaining Settings
         form-row builders inside `renderSettingsDisplayTab`/`renderSettingsEncodeTab`
-        (`settings-tabs.ts`) — the `renderBasesDisplaySection` cluster/prefix toggle rows
-        (could share one toggle-row descriptor builder), and the Bridge-finder "Show ghost
-        edges" toggle row.
+        (`settings-tabs.ts`) — the Bridge-finder "Show ghost edges" toggle row, and the
+        "Show legend on canvas" toggle row in `renderSettingsEncodeTab`. Both share the
+        same toggle-row DOM shape but carry handler-specific side effects
+        (`requestDraw`, legendHiddenModes reset), so extract a *descriptor* (key/label)
+        only and keep the change handler in the view.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under
