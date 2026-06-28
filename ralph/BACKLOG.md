@@ -214,9 +214,18 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         (`settings-sections.ts`) now read from pure builders; the min bound
         round-trips through the clamp in the test. Mirrors the `min-font-input`
         extraction (clamp-not-reject, no upper bound: junk / below-1 → 1). — 1c51fd7
-  - [ ] next seams to peel (pure builders, one per iteration): the remaining Settings
-        form-row builders — e.g. the `renderNodeDisplaySection` size-row parse/clamp.
-        Keep handler side effects in the view; extract descriptors/clamps only.
+  - [x] `renderNodeDisplaySection` size-row parse/descriptor → `parseNodeSize(raw, max)`
+        / `nodeSizeInput()` (`src/panel/node-size-input.ts`) + `test/node-size-input.test.ts`.
+        The inline `parseInt` + `Number.isFinite && 1..N` accept/reject rule for the
+        "Size (m × n)" inputs now reads from a pure parser (reject-not-snap; caller picks
+        max=8 layer / 12 global, preserving the original asymmetry) + a static min/max/step
+        descriptor. The override-delete (layer) / keep-current (global) side effects + DOM
+        wiring stay in the view. Mirrors the `min-font-input` / `heatmap-min-tag-input`
+        extractions. — 2db1b78
+  - [ ] next seams to peel (pure builders, one per iteration): scan the remaining
+        Settings form-row builders in `settings-sections.ts` / `settings-tabs.ts` for
+        inline parse/clamp/descriptor blocks not yet extracted. Keep handler side
+        effects in the view; extract descriptors/clamps only.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under
