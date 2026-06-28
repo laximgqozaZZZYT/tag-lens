@@ -1,6 +1,6 @@
 {
 	"name": "tag-lens",
-	"version": "0.3.30",
+	"version": "0.3.31",
 	"private": true,
 	"description": "Visualize tag–note relationships in your Bases vault. Co-occurrence heatmap, intersection lattice, BubbleSets, and Icon Gallery.",
 	"author": "laximgqozaZZZYT",
