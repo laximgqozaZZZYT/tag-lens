@@ -297,7 +297,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         The inline `setCssStyles` block for the pinned panel's `lgrip` (the thin
         transparent ew-resize strip down the left border) in `ensureNoteMenu` is now a
         thin application of a pure builder returning the static style record; the
-        widen-on-drag-left + canvas re-reserve wiring stays in the view. No state branch.
+        widen-on-drag-left + canvas re-reserve wiring stays in the view. No state branch. — 1b3207e
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
