@@ -72,6 +72,7 @@ import {
 import { computeLatticeDrawInput } from "./draw/lattice-draw-input";
 import { computeDrosteDrawInput } from "./draw/droste-draw-input";
 import { computeEnclosureDrawInput } from "./draw/enclosure-draw-input";
+import { computeEdgeDrawPlan } from "./draw/edge-draw-plan";
 import { computeHeatmapDrawInput } from "./draw/heatmap-draw-input";
 import { computeUpsetDrawInput } from "./draw/upset-draw-input";
 import { latticeNodeAt } from "./layout/lattice-layout";
@@ -2493,16 +2494,23 @@ export class MiniGraphView extends ItemView {
 			);
 		}
 
-		if (this.settings.showEdges && !this.laid.upset) {
-			if (this.settings.showGhostEdges) {
-				drawGhostEdges(
-					ctx,
-					this.laid,
-					this.zoom,
-					skipNode
-				);
-			}
+		const edgePlan = computeEdgeDrawPlan({
+			showEdges: this.settings.showEdges,
+			showGhostEdges: this.settings.showGhostEdges,
+			upset: !!this.laid.upset,
+			hasHighlight,
+		});
 
+		if (edgePlan.drawGhost) {
+			drawGhostEdges(
+				ctx,
+				this.laid,
+				this.zoom,
+				skipNode
+			);
+		}
+
+		if (edgePlan.drawBase) {
 			drawBaseEdges(
 				ctx,
 				this.laid,
@@ -2550,7 +2558,7 @@ export class MiniGraphView extends ItemView {
 			}
 		}
 
-		if (hasHighlight && this.settings.showEdges && !this.laid.upset) {
+		if (edgePlan.drawAccent) {
 			drawAccentEdges(
 				ctx,
 				this.laid,
