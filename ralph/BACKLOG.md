@@ -12,12 +12,6 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
 
 ### Small / additive (do these first to build momentum)
 
-- [ ] **P1 — cognitive-complexity baseline (measure, don't enforce yet).** Turn on
-      Biome `complexity/noExcessiveCognitiveComplexity` in **report/warn** mode (not
-      error) and capture the current offender count somewhere durable
-      (`docs/<latest>/complexity-baseline.md`). This only measures; the ratchet to
-      `error` is a later item once the big methods shrink.
-
 - [ ] **Categorical `scale.reverse` (latent bug).** The categorical colour scale
       ignores `scale.reverse` (only the quantitative path honours it — `src/visual/scales.ts`).
       Make categorical honour `reverse`, with a test in `encoding-scales.test.ts`.
@@ -61,6 +55,11 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
       inventory key-set lock on `DEFAULT_SETTINGS`). No new work needed.
 - [x] **P4 — `view.ts` line-count ratchet.** `test/view-line-ratchet.test.ts`
       fails if `src/view.ts` exceeds baseline 4478 (ratchet only goes down). — 4045e0e
+- [x] **P1 — cognitive-complexity baseline.** Enabled
+      `complexity/noExcessiveCognitiveComplexity` at `warn` in `biome.json` (warnings
+      don't fail `biome lint`, so verify stays green); baseline **111 offenders**
+      (max score 163, top file `view.ts` ×16) recorded in
+      `docs/0.3.21/complexity-baseline.md`. Ratchet-to-`error` deferred to a later item.
 
 ## Blockers
 

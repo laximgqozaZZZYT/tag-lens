@@ -23,7 +23,8 @@
 			},
 			"complexity": {
 				"noUselessLoneBlockStatements": "off",
-				"useLiteralKeys": "off"
+				"useLiteralKeys": "off",
+				"noExcessiveCognitiveComplexity": "warn"
 			}
 		}
 	},
