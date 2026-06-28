@@ -44,12 +44,18 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         (`src/draw/edge-draw-plan.ts`) + `test/edge-draw-plan.test.ts`. The three
         inline `if` conditions in `drawBodyTile` now read a `{drawGhost, drawBase,
         drawAccent}` plan; the view keeps the actual draw*Edges calls + live args. — 04e0e72
-  - [ ] node-card loops inside `drawBodyTile` are the remaining inline assembly:
-        two `for (n of laid.nodes)` passes (base, then highlighted) plus the
-        junihitoe/aggregate-stack loops. They read live `this.*` heavily
-        (`drawCard`, aggregation maps); next: peel off a node-draw-list builder
-        that partitions nodes into base/highlighted (skipping highlighted+skipNode+
-        aggregated), one seam per iteration.
+  - [x] node-card base/highlighted partitioning → `computeNodeDrawList`
+        (`src/draw/node-draw-list.ts`) + `test/node-draw-list.test.ts`. The two
+        `for (n of laid.nodes)` passes now loop over a pre-partitioned
+        `{base, highlighted}` list (skip/aggregated rules in the builder); the
+        `drawCard` calls + the junihitoe/aggregate-stack loops stay in the view. — 9fcaaf9
+  - [ ] junihitoe/aggregate-stack loops inside `drawBodyTile` are the remaining
+        inline assembly: both read `this.laid.nodes[0].{width,height}` for the card
+        size and iterate `aggregationState.groups` / `aggregateCount` + `laid.clusters`
+        to compute an `isHigh` flag per stack. Next: peel off a stack-draw-list
+        builder that emits `{group/cluster, cardW, cardH, count?, isHigh}` descriptors
+        (one of the two stack kinds per iteration), leaving the `drawJunihitoeStack`/
+        `drawAggregateStack` calls in the view.
 
 - [ ] **BubbleSets visibility & density.** A written 3-task plan exists at
       `docs/superpowers/plans/2026-06-22-bubblesets-visibility-and-density.md`
