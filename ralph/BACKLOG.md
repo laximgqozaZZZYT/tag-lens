@@ -338,6 +338,12 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `ageDays`/`mtime`), schema/version wrapping, and `lensPresets`→`presets` split
         in `renderDataJsonBody` are now a pure builder; the view just JSON-serializes
         it. Behaviour-identical (same constants/fields, inputs untouched). — 5a8214a
+  - [x] view-shell root/canvas chrome → `viewRootStyle()` / `viewCanvasStyle()`
+        (`src/view-shell-style.ts`) + `test/view-shell-style.test.ts`. The 7 inline
+        `setCssStyles` calls in `onOpen` (3 root: no-pad/clip/relative; 4 canvas:
+        100%×100%/block/grab) are now thin applications of pure static builders.
+        Not strictly `ensureNoteMenu`, but the same chrome-extraction pattern and a
+        clean self-contained seam. No state branch. — 0474c5b
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
