@@ -285,6 +285,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         + the faint 10px chrome; now a pure builder returning `{text, style}`, the view
         just creates the div and applies them. The now-single-use `verb` const + comment
         are gone. — 4c28f89
+  - [x] suggestion-row chrome → `noteMenuSuggestStyle()`
+        (`src/interaction/note-menu-geom.ts`) + a case in `test/note-menu-geom.test.ts`.
+        The two inline `setCssStyles` blocks for the autocomplete dropdown row + its
+        leading glyph span in `openSuggest` are now thin applications of a pure builder
+        returning `{row, glyph}` static layout records; the per-kind glyph colour (from
+        `suggestionKindStyle`) is applied on top by the view, and the hover/mousedown
+        wiring stays inline. No state branch. — 7a5f831
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
