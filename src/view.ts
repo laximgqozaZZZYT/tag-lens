@@ -3057,13 +3057,7 @@ export class MiniGraphView extends ItemView {
 				const b = tabBtns[key];
 				if (!b) continue;
 				const on = this.activeMenuTab === key;
-				b.setCssStyles({
-					background: "transparent", border: "none",
-					borderBottom: on ? "2px solid var(--interactive-accent)" : "2px solid transparent",
-					borderRadius: "0", padding: "6px 14px", marginBottom: "-1px",
-					color: on ? "var(--text-normal)" : "var(--text-muted)", fontWeight: on ? "600" : "400",
-					cursor: "pointer", fontSize: "11px", lineHeight: "1.3",
-				});
+				b.setCssStyles(noteMenuTabButtonStyle(on, { padding: "6px 14px", fontSize: "11px" }));
 			}
 		};
 		const showTab = (key: MenuTab): void => {

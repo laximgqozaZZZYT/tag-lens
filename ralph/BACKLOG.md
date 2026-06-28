@@ -109,10 +109,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         pure builder; `size` (padding/fontSize) is a param so the same builder
         serves both tab strips. The `D_SUBS` descriptor list + event wiring stay
         in the view. — 9d6041a
-  - [ ] next seams to peel (pure builders, one per iteration): the top-level tab
-        spec (`TABS` + `styleTabs` — reuse `noteMenuTabButtonStyle(on, {padding:
-        "6px 14px", fontSize: "11px"})`), and the title-row button descriptors
-        (pin/close icon + aria-label + style). Keep the event wiring in the view.
+  - [x] top-level tab strip → `styleTabs`'s inline `setCssStyles` block is now a thin
+        application of `noteMenuTabButtonStyle(on, {padding: "6px 14px", fontSize:
+        "11px"})` (already test-covered at `test/note-menu-geom.test.ts:109`). The
+        `TABS`/`tabBtns`/event wiring stay in the view. — 9d7faee
+  - [ ] next seams to peel (pure builders, one per iteration): the title-row button
+        descriptors (pin/close icon + aria-label + style). Keep the event wiring in
+        the view.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under
