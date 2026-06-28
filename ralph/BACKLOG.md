@@ -229,6 +229,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         share one pure builder returning `{value,text,selected}[]` including the leading
         `(none)` option; the `createEl("option")` + change-handler wiring stay in the
         view. Test locks the (none)-first order, single-selection rule, and self-exclusion. — cf690af
+  - [x] note-menu bulk Select/Deselect-all → `bulkSetHidden(current, keys, hide)`
+        (`src/interaction/note-menu.ts`, next to `hideKey`/`nodeIsHidden`) + cases in
+        `test/note-menu.test.ts`. The two inline `hiddenNodes` mutation loops in
+        `ensureNoteMenu` (per-node indexOf+splice for show / push-if-absent for hide)
+        are now a single pure array transform; hide appends de-duped in push order,
+        show removes the listed keys, input never mutated. Behaviour-identical
+        (dedup-on-add makes filter-all == legacy first-occurrence splice). — a974ba6
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
