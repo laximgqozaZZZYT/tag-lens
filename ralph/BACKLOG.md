@@ -151,11 +151,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         source of truth for both the `settingsSubTab` field type and the rendered
         button keys/labels (mirrors the note-menu `noteMenuTopTabs`/`noteMenuDataSubTabs`
         extraction). The `styleSubs`/button/event wiring stays in the view. — 47ae01f
-  - [ ] next seams to peel (pure builders, one per iteration): `renderSettingsBody`'s
-        `styleSubs` inline `setCssStyles` block is identical to `noteMenuTabButtonStyle`
-        except padding/fontSize (already params) — collapse it into a thin
-        `noteMenuTabButtonStyle(on, { padding: "4px 8px", fontSize: "10.5px" })` call to
-        kill the duplicated underline-tab style. After that, the Settings form-row
+  - [x] Settings sub-tab styling dedup → `renderSettingsBody`'s `styleSubs` inline
+        `setCssStyles` block was byte-identical to `noteMenuTabButtonStyle` except
+        padding/fontSize (already params); collapsed it into a thin
+        `noteMenuTabButtonStyle(on, { padding: "4px 8px", fontSize: "10.5px" })` call,
+        killing the last duplicated underline-tab style block. No behaviour change
+        (same fields/values); already test-covered at `test/note-menu-geom.test.ts`.
+  - [ ] next seams to peel (pure builders, one per iteration): the Settings form-row
         builders inside `renderSettingsViewTab`/`renderSettingsDisplayTab`/
         `renderSettingsEncodeTab` (`settings-tabs.ts`) remain — investigate seams there.
 
