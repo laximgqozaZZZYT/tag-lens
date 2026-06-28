@@ -34,6 +34,33 @@ git log --oneline main..ralph/auto
 git switch main && git merge --ff-only ralph/auto    # or open a PR
 ```
 
+## Scheduled (hourly) runs
+
+A cron entry resumes the loop **once an hour** — it picks up exactly where the last
+batch stopped, because the loop is resume-safe (progress persists only via green
+commits; an interrupted task stays open in `BACKLOG.md`). This is the answer to the
+usage limit: each hourly batch works until the limit, the loop **early-breaks** the
+moment a "session/usage limit" line appears, and the next hour resumes.
+
+```cron
+40 * * * * /home/ubuntu/obsidian-plugins/tag-lens/ralph/cron.sh >> /tmp/tag-lens-ralph.log 2>&1
+```
+
+`ralph/cron.sh` fixes the PATH for cron (nvm-node/claude/git), takes a `flock` so a
+slow batch never overlaps the next tick, and honours `ralph/STOP` as a pause switch.
+
+```bash
+tail -f /tmp/tag-lens-ralph.log     # watch the scheduled runs
+touch ralph/STOP                    # pause scheduled runs (no crontab edit needed)
+rm ralph/STOP                       # resume
+crontab -l | grep -A2 TAG-LENS-RALPH   # inspect the entry; edit/remove with `crontab -e`
+```
+
+> Caveat: the loop runs on branch `ralph/auto` in the main working tree. If you are
+> editing this repo on another branch when the hour fires, `git switch ralph/auto`
+> can clash — pause with `ralph/STOP` while you work, or move the loop to a dedicated
+> git worktree for full isolation.
+
 ## How each iteration works
 
 1. Read `AGENTS.md` → `docs/<latest>/AGENTS.md` for the rules.
