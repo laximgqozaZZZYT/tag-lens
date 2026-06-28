@@ -34,7 +34,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         object (was 10 positional args) — canvasW/H come from `canvas.clientWidth/Height`
         in the builder. Smoke-test call site updated. Remaining `draw()` modes
         (bubblesets, default node graph) inline their assembly inside the world-map
-        tiling body loop (`drawBodyTile`), which is more entangled — decompose next.
+        tiling body loop (`drawBodyTile`), which is more entangled — decompose next. — ecad63b
 
 - [ ] **BubbleSets visibility & density.** A written 3-task plan exists at
       `docs/superpowers/plans/2026-06-22-bubblesets-visibility-and-density.md`
