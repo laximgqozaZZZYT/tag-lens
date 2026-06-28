@@ -125,7 +125,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -3014,13 +3014,7 @@ export class MiniGraphView extends ItemView {
 				const b = dSubBtns.get(key);
 				if (!b) continue;
 				const on = this.dataSubTab === key;
-				b.setCssStyles({
-					background: "transparent", border: "none",
-					borderBottom: on ? "2px solid var(--interactive-accent)" : "2px solid transparent",
-					borderRadius: "0", padding: "4px 8px", marginBottom: "-1px",
-					color: on ? "var(--text-normal)" : "var(--text-muted)", fontWeight: on ? "600" : "400",
-					cursor: "pointer", fontSize: "10.5px", lineHeight: "1.3",
-				});
+				b.setCssStyles(noteMenuTabButtonStyle(on, { padding: "4px 8px", fontSize: "10.5px" }));
 			}
 		};
 		const showDSubTab = (key: DataSubTab): void => {

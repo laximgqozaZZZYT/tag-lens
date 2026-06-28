@@ -103,12 +103,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         (`src/interaction/note-menu-geom.ts`) + cases in `test/note-menu-geom.test.ts`.
         The two inline pinned-vs-floating `setCssStyles` blocks are now thin
         applications of pure style builders. — 6568a23
-  - [ ] next seams to peel (pure builders, one per iteration): the Data sub-tab
-        bar spec (`D_SUBS` + active/inactive button styling `styleDSubs`), the
-        top-level tab spec (`TABS` + `styleTabs`), and the title-row button
-        descriptors (pin/close icon + aria-label + style). Each is a static
-        descriptor list + a pure styler keyed on the active tab — extract the
-        data/style, keep the event wiring in the view.
+  - [x] Data sub-tab button styling → `noteMenuTabButtonStyle(on, size)`
+        (`src/interaction/note-menu-geom.ts`) + cases in `test/note-menu-geom.test.ts`.
+        `styleDSubs`'s inline `setCssStyles` block is now a thin application of the
+        pure builder; `size` (padding/fontSize) is a param so the same builder
+        serves both tab strips. The `D_SUBS` descriptor list + event wiring stay
+        in the view. — 9d6041a
+  - [ ] next seams to peel (pure builders, one per iteration): the top-level tab
+        spec (`TABS` + `styleTabs` — reuse `noteMenuTabButtonStyle(on, {padding:
+        "6px 14px", fontSize: "11px"})`), and the title-row button descriptors
+        (pin/close icon + aria-label + style). Keep the event wiring in the view.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under

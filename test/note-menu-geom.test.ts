@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -90,4 +90,22 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(noteMenuHeadStyle(false).cursor === "move", "floating header is a drag handle");
 	ok(noteMenuHeadStyle(true).cursor === "default", "pinned header is not draggable");
 	ok(noteMenuHeadStyle(true).flex === "0 0 auto", "header does not stretch");
+}
+
+// noteMenuTabButtonStyle: active gets the accent underline + emphasised text;
+// inactive is transparent + muted. Padding/fontSize come from the size param so
+// the same builder serves both the top-level bar and the Data sub-tab bar.
+{
+	const sz = { padding: "4px 8px", fontSize: "10.5px" };
+	const on = noteMenuTabButtonStyle(true, sz);
+	ok(on.borderBottom === "2px solid var(--interactive-accent)", "active: accent underline");
+	ok(on.color === "var(--text-normal)" && on.fontWeight === "600", "active: emphasised text");
+	const off = noteMenuTabButtonStyle(false, sz);
+	ok(off.borderBottom === "2px solid transparent", "inactive: transparent underline");
+	ok(off.color === "var(--text-muted)" && off.fontWeight === "400", "inactive: muted text");
+	ok(on.padding === "4px 8px" && on.fontSize === "10.5px", "size param flows through");
+	ok(on.background === "transparent" && on.border === "none" && on.borderRadius === "0", "shared chrome");
+	// A different size param (top-level bar) flows through unchanged.
+	const big = noteMenuTabButtonStyle(true, { padding: "6px 14px", fontSize: "11px" });
+	ok(big.padding === "6px 14px" && big.fontSize === "11px", "top-level size param flows through");
 }

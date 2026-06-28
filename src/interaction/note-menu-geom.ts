@@ -79,6 +79,30 @@ export function noteMenuPanelStyle(
 	};
 }
 
+// Tab-button CSS for the note-navigator's two tab strips (the top-level
+// Data/Settings/Insight bar and the Data sub-tab bar). Both share the same
+// underline-on-active look and differ only in padding/fontSize, so the size
+// comes in as a parameter. `on` toggles the accent underline + emphasised text.
+// Pure builder: returns the style record the view applies via setCssStyles().
+export function noteMenuTabButtonStyle(
+	on: boolean,
+	size: { padding: string; fontSize: string },
+): Partial<CSSStyleDeclaration> {
+	return {
+		background: "transparent",
+		border: "none",
+		borderBottom: on ? "2px solid var(--interactive-accent)" : "2px solid transparent",
+		borderRadius: "0",
+		padding: size.padding,
+		marginBottom: "-1px",
+		color: on ? "var(--text-normal)" : "var(--text-muted)",
+		fontWeight: on ? "600" : "400",
+		cursor: "pointer",
+		fontSize: size.fontSize,
+		lineHeight: "1.3",
+	};
+}
+
 // Header (title row + tab bar) CSS for the note-navigator. When floating the
 // header IS the drag handle (cursor:move); when pinned the panel is docked so it
 // can't be moved (cursor:default). Pure builder — applied via setCssStyles().
