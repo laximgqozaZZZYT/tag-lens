@@ -127,7 +127,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -3031,7 +3031,7 @@ export class MiniGraphView extends ItemView {
 			b.addEventListener("mousedown", (ev) => ev.stopPropagation());
 			b.addEventListener("click", (ev) => { ev.stopPropagation(); showDSubTab(key); });
 			b.addEventListener("mouseenter", () => {
-				if (this.dataSubTab !== key) { b.setCssStyles({ color: "var(--text-muted)" }); b.setCssStyles({ borderBottomColor: "var(--background-modifier-border)" }); }
+				if (this.dataSubTab !== key) b.setCssStyles(noteMenuTabHoverStyle());
 			});
 			b.addEventListener("mouseleave", () => styleDSubs());
 		}
@@ -3086,7 +3086,7 @@ export class MiniGraphView extends ItemView {
 			b.addEventListener("click", (ev) => { ev.stopPropagation(); showTab(key); });
 			// Hover affordance for the inactive tab (active styling wins via styleTabs).
 			b.addEventListener("mouseenter", () => {
-				if (this.activeMenuTab !== key) { b.setCssStyles({ color: "var(--text-muted)" }); b.setCssStyles({ borderBottomColor: "var(--background-modifier-border)" }); }
+				if (this.activeMenuTab !== key) b.setCssStyles(noteMenuTabHoverStyle());
 			});
 			b.addEventListener("mouseleave", () => styleTabs());
 		};

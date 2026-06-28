@@ -236,6 +236,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         are now a single pure array transform; hide appends de-duped in push order,
         show removes the listed keys, input never mutated. Behaviour-identical
         (dedup-on-add makes filter-all == legacy first-occurrence splice). — a974ba6
+  - [x] inactive-tab hover hint → `noteMenuTabHoverStyle()`
+        (`src/interaction/note-menu-geom.ts`) + a case in `test/note-menu-geom.test.ts`.
+        The two byte-identical inline mouseenter blocks (`b.setCssStyles({color})` +
+        `b.setCssStyles({borderBottomColor})`, one in the Data sub-bar loop, one in
+        `mkTab`) now apply one pure builder returning just the two hint props; the
+        `!== active` guard + mouseleave→`styleDSubs`/`styleTabs` restore stay in the
+        view. Behaviour-identical (one merged setCssStyles == two sequential ones).
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list

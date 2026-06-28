@@ -103,6 +103,17 @@ export function noteMenuTabButtonStyle(
 	};
 }
 
+// Hover affordance for an inactive note-navigator tab button (both the top-level
+// bar and the Data sub-bar): muted text + a faint underline hint. Applied on
+// mouseenter only when the tab is NOT the active one; mouseleave restores the
+// full `noteMenuTabButtonStyle`. Pure builder — applied via setCssStyles().
+export function noteMenuTabHoverStyle(): Partial<CSSStyleDeclaration> {
+	return {
+		color: "var(--text-muted)",
+		borderBottomColor: "var(--background-modifier-border)",
+	};
+}
+
 // Header (title row + tab bar) CSS for the note-navigator. When floating the
 // header IS the drag handle (cursor:move); when pinned the panel is docked so it
 // can't be moved (cursor:default). Pure builder — applied via setCssStyles().

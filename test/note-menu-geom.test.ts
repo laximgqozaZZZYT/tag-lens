@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -108,6 +108,17 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	// A different size param (top-level bar) flows through unchanged.
 	const big = noteMenuTabButtonStyle(true, { padding: "6px 14px", fontSize: "11px" });
 	ok(big.padding === "6px 14px" && big.fontSize === "11px", "top-level size param flows through");
+}
+
+// noteMenuTabHoverStyle: the inactive-tab hover hint — muted text + a faint
+// underline colour. Shared verbatim by both the top-level bar and the Data
+// sub-bar mouseenter handlers (it sets only the two props the active style
+// would otherwise own, leaving the rest of the button chrome untouched).
+{
+	const h = noteMenuTabHoverStyle();
+	ok(h.color === "var(--text-muted)", "hover: muted text");
+	ok(h.borderBottomColor === "var(--background-modifier-border)", "hover: faint underline");
+	ok(Object.keys(h).length === 2, "hover: only the two hint props (no full chrome)");
 }
 
 // noteMenuTitleButtons: the pin button flips icon/colour/label with `pinned`;
