@@ -127,7 +127,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -846,7 +846,7 @@ export class MiniGraphView extends ItemView {
 		const presetCount = lensPresets.length;
 		const nodeCount = this.laid?.nodes?.length || 0;
 		const expLabel = host.createDiv({ text: `Export View State (${nodeCount} node${nodeCount === 1 ? "" : "s"}, ${presetCount} preset${presetCount === 1 ? "" : "s"})` });
-		expLabel.setCssStyles({ fontSize: "11px", fontWeight: "600", margin: "4px 0 2px" });
+		expLabel.setCssStyles(noteMenuJsonLabelStyle("4px 0 2px"));
 
 		const exportNodes = (this.laid?.nodes || []).map((n) => {
 			// Strip derived/volatile fields (ageDays, mtime) from each node before
@@ -871,13 +871,10 @@ export class MiniGraphView extends ItemView {
 		const ta = host.createEl("textarea");
 		ta.value = json;
 		ta.readOnly = true;
-		ta.setCssStyles({
-			width: "100%", height: "110px", fontFamily: "var(--font-monospace, monospace)",
-			fontSize: "10px", resize: "vertical", boxSizing: "border-box",
-		});
+		ta.setCssStyles(noteMenuJsonTextareaStyle("110px"));
 		ta.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		const btnRow = host.createDiv();
-		btnRow.setCssStyles({ display: "flex", gap: "6px", marginTop: "4px" });
+		btnRow.setCssStyles(noteMenuJsonButtonRowStyle());
 		const copyBtn = btnRow.createEl("button", { text: "Copy to clipboard" });
 		copyBtn.addEventListener("click", (ev) => { ev.stopPropagation(); void this.copyTextToClipboard(json); });
 		const saveBtn = btnRow.createEl("button", { text: "Save .json to vault" });
@@ -885,16 +882,13 @@ export class MiniGraphView extends ItemView {
 
 		// ── Import ──
 		const impLabel = host.createDiv({ text: "Import" });
-		impLabel.setCssStyles({ fontSize: "11px", fontWeight: "600", margin: "12px 0 2px" });
+		impLabel.setCssStyles(noteMenuJsonLabelStyle("12px 0 2px"));
 		const impTa = host.createEl("textarea");
 		impTa.placeholder = "Paste preset JSON here (bundle or array)…";
-		impTa.setCssStyles({
-			width: "100%", height: "90px", fontFamily: "var(--font-monospace, monospace)",
-			fontSize: "10px", resize: "vertical", boxSizing: "border-box",
-		});
+		impTa.setCssStyles(noteMenuJsonTextareaStyle("90px"));
 		impTa.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		const impRow = host.createDiv();
-		impRow.setCssStyles({ display: "flex", gap: "6px", marginTop: "4px" });
+		impRow.setCssStyles(noteMenuJsonButtonRowStyle());
 		const importBtn = impRow.createEl("button", { text: "Import" });
 		importBtn.addEventListener("click", (ev) => {
 			ev.stopPropagation();

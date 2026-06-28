@@ -440,6 +440,27 @@ export function noteMenuTreeRowStyle(
 	};
 }
 
+// Data ▸ JSON tab chrome: the three repeated style blocks in renderDataJsonBody
+// (the export/import section labels, the read-only/paste textareas, and the
+// Copy/Save · Import/Bundled button rows) collapse onto these pure builders.
+// Only the label margin and textarea height differ between the two occurrences
+// of each, so those are params; everything else is shared. The DOM creation +
+// click/mousedown wiring stays in the view.
+export function noteMenuJsonLabelStyle(margin: string): Partial<CSSStyleDeclaration> {
+	return { fontSize: "11px", fontWeight: "600", margin };
+}
+
+export function noteMenuJsonTextareaStyle(height: string): Partial<CSSStyleDeclaration> {
+	return {
+		width: "100%", height, fontFamily: "var(--font-monospace, monospace)",
+		fontSize: "10px", resize: "vertical", boxSizing: "border-box",
+	};
+}
+
+export function noteMenuJsonButtonRowStyle(): Partial<CSSStyleDeclaration> {
+	return { display: "flex", gap: "6px", marginTop: "4px" };
+}
+
 // Static chrome for the pinned panel's left-edge resize handle: a thin
 // transparent strip docked down the left border with an ew-resize cursor,
 // stacked above the body so the drag is always grabbable. No state branch; the

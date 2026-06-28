@@ -305,6 +305,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         header) now read `{row, label}` from one pure builder; `padding` precedes
         `paddingLeft` so the depth indent survives. The leaf highlight colour, hover
         background swaps, and checkbox/expand wiring stay in the view. — 7a1747e
+  - [x] Data ▸ JSON tab chrome → `noteMenuJsonLabelStyle(margin)` /
+        `noteMenuJsonTextareaStyle(height)` / `noteMenuJsonButtonRowStyle()`
+        (`src/interaction/note-menu-geom.ts`) + cases in `test/note-menu-geom.test.ts`.
+        The three repeated style blocks in `renderDataJsonBody` (export/import section
+        labels, the read-only/paste textareas, the Copy/Save · Import/Bundled button
+        rows) are now thin applications of pure builders; only the label margin and
+        textarea height differ between the two occurrences of each, so those are params.
+        The DOM creation + click/mousedown wiring stays in the view. — PENDING
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list

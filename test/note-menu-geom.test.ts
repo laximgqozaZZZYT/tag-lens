@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -310,4 +310,22 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(all.row.color === "var(--text-faint)" && all.row.fontStyle === "italic", "all: faint, italic");
 	ok(all.row.paddingLeft === `${26 + 1 * 12}px`, "all: extra checkbox-width indent (26 + depth*12)");
 	ok(all.label.cursor === "pointer", "all label: collapse cursor");
+}
+
+// Data ▸ JSON tab chrome: label margin and textarea height are params; the rest
+// is shared between the export and import occurrences.
+{
+	const expL = noteMenuJsonLabelStyle("4px 0 2px");
+	const impL = noteMenuJsonLabelStyle("12px 0 2px");
+	ok(expL.fontSize === "11px" && expL.fontWeight === "600", "json label: 11px bold");
+	ok(expL.margin === "4px 0 2px" && impL.margin === "12px 0 2px", "json label: margin is the only difference");
+
+	const expTa = noteMenuJsonTextareaStyle("110px");
+	const impTa = noteMenuJsonTextareaStyle("90px");
+	ok(expTa.width === "100%" && expTa.fontFamily === "var(--font-monospace, monospace)", "json textarea: full-width mono");
+	ok(expTa.fontSize === "10px" && expTa.resize === "vertical" && expTa.boxSizing === "border-box", "json textarea: 10px vertical-resize border-box");
+	ok(expTa.height === "110px" && impTa.height === "90px", "json textarea: height is the only difference");
+
+	const row = noteMenuJsonButtonRowStyle();
+	ok(row.display === "flex" && row.gap === "6px" && row.marginTop === "4px", "json button row: flex, 6px gap, 4px top");
 }
