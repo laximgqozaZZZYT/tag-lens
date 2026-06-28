@@ -70,6 +70,7 @@ import "./heatmap-draw-input.test";
 import "./upset-draw-input.test";
 import "./enclosure-draw-input.test";
 import "./edge-draw-plan.test";
+import "./node-draw-list.test";
 import "./view-line-ratchet.test";
 
 

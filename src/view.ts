@@ -75,6 +75,7 @@ import { computeEnclosureDrawInput } from "./draw/enclosure-draw-input";
 import { computeEdgeDrawPlan } from "./draw/edge-draw-plan";
 import { computeHeatmapDrawInput } from "./draw/heatmap-draw-input";
 import { computeUpsetDrawInput } from "./draw/upset-draw-input";
+import { computeNodeDrawList } from "./draw/node-draw-list";
 import { latticeNodeAt } from "./layout/lattice-layout";
 import { drawCard as drawCardFn } from "./draw/draw-card";
 import { drawLegend } from "./draw/legend-layout";
@@ -2520,11 +2521,15 @@ export class MiniGraphView extends ItemView {
 			);
 		}
 
+		const nodeDrawList = computeNodeDrawList({
+			nodes: this.laid.nodes,
+			highlightedNodes: this.highlightedNodes,
+			aggregatedNodeIds: this.aggregationState.aggregatedNodeIds,
+			skipNode,
+		});
+
 		if (this.settings.showNodes) {
-			for (const n of this.laid.nodes) {
-				if (this.highlightedNodes.has(n.id)) continue;
-				if (skipNode(n.id)) continue;
-				if (this.aggregationState.aggregatedNodeIds.has(n.id)) continue;
+			for (const n of nodeDrawList.base) {
 				this.drawCard(ctx, n, false);
 			}
 		}
@@ -2570,10 +2575,7 @@ export class MiniGraphView extends ItemView {
 		}
 
 		if (this.settings.showNodes) {
-			for (const n of this.laid.nodes) {
-				if (!this.highlightedNodes.has(n.id)) continue;
-				if (skipNode(n.id)) continue;
-				if (this.aggregationState.aggregatedNodeIds.has(n.id)) continue;
+			for (const n of nodeDrawList.highlighted) {
 				this.drawCard(ctx, n, true);
 			}
 		}
