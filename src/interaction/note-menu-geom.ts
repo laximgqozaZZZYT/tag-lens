@@ -112,3 +112,38 @@ export function noteMenuHeadStyle(pinned: boolean): Partial<CSSStyleDeclaration>
 		cursor: pinned ? "default" : "move", userSelect: "none", flex: "0 0 auto",
 	};
 }
+
+// Descriptor for one title-row icon button: the style record the view applies
+// via setCssStyles(), the accessible label, and (pin only) the lucide icon name.
+export type NoteMenuTitleButton = {
+	style: Partial<CSSStyleDeclaration>;
+	ariaLabel: string;
+	icon?: string;
+};
+
+// Title-row button descriptors for the note-navigator header (pin/unpin + close).
+// The pin icon/colour/label flip with `pinned`; the close button is static. Pure
+// builder — the view applies the styles/attrs and wires the click handlers.
+export function noteMenuTitleButtons(pinned: boolean): {
+	pin: NoteMenuTitleButton;
+	close: NoteMenuTitleButton;
+} {
+	return {
+		pin: {
+			style: {
+				cursor: "pointer",
+				color: pinned ? "var(--interactive-accent)" : "var(--text-muted)",
+				display: "inline-flex", alignItems: "center", padding: "0 2px",
+			},
+			ariaLabel: pinned ? "Unpin (float)" : "Pin to right",
+			icon: pinned ? "pin-off" : "pin",
+		},
+		close: {
+			style: {
+				cursor: "pointer", fontWeight: "700", fontSize: "16px", lineHeight: "1",
+				padding: "0 4px", color: "var(--text-muted)", flex: "0 0 auto",
+			},
+			ariaLabel: "Close menu",
+		},
+	};
+}

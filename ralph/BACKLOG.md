@@ -113,9 +113,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         application of `noteMenuTabButtonStyle(on, {padding: "6px 14px", fontSize:
         "11px"})` (already test-covered at `test/note-menu-geom.test.ts:109`). The
         `TABS`/`tabBtns`/event wiring stay in the view. — 9d7faee
-  - [ ] next seams to peel (pure builders, one per iteration): the title-row button
-        descriptors (pin/close icon + aria-label + style). Keep the event wiring in
-        the view.
+  - [x] title-row button descriptors → `noteMenuTitleButtons(pinned)`
+        (`src/interaction/note-menu-geom.ts`) + cases in `test/note-menu-geom.test.ts`.
+        Returns `{pin, close}` descriptors (each `{style, ariaLabel, icon?}`); the pin
+        icon/colour/label flip with `pinned`, close is static. The view applies the
+        styles/attrs (`setCssStyles`/`setIcon`/`setAttr`) and keeps all event wiring.
+  - [ ] next seams to peel (pure builders, one per iteration): the title-row
+        container styles (titleRow flex layout + headBtns row) are still inline, but
+        they're static (no `pinned` branch) so lower-value. Better targets: the tab
+        strip descriptor list (TABS/D_SUBS arrays) or the Settings-panel form-row
+        builders. Investigate which has the cleanest pure seam.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under

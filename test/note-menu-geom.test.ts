@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -108,4 +108,21 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	// A different size param (top-level bar) flows through unchanged.
 	const big = noteMenuTabButtonStyle(true, { padding: "6px 14px", fontSize: "11px" });
 	ok(big.padding === "6px 14px" && big.fontSize === "11px", "top-level size param flows through");
+}
+
+// noteMenuTitleButtons: the pin button flips icon/colour/label with `pinned`;
+// the close button is static. Both carry an accessible label.
+{
+	const p = noteMenuTitleButtons(true);
+	ok(p.pin.icon === "pin-off", "pinned: pin-off icon");
+	ok(p.pin.ariaLabel === "Unpin (float)", "pinned: unpin label");
+	ok(p.pin.style.color === "var(--interactive-accent)", "pinned: accent colour");
+	const f = noteMenuTitleButtons(false);
+	ok(f.pin.icon === "pin", "floating: pin icon");
+	ok(f.pin.ariaLabel === "Pin to right", "floating: pin label");
+	ok(f.pin.style.color === "var(--text-muted)", "floating: muted colour");
+	// Close is identical regardless of pin state.
+	ok(p.close.ariaLabel === "Close menu" && f.close.ariaLabel === "Close menu", "close label static");
+	ok(p.close.icon === undefined, "close has no lucide icon (uses × glyph)");
+	ok(p.close.style.fontWeight === "700" && p.close.style.fontSize === "16px", "close glyph styling");
 }

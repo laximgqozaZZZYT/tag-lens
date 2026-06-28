@@ -125,7 +125,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -2949,18 +2949,19 @@ export class MiniGraphView extends ItemView {
 		titleRow.createSpan({ text: "Tag Lens" });
 		const headBtns = titleRow.createDiv();
 		headBtns.setCssStyles({ display: "flex", alignItems: "center", gap: "2px", flex: "0 0 auto" });
+		const titleBtns = noteMenuTitleButtons(pinned);
 
 		// Pin/unpin: dock the menu to the right edge (standard pin affordance).
 		const pinBtn = headBtns.createSpan();
-		pinBtn.setCssStyles({ cursor: "pointer", color: pinned ? "var(--interactive-accent)" : "var(--text-muted)", display: "inline-flex", alignItems: "center", padding: "0 2px" });
-		setIcon(pinBtn, pinned ? "pin-off" : "pin");
-		pinBtn.setAttr("aria-label", pinned ? "Unpin (float)" : "Pin to right");
+		pinBtn.setCssStyles(titleBtns.pin.style);
+		if (titleBtns.pin.icon) setIcon(pinBtn, titleBtns.pin.icon);
+		pinBtn.setAttr("aria-label", titleBtns.pin.ariaLabel);
 		pinBtn.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		pinBtn.addEventListener("dblclick", (ev) => ev.stopPropagation());
 		pinBtn.addEventListener("click", (ev) => { ev.stopPropagation(); this.togglePin(); });
 		const closeBtn = headBtns.createSpan({ text: "×" });
-		closeBtn.setCssStyles({ cursor: "pointer", fontWeight: "700", fontSize: "16px", lineHeight: "1", padding: "0 4px", color: "var(--text-muted)", flex: "0 0 auto" });
-		closeBtn.setAttr("aria-label", "Close menu");
+		closeBtn.setCssStyles(titleBtns.close.style);
+		closeBtn.setAttr("aria-label", titleBtns.close.ariaLabel);
 		closeBtn.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		closeBtn.addEventListener("dblclick", (ev) => ev.stopPropagation());
 		closeBtn.addEventListener("click", (ev) => { ev.stopPropagation(); this.toggleNoteMenu(); });
