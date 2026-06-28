@@ -75,6 +75,7 @@ import { computeEnclosureDrawInput } from "./draw/enclosure-draw-input";
 import { computeEdgeDrawPlan } from "./draw/edge-draw-plan";
 import { computeHeatmapDrawInput } from "./draw/heatmap-draw-input";
 import { computeUpsetDrawInput } from "./draw/upset-draw-input";
+import { computeJunihitoeStackList } from "./draw/junihitoe-stack-list";
 import { computeNodeDrawList } from "./draw/node-draw-list";
 import { latticeNodeAt } from "./layout/lattice-layout";
 import { drawCard as drawCardFn } from "./draw/draw-card";
@@ -2535,17 +2536,14 @@ export class MiniGraphView extends ItemView {
 		}
 
 		// Node Aggregation: Junihitoe Stacks
-		if (
-			this.settings.showNodes &&
-			this.aggregationState.groups.size > 0 &&
-			this.laid.nodes.length > 0
-		) {
-			const cardW = this.laid.nodes[0].width;
-			const cardH = this.laid.nodes[0].height;
-			for (const group of this.aggregationState.groups.values()) {
-				const isHigh = group.nodeIds.some(id => this.highlightedNodes.has(id));
-				this.drawJunihitoeStack(ctx, group, cardW, cardH, isHigh);
-			}
+		const junihitoeStacks = computeJunihitoeStackList({
+			showNodes: this.settings.showNodes,
+			nodes: this.laid.nodes,
+			groups: this.aggregationState.groups,
+			highlightedNodes: this.highlightedNodes,
+		});
+		for (const s of junihitoeStacks) {
+			this.drawJunihitoeStack(ctx, s.group, s.cardW, s.cardH, s.isHigh);
 		}
 
 		if (

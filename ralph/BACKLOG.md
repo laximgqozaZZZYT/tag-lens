@@ -49,13 +49,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `for (n of laid.nodes)` passes now loop over a pre-partitioned
         `{base, highlighted}` list (skip/aggregated rules in the builder); the
         `drawCard` calls + the junihitoe/aggregate-stack loops stay in the view. — 9fcaaf9
-  - [ ] junihitoe/aggregate-stack loops inside `drawBodyTile` are the remaining
-        inline assembly: both read `this.laid.nodes[0].{width,height}` for the card
-        size and iterate `aggregationState.groups` / `aggregateCount` + `laid.clusters`
-        to compute an `isHigh` flag per stack. Next: peel off a stack-draw-list
-        builder that emits `{group/cluster, cardW, cardH, count?, isHigh}` descriptors
-        (one of the two stack kinds per iteration), leaving the `drawJunihitoeStack`/
-        `drawAggregateStack` calls in the view.
+  - [x] junihitoe stacks → `computeJunihitoeStackList`
+        (`src/draw/junihitoe-stack-list.ts`) + `test/junihitoe-stack-list.test.ts`.
+        Gating (showNodes / non-empty groups / non-empty nodes), card size from
+        `nodes[0]`, and the per-group "high iff any member highlighted" rule now live
+        in the builder; the view keeps the `drawJunihitoeStack` calls. — PENDING
+  - [ ] aggregate stacks → `computeAggregateStackList`: the remaining inline loop
+        iterates `laid.clusters`, reads `aggregateCount.get(cluster.groupKey)`
+        (skips falsy counts) and `highlightedClusters.has(groupKey)` for `isHigh`,
+        with the same `nodes[0].{width,height}` card size + showNodes/non-empty
+        gating. Peel it off next (same pattern), leaving the `drawAggregateStack`
+        calls in the view.
 
 - [ ] **BubbleSets visibility & density.** A written 3-task plan exists at
       `docs/superpowers/plans/2026-06-22-bubblesets-visibility-and-density.md`
