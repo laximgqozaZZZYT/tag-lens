@@ -3,6 +3,7 @@ import { renderViewModeSection } from "./settings-sections";
 import { parseGhostJaccard } from "./jaccard-input";
 import { basesEdgeKinds } from "./bases-edge-kinds";
 import { basesToggleRows } from "./bases-toggle-rows";
+import { bridgeGhostEdgeToggle, legendToggle } from "./settings-toggle-rows";
 import { setIcon, AbstractInputSuggest, type App, type TFile } from "obsidian";
 import { scanBaseFiles } from "../bases/parser";
 import { addBaseFileToSelected, removeBaseFileFromSelected } from "../bases/selection";
@@ -272,15 +273,16 @@ export function renderSettingsDisplayTab(el: HTMLElement, deps: DisplayTabDeps):
 		const bridgeSection = el.createDiv({ cls: "gim-panel-section" });
 		bridgeSection.createEl("h4", { text: "Bridge finder" });
 		
+		const ghost = bridgeGhostEdgeToggle();
 		const ghostRow = bridgeSection.createEl("label", { cls: "gim-toggle-row" });
 		const ghostCb = ghostRow.createEl("input", { type: "checkbox" });
-		ghostCb.checked = deps.settings.showGhostEdges;
+		ghostCb.checked = deps.settings[ghost.key];
 		ghostCb.addEventListener("change", () => {
-			deps.settings.showGhostEdges = ghostCb.checked;
+			deps.settings[ghost.key] = ghostCb.checked;
 			deps.save();
 			deps.rebuild();
 		});
-		ghostRow.createSpan({ text: "Show ghost edges" });
+		ghostRow.createSpan({ text: ghost.label });
 		
 		const jaccardRow = bridgeSection.createDiv({ cls: "gim-setting-row" });
 		jaccardRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", paddingLeft: "24px" });
@@ -363,19 +365,20 @@ export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): v
 	section.createEl("h4", { text: "Visual Encoding" });
 
 	// On-canvas legend toggle (paints the colour/shape/size key on the canvas).
+	const legend = legendToggle();
 	const legendRow = section.createEl("label", { cls: "gim-toggle-row" });
 	legendRow.setCssStyles({ marginTop: "8px" });
 	const legendCb = legendRow.createEl("input", { type: "checkbox" });
-	legendCb.checked = deps.settings.showLegend;
+	legendCb.checked = deps.settings[legend.key];
 	legendCb.addEventListener("change", () => {
-		deps.settings.showLegend = legendCb.checked;
+		deps.settings[legend.key] = legendCb.checked;
 		if (legendCb.checked) {
 			deps.settings.legendHiddenModes = {};
 		}
 		deps.save();
 		deps.requestDraw();
 	});
-	legendRow.createSpan({ text: "Show legend on canvas" });
+	legendRow.createSpan({ text: legend.label });
 
 	renderLayersSubSection(el, deps);
 }

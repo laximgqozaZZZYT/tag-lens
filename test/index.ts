@@ -45,6 +45,7 @@ import "./view-mode-picker.test";
 import "./jaccard-input.test";
 import "./bases-edge-kinds.test";
 import "./bases-toggle-rows.test";
+import "./settings-toggle-rows.test";
 import "./zoom-math.test";
 import "./hit-modes.test";
 import "./settings-parity.test";

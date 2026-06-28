@@ -183,13 +183,20 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         (differing only in settings key + label) are now a single thin render loop over a
         pure descriptor list; test locks key/label/order against `DEFAULT_SETTINGS` (each
         key a real boolean field). Mirrors the `basesEdgeKinds` extraction. — 186b1e7
+  - [x] standalone Settings toggle-row descriptors → `bridgeGhostEdgeToggle()` /
+        `legendToggle()` / `SettingsToggleRow` (`src/panel/settings-toggle-rows.ts`) +
+        `test/settings-toggle-rows.test.ts`. The Bridge-finder "Show ghost edges" row
+        (`renderSettingsDisplayTab`) and the "Show legend on canvas" row
+        (`renderSettingsEncodeTab`) now read their key↔label from pure descriptors;
+        the handler-specific side effects (save+rebuild for ghost; legendHiddenModes
+        reset + requestDraw for legend) stay inline in the view. Test locks each
+        key/label against `DEFAULT_SETTINGS` (both real boolean fields). Mirrors the
+        `basesToggleRows`/`basesEdgeKinds` extractions. — 765a147
   - [ ] next seams to peel (pure builders, one per iteration): the remaining Settings
         form-row builders inside `renderSettingsDisplayTab`/`renderSettingsEncodeTab`
-        (`settings-tabs.ts`) — the Bridge-finder "Show ghost edges" toggle row, and the
-        "Show legend on canvas" toggle row in `renderSettingsEncodeTab`. Both share the
-        same toggle-row DOM shape but carry handler-specific side effects
-        (`requestDraw`, legendHiddenModes reset), so extract a *descriptor* (key/label)
-        only and keep the change handler in the view.
+        (`settings-tabs.ts`) — e.g. the Min-Jaccard number row (label/step/min/max
+        descriptor) and the `renderNodeDisplaySection`/`renderMinFontSection` form
+        rows. Keep handler side effects in the view; extract descriptors only.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under
