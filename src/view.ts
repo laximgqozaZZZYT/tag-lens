@@ -127,7 +127,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuNotesHint, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuNotesHint, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -3536,12 +3536,13 @@ export class MiniGraphView extends ItemView {
 			suggBox.empty();
 			selIdx = -1;
 			if (suggestions.length === 0) { suggBox.setCssStyles({ display: "none" }); return; }
+			const suggStyle = noteMenuSuggestStyle();
 			suggestions.forEach((s, i) => {
 				const row = suggBox.createDiv();
-				row.setCssStyles({ padding: "3px 8px", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", gap: "6px", alignItems: "center" });
+				row.setCssStyles(suggStyle.row);
 				const ks = suggestionKindStyle(s.kind);
 				const glyph = row.createSpan({ text: ks.glyph });
-				glyph.setCssStyles({ color: ks.color, width: "10px", flex: "0 0 auto", textAlign: "center" });
+				glyph.setCssStyles({ ...suggStyle.glyph, color: ks.color });
 				row.createSpan({ text: s.text });
 				row.addEventListener("mouseenter", () => { selIdx = i; renderSelection(); });
 				// mousedown (not click) so it fires before the input's blur closes the box.

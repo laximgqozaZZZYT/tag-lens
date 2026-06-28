@@ -374,3 +374,21 @@ export function suggestionKindStyle(kind: Suggestion["kind"]): { glyph: string; 
 			return { glyph: "·", color: "var(--text-muted)" };
 	}
 }
+
+// Static chrome for one autocomplete suggestion row in the search dropdown:
+//   row   — the padded, single-line flex row (glyph + label) with ellipsis overflow.
+//   glyph — the fixed-width, centred leading glyph span (its `color` is supplied
+//           per-kind by suggestionKindStyle and applied on top by the view).
+// No state branch; the per-row hover highlight + mousedown wiring stay in the view.
+export function noteMenuSuggestStyle(): {
+	row: Partial<CSSStyleDeclaration>;
+	glyph: Partial<CSSStyleDeclaration>;
+} {
+	return {
+		row: {
+			padding: "3px 8px", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden",
+			textOverflow: "ellipsis", display: "flex", gap: "6px", alignItems: "center",
+		},
+		glyph: { width: "10px", flex: "0 0 auto", textAlign: "center" },
+	};
+}

@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuNotesHint, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuNotesHint, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -271,4 +271,13 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(field.glyph === "⊳" && field.color === "var(--color-purple)", "field: ⊳ / purple");
 	const note = suggestionKindStyle("note");
 	ok(note.glyph === "·" && note.color === "var(--text-muted)", "note: · / muted");
+}
+
+// noteMenuSuggestStyle: static chrome for a suggestion dropdown row + its glyph span.
+{
+	const s = noteMenuSuggestStyle();
+	ok(s.row.display === "flex" && s.row.gap === "6px" && s.row.alignItems === "center", "row: flex, 6px gap, centred");
+	ok(s.row.padding === "3px 8px" && s.row.cursor === "pointer", "row: padded, pointer");
+	ok(s.row.whiteSpace === "nowrap" && s.row.overflow === "hidden" && s.row.textOverflow === "ellipsis", "row: single-line ellipsis");
+	ok(s.glyph.width === "10px" && s.glyph.flex === "0 0 auto" && s.glyph.textAlign === "center", "glyph: fixed-width centred (colour applied per-kind)");
 }
