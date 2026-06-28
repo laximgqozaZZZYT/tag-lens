@@ -183,6 +183,14 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(sub.gap === "1px" && sub.padding === "4px 6px 0", "sub: 1px gap, padded edge");
 	ok(sub.borderBottom === "1px solid var(--background-modifier-border)", "sub: bottom divider");
 	ok(sub.marginTop === undefined && sub.fontSize === undefined, "sub: no top gap / inherits font");
+
+	// settings: like the Data sub bar (wrapping flex + 1px gap + divider) but spaced
+	// below via marginBottom instead of the padded-in edge.
+	const settings = noteMenuTabBarStyle("settings");
+	ok(settings.display === "flex" && settings.flexWrap === "wrap", "settings: wrapping flex row");
+	ok(settings.gap === "1px" && settings.marginBottom === "6px", "settings: 1px gap, 6px bottom gap");
+	ok(settings.borderBottom === "1px solid var(--background-modifier-border)", "settings: bottom divider");
+	ok(settings.padding === undefined && settings.marginTop === undefined, "settings: no edge padding / no top gap");
 }
 
 // noteMenuTopTabs / noteMenuDataSubTabs: descriptor lists drive both the button

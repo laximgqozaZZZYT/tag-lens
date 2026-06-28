@@ -721,7 +721,7 @@ export class MiniGraphView extends ItemView {
 		// Sub-tab bar: View / Filter / Sort / Display / Layers. Underline style,
 		// matching the top-level Notes/Settings tabs but more compact.
 		const subBar = host.createDiv();
-		subBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", marginBottom: "6px", borderBottom: "1px solid var(--background-modifier-border)" });
+		subBar.setCssStyles(noteMenuTabBarStyle("settings"));
 		const content = host.createDiv({ cls: "gim-panel-content" });
 		const SUBS = settingsSubTabs();
 		const subBtns = new Map<string, HTMLElement>();

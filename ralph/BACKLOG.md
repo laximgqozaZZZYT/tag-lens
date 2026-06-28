@@ -344,6 +344,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         100%×100%/block/grab) are now thin applications of pure static builders.
         Not strictly `ensureNoteMenu`, but the same chrome-extraction pattern and a
         clean self-contained seam. No state branch. — 0474c5b
+  - [x] Settings sub-tab bar chrome → `noteMenuTabBarStyle("settings")`
+        (`src/interaction/note-menu-geom.ts`) + a case in `test/note-menu-geom.test.ts`.
+        The inline `setCssStyles` block for `renderSettingsBody`'s `subBar` (wrapping
+        flex + 1px gap + divider, spaced below via `marginBottom:6px` instead of the
+        Data sub bar's padded-in edge) is now a thin application of a new `"settings"`
+        kind on the existing tab-bar builder; the sub-button/event wiring stays in the
+        view. No state branch. — 8f0c4b3
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list

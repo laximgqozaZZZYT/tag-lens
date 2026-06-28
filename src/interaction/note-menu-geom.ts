@@ -243,7 +243,7 @@ export function noteMenuDataSubTabDisplay(active: NoteMenuDataSubTab): {
 //   sub — the Data sub-tab bar: wraps onto multiple rows (flexWrap) and is padded
 //         in from the pane edge; same bottom divider.
 // Neither branches on state. Pure builder — applied via setCssStyles().
-export type NoteMenuTabBarKind = "top" | "sub";
+export type NoteMenuTabBarKind = "top" | "sub" | "settings";
 
 export function noteMenuTabBarStyle(kind: NoteMenuTabBarKind): Partial<CSSStyleDeclaration> {
 	const divider = "1px solid var(--background-modifier-border)";
@@ -251,6 +251,14 @@ export function noteMenuTabBarStyle(kind: NoteMenuTabBarKind): Partial<CSSStyleD
 		return {
 			display: "flex", gap: "2px", marginTop: "8px",
 			fontWeight: "400", fontSize: "11px", borderBottom: divider,
+		};
+	}
+	if (kind === "settings") {
+		// Settings sub-tab bar (View/Filter/Sort/Display/Layers): like the Data
+		// sub bar (wrapping flex + divider) but spaced below instead of padded in.
+		return {
+			display: "flex", flexWrap: "wrap", gap: "1px",
+			borderBottom: divider, marginBottom: "6px",
 		};
 	}
 	return {
