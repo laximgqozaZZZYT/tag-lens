@@ -228,7 +228,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         in `renderSetLayerTab` (no exclusion) and `renderLayerTab` (excludes self) now
         share one pure builder returning `{value,text,selected}[]` including the leading
         `(none)` option; the `createEl("option")` + change-handler wiring stay in the
-        view. Test locks the (none)-first order, single-selection rule, and self-exclusion.
+        view. Test locks the (none)-first order, single-selection rule, and self-exclusion. — cf690af
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
