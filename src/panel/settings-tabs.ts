@@ -2,6 +2,7 @@ import type { MiniSettings } from "../types";
 import { renderViewModeSection } from "./settings-sections";
 import { parseGhostJaccard } from "./jaccard-input";
 import { basesEdgeKinds } from "./bases-edge-kinds";
+import { basesToggleRows } from "./bases-toggle-rows";
 import { setIcon, AbstractInputSuggest, type App, type TFile } from "obsidian";
 import { scanBaseFiles } from "../bases/parser";
 import { addBaseFileToSelected, removeBaseFileFromSelected } from "../bases/selection";
@@ -324,27 +325,18 @@ function renderBasesDisplaySection(el: HTMLElement, deps: DisplayTabDeps): void 
 		row.createSpan({ text: label });
 	}
 
-	const clusterRow = section.createEl("label", { cls: "gim-toggle-row" });
-	clusterRow.setCssStyles({ marginTop: "6px" });
-	const clusterCb = clusterRow.createEl("input", { type: "checkbox" });
-	clusterCb.checked = !!deps.settings.basesClusterByView;
-	clusterCb.addEventListener("change", () => {
-		deps.settings.basesClusterByView = clusterCb.checked;
-		deps.save();
-		deps.rebuild();
-	});
-	clusterRow.createSpan({ text: "Always cluster by view (even single-view bases)" });
-
-	const prefixRow = section.createEl("label", { cls: "gim-toggle-row" });
-	prefixRow.setCssStyles({ marginTop: "6px" });
-	const prefixCb = prefixRow.createEl("input", { type: "checkbox" });
-	prefixCb.checked = !!deps.settings.basesShowPrefix;
-	prefixCb.addEventListener("change", () => {
-		deps.settings.basesShowPrefix = prefixCb.checked;
-		deps.save();
-		deps.rebuild();
-	});
-	prefixRow.createSpan({ text: "Show base file name prefix in labels" });
+	for (const { key, label } of basesToggleRows()) {
+		const row = section.createEl("label", { cls: "gim-toggle-row" });
+		row.setCssStyles({ marginTop: "6px" });
+		const cb = row.createEl("input", { type: "checkbox" });
+		cb.checked = !!deps.settings[key];
+		cb.addEventListener("change", () => {
+			deps.settings[key] = cb.checked;
+			deps.save();
+			deps.rebuild();
+		});
+		row.createSpan({ text: label });
+	}
 }
 
 export interface EncodeTabDeps {
