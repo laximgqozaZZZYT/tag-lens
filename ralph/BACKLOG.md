@@ -12,10 +12,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
 
 ### Small / additive (do these first to build momentum)
 
-- [ ] **Categorical `scale.reverse` (latent bug).** The categorical colour scale
-      ignores `scale.reverse` (only the quantitative path honours it — `src/visual/scales.ts`).
-      Make categorical honour `reverse`, with a test in `encoding-scales.test.ts`.
-      Keep the colorByKey legend↔node invariant intact.
+(none open)
 
 ### Medium
 
@@ -60,6 +57,10 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
       don't fail `biome lint`, so verify stays green); baseline **111 offenders**
       (max score 163, top file `view.ts` ×16) recorded in
       `docs/0.3.21/complexity-baseline.md`. Ratchet-to-`error` deferred to a later item.
+- [x] **Categorical `scale.reverse` (latent bug).** Categorical colour path now
+      honours `config.reverse` (flips the auto-colour INDEX; keyed palette overrides
+      and legend key-order unchanged; legend↔node invariant preserved). Tests added
+      in `test/encoding-scales.test.ts`. — b5458e4
 
 ## Blockers
 
