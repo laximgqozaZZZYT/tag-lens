@@ -486,7 +486,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
           `test/display-applicability.test.ts`. The six existing modes stay all-true.
           The Display panel's "Graph display" filter + the Bridge-finder section
           gate (both call `displayToggleApplies`) now drop the inert toggles in
-          scatter automatically.
+          scatter automatically. — b45df2b
     - [ ] **F2.7b draw() guard table** — scatter currently relies on empty
           clusters/edges to make the card-path enclosure/edge draws no-ops
           (`computeEnclosureDrawInput`/`computeEdgeDrawPlan` already short-circuit on
