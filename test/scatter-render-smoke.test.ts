@@ -9,15 +9,20 @@
 // the axes are actually populated (the F2.5 reflection point — scatter axes are
 // always on), and that grid + cards emit their expected draw ops.
 import { ok } from "./assert";
-import { layout, type SizedNode, type LayoutOptions } from "../src/layout/layout";
-import type { GraphData, GraphNode } from "../src/types";
+import { layout, type SizedNode, type LayoutOptions, type LaidOut } from "../src/layout/layout";
+import { type GraphData, type GraphNode, type MiniSettings, DEFAULT_SETTINGS } from "../src/types";
 import { axisLayout, type AxisSpec, type AxisBand, type AxisTick } from "../src/layout/axis-layout";
 import { scatterAxisDefaults } from "../src/encoding/scatter-axis-defaults";
 import type { EncContext } from "../src/encoding/types";
 import { drawCardGrid } from "../src/draw/draw-helpers";
 import { drawCard } from "../src/draw/draw-card";
+import { computeEnclosureDrawInput } from "../src/draw/enclosure-draw-input";
+import { computeEdgeDrawPlan } from "../src/draw/edge-draw-plan";
+import { drawEulerEnclosures } from "../src/draw/draw-enclosures";
+import { drawBubbleSetsEnclosures } from "../src/draw/draw-bubblesets";
+import { drawGhostEdges, drawBaseEdges, drawAccentEdges } from "../src/draw/draw-edges";
 import { setTheme, defaultTheme } from "../src/draw/theme";
-import { recordingCtx, mockCanvas } from "./recording-ctx";
+import { recordingCtx, mockCanvas, drewSomething } from "./recording-ctx";
 
 setTheme(defaultTheme()); // headless: theme() must not need getComputedStyle
 
@@ -107,6 +112,52 @@ function renderSmoke(label: string, nodes: GraphNode[]): void {
 	ok(rec.stroke > 0, `[${label}] axis grid + card outlines drew no stroked paths (stroke=0)`);
 	ok(rec.fill > 0, `[${label}] no card fills drawn (fill=0) for ${out.nodes.length} cards`);
 	ok(rec.fillText > 0, `[${label}] no card text drawn (fillText=0) for ${out.nodes.length} cards`);
+
+	assertNoEnclosureOrEdgeOps(label, out);
+}
+
+// F2.7b: scatter suppresses enclosures/edges DATA-DRIVEN, not gate-driven.
+// layoutScatter emits zero clusters/edges, so the card-path enclosure/edge
+// painters no-op even when the showEnclosures/showEdges/showGhostEdges toggles
+// are ON — no explicit `mode === "scatter"` guard is needed in the gating
+// builders. This locks that contract: drive the REAL gating builders
+// (computeEnclosureDrawInput / computeEdgeDrawPlan) + the actual painters with
+// every toggle on over a fresh recorder, and assert nothing was painted. The
+// gate itself is asserted NON-null (the toggle really is on) so the zero-ops
+// proof can only come from the empty cluster/edge data, not a suppressed gate.
+function assertNoEnclosureOrEdgeOps(label: string, out: LaidOut): void {
+	const settings: MiniSettings = {
+		...DEFAULT_SETTINGS,
+		viewMode: "scatter",
+		showEnclosures: true,
+		showEdges: true,
+		showGhostEdges: true,
+	};
+	const { ctx, rec } = recordingCtx();
+	const skipNode = () => false;
+
+	const encl = computeEnclosureDrawInput({
+		settings,
+		upset: false,
+		clusters: out.clusters,
+		nodes: out.nodes,
+		highlightedClusters: new Set<string>(),
+		zoom: 1,
+		hoveredNodeId: null,
+	});
+	ok(encl !== null, `[${label}] enclosure gate unexpectedly suppressed (showEnclosures is ON)`);
+	if (encl) {
+		const paint = encl.kind === "bubblesets" ? drawBubbleSetsEnclosures : drawEulerEnclosures;
+		paint(ctx, encl.clusters, encl.highlightedClusters, encl.warningClusters, encl.zoom, encl.hoverPos);
+	}
+
+	const plan = computeEdgeDrawPlan({ showEdges: true, showGhostEdges: true, upset: false, hasHighlight: true });
+	ok(plan.drawBase && plan.drawGhost && plan.drawAccent, `[${label}] edge gate unexpectedly suppressed a layer (toggles ON)`);
+	if (plan.drawGhost) drawGhostEdges(ctx, out, 1, skipNode);
+	if (plan.drawBase) drawBaseEdges(ctx, out, 1, new Set<number>(), skipNode);
+	if (plan.drawAccent) drawAccentEdges(ctx, out, 1, new Set<number>(), null, skipNode);
+
+	ok(!drewSomething(rec), `[${label}] scatter painted enclosure/edge ops with toggles ON — must be a data-driven no-op (${JSON.stringify(rec)})`);
 }
 
 // Dataset A: notes spread over a few tags with varying recency (ageDays drives Y).

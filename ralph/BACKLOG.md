@@ -487,13 +487,19 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
           The Display panel's "Graph display" filter + the Bridge-finder section
           gate (both call `displayToggleApplies`) now drop the inert toggles in
           scatter automatically. — b45df2b
-    - [ ] **F2.7b draw() guard table** — scatter currently relies on empty
-          clusters/edges to make the card-path enclosure/edge draws no-ops
-          (`computeEnclosureDrawInput`/`computeEdgeDrawPlan` already short-circuit on
-          empty/false). Decide whether to add an explicit `mode === "scatter"`
-          suppression in those builders for clarity, or leave the data-driven no-op
-          as-is + add a render-smoke assertion that scatter emits zero enclosure/edge
-          ops even with showEnclosures/showEdges on.
+    - [x] **F2.7b draw() guard table** — kept the data-driven no-op (no explicit
+          `mode === "scatter"` guard added to the builders) and LOCKED it with a new
+          render-smoke assertion (`assertNoEnclosureOrEdgeOps` in
+          `test/scatter-render-smoke.test.ts`, run for both datasets). It drives the
+          REAL gating builders (`computeEnclosureDrawInput`/`computeEdgeDrawPlan`) +
+          the actual painters (euler/bubblesets enclosures, ghost/base/accent edges)
+          with showEnclosures/showEdges/showGhostEdges all ON over a fresh recorder,
+          asserts the gates are NON-suppressed (toggles really on), then asserts
+          `!drewSomething(rec)` — so the zero-ops proof can only come from scatter's
+          empty clusters/edges, not a suppressed gate. Adding a `mode === "scatter"`
+          short-circuit was rejected as redundant: it would duplicate the empty-data
+          contract the layout already guarantees (`layoutScatter` emits no
+          clusters/edges) without changing any output. — 
   - [ ] **F2.8 E2E** — CDP scenario: switch to scatter, bind X/Y, verify
         *reflection* (node count unchanged, `laid.axes.x/y` populated, distinct
         positions), not just "no exception".
