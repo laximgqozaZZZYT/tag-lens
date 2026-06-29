@@ -446,6 +446,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         collapsed it into a thin `clampPinnedWidth(raw, cw)` call. Behaviour-identical
         (raw is always a number, so `?? 320` is inert); already test-covered at
         `test/note-menu-geom.test.ts:56`. — 152614b
+  - [x] folder disclosure display/label pair → `folderDisclosure(text, open)`
+        (`src/interaction/note-menu.ts`, next to `folderToggleLabel`, which it reuses)
+        + cases in `test/note-menu.test.ts`. The four open/close handlers in the
+        navigator tree builder (openAll/closeAll for the "(all)" header,
+        openFolder/closeFolder for regular folders) inlined the same `{display, label}`
+        pair (open → kids "block" + ▾-label, closed → "none" + ▸-label); now one pure
+        builder returning `{display, label}`. Centralizes the block↔open / none↔closed
+        mapping (mirrors `noteMenuTopTabDisplay`/`noteMenuMinimizeDisplay`); the view
+        applies display to the kids-div + label to the span, event wiring stays inline.
+        Initial-render label-only spots keep `folderToggleLabel`. Behaviour-identical. — fee6321
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
