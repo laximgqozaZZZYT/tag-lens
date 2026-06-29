@@ -453,7 +453,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         shift) with the recording-ctx mock. Asserts: one node per note / no
         clusters / no edges, **both axes populated with ticks** (the always-on
         reflection), and grid+card draw ops emitted without throwing. `window`
-        is stubbed for `drawCardGrid`'s DPR read. — 1b1fa85
+        is stubbed for `drawCardGrid`'s DPR read. — 11a5327
   - [ ] **F2.6 settings** — Scatter X/Y attr + scale pickers (reuse encoding
         controls); default-mode merge guard in `main.ts` if needed.
   - [ ] **F2.7 applicability + per-mode guards** — sync
