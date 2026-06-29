@@ -127,7 +127,7 @@ import {
 	positionTip as positionTipFn,
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
-import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
+import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, folderToggleLabel, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { buildViewStateBundle, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
@@ -3334,14 +3334,14 @@ export class MiniGraphView extends ItemView {
 			const allStyle = noteMenuTreeRowStyle("all", depth);
 			row.setCssStyles(allStyle.row);
 			// (all) has NO checkbox — only a collapsible label
-			const lbl = row.createSpan({ text: `\u25b8 (all)` });
+			const lbl = row.createSpan({ text: folderToggleLabel("(all)", false) });
 			lbl.setCssStyles(allStyle.label);
 			const kids = container.createDiv();
 			kids.setCssStyles({ display: "none" });
 			let built = false;
 			const openAll = (): void => {
 				kids.setCssStyles({ display: "block" });
-				lbl.textContent = `\u25be (all)`;
+				lbl.textContent = folderToggleLabel("(all)", true);
 				if (!built) {
 					for (const lf of leaves) leafRow(kids, lf.id, lf.label, depth + 1);
 					built = true;
@@ -3349,7 +3349,7 @@ export class MiniGraphView extends ItemView {
 			};
 			const closeAll = (): void => {
 				kids.setCssStyles({ display: "none" });
-				lbl.textContent = `\u25b8 (all)`;
+				lbl.textContent = folderToggleLabel("(all)", false);
 			};
 			lbl.addEventListener("click", () => {
 				if (kids.style.display !== "none") closeAll(); else openAll();
@@ -3403,7 +3403,7 @@ export class MiniGraphView extends ItemView {
 				applyFolderState();
 				// Live-refresh this group's tri-state after any toggle elsewhere.
 				checkboxRefreshers.push(applyFolderState);
-				const lbl = row.createSpan({ text: `▸ ${display}` });
+				const lbl = row.createSpan({ text: folderToggleLabel(display, false) });
 				lbl.setCssStyles(folderStyle.label);
 				const kids = container.createDiv();
 				kids.setCssStyles({ display: "none" });
@@ -3411,7 +3411,7 @@ export class MiniGraphView extends ItemView {
 				// Open this folder (build children lazily if not yet built).
 				const openFolder = (): void => {
 					kids.setCssStyles({ display: "block" });
-					lbl.textContent = `▾ ${display}`;
+					lbl.textContent = folderToggleLabel(display, true);
 					if (!built) {
 						// (all) subtree: in tag-tree mode, folders with sub-folders get a
 						// collapsible "(all)" at the top listing every descendant note.
@@ -3428,7 +3428,7 @@ export class MiniGraphView extends ItemView {
 				// Close this folder.
 				const closeFolder = (): void => {
 					kids.setCssStyles({ display: "none" });
-					lbl.textContent = `▸ ${display}`;
+					lbl.textContent = folderToggleLabel(display, false);
 				};
 				lbl.addEventListener("click", () => {
 					if (kids.style.display !== "none") closeFolder(); else openFolder();

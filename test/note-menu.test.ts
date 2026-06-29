@@ -26,6 +26,7 @@ import {
 	collectDescendantNoteKeys,
 	folderCheckState,
 	buildFolderPathKey,
+	folderToggleLabel,
 	suggestKeyAction,
 	type NoteRef,
 	type TreeNode,
@@ -899,6 +900,19 @@ const advNotes: NoteRef[] = [
 
 	// Combo subgroup key (tag tree): parent is a tag key, child is a combo:xxxx key.
 	ok(buildFolderPathKey("tag=proj", "combo:aabb") === "tag=proj/combo:aabb", "buildFolderPathKey: tag-tree combo subgroup key");
+}
+
+// ── folderToggleLabel: disclosure-triangle prefix for collapsible rows ────────
+// The navigator tree builder repeats this glyph choice for every collapsible row
+// (regular folders + the "(all)" subtree header) at initial render and on each
+// open/close. Open → ▾ (U+25BE), closed → ▸ (U+25B8), one space then the text.
+{
+	ok(folderToggleLabel("Area", false) === "▸ Area", "folderToggleLabel: closed folder uses ▸");
+	ok(folderToggleLabel("Area", true) === "▾ Area", "folderToggleLabel: open folder uses ▾");
+	ok(folderToggleLabel("(all)", false) === "▸ (all)", "folderToggleLabel: closed (all) header");
+	ok(folderToggleLabel("(all)", true) === "▾ (all)", "folderToggleLabel: open (all) header");
+	// Glyph + single space + text exactly; the open/closed forms differ only by glyph.
+	ok(folderToggleLabel("X", true).slice(1) === folderToggleLabel("X", false).slice(1), "folderToggleLabel: only the leading glyph differs");
 }
 
 // ── STATE-PRESERVATION CONTRACT (pure invariant) ─────────────────────────────

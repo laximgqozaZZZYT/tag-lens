@@ -261,6 +261,17 @@ export function buildFolderPathKey(parentPath: string, name: string): string {
 	return parentPath ? `${parentPath}/${name}` : name;
 }
 
+// Build the navigator folder-row label, prefixing the display text with a
+// disclosure triangle that reflects the open/closed state: ▾ (U+25BE) when open,
+// ▸ (U+25B8) when closed. Centralises the glyph choice that the tree builder
+// repeats for every collapsible row (regular folders and the "(all)" subtree
+// header) and at both initial render and each open/close toggle.
+//
+// Exported so the glyph mapping is unit-testable independently of the DOM.
+export function folderToggleLabel(text: string, open: boolean): string {
+	return `${open ? "▾" : "▸"} ${text}`;
+}
+
 // All DISTINCT descendant note hide-keys under a tree node, recursively across
 // nested folders AND combination subgroups. A note that appears under multiple
 // groups (e.g. a combo placed under each constituent tag) is counted ONCE.
