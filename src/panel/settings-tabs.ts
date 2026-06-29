@@ -5,6 +5,15 @@ import { basesEdgeKinds } from "./bases-edge-kinds";
 import { basesToggleRows } from "./bases-toggle-rows";
 import { inheritFromOptions } from "./inherit-from-options";
 import { bridgeGhostEdgeToggle, legendToggle } from "./settings-toggle-rows";
+import {
+	scatterAxisFieldOptions,
+	scatterAxisScaleOptions,
+} from "./scatter-axis-options";
+import {
+	scatterAxisSelection,
+	setScatterAxisBinding,
+	type ScatterAxisChannel,
+} from "./scatter-axis-binding";
 import { setIcon, AbstractInputSuggest, type App, type TFile } from "obsidian";
 import { scanBaseFiles } from "../bases/parser";
 import { addBaseFileToSelected, removeBaseFileFromSelected } from "../bases/selection";
@@ -382,7 +391,61 @@ export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): v
 	});
 	legendRow.createSpan({ text: legend.label });
 
+	// Scatter (F2.6) X/Y axis pickers — surfaced only in scatter mode, where the
+	// two quantitative axes define the plot. Writes the axisX/axisY encoding
+	// bindings (shared with the euler/bubblesets overlay) and relays out.
+	if (deps.settings.viewMode === "scatter") {
+		renderScatterAxisSection(el, deps);
+	}
+
 	renderLayersSubSection(el, deps);
+}
+
+function renderScatterAxisSection(el: HTMLElement, deps: EncodeTabDeps): void {
+	const section = el.createDiv({ cls: "gim-panel-section" });
+	section.createEl("h4", { text: "Scatter axes" });
+	renderScatterAxisRow(section, deps, "axisX", "X axis");
+	renderScatterAxisRow(section, deps, "axisY", "Y axis");
+}
+
+function renderScatterAxisRow(
+	section: HTMLElement,
+	deps: EncodeTabDeps,
+	channel: ScatterAxisChannel,
+	label: string,
+): void {
+	const sel = scatterAxisSelection(deps.settings.encoding);
+	const choice = channel === "axisX" ? sel.x : sel.y;
+
+	const row = section.createDiv({ cls: "gim-order-row" });
+	row.createSpan({ text: label, cls: "gim-order-field" });
+
+	// setScatterAxisBinding preserves the unspecified side from the current
+	// effective selection, so each select only sends its own changed dimension.
+	const attrSel = row.createEl("select", { cls: "gim-order-dir" });
+	for (const o of scatterAxisFieldOptions()) {
+		const opt = attrSel.createEl("option", { value: o.value, text: o.label });
+		if (o.value === choice.fieldId) opt.selected = true;
+	}
+	attrSel.addEventListener("change", () => {
+		deps.settings.encoding = setScatterAxisBinding(deps.settings.encoding, channel, {
+			fieldId: attrSel.value,
+		});
+		deps.save();
+		void deps.rebuild();
+	});
+
+	const scaleSel = row.createEl("select", { cls: "gim-order-dir" });
+	for (const o of scatterAxisScaleOptions()) {
+		const opt = scaleSel.createEl("option", { value: o.value, text: o.label });
+		if (o.value === choice.scale) opt.selected = true;
+	}
+	scaleSel.addEventListener("change", () => {
+		const scale = scatterAxisScaleOptions().find((o) => o.value === scaleSel.value)?.value;
+		deps.settings.encoding = setScatterAxisBinding(deps.settings.encoding, channel, { scale });
+		deps.save();
+		void deps.rebuild();
+	});
 }
 
 function renderLayersSubSection(el: HTMLElement, deps: EncodeTabDeps): void {
