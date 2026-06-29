@@ -454,8 +454,10 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         clusters / no edges, **both axes populated with ticks** (the always-on
         reflection), and grid+card draw ops emitted without throwing. `window`
         is stubbed for `drawCardGrid`'s DPR read. — 11a5327
-  - [ ] **F2.6 settings** — Scatter X/Y attr + scale pickers (reuse encoding
-        controls); default-mode merge guard in `main.ts` if needed.
+  - [x] **F2.6 settings** — Scatter X/Y attr + scale pickers (reuse encoding
+        controls); default-mode merge guard in `main.ts` if needed. Closed by F2.6a
+        (option lists) + F2.6b (picker DOM); 6b confirmed no `main.ts` merge guard is
+        needed (bindings live in the existing `settings.encoding[]`, no new field).
     - [x] **F2.6a option lists** — pure `scatterAxisFieldOptions()` /
           `scatterAxisScaleOptions()` (`src/panel/scatter-axis-options.ts`) +
           `test/scatter-axis-options.test.ts`. The X/Y attribute dropdown options are
@@ -477,8 +479,11 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
           channels, never mutating input. Each select sends only its own changed
           dimension → save → rebuild. No new settings field, so no `main.ts` merge
           guard needed (bindings live in the existing `settings.encoding[]`). — 62a0b8a
-  - [ ] **F2.7 applicability + per-mode guards** — sync
-        `display-applicability.ts` + `draw()` guard table for scatter.
+  - [x] **F2.7 applicability + per-mode guards** — sync
+        `display-applicability.ts` + `draw()` guard table for scatter. Closed by F2.7a
+        (`displayToggleApplies("scatter", …)` drops the inert enclosure/edge toggles)
+        + F2.7b (draw() kept data-driven no-op, locked by `assertNoEnclosureOrEdgeOps`
+        in `test/scatter-render-smoke.test.ts`).
     - [x] **F2.7a applicability** — `displayToggleApplies("scatter", …)`
           (`src/visual/display-applicability.ts`) now returns false for
           `showEnclosures`/`showEdges` (layoutScatter emits no clusters/edges, so
