@@ -441,7 +441,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         shiftSpec) fires. No behaviour change for the euler/bubblesets overlay. The
         `axisX`/`axisY` channel `appliesTo` (excludes scatter) is untouched — applyAxisLayout
         reads bindings directly, bypassing the channel registry; channel `appliesTo` is an
-        F2.6/F2.7 concern. — PENDING
+        F2.6/F2.7 concern. — 605f819
   - [ ] **F2.5 draw** — route scatter through card `drawBodyTile` + `laid.axes`
         grid; render-smoke test (mock ctx) à la `bubblesets-render-smoke`.
   - [ ] **F2.6 settings** — Scatter X/Y attr + scale pickers (reuse encoding
