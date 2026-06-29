@@ -399,6 +399,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         builder returning `{errorLines, moreText}`, the view loops the strings + applies
         the already-extracted status styles. Behaviour-identical (same glyph/cap/overflow
         text, input untouched). — 99fb8ea
+  - [x] tag self-or-subtag predicate dedup → `isTagOrSubtag(candidate, tag)`
+        (`src/insight/tag-path.ts`, next to `isValidTagName`) + cases in
+        `test/tag-path.test.ts`. The `s === tag || s.startsWith(`${tag}/`)` nesting
+        match was inlined 5× in `convertToNestedTag` (`src/insight/actions.ts`): the
+        `#`-prefixed `cache.tags` hit-test (called with `#${tag}`) plus four bare-form
+        spots (fmTags array/string hit-test, the array `.map` rewrite, the string
+        rewrite). Now one pure predicate; `/`-delimited descendant only (bare prefix
+        "foobar" vs "foo" is NOT a hit, locked by test). Behaviour-identical. Not a
+        note-menu/F2 seam but a genuine duplicate discovered while seam-hunting. — COMMIT
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list

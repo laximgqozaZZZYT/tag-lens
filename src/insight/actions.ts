@@ -1,5 +1,5 @@
 import { type App, Notice } from "obsidian";
-import { isValidTagName } from "./tag-path";
+import { isTagOrSubtag, isValidTagName } from "./tag-path";
 
 export async function applyGolderClassification(
 	app: App,
@@ -48,10 +48,10 @@ export async function convertToNestedTag(
 		if (!cache) continue;
 		
 		const fmTags: unknown = cache.frontmatter?.tags;
-		const hasTag = cache.tags?.some(t => t.tag === `#${tag}` || t.tag.startsWith(`#${tag}/`)) || 
+		const hasTag = cache.tags?.some(t => isTagOrSubtag(t.tag, `#${tag}`)) ||
 					   (fmTags && (
-						   (Array.isArray(fmTags) && fmTags.some(t => typeof t === "string" && (t === tag || t.startsWith(`${tag}/`)))) ||
-						   (typeof fmTags === "string" && (fmTags === tag || fmTags.startsWith(`${tag}/`)))
+						   (Array.isArray(fmTags) && fmTags.some(t => typeof t === "string" && isTagOrSubtag(t, tag))) ||
+						   (typeof fmTags === "string" && isTagOrSubtag(fmTags, tag))
 					   ));
 		
 		if (hasTag) {
@@ -66,10 +66,10 @@ export async function convertToNestedTag(
 						if (Array.isArray(rfm.tags)) {
 							rfm.tags = rfm.tags.map((t: unknown) => {
 								if (typeof t !== "string") return t;
-								if (t === tag || t.startsWith(`${tag}/`)) return `${parentPath}/${t}`;
+								if (isTagOrSubtag(t, tag)) return `${parentPath}/${t}`;
 								return t;
 							});
-						} else if (typeof rfm.tags === "string" && (rfm.tags === tag || rfm.tags.startsWith(`${tag}/`))) {
+						} else if (typeof rfm.tags === "string" && isTagOrSubtag(rfm.tags, tag)) {
 							rfm.tags = `${parentPath}/${rfm.tags}`;
 						}
 					}
