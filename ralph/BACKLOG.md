@@ -382,6 +382,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         mode-legend size suffix (`draw/mode-legend-input.ts`); all collapsed into one
         pure builder. Behaviour-identical (regular-`s`; multi-word "bundled preset"
         pluralizes on the tail). — d713f89
+  - [x] tree leaf "current note" highlight → `noteMenuLeafHighlight(isCurrent)`
+        (`src/interaction/note-menu-geom.ts`, next to `noteMenuTreeRowStyle`) + cases in
+        `test/note-menu-geom.test.ts`. The leaf-row highlight was two scattered
+        conditionals on the same `id === currentMenuHighlightId()` predicate: the `baseBg`
+        magic hex `#2d6cdf55` (a hardcoded copy of `draw/theme.ts`'s `accent: "#2d6cdf"`
+        at ~33% alpha — threaded into the row style + restored on mouseleave) and the
+        `var(--color-yellow)` label colour. Now one pure builder returning `{rowBg,
+        labelColor?}`; the view computes the predicate once and applies the records.
+        Behaviour-identical (same hex/yellow/empty-bg default). — 2cde31e
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
