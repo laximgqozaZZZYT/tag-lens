@@ -93,6 +93,16 @@ function renderSmoke(label: string, nodes: GraphNode[]): void {
 	ok((out.axes.x?.ticks?.length ?? 0) > 0, `[${label}] scatter X axis has no ticks`);
 	ok((out.axes.y?.ticks?.length ?? 0) > 0, `[${label}] scatter Y axis has no ticks`);
 
+	// F2.8 reflection: the axes must actually SPREAD the dots — the whole point of
+	// scatter is quantitative position, not a stacked pile. Each dataset varies both
+	// degree (X) and ageDays (Y) across notes, so placement must yield more than one
+	// distinct X and more than one distinct Y coordinate (this is what the CDP E2E
+	// would observe in-app; asserted headlessly since CDP is unrunnable here).
+	const xs = new Set(out.nodes.map((n) => n.x));
+	const ys = new Set(out.nodes.map((n) => n.y));
+	ok(xs.size > 1, `[${label}] scatter collapsed all nodes onto one X (distinct x = ${xs.size})`);
+	ok(ys.size > 1, `[${label}] scatter collapsed all nodes onto one Y (distinct y = ${ys.size})`);
+
 	const { ctx, rec } = recordingCtx();
 	const canvas = mockCanvas(2000, 2000, 1, ctx);
 	let threw: string | null = null;

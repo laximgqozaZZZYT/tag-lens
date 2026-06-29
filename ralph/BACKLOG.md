@@ -503,6 +503,18 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
   - [ ] **F2.8 E2E** — CDP scenario: switch to scatter, bind X/Y, verify
         *reflection* (node count unchanged, `laid.axes.x/y` populated, distinct
         positions), not just "no exception".
+    - [x] **F2.8a headless reflection (distinct positions).** CDP is unrunnable in
+          this env (fresh-profile workspace init fails), so the in-app reflection
+          the scenario would observe is now locked at the layout+axis level in
+          `test/scatter-render-smoke.test.ts`: after `placeScatterAxes`, assert the
+          dots occupy **>1 distinct X and >1 distinct Y** (both datasets vary degree
+          and ageDays), proving the axes actually spread the figure rather than
+          stacking it. Node-count-unchanged + axes-populated were already asserted. — a9a3d8c
+    - [ ] **F2.8b CDP scenario (BLOCKED in this env).** The actual CDP-driven
+          switch-to-scatter + bind-X/Y reflection check still needs a real Obsidian;
+          run when the CDP harness is unblocked.
+  > BLOCKER (F2.8b only): CDP/E2E harness blocked in the agent sandbox
+  > (fresh-profile workspace init "No tab group found"); headless smoke is the gate.
 
 ## Done
 
