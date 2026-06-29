@@ -415,10 +415,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
       invention**. Do one sub-step per iteration, each verify-green.
   - [x] short plan under `docs/0.3.21/f2-scatter-mode.md` (mode id `"scatter"`,
         panorama, reuse card layout + `axisLayout`; 8 implementation sub-steps).
-  - [ ] **F2.2 types + picker** — add `"scatter"` to the `ViewMode` union
-        (`src/types.ts`) + a `VIEW_MODES` entry (`experimental: true`, panorama).
-        Update `test/view-mode-picker.test.ts` if it locks the mode set. Smallest
-        safe slice (mode selectable, renders fallback until layout lands).
+  - [x] **F2.2 types + picker** — added `"scatter"` to the `ViewMode` union
+        (`src/types.ts`) + a `VIEW_MODES` entry (`experimental: true`, panorama
+        via default-absent `perspective`). No picker-test change needed:
+        `test/view-mode-picker.test.ts` partitions `VIEW_MODES` generically (no
+        hardcoded count). Type-safe — the two `mode` switches (`mode-legend`
+        `buildModeLegendBody`, `legendAnchor`) both have `default` cases and the
+        `Record<ViewMode>` uses are `Partial`, so no per-mode handling needed.
+        Mode is selectable; renders fallback until F2.3 layout lands. — 657f257
   - [ ] **F2.3 layout dispatch** — flat card layout (no clusters) for
         `viewMode === "scatter"` in `src/layout/layout.ts` (~line 339, `grep -a`);
         unit-test: one node per displayed note, no clusters.
