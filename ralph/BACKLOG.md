@@ -407,7 +407,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         spots (fmTags array/string hit-test, the array `.map` rewrite, the string
         rewrite). Now one pure predicate; `/`-delimited descendant only (bare prefix
         "foobar" vs "foo" is NOT a hit, locked by test). Behaviour-identical. Not a
-        note-menu/F2 seam but a genuine duplicate discovered while seam-hunting. — COMMIT
+        note-menu/F2 seam but a genuine duplicate discovered while seam-hunting. — cf70a6b
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
