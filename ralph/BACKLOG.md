@@ -442,8 +442,18 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `axisX`/`axisY` channel `appliesTo` (excludes scatter) is untouched — applyAxisLayout
         reads bindings directly, bypassing the channel registry; channel `appliesTo` is an
         F2.6/F2.7 concern. — 605f819
-  - [ ] **F2.5 draw** — route scatter through card `drawBodyTile` + `laid.axes`
-        grid; render-smoke test (mock ctx) à la `bubblesets-render-smoke`.
+  - [x] **F2.5 draw** — scatter already routes through the card path: `draw()`
+        falls past the lattice/droste/heatmap/upset guards (all undefined for
+        scatter) into the world-map tiling → `drawBodyTile` (cards; empty
+        clusters/edges = no enclosures/edges) + `drawCardGrid` (reads `laid.axes`
+        for the axis grid). So F2.5 is **proof, not wiring**: new
+        `test/scatter-render-smoke.test.ts` drives the actual `drawCardGrid` +
+        `drawCard` over `layout(viewMode:"scatter")` + a pure `axisLayout` pass
+        (mirroring `applyAxisLayout`'s degree/ageDays defaults + world-centre
+        shift) with the recording-ctx mock. Asserts: one node per note / no
+        clusters / no edges, **both axes populated with ticks** (the always-on
+        reflection), and grid+card draw ops emitted without throwing. `window`
+        is stubbed for `drawCardGrid`'s DPR read. — 1b1fa85
   - [ ] **F2.6 settings** — Scatter X/Y attr + scale pickers (reuse encoding
         controls); default-mode merge guard in `main.ts` if needed.
   - [ ] **F2.7 applicability + per-mode guards** — sync

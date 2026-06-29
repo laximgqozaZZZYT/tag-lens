@@ -76,6 +76,7 @@ import "./label-collision.test";
 import "./bubblesets-label-collision.test";
 import "./bubblesets-invariants.test";
 import "./bubblesets-render-smoke.test";
+import "./scatter-render-smoke.test";
 import "./all-modes-render-smoke.test";
 import "./lattice-draw-input.test";
 import "./droste-draw-input.test";
