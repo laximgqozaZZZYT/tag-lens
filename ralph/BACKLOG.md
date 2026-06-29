@@ -466,11 +466,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
           descriptor builders only — not yet wired into the panel; the picker DOM +
           binding save/rebuild wiring is the next F2.6 sub-step. Mirrors the
           `basesEdgeKinds`/`settingsSubTabs` descriptor extractions. — 7c51d9e
-    - [ ] **F2.6b picker DOM** — render the Scatter X/Y attr + scale `<select>`s
-          (consuming F2.6a option lists) in the Encode/Display panel, wired to the
-          `axisX`/`axisY` encoding bindings + scale config (save → rebuild). Surface
-          only in scatter mode. Default-mode merge guard in `main.ts` if a new
-          settings field is introduced.
+    - [x] **F2.6b picker DOM** — Scatter X/Y attr + scale `<select>`s rendered in the
+          Encode tab (`renderScatterAxisSection`/`renderScatterAxisRow` in
+          `settings-tabs.ts`), surfaced only when `viewMode === "scatter"`. New pure
+          bridge `scatterAxisSelection` / `setScatterAxisBinding`
+          (`src/panel/scatter-axis-binding.ts`) + `test/scatter-axis-binding.test.ts`:
+          seeds the dropdowns from the user's enabled `axisX`/`axisY` binding (else the
+          scatter default, scale narrowed to the quantitative subset) and upserts an
+          enabled binding on change — preserving the unspecified dimension and other
+          channels, never mutating input. Each select sends only its own changed
+          dimension → save → rebuild. No new settings field, so no `main.ts` merge
+          guard needed (bindings live in the existing `settings.encoding[]`). — 62a0b8a
   - [ ] **F2.7 applicability + per-mode guards** — sync
         `display-applicability.ts` + `draw()` guard table for scatter.
   - [ ] **F2.8 E2E** — CDP scenario: switch to scatter, bind X/Y, verify
