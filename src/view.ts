@@ -127,7 +127,7 @@ import {
 	positionTip as positionTipFn,
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
-import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
+import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { buildViewStateBundle, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
@@ -3526,28 +3526,32 @@ export class MiniGraphView extends ItemView {
 		search.addEventListener("input", onInput);
 		search.addEventListener("keydown", (ev: KeyboardEvent) => {
 			const open = suggBox.style.display !== "none" && suggestions.length > 0;
-			if (ev.key === "ArrowDown") {
-				if (!open) { openSuggest(); return; }
-				ev.preventDefault();
-				selIdx = (selIdx + 1) % suggestions.length;
-				renderSelection();
-			} else if (ev.key === "ArrowUp") {
-				if (!open) return;
-				ev.preventDefault();
-				selIdx = (selIdx - 1 + suggestions.length) % suggestions.length;
-				renderSelection();
-			} else if (ev.key === "Enter") {
-				if (open && selIdx >= 0) {
+			const action = suggestKeyAction(ev.key, { open, selIdx, count: suggestions.length });
+			switch (action.type) {
+				case "open":
+					openSuggest();
+					break;
+				case "move":
 					ev.preventDefault();
-					const s = suggestions[selIdx];
+					selIdx = action.selIdx;
+					renderSelection();
+					break;
+				case "accept": {
+					ev.preventDefault();
+					const s = suggestions[action.index];
 					acceptSuggestion(s.text, s.kind);
-				} else {
+					break;
+				}
+				case "search":
 					// No highlighted suggestion → just run the search (close any box).
 					closeSuggest();
 					draw();
-				}
-			} else if (ev.key === "Escape") {
-				if (open) { ev.preventDefault(); ev.stopPropagation(); closeSuggest(); }
+					break;
+				case "close":
+					ev.preventDefault();
+					ev.stopPropagation();
+					closeSuggest();
+					break;
 			}
 		});
 		// Close on blur — small delay so a suggestion mousedown/click lands first.

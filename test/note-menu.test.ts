@@ -25,6 +25,7 @@ import {
 	collectDescendantNoteKeys,
 	folderCheckState,
 	buildFolderPathKey,
+	suggestKeyAction,
 	type NoteRef,
 	type TreeNode,
 } from "../src/interaction/note-menu";
@@ -920,4 +921,45 @@ const advNotes: NoteRef[] = [
 	ok(expandedPaths.has(buildFolderPathKey("Area", "Sub")), "state-preservation: snapshot 'Area/Sub' found at depth 1");
 	// A folder NOT in the snapshot (e.g. a different sibling) is not restored.
 	ok(!expandedPaths.has(buildFolderPathKey("", "Other")), "state-preservation: unlisted folder NOT in snapshot");
+}
+
+// ── suggestKeyAction: search-box dropdown keyboard reducer ───────────────────
+// Pure transition mirroring the keydown handler in view.ts. `open` implies the
+// dropdown is shown WITH suggestions (count > 0).
+{
+	const closed = { open: false, selIdx: -1, count: 0 };
+	const openTop = { open: true, selIdx: -1, count: 3 };
+	const openSel1 = { open: true, selIdx: 1, count: 3 };
+
+	// ArrowDown closed → open the dropdown (no preventDefault action).
+	ok(suggestKeyAction("ArrowDown", closed).type === "open", "suggestKey: ArrowDown closed → open");
+
+	// ArrowDown open → move highlight forward (wraps), preventing default.
+	const dn = suggestKeyAction("ArrowDown", openSel1);
+	ok(dn.type === "move" && dn.selIdx === 2 && dn.preventDefault === true, "suggestKey: ArrowDown open → move to next");
+	const dnWrap = suggestKeyAction("ArrowDown", { open: true, selIdx: 2, count: 3 });
+	ok(dnWrap.type === "move" && dnWrap.selIdx === 0, "suggestKey: ArrowDown wraps to 0 at end");
+	const dnFromNone = suggestKeyAction("ArrowDown", openTop);
+	ok(dnFromNone.type === "move" && dnFromNone.selIdx === 0, "suggestKey: ArrowDown from −1 → 0");
+
+	// ArrowUp closed → nothing; open → move backward (wraps).
+	ok(suggestKeyAction("ArrowUp", closed).type === "none", "suggestKey: ArrowUp closed → none");
+	const up = suggestKeyAction("ArrowUp", openSel1);
+	ok(up.type === "move" && up.selIdx === 0, "suggestKey: ArrowUp open → move to prev");
+	const upWrap = suggestKeyAction("ArrowUp", { open: true, selIdx: 0, count: 3 });
+	ok(upWrap.type === "move" && upWrap.selIdx === 2, "suggestKey: ArrowUp wraps to last from 0");
+
+	// Enter with a highlighted row → accept that index; otherwise → run search.
+	const acc = suggestKeyAction("Enter", openSel1);
+	ok(acc.type === "accept" && acc.index === 1 && acc.preventDefault === true, "suggestKey: Enter highlighted → accept index");
+	ok(suggestKeyAction("Enter", openTop).type === "search", "suggestKey: Enter open w/o highlight → search");
+	ok(suggestKeyAction("Enter", closed).type === "search", "suggestKey: Enter closed → search");
+
+	// Escape open → close (suppress default + propagation); closed → nothing.
+	const esc = suggestKeyAction("Escape", openSel1);
+	ok(esc.type === "close" && esc.preventDefault === true && esc.stopPropagation === true, "suggestKey: Escape open → close");
+	ok(suggestKeyAction("Escape", closed).type === "none", "suggestKey: Escape closed → none");
+
+	// Any other key is inert.
+	ok(suggestKeyAction("a", openSel1).type === "none", "suggestKey: unrelated key → none");
 }

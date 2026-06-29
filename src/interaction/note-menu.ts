@@ -777,3 +777,45 @@ export function suggestQuery(notes: NoteRef[], query: string): Suggestion[] {
 	out.push(...noteSugs.slice(0, MERGED_CAP));
 	return sortSuggestions(out).slice(0, MERGED_CAP);
 }
+
+// ── Suggestion-dropdown keyboard reducer ────────────────────────────────────
+// Pure transition for the search box's keydown handler. Given the current
+// dropdown state and the pressed key, return the action the view should take
+// (open / move the highlight / accept / run the search / close), along with
+// which default event behaviours to suppress. `selIdx` is the keyboard-
+// highlighted row (−1 = none); `count` is the number of live suggestions;
+// `open` mirrors whether the dropdown is currently shown WITH suggestions
+// (so `open` implies `count > 0`, keeping the modulo math safe).
+export interface SuggestKeyState {
+	open: boolean;
+	selIdx: number;
+	count: number;
+}
+
+export type SuggestKeyAction =
+	| { type: "none" }
+	| { type: "open" }
+	| { type: "move"; selIdx: number; preventDefault: true }
+	| { type: "accept"; index: number; preventDefault: true }
+	| { type: "search" }
+	| { type: "close"; preventDefault: true; stopPropagation: true };
+
+export function suggestKeyAction(key: string, state: SuggestKeyState): SuggestKeyAction {
+	const { open, selIdx, count } = state;
+	switch (key) {
+		case "ArrowDown":
+			if (!open) return { type: "open" };
+			return { type: "move", selIdx: (selIdx + 1) % count, preventDefault: true };
+		case "ArrowUp":
+			if (!open) return { type: "none" };
+			return { type: "move", selIdx: (selIdx - 1 + count) % count, preventDefault: true };
+		case "Enter":
+			if (open && selIdx >= 0) return { type: "accept", index: selIdx, preventDefault: true };
+			return { type: "search" };
+		case "Escape":
+			if (open) return { type: "close", preventDefault: true, stopPropagation: true };
+			return { type: "none" };
+		default:
+			return { type: "none" };
+	}
+}
