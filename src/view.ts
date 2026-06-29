@@ -127,7 +127,7 @@ import {
 	positionTip as positionTipFn,
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
-import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
+import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { buildViewStateBundle, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
@@ -3475,11 +3475,7 @@ export class MiniGraphView extends ItemView {
 		// trailing space (term complete); "key:" stays open (no space) so the user
 		// can keep typing the value.
 		const acceptSuggestion = (text: string, _kind: Suggestion["kind"]): void => {
-			const val = search.value;
-			const tok = currentToken(val);
-			const head = val.slice(0, val.length - tok.length);
-			const trailing = text.endsWith(":") ? "" : " ";
-			search.value = head + text + trailing;
+			search.value = applySuggestionToken(search.value, text);
 			closeSuggest();
 			search.focus();
 			draw();

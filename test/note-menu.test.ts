@@ -16,6 +16,7 @@ import {
 	advancedSearch,
 	suggestQuery,
 	currentToken,
+	applySuggestionToken,
 	tagLabel,
 	comboLabel,
 	UNTAGGED_BUCKET,
@@ -523,6 +524,29 @@ const advNotes: NoteRef[] = [
 	ok(currentToken("#pr") === "#pr", "currentToken: whole string when no space");
 	ok(currentToken("#proj stat") === "stat", "currentToken: substring after last space");
 	ok(currentToken("done ") === "", "currentToken: trailing space → empty token");
+}
+
+// ── applySuggestionToken ─────────────────────────────────────────────────────
+{
+	// Tag/note completions replace the trailing token and add a closing space.
+	ok(
+		applySuggestionToken("#pro", "#project") === "#project ",
+		"applySuggestionToken: tag replaces token + trailing space",
+	);
+	ok(
+		applySuggestionToken("#proj sta", "status") === "#proj status ",
+		"applySuggestionToken: only the last token is replaced",
+	);
+	// "key:" completions keep no space so the value can keep being typed.
+	ok(
+		applySuggestionToken("stat", "status:") === "status:",
+		"applySuggestionToken: key: completion adds no trailing space",
+	);
+	// Empty token (trailing space) → suggestion is appended.
+	ok(
+		applySuggestionToken("#done ", "#project") === "#done #project ",
+		"applySuggestionToken: empty token appends after the space",
+	);
 }
 
 // ── suggestQuery ─────────────────────────────────────────────────────────────

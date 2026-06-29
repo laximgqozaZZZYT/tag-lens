@@ -691,6 +691,17 @@ export function currentToken(query: string): string {
 	return m ? m[1] : "";
 }
 
+// Replace the token currently being typed (the trailing non-space run) with the
+// accepted suggestion `text`, returning the new full search value. Tags/notes get
+// a trailing space (the term is complete); a "key:" completion keeps no space so
+// the user can continue typing the value. Pure: never touches the DOM.
+export function applySuggestionToken(value: string, text: string): string {
+	const tok = currentToken(value);
+	const head = value.slice(0, value.length - tok.length);
+	const trailing = text.endsWith(":") ? "" : " ";
+	return head + text + trailing;
+}
+
 // Distinct sorted tags across the note set (no '#', lowercase preserved as-is).
 function allTags(notes: NoteRef[]): string[] {
 	const set = new Set<string>();
