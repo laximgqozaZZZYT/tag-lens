@@ -424,6 +424,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         application of a pure builder, centralizing the magic CSS var; the view keeps
         the `selIdx` state + the row loop. Behaviour-identical (selected → modifier-border
         bg, others → cleared). — 82bcb6a
+  - [x] tri-state checkbox aria-checked mapping → `checkboxAriaChecked(state)`
+        (`src/interaction/note-menu.ts`, next to `folderCheckState`, sharing its
+        `FolderCheckState` type) + cases in `test/note-menu.test.ts`. The custom
+        `gim-nav-cb` span's `setCbState` inlined the tri-state → aria-checked ternary
+        (indeterminate → "mixed", checked → "true", unchecked → "false"); now a pure
+        builder, and the local `CbState` alias reuses `FolderCheckState`. Centralizes
+        the WAI-ARIA tri-state contract; behaviour-identical. — cad3aa0
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
