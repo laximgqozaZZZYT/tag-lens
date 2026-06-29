@@ -255,6 +255,7 @@ export type ViewMode =
 	| "heatmap"
 	| "lattice"
 	| "upset"
+	| "scatter"
 	| "droste";
 
 export interface ViewModeOption {
@@ -325,6 +326,16 @@ export const VIEW_MODES: ViewModeOption[] = [
 		id: "upset",
 		label: "UpSet plot",
 		description: "Stack of cards per intersection + dot matrix (handles ≥4-way intersections)",
+		experimental: true,
+	},
+	{
+		// Scatter: one card per note placed on 2D quantitative axes (X/Y bound to
+		// note attributes). Promotes the existing axis-encoding overlay into a
+		// first-class panorama mode. Experimental until the layout/draw/E2E
+		// sub-steps land (F2.3–F2.8); selecting it today renders the fallback.
+		id: "scatter",
+		label: "Scatter plot",
+		description: "One card per note on 2D quantitative axes (X/Y bound to attributes); pan/zoom to browse",
 		experimental: true,
 	},
 ];
