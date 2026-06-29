@@ -4,6 +4,7 @@ import { renderInsightTab } from "./insight/render";
 import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
 
 import type { EncContext, EncNode, NodeDrawParams, EncodingBinding } from "./encoding/types";
+import { scatterAxisDefaults } from "./encoding/scatter-axis-defaults";
 import { axisLayout, type AxisSpec, type AxisBand, type AxisTick } from "./layout/axis-layout";
 import { assignGalleryAxes } from "./layout/droste-axis";
 import { LaneRegistry, routeZ } from "./layout/edge-routing";
@@ -1354,8 +1355,16 @@ export class MiniGraphView extends ItemView {
 		this.refreshJsonTab();
 	}
 	private applyAxisLayout(effEnc: EncodingBinding[], encCtx: EncContext): void {
-		const bindingX = effEnc.find((b) => b.channelId === "axisX");
-		const bindingY = effEnc.find((b) => b.channelId === "axisY");
+		let bindingX = effEnc.find((b) => b.channelId === "axisX");
+		let bindingY = effEnc.find((b) => b.channelId === "axisY");
+		// Scatter (F2) is DEFINED by its two quantitative axes — unlike the
+		// euler/bubblesets overlay they are always on, defaulting to degree/ageDays
+		// when the user has not bound them. The user's enabled bindings still win.
+		if (this.settings.viewMode === "scatter") {
+			const def = scatterAxisDefaults(bindingX, bindingY);
+			bindingX = def.x;
+			bindingY = def.y;
+		}
 		if (!bindingX?.enabled && !bindingY?.enabled) {
 			this.laid.axes = undefined;
 			return;
@@ -1370,7 +1379,8 @@ export class MiniGraphView extends ItemView {
 
 		const isCardMode =
 			this.settings.viewMode === "euler" ||
-			this.settings.viewMode === "bubblesets";
+			this.settings.viewMode === "bubblesets" ||
+			this.settings.viewMode === "scatter";
 
 		if (!isCardMode) {
 			this.laid.axes = undefined;

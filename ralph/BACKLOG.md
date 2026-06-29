@@ -431,9 +431,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         encoding-attr propagation, deterministic overlap-free row-major grid as the
         pre-axis fallback. Edges left empty for now — F2.5 (draw) decides whether
         scatter renders relation lines between dots. — 72af79e
-  - [ ] **F2.4 axis placement on** — treat `"scatter"` as a card mode in
-        `applyAxisLayout` + default `axisX`/`axisY` to quantitative when unset;
-        unit-test the pure defaulting helper.
+  - [x] **F2.4 axis placement on** — pure `scatterAxisDefaults(bindingX, bindingY)`
+        (`src/encoding/scatter-axis-defaults.ts`) + `test/scatter-axis-defaults.test.ts`
+        returns the effective X/Y bindings (user's enabled binding wins; else default
+        quantitative `degree`/`ageDays` on a linear scale — axes always on in scatter).
+        Wired into `applyAxisLayout` (`src/view.ts`): scatter defaults the bindings via
+        the helper before the early no-axis guard, and `"scatter"` joins euler/bubblesets
+        in `isCardMode` so the existing card axis-placement path (axisLayout + world-centre
+        shiftSpec) fires. No behaviour change for the euler/bubblesets overlay. The
+        `axisX`/`axisY` channel `appliesTo` (excludes scatter) is untouched — applyAxisLayout
+        reads bindings directly, bypassing the channel registry; channel `appliesTo` is an
+        F2.6/F2.7 concern. — PENDING
   - [ ] **F2.5 draw** — route scatter through card `drawBodyTile` + `laid.axes`
         grid; render-smoke test (mock ctx) à la `bubblesets-render-smoke`.
   - [ ] **F2.6 settings** — Scatter X/Y attr + scale pickers (reuse encoding
