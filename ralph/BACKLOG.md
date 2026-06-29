@@ -367,6 +367,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         just assigns the result to `search.value` and keeps the close/focus/redraw
         side effects inline. Second `ensureNoteMenu` behaviour seam (after
         `suggestKeyAction`). Behaviour-identical. — c233f0e
+  - [x] navigator folder triangle-label → `folderToggleLabel(text, open)`
+        (`src/interaction/note-menu.ts`, next to `buildFolderPathKey`) + cases in
+        `test/note-menu.test.ts`. The disclosure-triangle prefix (▾ open / ▸ closed)
+        was inlined 6× across the tree builder (regular folder rows + the "(all)"
+        subtree header, each at initial render and on open/close) with an
+        inconsistent literal-vs-`\u` escape glyph spelling; now one pure builder.
+        Behaviour-identical (same glyphs, same single space). — f3d0494
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
