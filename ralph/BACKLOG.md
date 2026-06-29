@@ -381,6 +381,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         whose only logic is a single settings-field toggle — extract only if a genuine
         duplicate descriptor list emerges (mirror `basesToggleRows`). Otherwise pivot to
         the `ensureNoteMenu` body-builder seams or F2.
+  - [x] pinned left-grip resize clamp dedup → the inline
+        `Math.min(Math.max(NOTE_MENU_MIN.width, raw), Math.max(NOTE_MENU_MIN.width,
+        Math.floor((cw||320)*0.8)))` in the pinned `lgrip` `onMove` handler was
+        byte-identical to the existing pure `clampPinnedWidth(raw, cw)` (the same
+        floor-to-min / ceiling-to-80%-of-container rule the initial dock width uses);
+        collapsed it into a thin `clampPinnedWidth(raw, cw)` call. Behaviour-identical
+        (raw is always a number, so `?? 320` is inert); already test-covered at
+        `test/note-menu-geom.test.ts:56`. — 152614b
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Large feature: first iteration writes a short plan under

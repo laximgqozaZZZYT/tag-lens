@@ -3213,10 +3213,9 @@ export class MiniGraphView extends ItemView {
 				const onMove = (e: MouseEvent): void => {
 					const cw = this.root.clientWidth || 0;
 					const raw = startW + (startX - e.clientX); // drag left → wider
-					const w = Math.min(
-						Math.max(NOTE_MENU_MIN.width, raw),
-						Math.max(NOTE_MENU_MIN.width, Math.floor((cw || 320) * 0.8)),
-					);
+					// Same floor-to-min / ceiling-to-80%-of-container rule as the
+					// initial dock width — reuse the pure builder, never above 80%.
+					const w = clampPinnedWidth(raw, cw);
 					panel.setCssStyles({ width: `${w}px` });
 					this.settings.noteMenuPinnedWidth = w;
 					this.requestDraw(); // re-reserve canvas width + re-pan the figure
