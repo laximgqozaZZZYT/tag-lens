@@ -465,7 +465,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
           (linear/log/quantile, a typed subset of `ScaleConfig["type"]`). Pure
           descriptor builders only — not yet wired into the panel; the picker DOM +
           binding save/rebuild wiring is the next F2.6 sub-step. Mirrors the
-          `basesEdgeKinds`/`settingsSubTabs` descriptor extractions. — <pending>
+          `basesEdgeKinds`/`settingsSubTabs` descriptor extractions. — 7c51d9e
     - [ ] **F2.6b picker DOM** — render the Scatter X/Y attr + scale `<select>`s
           (consuming F2.6a option lists) in the Encode/Display panel, wired to the
           `axisX`/`axisY` encoding bindings + scale config (save → rebuild). Surface
