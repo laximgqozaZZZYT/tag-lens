@@ -351,6 +351,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         Data sub bar's padded-in edge) is now a thin application of a new `"settings"`
         kind on the existing tab-bar builder; the sub-button/event wiring stays in the
         view. No state branch. — 8f0c4b3
+  - [x] search-box dropdown keyboard reducer → `suggestKeyAction(key, state)` /
+        `SuggestKeyState` / `SuggestKeyAction` (`src/interaction/note-menu.ts`, next to
+        `suggestQuery`/`currentToken`) + cases in `test/note-menu.test.ts`. The inline
+        ArrowDown/ArrowUp/Enter/Escape branching in the search `keydown` handler is now
+        a thin switch over a tagged action (open/move/accept/search/close, each carrying
+        which default behaviours to suppress); all DOM/event side effects stay in the
+        view. First `ensureNoteMenu` *behaviour* seam (vs the earlier CSS-chrome ones).
+        Behaviour-identical (wrap-around, accept-vs-search on Enter, Escape close). — a24d8f2
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
