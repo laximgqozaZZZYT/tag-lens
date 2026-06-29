@@ -509,7 +509,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
           `test/scatter-render-smoke.test.ts`: after `placeScatterAxes`, assert the
           dots occupy **>1 distinct X and >1 distinct Y** (both datasets vary degree
           and ageDays), proving the axes actually spread the figure rather than
-          stacking it. Node-count-unchanged + axes-populated were already asserted. — a9a3d8c
+          stacking it. Node-count-unchanged + axes-populated were already asserted. — d4854b1
     - [ ] **F2.8b CDP scenario (BLOCKED in this env).** The actual CDP-driven
           switch-to-scatter + bind-X/Y reflection check still needs a real Obsidian;
           run when the CDP harness is unblocked.
