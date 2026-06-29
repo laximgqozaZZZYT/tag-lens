@@ -456,6 +456,21 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         is stubbed for `drawCardGrid`'s DPR read. — 11a5327
   - [ ] **F2.6 settings** — Scatter X/Y attr + scale pickers (reuse encoding
         controls); default-mode merge guard in `main.ts` if needed.
+    - [x] **F2.6a option lists** — pure `scatterAxisFieldOptions()` /
+          `scatterAxisScaleOptions()` (`src/panel/scatter-axis-options.ts`) +
+          `test/scatter-axis-options.test.ts`. The X/Y attribute dropdown options are
+          exactly the quantitative field sources (new exported `listFieldSources()`
+          in `field-sources.ts` is the single source of truth; categorical/temporal
+          excluded) and the scale dropdown is the three quantitative scales
+          (linear/log/quantile, a typed subset of `ScaleConfig["type"]`). Pure
+          descriptor builders only — not yet wired into the panel; the picker DOM +
+          binding save/rebuild wiring is the next F2.6 sub-step. Mirrors the
+          `basesEdgeKinds`/`settingsSubTabs` descriptor extractions. — <pending>
+    - [ ] **F2.6b picker DOM** — render the Scatter X/Y attr + scale `<select>`s
+          (consuming F2.6a option lists) in the Encode/Display panel, wired to the
+          `axisX`/`axisY` encoding bindings + scale config (save → rebuild). Surface
+          only in scatter mode. Default-mode merge guard in `main.ts` if a new
+          settings field is introduced.
   - [ ] **F2.7 applicability + per-mode guards** — sync
         `display-applicability.ts` + `draw()` guard table for scatter.
   - [ ] **F2.8 E2E** — CDP scenario: switch to scatter, bind X/Y, verify

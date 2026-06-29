@@ -50,6 +50,7 @@ import "./min-font-input.test";
 import "./heatmap-min-tag-input.test";
 import "./node-size-input.test";
 import "./bases-edge-kinds.test";
+import "./scatter-axis-options.test";
 import "./bases-toggle-rows.test";
 import "./inherit-from-options.test";
 import "./settings-toggle-rows.test";
