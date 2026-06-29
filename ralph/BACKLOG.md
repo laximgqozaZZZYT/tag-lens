@@ -423,7 +423,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         per-row `forEach` (the keyboard/hover dropdown highlight) is now a thin
         application of a pure builder, centralizing the magic CSS var; the view keeps
         the `selIdx` state + the row loop. Behaviour-identical (selected → modifier-border
-        bg, others → cleared). — PENDING
+        bg, others → cleared). — 82bcb6a
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
