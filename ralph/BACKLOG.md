@@ -359,6 +359,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         which default behaviours to suppress); all DOM/event side effects stay in the
         view. First `ensureNoteMenu` *behaviour* seam (vs the earlier CSS-chrome ones).
         Behaviour-identical (wrap-around, accept-vs-search on Enter, Escape close). — a24d8f2
+  - [x] search-box suggestion token apply → `applySuggestionToken(value, text)`
+        (`src/interaction/note-menu.ts`, next to `currentToken`) + cases in
+        `test/note-menu.test.ts`. The inline token-replace string math in
+        `acceptSuggestion` (replace the trailing token with the accepted text;
+        trailing space unless the completion ends in `":"`) is now pure; the view
+        just assigns the result to `search.value` and keeps the close/focus/redraw
+        side effects inline. Second `ensureNoteMenu` behaviour seam (after
+        `suggestKeyAction`). Behaviour-identical. — c233f0e
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
