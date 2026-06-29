@@ -236,6 +236,21 @@ export function noteMenuDataSubTabDisplay(active: NoteMenuDataSubTab): {
 	};
 }
 
+// CSS `display` values for the two elements the minimize toggle hides/shows: the
+// whole tab `body` (a flex column when expanded) and the resize `grip` (its own
+// default display when expanded, hidden when collapsed since resize is meaningless
+// while minimized). The panel HEIGHT is computed separately by noteMenuHeight().
+// Pure builder — applied via setCssStyles().
+export function noteMenuMinimizeDisplay(minimized: boolean): {
+	body: string;
+	grip: string;
+} {
+	return {
+		body: minimized ? "none" : "flex",
+		grip: minimized ? "none" : "",
+	};
+}
+
 // Container CSS for one of the note-navigator's two tab bars. Two shapes:
 //   top — the top-level Data/Settings/Insight bar in the header: the underline
 //         divider that the active tab's accent sits on (marginBottom:-1px on the

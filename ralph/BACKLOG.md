@@ -408,6 +408,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         rewrite). Now one pure predicate; `/`-delimited descendant only (bare prefix
         "foobar" vs "foo" is NOT a hit, locked by test). Behaviour-identical. Not a
         note-menu/F2 seam but a genuine duplicate discovered while seam-hunting. — cf70a6b
+  - [x] minimize body/grip display map → `noteMenuMinimizeDisplay(minimized)`
+        (`src/interaction/note-menu-geom.ts`, next to `noteMenuTopTabDisplay`/
+        `noteMenuDataSubTabDisplay`) + a case in `test/note-menu-geom.test.ts`. The two
+        body+grip `setCssStyles({display})` pairs in `applyMinimizedState`'s
+        minimized/expanded branches (`bodyWrap` none↔flex, `grip` none↔default) are now
+        one pure builder returning `{body, grip}` applied once before the height branch;
+        the panel-height computation (`noteMenuHeight` + restore-rect bookkeeping) stays
+        in the view. Behaviour-identical (same display strings per state). — PENDING
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
