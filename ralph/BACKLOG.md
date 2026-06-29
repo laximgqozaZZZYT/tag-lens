@@ -391,6 +391,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `var(--color-yellow)` label colour. Now one pure builder returning `{rowBg,
         labelColor?}`; the view computes the predicate once and applies the records.
         Behaviour-identical (same hex/yellow/empty-bg default). — 2cde31e
+  - [x] Data ▸ JSON status error-list formatter → `formatJsonStatusLines(errors,
+        cap = JSON_STATUS_ERROR_CAP)` (`src/interaction/preset-io.ts`, next to
+        `buildViewStateBundle`) + cases in `test/preset-io.test.ts`. The status block in
+        `renderDataJsonBody` inlined the error presentation twice over the magic cap 20
+        (`• ${e}` bullets on the first 20, then "…and N more." overflow); now one pure
+        builder returning `{errorLines, moreText}`, the view loops the strings + applies
+        the already-extracted status styles. Behaviour-identical (same glyph/cap/overflow
+        text, input untouched). — 99fb8ea
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
