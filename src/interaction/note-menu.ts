@@ -272,6 +272,20 @@ export function folderToggleLabel(text: string, open: boolean): string {
 	return `${open ? "▾" : "▸"} ${text}`;
 }
 
+// Disclosure descriptor for a collapsible navigator row: pairs the kids-div
+// `display` (open → "block", closed → "none") with the triangle-prefixed label
+// from folderToggleLabel. The tree builder inlines this exact pair four times
+// (openAll/closeAll for the "(all)" header, openFolder/closeFolder for regular
+// folders); centralising it here keeps the block↔open / none↔closed mapping in
+// one place (mirrors the noteMenuTopTabDisplay / noteMenuMinimizeDisplay maps).
+// The view applies `display` to the kids-div and `label` to the row's label
+// span; all event wiring stays in the view.
+//
+// Exported so the open↔display mapping is unit-testable independently of the DOM.
+export function folderDisclosure(text: string, open: boolean): { display: string; label: string } {
+	return { display: open ? "block" : "none", label: folderToggleLabel(text, open) };
+}
+
 // All DISTINCT descendant note hide-keys under a tree node, recursively across
 // nested folders AND combination subgroups. A note that appears under multiple
 // groups (e.g. a combo placed under each constituent tag) is counted ONCE.

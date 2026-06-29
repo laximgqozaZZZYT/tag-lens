@@ -129,7 +129,7 @@ import {
 	positionTip as positionTipFn,
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
-import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, checkboxAriaChecked, buildFolderPathKey, folderToggleLabel, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion, type FolderCheckState } from "./interaction/note-menu";
+import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, checkboxAriaChecked, buildFolderPathKey, folderToggleLabel, folderDisclosure, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion, type FolderCheckState } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { buildViewStateBundle, formatJsonStatusLines, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
@@ -3349,16 +3349,18 @@ export class MiniGraphView extends ItemView {
 			kids.setCssStyles({ display: "none" });
 			let built = false;
 			const openAll = (): void => {
-				kids.setCssStyles({ display: "block" });
-				lbl.textContent = folderToggleLabel("(all)", true);
+				const d = folderDisclosure("(all)", true);
+				kids.setCssStyles({ display: d.display });
+				lbl.textContent = d.label;
 				if (!built) {
 					for (const lf of leaves) leafRow(kids, lf.id, lf.label, depth + 1);
 					built = true;
 				}
 			};
 			const closeAll = (): void => {
-				kids.setCssStyles({ display: "none" });
-				lbl.textContent = folderToggleLabel("(all)", false);
+				const d = folderDisclosure("(all)", false);
+				kids.setCssStyles({ display: d.display });
+				lbl.textContent = d.label;
 			};
 			lbl.addEventListener("click", () => {
 				if (kids.style.display !== "none") closeAll(); else openAll();
@@ -3419,8 +3421,9 @@ export class MiniGraphView extends ItemView {
 				let built = false;
 				// Open this folder (build children lazily if not yet built).
 				const openFolder = (): void => {
-					kids.setCssStyles({ display: "block" });
-					lbl.textContent = folderToggleLabel(display, true);
+					const d = folderDisclosure(display, true);
+					kids.setCssStyles({ display: d.display });
+					lbl.textContent = d.label;
 					if (!built) {
 						// (all) subtree: in tag-tree mode, folders with sub-folders get a
 						// collapsible "(all)" at the top listing every descendant note.
@@ -3436,8 +3439,9 @@ export class MiniGraphView extends ItemView {
 				};
 				// Close this folder.
 				const closeFolder = (): void => {
-					kids.setCssStyles({ display: "none" });
-					lbl.textContent = folderToggleLabel(display, false);
+					const d = folderDisclosure(display, false);
+					kids.setCssStyles({ display: d.display });
+					lbl.textContent = d.label;
 				};
 				lbl.addEventListener("click", () => {
 					if (kids.style.display !== "none") closeFolder(); else openFolder();

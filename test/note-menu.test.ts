@@ -28,6 +28,7 @@ import {
 	checkboxAriaChecked,
 	buildFolderPathKey,
 	folderToggleLabel,
+	folderDisclosure,
 	suggestKeyAction,
 	type NoteRef,
 	type TreeNode,
@@ -929,6 +930,17 @@ const advNotes: NoteRef[] = [
 	ok(folderToggleLabel("(all)", true) === "▾ (all)", "folderToggleLabel: open (all) header");
 	// Glyph + single space + text exactly; the open/closed forms differ only by glyph.
 	ok(folderToggleLabel("X", true).slice(1) === folderToggleLabel("X", false).slice(1), "folderToggleLabel: only the leading glyph differs");
+}
+
+// ── folderDisclosure: kids-div display paired with the toggle label ──────────
+// The four open/close handlers (openAll/closeAll, openFolder/closeFolder) inline
+// the same {display, label} pair; open → "block", closed → "none", label from
+// folderToggleLabel. Centralises the block↔open / none↔closed mapping.
+{
+	ok(folderDisclosure("Area", true).display === "block", "folderDisclosure: open → block");
+	ok(folderDisclosure("Area", false).display === "none", "folderDisclosure: closed → none");
+	ok(folderDisclosure("Area", true).label === folderToggleLabel("Area", true), "folderDisclosure: open label matches folderToggleLabel");
+	ok(folderDisclosure("(all)", false).label === folderToggleLabel("(all)", false), "folderDisclosure: closed label matches folderToggleLabel");
 }
 
 // ── STATE-PRESERVATION CONTRACT (pure invariant) ─────────────────────────────
