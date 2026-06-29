@@ -44,6 +44,22 @@ export function buildViewStateBundle(nodes: GraphNode[], settings: MiniSettings)
 	};
 }
 
+// Default cap on how many import/bundled-load error lines the JSON status block
+// renders before collapsing the rest into a "…and N more." summary.
+export const JSON_STATUS_ERROR_CAP = 20;
+
+// Format the Data ▸ JSON status block error list: bullet-prefix up to `cap`
+// errors, then a single "…and N more." line for any overflow (null when none).
+// Pure presentation — the input array is never mutated.
+export function formatJsonStatusLines(
+	errors: string[],
+	cap: number = JSON_STATUS_ERROR_CAP,
+): { errorLines: string[]; moreText: string | null } {
+	const errorLines = errors.slice(0, cap).map((e) => `• ${e}`);
+	const overflow = errors.length - cap;
+	return { errorLines, moreText: overflow > 0 ? `…and ${overflow} more.` : null };
+}
+
 // Query fields that MUST be arrays / a string for a preset to be applyLens-safe.
 const QUERY_ARRAY_KEYS = ["selectedBases"] as const;
 

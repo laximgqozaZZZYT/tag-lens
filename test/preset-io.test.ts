@@ -1,6 +1,6 @@
 // F1-1 — pure preset (de)serialization. Round-trip fidelity + tolerant parsing.
 import { ok } from "./assert";
-import { serializePresets, parsePresets, presetFileName, mergePresets, buildViewStateBundle, PRESET_SCHEMA, PRESET_SCHEMA_VERSION } from "../src/interaction/preset-io";
+import { serializePresets, parsePresets, presetFileName, mergePresets, buildViewStateBundle, formatJsonStatusLines, JSON_STATUS_ERROR_CAP, PRESET_SCHEMA, PRESET_SCHEMA_VERSION } from "../src/interaction/preset-io";
 import { captureLens } from "../src/interaction/lens-presets";
 import { DEFAULT_SETTINGS } from "../src/types";
 import type { GraphNode, LensPreset } from "../src/types";
@@ -122,4 +122,31 @@ const sample: LensPreset[] = [
 	// Inputs untouched (shallow copies).
 	ok(nodes[0].mtime === 123 && nodes[0].ageDays === 4, "input node not mutated");
 	ok("lensPresets" in settings, "input settings not mutated");
+}
+
+// formatJsonStatusLines: bullet-prefix up to the cap, overflow → "…and N more.".
+{
+	// Empty → no lines, no overflow.
+	const none = formatJsonStatusLines([]);
+	ok(none.errorLines.length === 0 && none.moreText === null, "empty errors → no lines/more");
+
+	// Under cap → every error bulleted, no "more".
+	const few = formatJsonStatusLines(["bad name", "missing query"]);
+	ok(few.errorLines.length === 2 && few.moreText === null, "under-cap → all bulleted, no more");
+	ok(few.errorLines[0] === "• bad name", "errors are bullet-prefixed");
+
+	// Exactly cap → all shown, no overflow line.
+	const exact = formatJsonStatusLines(Array.from({ length: JSON_STATUS_ERROR_CAP }, (_, i) => `e${i}`));
+	ok(exact.errorLines.length === JSON_STATUS_ERROR_CAP && exact.moreText === null, "exactly cap → no more line");
+
+	// Over cap → capped lines + "…and N more.".
+	const over = formatJsonStatusLines(Array.from({ length: JSON_STATUS_ERROR_CAP + 3 }, (_, i) => `e${i}`));
+	ok(over.errorLines.length === JSON_STATUS_ERROR_CAP, "over-cap → lines capped at cap");
+	ok(over.moreText === "…and 3 more.", "overflow summarized");
+
+	// Custom cap honoured; input array not mutated.
+	const src = ["a", "b", "c"];
+	const custom = formatJsonStatusLines(src, 1);
+	ok(custom.errorLines.length === 1 && custom.moreText === "…and 2 more.", "custom cap honoured");
+	ok(src.length === 3, "input array not mutated");
 }
