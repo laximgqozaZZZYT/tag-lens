@@ -430,7 +430,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         id, NO per-tag duplication), no clusters / edges, full membership +
         encoding-attr propagation, deterministic overlap-free row-major grid as the
         pre-axis fallback. Edges left empty for now — F2.5 (draw) decides whether
-        scatter renders relation lines between dots.
+        scatter renders relation lines between dots. — 72af79e
   - [ ] **F2.4 axis placement on** — treat `"scatter"` as a card mode in
         `applyAxisLayout` + default `axisX`/`axisY` to quantitative when unset;
         unit-test the pure defaulting helper.
