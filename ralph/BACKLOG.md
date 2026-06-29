@@ -423,9 +423,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `buildModeLegendBody`, `legendAnchor`) both have `default` cases and the
         `Record<ViewMode>` uses are `Partial`, so no per-mode handling needed.
         Mode is selectable; renders fallback until F2.3 layout lands. — 657f257
-  - [ ] **F2.3 layout dispatch** — flat card layout (no clusters) for
-        `viewMode === "scatter"` in `src/layout/layout.ts` (~line 339, `grep -a`);
-        unit-test: one node per displayed note, no clusters.
+  - [x] **F2.3 layout dispatch** — flat card layout for `viewMode === "scatter"`
+        via new pure `layoutScatter` (`src/layout/scatter-layout.ts`) +
+        `test/scatter-layout.test.ts`; wired into `layout()`'s dispatch
+        (`src/layout/layout.ts`). One PositionedNode per displayed note (id = note
+        id, NO per-tag duplication), no clusters / edges, full membership +
+        encoding-attr propagation, deterministic overlap-free row-major grid as the
+        pre-axis fallback. Edges left empty for now — F2.5 (draw) decides whether
+        scatter renders relation lines between dots.
   - [ ] **F2.4 axis placement on** — treat `"scatter"` as a card mode in
         `applyAxisLayout` + default `axisX`/`axisY` to quantitative when unset;
         unit-test the pure defaulting helper.

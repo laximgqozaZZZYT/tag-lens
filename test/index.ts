@@ -30,6 +30,7 @@ import "./bridge-finder.test";
 import "./status-overlay.test";
 import "./note-maturity.test";
 import "./heatmap-layout.test";
+import "./scatter-layout.test";
 import "./display-applicability.test";
 import "./encoding-scales.test";
 import "./encoding-evaluate.test";

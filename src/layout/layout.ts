@@ -13,6 +13,7 @@ import { layoutUpset } from "./upset-layout";
 import type { AxisSpec } from "./axis-layout";
 import { layoutHeatmap } from "./heatmap-layout";
 import { layoutLattice } from "./lattice-layout";
+import { layoutScatter } from "./scatter-layout";
 import { buildGallery, type DrosteGallery } from "./droste-layout";
 import { buildRouteObstacles } from "./layout-shared";
 import { computeChannelDims, minFontScale } from "./card-sizing";
@@ -368,6 +369,7 @@ export function layout(data: GraphData, sized: SizedNode[], opts: LayoutOptions)
 		// rectangular iso-contour).
 		return layoutEulerTrue(data, sized, opts);
 	}
+	if (opts.viewMode === "scatter") return layoutScatter(data, sized, opts);
 	return layoutEulerNested(data, sized, opts);
 }
 
