@@ -85,6 +85,7 @@ import "./node-draw-list.test";
 import "./junihitoe-stack-list.test";
 import "./aggregate-stack-list.test";
 import "./view-line-ratchet.test";
+import "./pluralize.test";
 
 
 summary();

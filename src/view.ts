@@ -114,6 +114,7 @@ import {
 	type SettingsSubTab,
 } from "./panel/settings-tabs";
 import { viewRootStyle, viewCanvasStyle } from "./view-shell-style";
+import { pluralize } from "./util/pluralize";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes } from "./panel/menu-notes";
 import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVault } from "./panel/export-image";
@@ -840,7 +841,7 @@ export class MiniGraphView extends ItemView {
 		// ── Export ──
 		const presetCount = this.settings.lensPresets.length;
 		const nodeCount = this.laid?.nodes?.length || 0;
-		const expLabel = host.createDiv({ text: `Export View State (${nodeCount} node${nodeCount === 1 ? "" : "s"}, ${presetCount} preset${presetCount === 1 ? "" : "s"})` });
+		const expLabel = host.createDiv({ text: `Export View State (${pluralize(nodeCount, "node")}, ${pluralize(presetCount, "preset")})` });
 		expLabel.setCssStyles(noteMenuJsonLabelStyle("4px 0 2px"));
 
 		// Node-stripping + schema/version wrapping + lensPresets split now live in
@@ -880,7 +881,7 @@ export class MiniGraphView extends ItemView {
 				this.refreshFilterTab();
 			}
 			const msg = presets.length > 0
-				? `Imported ${presets.length} preset${presets.length === 1 ? "" : "s"}.`
+				? `Imported ${pluralize(presets.length, "preset")}.`
 				: "No valid presets found.";
 			this.renderDataJsonBody(host, { msg, errors });
 		});
@@ -893,7 +894,7 @@ export class MiniGraphView extends ItemView {
 			void this.save();
 			this.syncLensCommands(this.settings.lensPresets);
 			this.refreshFilterTab();
-			this.renderDataJsonBody(host, { msg: `Added ${added} bundled preset${added === 1 ? "" : "s"}.`, errors: [] });
+			this.renderDataJsonBody(host, { msg: `Added ${pluralize(added, "bundled preset")}.`, errors: [] });
 		});
 
 		// ── Status (last import / bundled-load) ──
