@@ -340,6 +340,15 @@ export function folderCheckState(descendantKeys: string[], hiddenSet: Set<string
 	return "indeterminate";
 }
 
+// ARIA `aria-checked` value for a tri-state checkbox. The custom `gim-nav-cb`
+// span (leaf + folder rows) carries `data-state` for the CSS glyph and this
+// matching `aria-checked` for assistive tech: indeterminate → "mixed", checked
+// → "true", unchecked → "false" (the WAI-ARIA tri-state checkbox contract).
+export function checkboxAriaChecked(state: FolderCheckState): "mixed" | "true" | "false" {
+	if (state === "indeterminate") return "mixed";
+	return state === "checked" ? "true" : "false";
+}
+
 // Display label for a note: the final segment of its id path (after stripping
 // any Euler-copy tab prefix so the label always shows the real filename).
 function leafLabel(note: NoteRef): string {

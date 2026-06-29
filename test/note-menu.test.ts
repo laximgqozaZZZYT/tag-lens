@@ -25,6 +25,7 @@ import {
 	bulkSetHidden,
 	collectDescendantNoteKeys,
 	folderCheckState,
+	checkboxAriaChecked,
 	buildFolderPathKey,
 	folderToggleLabel,
 	suggestKeyAction,
@@ -726,6 +727,21 @@ const advNotes: NoteRef[] = [
 	ok(folderCheckState(keys, new Set(["b.md"])) === "indeterminate", "folderCheckState: some hidden → indeterminate");
 	// Empty group → defaults checked (no descendants).
 	ok(folderCheckState([], new Set(["x"])) === "checked", "folderCheckState: empty group → checked");
+}
+
+// checkboxAriaChecked: WAI-ARIA tri-state checkbox contract. The `data-state`
+// the view stamps maps to aria-checked: indeterminate → "mixed", checked →
+// "true", unchecked → "false".
+{
+	ok(checkboxAriaChecked("checked") === "true", "checkboxAriaChecked: checked → true");
+	ok(checkboxAriaChecked("unchecked") === "false", "checkboxAriaChecked: unchecked → false");
+	ok(checkboxAriaChecked("indeterminate") === "mixed", "checkboxAriaChecked: indeterminate → mixed");
+	// Round-trips with folderCheckState — every tri-state it can return has an
+	// aria value (no "undefined"/empty leak to assistive tech).
+	for (const st of ["checked", "unchecked", "indeterminate"] as const) {
+		const v = checkboxAriaChecked(st);
+		ok(v === "true" || v === "false" || v === "mixed", `checkboxAriaChecked: ${st} → valid aria value`);
+	}
 }
 
 // CASCADE semantics: toggling a fully-checked folder hides ALL descendants;
