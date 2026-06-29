@@ -408,8 +408,32 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `test/note-menu-geom.test.ts:56`. — 152614b
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
-      view mode. Large feature: first iteration writes a short plan under
-      `docs/<latest>/`, then implement layout → draw → settings → E2E across iterations.
+      view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
+      the axis machinery already exists as an *encoding overlay* (pure `axisLayout`
+      + `applyAxisLayout` gated to euler/bubblesets/droste + `drawAxisGrid`/
+      `draw-helpers` axis rendering + shared zoom/pan); F2 is **promotion, not
+      invention**. Do one sub-step per iteration, each verify-green.
+  - [x] short plan under `docs/0.3.21/f2-scatter-mode.md` (mode id `"scatter"`,
+        panorama, reuse card layout + `axisLayout`; 8 implementation sub-steps).
+  - [ ] **F2.2 types + picker** — add `"scatter"` to the `ViewMode` union
+        (`src/types.ts`) + a `VIEW_MODES` entry (`experimental: true`, panorama).
+        Update `test/view-mode-picker.test.ts` if it locks the mode set. Smallest
+        safe slice (mode selectable, renders fallback until layout lands).
+  - [ ] **F2.3 layout dispatch** — flat card layout (no clusters) for
+        `viewMode === "scatter"` in `src/layout/layout.ts` (~line 339, `grep -a`);
+        unit-test: one node per displayed note, no clusters.
+  - [ ] **F2.4 axis placement on** — treat `"scatter"` as a card mode in
+        `applyAxisLayout` + default `axisX`/`axisY` to quantitative when unset;
+        unit-test the pure defaulting helper.
+  - [ ] **F2.5 draw** — route scatter through card `drawBodyTile` + `laid.axes`
+        grid; render-smoke test (mock ctx) à la `bubblesets-render-smoke`.
+  - [ ] **F2.6 settings** — Scatter X/Y attr + scale pickers (reuse encoding
+        controls); default-mode merge guard in `main.ts` if needed.
+  - [ ] **F2.7 applicability + per-mode guards** — sync
+        `display-applicability.ts` + `draw()` guard table for scatter.
+  - [ ] **F2.8 E2E** — CDP scenario: switch to scatter, bind X/Y, verify
+        *reflection* (node count unchanged, `laid.axes.x/y` populated, distinct
+        positions), not just "no exception".
 
 ## Done
 
