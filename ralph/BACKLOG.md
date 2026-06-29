@@ -374,6 +374,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         subtree header, each at initial render and on open/close) with an
         inconsistent literal-vs-`\u` escape glyph spelling; now one pure builder.
         Behaviour-identical (same glyphs, same single space). — f3d0494
+  - [x] count-noun plural idiom dedup → `pluralize(count, singular)`
+        (`src/util/pluralize.ts`, the first module under the new `src/util/`) +
+        `test/pluralize.test.ts`. The trailing-`s` plural `${n} word${n === 1 ? "" :
+        "s"}` was repeated 5× across the Data ▸ JSON tab labels in `renderDataJsonBody`
+        (export header node+preset counts, import result, bundled-load result) and the
+        mode-legend size suffix (`draw/mode-legend-input.ts`); all collapsed into one
+        pure builder. Behaviour-identical (regular-`s`; multi-word "bundled preset"
+        pluralizes on the tail). — d713f89
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
