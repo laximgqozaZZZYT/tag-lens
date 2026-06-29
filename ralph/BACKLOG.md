@@ -479,6 +479,21 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
           guard needed (bindings live in the existing `settings.encoding[]`). — 62a0b8a
   - [ ] **F2.7 applicability + per-mode guards** — sync
         `display-applicability.ts` + `draw()` guard table for scatter.
+    - [x] **F2.7a applicability** — `displayToggleApplies("scatter", …)`
+          (`src/visual/display-applicability.ts`) now returns false for
+          `showEnclosures`/`showEdges` (layoutScatter emits no clusters/edges, so
+          those overlays are inert), true for the rest; cases added to
+          `test/display-applicability.test.ts`. The six existing modes stay all-true.
+          The Display panel's "Graph display" filter + the Bridge-finder section
+          gate (both call `displayToggleApplies`) now drop the inert toggles in
+          scatter automatically.
+    - [ ] **F2.7b draw() guard table** — scatter currently relies on empty
+          clusters/edges to make the card-path enclosure/edge draws no-ops
+          (`computeEnclosureDrawInput`/`computeEdgeDrawPlan` already short-circuit on
+          empty/false). Decide whether to add an explicit `mode === "scatter"`
+          suppression in those builders for clarity, or leave the data-driven no-op
+          as-is + add a render-smoke assertion that scatter emits zero enclosure/edge
+          ops even with showEnclosures/showEdges on.
   - [ ] **F2.8 E2E** — CDP scenario: switch to scatter, bind X/Y, verify
         *reflection* (node count unchanged, `laid.axes.x/y` populated, distinct
         positions), not just "no exception".

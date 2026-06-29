@@ -18,7 +18,10 @@ export type DisplayToggleKey =
 // Modes whose figure is built from world-space cards via drawBodyTile/drawCard:
 // every card toggle and per-card overlay applies.
 
-
-export function displayToggleApplies(_mode: ViewMode, _key: DisplayToggleKey): boolean {
+export function displayToggleApplies(mode: ViewMode, key: DisplayToggleKey): boolean {
+	// Scatter is a flat card scatterplot built per-note: layoutScatter emits no
+	// clusters and no edges, so the enclosure/edge overlays are inert. Hide their
+	// toggles in scatter's Display panel. Every other mode keeps the full set.
+	if (mode === "scatter") return key !== "showEnclosures" && key !== "showEdges";
 	return true;
 }
