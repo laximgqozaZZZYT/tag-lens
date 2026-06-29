@@ -130,7 +130,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, folderToggleLabel, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { buildViewStateBundle, formatJsonStatusLines, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -3491,7 +3491,7 @@ export class MiniGraphView extends ItemView {
 		};
 		const renderSelection = (): void => {
 			const rows = Array.from(suggBox.children) as HTMLElement[];
-			rows.forEach((r, i) => { r.setCssStyles({ background: i === selIdx ? "var(--background-modifier-border)" : "" }); });
+			rows.forEach((r, i) => { r.setCssStyles(noteMenuSuggestSelectionStyle(i === selIdx)); });
 		};
 		const closeSuggest = (): void => {
 			suggBox.setCssStyles({ display: "none" });

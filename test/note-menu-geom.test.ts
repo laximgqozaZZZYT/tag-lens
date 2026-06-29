@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -297,6 +297,13 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(s.row.padding === "3px 8px" && s.row.cursor === "pointer", "row: padded, pointer");
 	ok(s.row.whiteSpace === "nowrap" && s.row.overflow === "hidden" && s.row.textOverflow === "ellipsis", "row: single-line ellipsis");
 	ok(s.glyph.width === "10px" && s.glyph.flex === "0 0 auto" && s.glyph.textAlign === "center", "glyph: fixed-width centred (colour applied per-kind)");
+}
+
+// noteMenuSuggestSelectionStyle: the selected suggestion row gets the modifier-border
+// background; all others clear it (empty string resets to the row default).
+{
+	ok(noteMenuSuggestSelectionStyle(true).background === "var(--background-modifier-border)", "selected: modifier-border bg");
+	ok(noteMenuSuggestSelectionStyle(false).background === "", "unselected: cleared bg");
 }
 
 // noteMenuLeftGripStyle: the pinned panel's thin transparent left-edge resize strip.

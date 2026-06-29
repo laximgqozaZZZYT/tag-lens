@@ -416,6 +416,14 @@ export function noteMenuSuggestStyle(): {
 	};
 }
 
+// The keyboard/hover selection highlight for a suggestion row: the selected row
+// gets the modifier-border background, all others clear it (empty string resets
+// to the row's default). Pure so the magic CSS var lives in one place; the view
+// loops the rows and applies it per row from the live `selIdx`.
+export function noteMenuSuggestSelectionStyle(selected: boolean): Partial<CSSStyleDeclaration> {
+	return { background: selected ? "var(--background-modifier-border)" : "" };
+}
+
 // Static chrome for a Tree-pane row + its ellipsised label. Three kinds:
 //  - "leaf":   a note row (cursor pointer, rounded, dynamic `baseBg` highlight);
 //              its label has no cursor (the row-click focus lives on the row).
