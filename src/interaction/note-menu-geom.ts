@@ -448,6 +448,22 @@ export function noteMenuTreeRowStyle(
 	};
 }
 
+// The "current note" highlight for a Tree-pane leaf row: when the leaf is the
+// note the canvas is currently focused on, its row gets a translucent accent
+// wash (the same #2d6cdf accent as draw/theme.ts, at ~33% alpha) and its label
+// turns yellow. The accent hex is kept local here (not imported from the draw
+// layer) so this geometry module stays free of draw-layer deps. `rowBg` is also
+// the colour the row's mouseleave restores to. No highlight → empty bg and no
+// label-colour override.
+export function noteMenuLeafHighlight(isCurrent: boolean): {
+	rowBg: string;
+	labelColor?: string;
+} {
+	return isCurrent
+		? { rowBg: "#2d6cdf55", labelColor: "var(--color-yellow)" }
+		: { rowBg: "" };
+}
+
 // Data ▸ JSON tab chrome: the three repeated style blocks in renderDataJsonBody
 // (the export/import section labels, the read-only/paste textareas, and the
 // Copy/Save · Import/Bundled button rows) collapse onto these pure builders.

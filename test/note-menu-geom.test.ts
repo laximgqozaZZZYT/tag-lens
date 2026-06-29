@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -326,6 +326,20 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	ok(all.row.color === "var(--text-faint)" && all.row.fontStyle === "italic", "all: faint, italic");
 	ok(all.row.paddingLeft === `${26 + 1 * 12}px`, "all: extra checkbox-width indent (26 + depth*12)");
 	ok(all.label.cursor === "pointer", "all label: collapse cursor");
+}
+
+// noteMenuLeafHighlight: the "current note" leaf-row highlight (accent wash +
+// yellow label); rowBg is also what mouseleave restores to.
+{
+	const on = noteMenuLeafHighlight(true);
+	ok(on.rowBg === "#2d6cdf55", "highlight on: translucent accent wash (matches draw/theme accent + alpha)");
+	ok(on.labelColor === "var(--color-yellow)", "highlight on: yellow label");
+	// rowBg feeds noteMenuTreeRowStyle's baseBg, so it must round-trip into the leaf row.
+	ok(noteMenuTreeRowStyle("leaf", 0, on.rowBg).row.background === "#2d6cdf55", "highlight on: rowBg threads into leaf row background");
+
+	const off = noteMenuLeafHighlight(false);
+	ok(off.rowBg === "", "highlight off: no background wash");
+	ok(off.labelColor === undefined, "highlight off: no label-colour override");
 }
 
 // Data ▸ JSON tab chrome: label margin and textarea height are params; the rest

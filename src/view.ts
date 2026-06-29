@@ -129,7 +129,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, folderToggleLabel, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { buildViewStateBundle, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -3280,9 +3280,8 @@ export class MiniGraphView extends ItemView {
 
 		const leafRow = (container: HTMLElement, id: string, label: string, depth: number): HTMLElement => {
 			const row = container.createDiv();
-			const highlightId = this.currentMenuHighlightId();
-			const baseBg = id === highlightId ? "#2d6cdf55" : "";
-			const leafStyle = noteMenuTreeRowStyle("leaf", depth, baseBg);
+			const hl = noteMenuLeafHighlight(id === this.currentMenuHighlightId());
+			const leafStyle = noteMenuTreeRowStyle("leaf", depth, hl.rowBg);
 			row.setCssStyles(leafStyle.row);
 			// Per-note visibility checkbox. CHECKED ⇔ the note is NOT hidden. The
 			// state is GLOBAL per note (driven by hiddenNodes, keyed by PATH) so a
@@ -3312,9 +3311,9 @@ export class MiniGraphView extends ItemView {
 			// The label carries the row-click behaviour (focus/locate/open) + ellipsis.
 			const lbl = row.createSpan({ text: label });
 			lbl.setCssStyles(leafStyle.label);
-			if (id === highlightId) lbl.setCssStyles({ color: "var(--color-yellow)" });
+			if (hl.labelColor) lbl.setCssStyles({ color: hl.labelColor });
 			row.addEventListener("mouseenter", () => { row.setCssStyles({ background: "var(--background-modifier-border)" }); });
-			row.addEventListener("mouseleave", () => { row.setCssStyles({ background: baseBg }); });
+			row.addEventListener("mouseleave", () => { row.setCssStyles({ background: hl.rowBg }); });
 			lbl.addEventListener("click", () => this.focusNoteFromMenu(id));
 			return row;
 		};
