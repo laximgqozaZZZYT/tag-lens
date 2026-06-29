@@ -499,7 +499,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
           empty clusters/edges, not a suppressed gate. Adding a `mode === "scatter"`
           short-circuit was rejected as redundant: it would duplicate the empty-data
           contract the layout already guarantees (`layoutScatter` emits no
-          clusters/edges) without changing any output. — 
+          clusters/edges) without changing any output. — db5a0ce
   - [ ] **F2.8 E2E** — CDP scenario: switch to scatter, bind X/Y, verify
         *reflection* (node count unchanged, `laid.axes.x/y` populated, distinct
         positions), not just "no exception".
