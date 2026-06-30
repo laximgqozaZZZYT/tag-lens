@@ -10,6 +10,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
 
 ## Open
 
+### Highest priority — user-facing correctness bug
+
+- [ ] **`.base` filter grammar — `containsAny`/`containsAll` etc. (graph goes empty).**
+      `file.tags.containsAny("書籍","小説")` matches 0 notes because `unquote` mangles the
+      multi-arg string and `evalCond` only knows `contains`. Full spec + decomposed
+      tasks T1–T4 in `docs/superpowers/plans/2026-06-30-base-filter-grammar.md`. Do ONE
+      sub-task (T1→T4) per iteration. Keep `src/bases/parser.ts` & `resolve.ts` pure
+      (no `obsidian`) and **never throw** on unknown grammar.
+
 ### Small / additive (do these first to build momentum)
 
 (none open)
