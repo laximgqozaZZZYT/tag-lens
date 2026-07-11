@@ -467,6 +467,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         (indeterminate → "mixed", checked → "true", unchecked → "false"); now a pure
         builder, and the local `CbState` alias reuses `FolderCheckState`. Centralizes
         the WAI-ARIA tri-state contract; behaviour-identical. — cad3aa0
+  - [x] row-checkbox initial DOM descriptor → `noteMenuRowCheckboxSpec()` /
+        `NoteMenuRowCheckboxSpec` (`src/interaction/note-menu.ts`, next to
+        `checkboxAriaChecked`) + cases in `test/note-menu.test.ts`. The custom
+        tri-state row checkbox `<span>` (`gim-nav-cb`, every leaf + folder row)
+        seeded its `cls`/WAI-ARIA `attr`/initial `data-state` from an inline
+        literal in `mkRowCheckbox`; now a pure `{cls, state, attr}` descriptor
+        whose initial `aria-checked` derives from the same `state` through
+        `checkboxAriaChecked` (aria seed can't drift from the data-state seed).
+        The view applies it. Behaviour-identical (gim-nav-cb / role checkbox /
+        aria-checked "false" / tabindex "0" / data-state "unchecked"). — 5e32495
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
