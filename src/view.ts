@@ -119,6 +119,7 @@ import { viewRootStyle, viewCanvasStyle } from "./view-shell-style";
 import { pluralize } from "./util/pluralize";
 import { jaccardSimilarity } from "./util/jaccard";
 import { clampZoom } from "./util/clamp-zoom";
+import { pointInRect } from "./util/point-in-rect";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes } from "./panel/menu-notes";
 import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVault } from "./panel/export-image";
@@ -3957,8 +3958,8 @@ export class MiniGraphView extends ItemView {
 			// F5: begin dragging the legend panel (but not its × button).
 			{
 				const pr = this.legendPanelRect, cr0 = this.legendCloseRect;
-				const inClose = !!cr0 && sx >= cr0.x && sx <= cr0.x + cr0.w && sy >= cr0.y && sy <= cr0.y + cr0.h;
-				if (pr && !inClose && sx >= pr.x && sx <= pr.x + pr.w && sy >= pr.y && sy <= pr.y + pr.h) {
+				const inClose = !!cr0 && pointInRect(sx, sy, cr0);
+				if (pr && !inClose && pointInRect(sx, sy, pr)) {
 					// Detect scrollbar drag
 					if (this.legendMaxScrollY > 0 && sx >= pr.x + pr.w - 12) {
 						// Calculate absolute scroll position based on click Y coordinate
@@ -4142,7 +4143,7 @@ export class MiniGraphView extends ItemView {
 			// F5: the on-canvas legend's × dismisses the legend for the current mode.
 			// Screen-space, checked first so it wins over any canvas content beneath.
 			const cr = this.legendCloseRect;
-			if (cr && sx >= cr.x && sx <= cr.x + cr.w && sy >= cr.y && sy <= cr.y + cr.h) {
+			if (cr && pointInRect(sx, sy, cr)) {
 				this.sessionHiddenLegends.add(this.settings.viewMode);
 				this.draw();
 				return;
@@ -4299,7 +4300,7 @@ export class MiniGraphView extends ItemView {
 			const sy = e.clientY - rect.top;
 
 			const lr = this.legendPanelRect;
-			if (lr && sx >= lr.x && sx <= lr.x + lr.w && sy >= lr.y && sy <= lr.y + lr.h) {
+			if (lr && pointInRect(sx, sy, lr)) {
 				if (this.legendMaxScrollY > 0) {
 					const vmode = this.settings.viewMode;
 					const cur = this.legendScrollY[vmode] ?? 0;

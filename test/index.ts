@@ -98,6 +98,7 @@ import "./heatmap-detail.test";
 import "./hover-tip-text.test";
 import "./clamp-zoom.test";
 import "./content-bounds.test";
+import "./point-in-rect.test";
 
 
 summary();
