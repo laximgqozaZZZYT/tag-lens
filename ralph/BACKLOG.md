@@ -553,6 +553,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         cross-layer `draw/`→`interaction/` import). New `test/tab-prefix.test.ts`
         locks the behaviour (first-tab split, plain-path passthrough).
         Behaviour-identical. — a85a37c
+  - [x] fit-zoom clamp dedup → `clampZoom(value, min, max = 2)`
+        (`src/util/clamp-zoom.ts`, next to `pluralize`/`jaccard`/`tab-prefix`) +
+        `test/clamp-zoom.test.ts`. The two-sided fit clamp
+        `Math.min(max, Math.max(min, x))` was re-derived inline 5× across the initial
+        view-fit paths in `view.ts` (upset/lattice/heatmap/panorama/droste), in both
+        min/max orderings; all collapsed into the pure helper. Behaviour-identical
+        (`min <= max` at every site makes the clamp order-independent, so both old
+        spellings fold in; droste passes an explicit `max` of 3). Mirrors the
+        `clampPinnedWidth`/`pluralize` util dedups. — a17e1a9
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
