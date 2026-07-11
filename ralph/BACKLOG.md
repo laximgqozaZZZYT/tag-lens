@@ -501,6 +501,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         shows all. The existing cascade test now drives the predicate (evaluated ONCE
         before the toggle loop, mirroring the view — mid-loop state change must not
         flip it) instead of re-modelling the rule inline. Behaviour-identical.
+  - [x] leaf-row hover background swap → `noteMenuLeafRowHoverStyle(hover, rowBg)`
+        (`src/interaction/note-menu-geom.ts`, next to `noteMenuLeafHighlight`) + cases
+        in `test/note-menu-geom.test.ts`. The two inline mouseenter/mouseleave
+        `setCssStyles` blocks in `leafRow` (enter → modifier-border wash, leave →
+        restore `hl.rowBg`) are now thin applications of a pure builder; centralizes
+        the magic hover CSS var shared with `noteMenuSuggestSelectionStyle`.
+        Behaviour-identical. — a35cca2
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
