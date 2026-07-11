@@ -148,13 +148,17 @@ function mapChildren(arr: unknown[]): BaseFilter[] {
 export function parseCond(text: string): BaseCond | null {
 	const s = text.trim();
 
-	// method form, e.g. file.tags.contains("#tag")
+	// method form, e.g. file.tags.contains("#tag") or the multi-arg
+	// file.tags.containsAny("書籍", "小説"). Split the arg list on top-level
+	// commas (quoted commas preserved) so each argument is unquoted independently.
 	const m = s.match(/^([A-Za-z0-9_.]+)\.([A-Za-z_]+)\((.*)\)\s*$/);
 	if (m) {
 		const lhs = m[1];
 		const op = m[2];
-		const rhs = unquote(m[3].trim());
-		return { lhs, op, rhs };
+		const args = splitArgs(m[3]).map((a) => unquote(a.trim()));
+		// Mirror the first arg into `rhs` so single-value consumers keep working;
+		// multi-arg operators read the full `args` list.
+		return { lhs, op, rhs: args[0] ?? "", args };
 	}
 
 	// compare form. Longest operators first so `>=` isn't split as `>`.
@@ -169,6 +173,34 @@ export function parseCond(text: string): BaseCond | null {
 	}
 
 	return null;
+}
+
+// Split a method-call argument list on top-level commas, respecting quoted
+// strings so `containsAny("A", "B,C")` yields ['"A"', ' "B,C"']. Blank input
+// yields []. Never throws: an unbalanced quote just runs to the end of the
+// segment (the caller unquotes each piece leniently).
+function splitArgs(raw: string): string[] {
+	const s = raw.trim();
+	if (s.length === 0) return [];
+	const out: string[] = [];
+	let cur = "";
+	let quote: string | null = null;
+	for (const ch of s) {
+		if (quote) {
+			cur += ch;
+			if (ch === quote) quote = null;
+		} else if (ch === '"' || ch === "'") {
+			quote = ch;
+			cur += ch;
+		} else if (ch === ",") {
+			out.push(cur);
+			cur = "";
+		} else {
+			cur += ch;
+		}
+	}
+	out.push(cur);
+	return out;
 }
 
 function unquote(v: string): string {

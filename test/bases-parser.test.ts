@@ -98,6 +98,32 @@ import type { BaseFilter } from "../src/bases/types";
 
 	const c5 = parseCond("garbage");
 	ok(c5 === null, "no operator / no method → null");
+
+	// multi-arg method form: args split on top-level commas, each unquoted.
+	const c6 = parseCond('file.tags.containsAny("書籍", "小説")');
+	ok(
+		c6?.op === "containsAny" &&
+			c6?.args?.length === 2 &&
+			c6.args[0] === "書籍" &&
+			c6.args[1] === "小説" &&
+			c6.rhs === "書籍",
+		"containsAny multi-arg → args split + unquoted, rhs mirrors args[0]",
+	);
+
+	// quoted comma inside an argument must not split it.
+	const c7 = parseCond('file.tags.containsAll("a,b", "c")');
+	ok(
+		c7?.args?.length === 2 && c7.args[0] === "a,b" && c7.args[1] === "c",
+		"quoted comma preserved inside argument",
+	);
+
+	// single-arg method stays backward compatible via rhs and gains args[0].
+	const c8 = parseCond('file.tags.contains("#tag")');
+	ok(c8?.rhs === "#tag" && c8?.args?.length === 1 && c8.args[0] === "#tag", "single-arg method: rhs + args[0]");
+
+	// empty argument list → args empty, rhs "".
+	const c9 = parseCond("file.tags.isEmpty()");
+	ok(c9?.op === "isEmpty" && c9?.args?.length === 0 && c9?.rhs === "", "no-arg method → empty args, rhs \"\"");
 }
 
 console.log("bases-parser tests passed");
