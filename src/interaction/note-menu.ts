@@ -1,3 +1,5 @@
+import { stripTabPrefix } from "../util/tab-prefix";
+
 // Pure (DOM-less) decision logic for the mode-agnostic note navigator.
 //
 // The navigator (folder tree + search panel, built in view.ts) is shown in
@@ -195,15 +197,11 @@ function emptyTree(): TreeNode {
 	return { folders: new Map(), leaves: [] };
 }
 
-// Strip the Euler-nested-copy prefix from an id.
-// Euler/bubbles layout duplicates a note that appears in N intersection regions
-// by creating copies with id `${tag}\t${originalPath}`. All other modes use the
-// plain file path with no tab. Stripping the prefix lets the folder tree, the
-// leaf display label, and the search deduplicator work on the real file path.
-export function stripTabPrefix(id: string): string {
-	const tab = id.indexOf("\t");
-	return tab >= 0 ? id.slice(tab + 1) : id;
-}
+// Strip the Euler-nested-copy prefix from an id. The canonical definition lives
+// in the neutral `util/tab-prefix` module so `draw/` can share it without a
+// cross-layer import; re-exported here so the navigator's many call sites (and
+// its downstream importers) keep the stable `interaction/note-menu` API.
+export { stripTabPrefix };
 
 // ── Per-row graph-visibility checkboxes (pure, DOM-less) ─────────────────────
 // Every navigator row (note leaf + folder/tag/combo group) carries a checkbox.

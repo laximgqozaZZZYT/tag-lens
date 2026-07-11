@@ -93,6 +93,7 @@ import "./aggregate-stack-list.test";
 import "./view-line-ratchet.test";
 import "./pluralize.test";
 import "./jaccard.test";
+import "./tab-prefix.test";
 import "./heatmap-detail.test";
 
 
