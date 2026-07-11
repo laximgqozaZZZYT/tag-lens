@@ -18,6 +18,19 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
       tasks T1–T4 in `docs/superpowers/plans/2026-06-30-base-filter-grammar.md`. Do ONE
       sub-task (T1→T4) per iteration. Keep `src/bases/parser.ts` & `resolve.ts` pure
       (no `obsidian`) and **never throw** on unknown grammar.
+  - [x] **T1 — `BaseCond` multi-value.** Added optional `args?: string[]` to `BaseCond`
+        (`src/bases/types.ts`) alongside the single-value `rhs`; complementary, so the
+        single-value path stays backward-compatible. Type-only, no behaviour change. — 3b4a1b6
+  - [ ] **T2 — parse multi-arg method forms.** In `parseCond` split `<args>` respecting
+        quoted commas, `unquote` each into `string[]` → set `args` (mirror `args[0]` into
+        `rhs` for single-value consumers). Broken input → `null`/`{raw}` fallback, never
+        throw. Add `containsAny("A","B")` / quoted-comma / empty-arg cases to
+        `test/bases-parser.test.ts`.
+  - [ ] **T3 — `evalCond` operators.** Add `containsAny`/`containsAll`/`containsNone`/
+        `startsWith`/`endsWith`; keep `compare()` array-aware for `==`/`IN`. Unknown op →
+        false (no throw). Cases in `test/bases-resolve.test.ts`.
+  - [ ] **T4 — finish.** Run existing `.base` smoke/E2E; verify green; ensure a real
+        `containsAny` `.base` no longer empties the graph (smoke, CDP blocked here).
 
 ### Small / additive (do these first to build momentum)
 
