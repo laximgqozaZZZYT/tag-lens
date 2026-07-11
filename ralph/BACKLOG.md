@@ -474,6 +474,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         whose only logic is a single settings-field toggle — extract only if a genuine
         duplicate descriptor list emerges (mirror `basesToggleRows`). Otherwise pivot to
         the `ensureNoteMenu` body-builder seams or F2.
+  - [x] count-based Jaccard dedup → `jaccardFromCounts(sizeA, sizeB, intersection)`
+        (`src/util/jaccard.ts`, next to `jaccardSimilarity`) + cases in
+        `test/jaccard.test.ts`. The intersection-over-union-from-counts score
+        (`uni = |A|+|B|-∩`; 0 on empty union) was re-derived inline in the heatmap
+        cell colour intensity (`draw/draw-heatmap.ts`) and its hover tooltip
+        (`view.ts`); both now call the pure helper. Behaviour-identical (view's
+        `uni>0 ? … : "0.00"` folds into the helper's empty-union→0 then `.toFixed(2)`).
+        A count-based sibling of the earlier set-based `jaccardSimilarity` dedup. — a132f57
   - [x] Jaccard set-similarity dedup → `jaccardSimilarity(a, b)`
         (`src/util/jaccard.ts`, next to `pluralize`) + `test/jaccard.test.ts`. The
         intersection-over-union score `inter / union` (0 on empty union) was
