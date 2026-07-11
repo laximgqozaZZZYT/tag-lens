@@ -609,6 +609,10 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
       inventory key-set lock on `DEFAULT_SETTINGS`). No new work needed.
 - [x] **P4 — `view.ts` line-count ratchet.** `test/view-line-ratchet.test.ts`
       fails if `src/view.ts` exceeds baseline 4478 (ratchet only goes down). — 4045e0e
+  - [x] **ratchet tighten 4478 → 4374.** Prior pure-module extractions (through
+        `fee6321`) shrank `view.ts` to 4374 without lowering the ratchet, leaving
+        104 lines of slack; tightened `BASELINE` to the current 4374 (the test's
+        own documented companion action) to lock in the gains. No src change. — f358fa3
 - [x] **P1 — cognitive-complexity baseline.** Enabled
       `complexity/noExcessiveCognitiveComplexity` at `warn` in `biome.json` (warnings
       don't fail `biome lint`, so verify stays green); baseline **111 offenders**
