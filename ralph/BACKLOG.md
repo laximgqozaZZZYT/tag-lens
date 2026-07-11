@@ -481,7 +481,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `new Set` allocations behind a size-guard) and the redundant-tag-pair finder
         (`insight/compute.ts` — behind an unreachable `union===0` guard, both sets
         already size ≥ 2). Both now call the pure helper, which folds the empty-union
-        → 0 case in and iterates the smaller set. Behaviour-identical.
+        → 0 case in and iterates the smaller set. Behaviour-identical. — 94c101f
         **Follow-up:** `query/bridge-finder.ts` keeps its own loop because it also
         collects `sharedTags` while scanning; a `jaccardWithShared(a, b)` variant
         could dedup that third site if wanted.
