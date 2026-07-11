@@ -46,6 +46,17 @@ export function clampPinnedWidth(settingsWidth: number | undefined, containerWid
 	);
 }
 
+// The floating panel's absolute position/size as px CSS strings. Shared by the
+// initial `noteMenuPanelStyle` (floating branch) and every live drag/resize
+// re-apply (`applyRect`), so the rect→px mapping can't drift between them.
+// Pure builder: returns the style record the view applies via setCssStyles().
+export function noteMenuRectStyle(rect: MenuRect): Partial<CSSStyleDeclaration> {
+	return {
+		left: `${rect.left}px`, top: `${rect.top}px`,
+		width: `${rect.width}px`, height: `${rect.height}px`,
+	};
+}
+
 // Panel-container CSS for the note-navigator. Two looks, no DOM:
 //   pinned   — docked to the right edge: full height, fixed width, square corners,
 //              a left border only (like a standard docked side panel).
@@ -72,8 +83,7 @@ export function noteMenuPanelStyle(
 	}
 	return {
 		...common,
-		left: `${rect.left}px`, top: `${rect.top}px`, right: "", bottom: "",
-		width: `${rect.width}px`, height: `${rect.height}px`,
+		...noteMenuRectStyle(rect), right: "", bottom: "",
 		border: "1px solid var(--background-modifier-border)", borderRadius: "6px",
 		boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
 	};

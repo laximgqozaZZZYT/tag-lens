@@ -477,6 +477,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `checkboxAriaChecked` (aria seed can't drift from the data-state seed).
         The view applies it. Behaviour-identical (gim-nav-cb / role checkbox /
         aria-checked "false" / tabindex "0" / data-state "unchecked"). — 5e32495
+  - [x] floating-panel rect → px mapping dedup → `noteMenuRectStyle(rect)`
+        (`src/interaction/note-menu-geom.ts`, next to `noteMenuPanelStyle`) + a case in
+        `test/note-menu-geom.test.ts`. The `{left,top,width,height}` px-string mapping was
+        derived twice: `noteMenuPanelStyle`'s floating branch and `applyRect`'s four
+        separate `setCssStyles` calls in `ensureNoteMenu` (view.ts). Now one pure builder
+        both consume — the panel-init and every live drag/resize re-apply can't drift.
+        The four-call `applyRect` collapses to one `setCssStyles(noteMenuRectStyle(r))`.
+        Behaviour-identical; test locks the four props + that the floating panel reuses
+        the same mapping. Mirrors the `clampPinnedWidth` chrome dedups. — PENDING
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list

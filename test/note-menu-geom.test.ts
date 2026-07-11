@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuLeafRowHoverStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuLeafRowHoverStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, noteMenuRectStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -82,6 +82,19 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	// Shared chrome on both looks.
 	ok(pinned.background === "var(--background-secondary)" && floating.background === "var(--background-secondary)", "shared background");
 	ok(pinned.zIndex === "60" && floating.zIndex === "60", "shared z-index");
+}
+
+// noteMenuRectStyle: the floating rect → px mapping, shared by noteMenuPanelStyle's
+// floating branch and every live drag/resize re-apply. Only the four position/size
+// props, no chrome; matches the floating panel's rect props exactly.
+{
+	const rect: MenuRect = { left: 12, top: 34, width: 300, height: 400 };
+	const s = noteMenuRectStyle(rect);
+	ok(s.left === "12px" && s.top === "34px" && s.width === "300px" && s.height === "400px", "rect mapped to px strings");
+	ok(Object.keys(s).length === 4, "only the four position/size props");
+	// Can't drift from the floating panel's rect props.
+	const floating = noteMenuPanelStyle(false, rect, 256);
+	ok(floating.left === s.left && floating.top === s.top && floating.width === s.width && floating.height === s.height, "floating panel reuses the same rect mapping");
 }
 
 // noteMenuHeadStyle: cursor is the only difference — move when floating (drag handle),
