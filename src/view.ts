@@ -129,7 +129,7 @@ import {
 	positionTip as positionTipFn,
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
-import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, checkboxAriaChecked, buildFolderPathKey, folderToggleLabel, folderDisclosure, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion, type FolderCheckState } from "./interaction/note-menu";
+import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, folderCascadeHide, checkboxAriaChecked, buildFolderPathKey, folderToggleLabel, folderDisclosure, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion, type FolderCheckState } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { buildViewStateBundle, formatJsonStatusLines, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
@@ -3397,8 +3397,7 @@ export class MiniGraphView extends ItemView {
 					// IMPORTANT: same as the leaf checkbox — do NOT call rebuild() here.
 					// requestDraw() is enough; the draw() skipNode filter re-reads
 					// hiddenNodes fresh each frame.
-					const wasChecked = folderCheckState(descKeys, hiddenSetNow()) === "checked";
-					const hide = wasChecked;
+					const hide = folderCascadeHide(descKeys, hiddenSetNow());
 					for (const k of descKeys) this.toggleArrayMember("hiddenNodes", k, hide);
 					void this.save();
 					this.requestDraw();

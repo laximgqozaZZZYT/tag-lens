@@ -25,6 +25,7 @@ import {
 	bulkSetHidden,
 	collectDescendantNoteKeys,
 	folderCheckState,
+	folderCascadeHide,
 	checkboxAriaChecked,
 	buildFolderPathKey,
 	folderToggleLabel,
@@ -746,25 +747,33 @@ const advNotes: NoteRef[] = [
 }
 
 // CASCADE semantics: toggling a fully-checked folder hides ALL descendants;
-// toggling an indeterminate/unchecked folder shows ALL. Modelled with a plain
-// Set mutation that mirrors the view's per-key toggleArrayMember loop.
+// toggling an indeterminate/unchecked folder shows ALL. Driven by the pure
+// folderCascadeHide predicate (true = hide-all) the view now calls, mutating a
+// Set that mirrors the view's per-key toggleArrayMember loop.
 {
 	const keys = ["a.md", "b.md", "c.md"];
 	const hidden = new Set<string>();
+	// The view evaluates the cascade decision ONCE (before the toggle loop), so the
+	// mid-loop state change never flips it — mirror that here.
 	// fully checked → cascade HIDE all.
-	const wasChecked1 = folderCheckState(keys, hidden) === "checked";
-	for (const k of keys) { if (wasChecked1) hidden.add(k); else hidden.delete(k); }
+	const hide1 = folderCascadeHide(keys, hidden);
+	ok(hide1 === true, "folderCascadeHide: checked folder → hide");
+	for (const k of keys) { if (hide1) hidden.add(k); else hidden.delete(k); }
 	ok(folderCheckState(keys, hidden) === "unchecked", "cascade: checked folder → uncheck-all (all hidden)");
 	// now unchecked → cascade SHOW all.
-	const wasChecked2 = folderCheckState(keys, hidden) === "checked";
-	for (const k of keys) { if (wasChecked2) hidden.add(k); else hidden.delete(k); }
+	const hide2 = folderCascadeHide(keys, hidden);
+	ok(hide2 === false, "folderCascadeHide: unchecked folder → show");
+	for (const k of keys) { if (hide2) hidden.add(k); else hidden.delete(k); }
 	ok(folderCheckState(keys, hidden) === "checked", "cascade: unchecked folder → check-all (all visible)");
 	// indeterminate → cascade SHOW all (not "checked", so hide=false branch).
 	hidden.clear(); hidden.add("b.md");
 	ok(folderCheckState(keys, hidden) === "indeterminate", "cascade: precondition mixed → indeterminate");
-	const wasChecked3 = folderCheckState(keys, hidden) === "checked";
-	for (const k of keys) { if (wasChecked3) hidden.add(k); else hidden.delete(k); }
+	const hide3 = folderCascadeHide(keys, hidden);
+	ok(hide3 === false, "folderCascadeHide: indeterminate folder → show");
+	for (const k of keys) { if (hide3) hidden.add(k); else hidden.delete(k); }
 	ok(folderCheckState(keys, hidden) === "checked", "cascade: indeterminate folder → check-all (all visible)");
+	// empty group defaults checked → hide.
+	ok(folderCascadeHide([], new Set()) === true, "folderCascadeHide: empty group → hide (defaults checked)");
 }
 
 // MENU STILL LISTS A HIDDEN NOTE: the displayed list is the universal menuNotes,

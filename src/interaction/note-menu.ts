@@ -354,6 +354,15 @@ export function folderCheckState(descendantKeys: string[], hiddenSet: Set<string
 	return "indeterminate";
 }
 
+// Cascade decision for a group (folder/tag) checkbox toggle: `true` = hide every
+// descendant, `false` = show every descendant. A fully-checked group (all visible)
+// hides on toggle; an unchecked OR indeterminate group shows all — so a single
+// click always resolves a partial group to fully-visible first. Mirrors the
+// standard tri-state "click clears the mixed state toward on" affordance.
+export function folderCascadeHide(descendantKeys: string[], hiddenSet: Set<string>): boolean {
+	return folderCheckState(descendantKeys, hiddenSet) === "checked";
+}
+
 // ARIA `aria-checked` value for a tri-state checkbox. The custom `gim-nav-cb`
 // span (leaf + folder rows) carries `data-state` for the CSS glyph and this
 // matching `aria-checked` for assistive tech: indeterminate → "mixed", checked

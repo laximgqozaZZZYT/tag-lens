@@ -485,6 +485,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         mapping (mirrors `noteMenuTopTabDisplay`/`noteMenuMinimizeDisplay`); the view
         applies display to the kids-div + label to the span, event wiring stays inline.
         Initial-render label-only spots keep `folderToggleLabel`. Behaviour-identical. — fee6321
+  - [x] folder-checkbox cascade decision → `folderCascadeHide(descKeys, hiddenSet)`
+        (`src/interaction/note-menu.ts`, next to `folderCheckState`) + cases in
+        `test/note-menu.test.ts`. The tri-state folder/group checkbox's inline
+        `folderCheckState(...) === "checked"` hide-vs-show decision in `renderTree`
+        (`ensureNoteMenu`) is now a named pure predicate (true = hide-all): a
+        fully-checked group hides on toggle, an unchecked OR indeterminate group
+        shows all. The existing cascade test now drives the predicate (evaluated ONCE
+        before the toggle loop, mirroring the view — mid-loop state change must not
+        flip it) instead of re-modelling the rule inline. Behaviour-identical.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
