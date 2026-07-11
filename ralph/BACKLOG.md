@@ -482,7 +482,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         aggregation-group `prefix:value` tail) now read from pure builders; the `node`
         branch stays inline (needs a vault lookup). `jaccardFromCounts` moved into the
         heatmap builder, so its now-unused `view.ts` import was dropped. Not an
-        `ensureNoteMenu` seam but a clean self-contained draw/hover seam. Behaviour-identical.
+        `ensureNoteMenu` seam but a clean self-contained draw/hover seam. Behaviour-identical. — 0201e7e
   - [x] count-based Jaccard dedup → `jaccardFromCounts(sizeA, sizeB, intersection)`
         (`src/util/jaccard.ts`, next to `jaccardSimilarity`) + cases in
         `test/jaccard.test.ts`. The intersection-over-union-from-counts score
