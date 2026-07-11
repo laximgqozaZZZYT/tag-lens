@@ -28,6 +28,7 @@ import { CARD_CELL_W, CARD_CELL_H } from "./types";
 import { clusterHue, createStripeGradient, membershipStripeHues } from "./draw/canvas-utils";
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
+import { contentBounds } from "./layout/content-bounds";
 import { runAggregateSnap } from "./layout/aggregate-snap";
 import {
 	drawCardGrid as drawCardGridFn,
@@ -1985,25 +1986,9 @@ export class MiniGraphView extends ItemView {
 			this.centerDrosteOn(this.settings.drosteFocus || this.laid.drosteGallery.cells[0]?.id || "");
 			return;
 		}
-		const hasContent =
-			this.laid.clusters.length > 0 || this.laid.nodes.length > 0;
-		if (!hasContent) return;
-		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-		for (const c of this.laid.clusters) {
-			minX = Math.min(minX, c.x);
-			minY = Math.min(minY, c.y);
-			maxX = Math.max(maxX, c.x + c.width);
-			maxY = Math.max(maxY, c.y + c.height);
-		}
-		// Cards stay visible even when no enclosure surrounds them (e.g. files
-		// that landed in NONE_BUCKET after HAVING dropped their only cluster).
-		for (const n of this.laid.nodes) {
-			minX = Math.min(minX, n.x - n.width / 2);
-			minY = Math.min(minY, n.y - n.height / 2);
-			maxX = Math.max(maxX, n.x + n.width / 2);
-			maxY = Math.max(maxY, n.y + n.height / 2);
-		}
-		if (!Number.isFinite(minX)) return;
+		const bounds = contentBounds(this.laid.clusters, this.laid.nodes);
+		if (!bounds) return;
+		const { minX, minY, maxX, maxY } = bounds;
 		// The settings panel overlays the right side of the canvas without
 		// pushing it, so subtract its width from the effective fit area and
 		// centre against the visible half.

@@ -553,6 +553,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         cross-layer `draw/`→`interaction/` import). New `test/tab-prefix.test.ts`
         locks the behaviour (first-tab split, plain-path passthrough).
         Behaviour-identical. — a85a37c
+  - [x] panorama-fit content bounds → `contentBounds(clusters, nodes)`
+        (`src/layout/content-bounds.ts`) + `test/content-bounds.test.ts`. The inline
+        min/max accumulation over `laid.clusters` (top-left `x,y,width,height`) + a
+        second pass over `laid.nodes` (centre-anchored `x ± width/2`) in `fitPanorama`
+        is now a pure builder returning `{minX,minY,maxX,maxY}` or `null` (folds the
+        `hasContent` guard + the `!Number.isFinite(minX)` bail into the null return).
+        The view keeps the panel-width/padding fit math + pan/zoom assignment. Not a
+        note-menu seam but a clean self-contained layout-geometry seam discovered while
+        seam-hunting; behaviour-identical (stray NONE_BUCKET cards still folded in). — 8a07a6d
   - [x] fit-zoom clamp dedup → `clampZoom(value, min, max = 2)`
         (`src/util/clamp-zoom.ts`, next to `pluralize`/`jaccard`/`tab-prefix`) +
         `test/clamp-zoom.test.ts`. The two-sided fit clamp
