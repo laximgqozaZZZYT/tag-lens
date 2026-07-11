@@ -21,11 +21,11 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
   - [x] **T1 — `BaseCond` multi-value.** Added optional `args?: string[]` to `BaseCond`
         (`src/bases/types.ts`) alongside the single-value `rhs`; complementary, so the
         single-value path stays backward-compatible. Type-only, no behaviour change. — 3b4a1b6
-  - [ ] **T2 — parse multi-arg method forms.** In `parseCond` split `<args>` respecting
-        quoted commas, `unquote` each into `string[]` → set `args` (mirror `args[0]` into
-        `rhs` for single-value consumers). Broken input → `null`/`{raw}` fallback, never
-        throw. Add `containsAny("A","B")` / quoted-comma / empty-arg cases to
-        `test/bases-parser.test.ts`.
+  - [x] **T2 — parse multi-arg method forms.** `parseCond` method form now uses a
+        `splitArgs` helper (top-level comma split, quoted commas preserved) → `unquote`
+        each into `args[]`; `args[0]` mirrored into `rhs`. Blank arg list → `args:[]`,
+        `rhs:""`. Never throws. Added containsAny/quoted-comma/single-arg/empty-arg cases
+        to `test/bases-parser.test.ts`. — c690bb4
   - [ ] **T3 — `evalCond` operators.** Add `containsAny`/`containsAll`/`containsNone`/
         `startsWith`/`endsWith`; keep `compare()` array-aware for `==`/`IN`. Unknown op →
         false (no throw). Cases in `test/bases-resolve.test.ts`.
