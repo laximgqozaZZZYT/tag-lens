@@ -117,6 +117,7 @@ import {
 import { viewRootStyle, viewCanvasStyle } from "./view-shell-style";
 import { pluralize } from "./util/pluralize";
 import { jaccardSimilarity } from "./util/jaccard";
+import { clampZoom } from "./util/clamp-zoom";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes } from "./panel/menu-notes";
 import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVault } from "./panel/export-image";
@@ -1920,10 +1921,7 @@ export class MiniGraphView extends ItemView {
 				this.canvas.clientWidth - UPSET_LEFT_BAND_PX - padX,
 			);
 			const zoomFromW = visW / Math.max(1, u.cardsWorldWidth);
-			this.zoom = Math.max(
-				0.05,
-				Math.min(2, Math.min(zoomFromRows, zoomFromW)),
-			);
+			this.zoom = clampZoom(Math.min(zoomFromRows, zoomFromW), 0.05);
 			// Cards bottom (= world y = cardsWorldHeight) anchored at
 			// the top of the footer; tall stacks extend above the
 			// canvas and are reachable by panning.
@@ -1953,7 +1951,7 @@ export class MiniGraphView extends ItemView {
 			// Floor below which header text would shrink below ~10 screen px
 			// (HEADER_H = 22 world × 0.45 ≈ 10 px).
 			const MIN_READABLE = 0.45;
-			const zoom = Math.min(2, Math.max(MIN_READABLE, Math.min(zoomY, zoomX)));
+			const zoom = clampZoom(Math.min(zoomY, zoomX), MIN_READABLE);
 			this.zoom = zoom;
 			// PinPin the leftmost node just past the gutter. Centre on the
 			// gutter-right side when the whole lattice fits horizontally.
@@ -1976,7 +1974,7 @@ export class MiniGraphView extends ItemView {
 			const availW = Math.max(1, this.canvas.clientWidth - g.labelBand);
 			const availH = Math.max(1, this.canvas.clientHeight - g.headerH);
 			const fit = Math.min(availW, availH) / Math.max(1, h.n * h.cell);
-			this.zoom = Math.min(2, Math.max(0.05, fit));
+			this.zoom = clampZoom(fit, 0.05);
 			this.panX = heatmapGeom(h, this.zoom, this.canvas.clientWidth).labelBand;
 			this.panY = heatmapGeom(h, this.zoom, this.canvas.clientWidth).headerH;
 			this.requestDraw();
@@ -2023,7 +2021,7 @@ export class MiniGraphView extends ItemView {
 		const zy = fitH / Math.max(1, maxY - minY);
 		// Min floor is intentionally very low so huge vaults still fit on
 		// screen; the user can zoom in interactively as needed.
-		this.zoom = Math.min(2, Math.max(0.005, Math.min(zx, zy)));
+		this.zoom = clampZoom(Math.min(zx, zy), 0.005);
 		const worldCenterX = (minX + maxX) / 2;
 		const worldCenterY = (minY + maxY) / 2;
 		this.panX = padX + fitW / 2 - worldCenterX * this.zoom;
@@ -2775,7 +2773,7 @@ export class MiniGraphView extends ItemView {
 		const cell = g.cells.find((c) => c.id === id) ?? g.cells[0];
 		if (!cell) return;
 		const cw = this.canvas.clientWidth || 1, ch = this.canvas.clientHeight || 1;
-		this.zoom = Math.max(0.05, Math.min(3, (Math.min(cw, ch) * 0.55) / DROSTE_CELL));
+		this.zoom = clampZoom((Math.min(cw, ch) * 0.55) / DROSTE_CELL, 0.05, 3);
 		const wx = (cell.col + 0.5) * DROSTE_CELL, wy = (cell.row + 0.5) * DROSTE_CELL;
 		this.panX = cw / 2 - wx * this.zoom;
 		this.panY = ch / 2 - wy * this.zoom;
