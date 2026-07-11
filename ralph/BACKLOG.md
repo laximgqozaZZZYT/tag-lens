@@ -26,9 +26,12 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         each into `args[]`; `args[0]` mirrored into `rhs`. Blank arg list → `args:[]`,
         `rhs:""`. Never throws. Added containsAny/quoted-comma/single-arg/empty-arg cases
         to `test/bases-parser.test.ts`. — c690bb4
-  - [ ] **T3 — `evalCond` operators.** Add `containsAny`/`containsAll`/`containsNone`/
-        `startsWith`/`endsWith`; keep `compare()` array-aware for `==`/`IN`. Unknown op →
-        false (no throw). Cases in `test/bases-resolve.test.ts`.
+  - [x] **T3 — `evalCond` operators.** Added `containsAny`/`containsAll`/`containsNone`
+        (tag-aware with `#` optional + generic over array fields / scalar substrings),
+        `startsWith`/`endsWith` over scalars, and a defensive array-aware `IN`. Unknown
+        op still falls back to `false` (no throw). Added true/false cases (incl. the real
+        `containsAny("書籍","小説")` bug + non-tag array field + unknown-op) to
+        `test/bases-resolve.test.ts`. — 0bf5d39
   - [ ] **T4 — finish.** Run existing `.base` smoke/E2E; verify green; ensure a real
         `containsAny` `.base` no longer empties the graph (smoke, CDP blocked here).
 
