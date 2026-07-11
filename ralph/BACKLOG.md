@@ -486,6 +486,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         The four-call `applyRect` collapses to one `setCssStyles(noteMenuRectStyle(r))`.
         Behaviour-identical; test locks the four props + that the floating panel reuses
         the same mapping. Mirrors the `clampPinnedWidth` chrome dedups. — 30d604f
+  - [x] legend point-in-rect hit-test dedup → `pointInRect(px, py, {x,y,w,h})`
+        (`src/util/point-in-rect.ts`, next to `clampZoom`/`pluralize`/`jaccard`) +
+        `test/point-in-rect.test.ts`. The inclusive-bounds `px >= r.x && px <=
+        r.x+r.w && py >= r.y && py <= r.y+r.h` test was re-derived inline 4× in
+        `view.ts`'s on-canvas legend interactions (mousedown legend-drag start + its
+        × guard, click-to-dismiss ×, wheel-scroll over the panel); all four are now
+        thin calls. Behaviour-identical (edges/corners inclusive, locked by an
+        inline-equivalence grid). The `{x0,y0,x1,y1}` droste-hit test at
+        `view.ts:3649` keeps its own inline form (different rect shape). — 5ccef41
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
