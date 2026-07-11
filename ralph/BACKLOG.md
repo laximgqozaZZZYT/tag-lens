@@ -519,6 +519,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         restore `hl.rowBg`) are now thin applications of a pure builder; centralizes
         the magic hover CSS var shared with `noteMenuSuggestSelectionStyle`.
         Behaviour-identical. — a35cca2
+  - [x] tab-prefix id-strip dedup → the `${tag}\t${origPath}` Euler-copy id → path
+        strip (`const sep = id.indexOf("\t"); sep >= 0 ? id.slice(sep+1) : id`) was
+        re-derived inline 5× in `view.ts` (buildLatticeNamedLabels, drawLattice
+        `nameOf`, drawCard, openFile, tooltip), each byte-identical to the existing
+        pure `stripTabPrefix` (`src/interaction/note-menu.ts`, already imported + used
+        at 3297). Collapsed all five into thin `stripTabPrefix(id)` calls.
+        Behaviour-identical. Mirrors the `clampPinnedWidth`/`tag-path` dedups. — 810b7cd
+        **Follow-up:** `src/draw/draw-droste.ts:532` keeps the same inline strip; a
+        6th dedup would need `draw/` to import from `interaction/note-menu` (layering
+        question) or a shared `stripTabPrefix` moved to a neutral `util/` module.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
