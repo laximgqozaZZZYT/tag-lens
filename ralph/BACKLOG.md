@@ -12,12 +12,12 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
 
 ### Highest priority — user-facing correctness bug
 
-- [ ] **`.base` filter grammar — `containsAny`/`containsAll` etc. (graph goes empty).**
+- [x] **`.base` filter grammar — `containsAny`/`containsAll` etc. (graph goes empty).**
       `file.tags.containsAny("書籍","小説")` matches 0 notes because `unquote` mangles the
       multi-arg string and `evalCond` only knows `contains`. Full spec + decomposed
       tasks T1–T4 in `docs/superpowers/plans/2026-06-30-base-filter-grammar.md`. Do ONE
       sub-task (T1→T4) per iteration. Keep `src/bases/parser.ts` & `resolve.ts` pure
-      (no `obsidian`) and **never throw** on unknown grammar.
+      (no `obsidian`) and **never throw** on unknown grammar. **DONE** (T1–T4). — 5a9b24a
   - [x] **T1 — `BaseCond` multi-value.** Added optional `args?: string[]` to `BaseCond`
         (`src/bases/types.ts`) alongside the single-value `rhs`; complementary, so the
         single-value path stays backward-compatible. Type-only, no behaviour change. — 3b4a1b6
@@ -32,8 +32,12 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         op still falls back to `false` (no throw). Added true/false cases (incl. the real
         `containsAny("書籍","小説")` bug + non-tag array field + unknown-op) to
         `test/bases-resolve.test.ts`. — 0bf5d39
-  - [ ] **T4 — finish.** Run existing `.base` smoke/E2E; verify green; ensure a real
-        `containsAny` `.base` no longer empties the graph (smoke, CDP blocked here).
+  - [x] **T4 — finish.** New `test/bases-containsany-smoke.test.ts` drives the full
+        pipeline the way `parseBaseFile` does — `parseBaseStructure` (the object
+        `parseYaml` yields) → `resolveElements` — over the bug-report filter
+        `file.tags.containsAny("書籍","小説")`, asserting it resolves the two tagged
+        notes (graph NON-empty) and no others. `npm run verify` green. CDP/E2E stays
+        blocked in the sandbox, so this headless smoke is the behaviour gate. — 5a9b24a
 
 ### Small / additive (do these first to build momentum)
 
