@@ -474,6 +474,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         whose only logic is a single settings-field toggle — extract only if a genuine
         duplicate descriptor list emerges (mirror `basesToggleRows`). Otherwise pivot to
         the `ensureNoteMenu` body-builder seams or F2.
+  - [x] hover-tooltip text builders → `heatmapCellTipText` / `ghostEdgeTipText` /
+        `clusterTipText` / `aggregationGroupTipText` (`src/interaction/hover-tip-text.ts`,
+        each returning `{title, sub}`) + `test/hover-tip-text.test.ts`. The four pure-data
+        branches in `view.ts`'s `showHover` (heatmap cell diagonal-vs-Jaccard, ghost-edge
+        shared-tag `#tag` truncation to 3 + `(+N)` overflow, cluster label/member-count,
+        aggregation-group `prefix:value` tail) now read from pure builders; the `node`
+        branch stays inline (needs a vault lookup). `jaccardFromCounts` moved into the
+        heatmap builder, so its now-unused `view.ts` import was dropped. Not an
+        `ensureNoteMenu` seam but a clean self-contained draw/hover seam. Behaviour-identical.
   - [x] count-based Jaccard dedup → `jaccardFromCounts(sizeA, sizeB, intersection)`
         (`src/util/jaccard.ts`, next to `jaccardSimilarity`) + cases in
         `test/jaccard.test.ts`. The intersection-over-union-from-counts score

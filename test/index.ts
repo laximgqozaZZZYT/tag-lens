@@ -95,6 +95,7 @@ import "./pluralize.test";
 import "./jaccard.test";
 import "./tab-prefix.test";
 import "./heatmap-detail.test";
+import "./hover-tip-text.test";
 
 
 summary();

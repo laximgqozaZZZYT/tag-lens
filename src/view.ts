@@ -116,7 +116,7 @@ import {
 } from "./panel/settings-tabs";
 import { viewRootStyle, viewCanvasStyle } from "./view-shell-style";
 import { pluralize } from "./util/pluralize";
-import { jaccardSimilarity, jaccardFromCounts } from "./util/jaccard";
+import { jaccardSimilarity } from "./util/jaccard";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes } from "./panel/menu-notes";
 import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVault } from "./panel/export-image";
@@ -133,6 +133,7 @@ import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, folderCascadeHide, checkboxAriaChecked, buildFolderPathKey, folderToggleLabel, folderDisclosure, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion, type FolderCheckState } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuLeafRowHoverStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { heatmapCellNoteIds } from "./interaction/heatmap-detail";
+import { heatmapCellTipText, ghostEdgeTipText, clusterTipText, aggregationGroupTipText } from "./interaction/hover-tip-text";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { buildViewStateBundle, formatJsonStatusLines, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -3910,28 +3911,18 @@ export class MiniGraphView extends ItemView {
 			const ti = h.tags[target.i];
 			const tj = h.tags[target.j];
 			const cnt = h.counts[target.i * h.n + target.j];
-			if (target.i === target.j) {
-				tip.createSpan({ cls: "gim-tip-title", text: ti.label });
-				tip.createSpan({ cls: "gim-tip-sub", text: `${ti.size} notes` });
-			} else {
-				// Raw intersection count + the Jaccard ratio so both the absolute
-				// and the normalised strength are readable, independent of the
-				// cell's colour scale.
-				const jac = jaccardFromCounts(ti.size, tj.size, cnt).toFixed(2);
-				tip.createSpan({ cls: "gim-tip-title", text: `${ti.label} * ${tj.label}` });
-				tip.createSpan({ cls: "gim-tip-sub", text: `${cnt} notes (Jaccard ${jac})` });
-			}
+			const cellTip = heatmapCellTipText(ti, tj, cnt, target.i === target.j);
+			tip.createSpan({ cls: "gim-tip-title", text: cellTip.title });
+			tip.createSpan({ cls: "gim-tip-sub", text: cellTip.sub });
 			this.root.appendChild(tip);
 			this.tipEl = tip;
 			this.positionTip(sx, sy, tip);
 			return;
 		}
 		if (target.kind === "ghostEdge") {
-			const b = target.bridge;
-			const tagsStr = b.sharedTags.slice(0, 3).map(t => `#${t}`).join(" ");
-			const moreTags = b.sharedTags.length > 3 ? ` (+${b.sharedTags.length - 3})` : "";
-			tip.createSpan({ cls: "gim-tip-title", text: "Suggested link" });
-			tip.createSpan({ cls: "gim-tip-sub", text: `shared tags: ${tagsStr}${moreTags} (Jaccard ${b.jaccard.toFixed(2)})` });
+			const bridgeTip = ghostEdgeTipText(target.bridge);
+			tip.createSpan({ cls: "gim-tip-title", text: bridgeTip.title });
+			tip.createSpan({ cls: "gim-tip-sub", text: bridgeTip.sub });
 			this.root.appendChild(tip);
 			this.tipEl = tip;
 			this.positionTip(sx, sy, tip);
@@ -3950,11 +3941,13 @@ export class MiniGraphView extends ItemView {
 		} else if (target.kind === "cluster") {
 			const cl = this.laid.clusters.find((c) => c.groupKey === target.group);
 			if (!cl) return;
-			tip.createSpan({ cls: "gim-tip-title", text: cl.label });
-			tip.createSpan({ cls: "gim-tip-sub", text: cl.memberCount + " items" });
+			const clusterTip = clusterTipText(cl.label, cl.memberCount);
+			tip.createSpan({ cls: "gim-tip-title", text: clusterTip.title });
+			tip.createSpan({ cls: "gim-tip-sub", text: clusterTip.sub });
 		} else if (target.kind === "aggregationGroup") {
-			tip.createSpan({ cls: "gim-tip-title", text: target.groupKey.split(":")[1] });
-			tip.createSpan({ cls: "gim-tip-sub", text: target.nodeIds.length + " notes" });
+			const aggTip = aggregationGroupTipText(target.groupKey, target.nodeIds.length);
+			tip.createSpan({ cls: "gim-tip-title", text: aggTip.title });
+			tip.createSpan({ cls: "gim-tip-sub", text: aggTip.sub });
 		}
 
 		this.root.appendChild(tip);
