@@ -529,6 +529,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         **Follow-up:** `src/draw/draw-droste.ts:532` keeps the same inline strip; a
         6th dedup would need `draw/` to import from `interaction/note-menu` (layering
         question) or a shared `stripTabPrefix` moved to a neutral `util/` module.
+  - [x] 6th strip dedup + neutral relocation → moved the canonical `stripTabPrefix`
+        to `src/util/tab-prefix.ts` (next to `pluralize`/`jaccard`), re-exported from
+        `interaction/note-menu` so its many call sites + downstream importers keep the
+        stable API, and pointed `draw/draw-droste.ts:532` at the util directly (no
+        cross-layer `draw/`→`interaction/` import). New `test/tab-prefix.test.ts`
+        locks the behaviour (first-tab split, plain-path passthrough).
+        Behaviour-identical. — a85a37c
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
