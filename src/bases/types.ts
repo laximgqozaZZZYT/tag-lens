@@ -5,10 +5,19 @@
 
 // A single leaf condition extracted from a `.base` filter string, e.g.
 // `file.tags.contains("#tag")` → { lhs: "file.tags", op: "contains", rhs: "#tag" }.
+//
+// `rhs` carries the single-argument value (compare form, or a one-arg method).
+// `args` carries the full argument list for multi-arg method forms such as
+// `file.tags.containsAny("書籍", "小説")` → { op: "containsAny", args: ["書籍",
+// "小説"] }. The two are complementary: the single-value path keeps using `rhs`
+// (backward compatible) and multi-arg operators read `args`; a method form may
+// populate both (`args[0]` mirrored into `rhs`) so single-value consumers keep
+// working unchanged.
 export interface BaseCond {
 	lhs: string;
 	op: string;
 	rhs?: string;
+	args?: string[];
 }
 
 // Recursive filter tree. `and`/`or` are the boolean nodes; `cond` is a parsed
