@@ -41,7 +41,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
 
 ### Small / additive (do these first to build momentum)
 
-(none open)
+- [x] heatmap cell-click detail → `heatmapCellNoteIds(nodeIds, i, j)`
+      (`src/interaction/heatmap-detail.ts`) + `test/heatmap-detail.test.ts`. The inline
+      diagonal-vs-intersection + dedup block in `view.ts`'s `openHeatmapDetail` (diagonal
+      i===j → the whole cell's notes; off-diagonal → the row-i∩row-j intersection in
+      first-seen order; both `[...new Set]`-deduped) is now a pure transform; the view
+      keeps `heatmapSelected = null` + `switchToCloseup`. Out-of-range indices resolve to
+      empty (missing row → no notes, no throw); input never mutated. Not an `ensureNoteMenu`
+      seam but a clean pure data-transform discovered while seam-hunting. — c86d597
 
 ### Medium
 

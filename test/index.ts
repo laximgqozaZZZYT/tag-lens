@@ -92,6 +92,7 @@ import "./junihitoe-stack-list.test";
 import "./aggregate-stack-list.test";
 import "./view-line-ratchet.test";
 import "./pluralize.test";
+import "./heatmap-detail.test";
 
 
 summary();

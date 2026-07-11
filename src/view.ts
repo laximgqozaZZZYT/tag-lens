@@ -131,6 +131,7 @@ import {
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, folderCascadeHide, checkboxAriaChecked, buildFolderPathKey, folderToggleLabel, folderDisclosure, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion, type FolderCheckState } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { heatmapCellNoteIds } from "./interaction/heatmap-detail";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { buildViewStateBundle, formatJsonStatusLines, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
@@ -3683,15 +3684,7 @@ export class MiniGraphView extends ItemView {
 	private openHeatmapDetail(i: number, j: number, _sx: number, _sy: number): void {
 		const h = this.laid.heatmap;
 		if (!h) return;
-		const a = h.nodeIds[i] ?? [];
-		let ids: string[];
-		if (i === j) {
-			ids = a.slice();
-		} else {
-			const setB = new Set(h.nodeIds[j] ?? []);
-			ids = a.filter((id) => setB.has(id));
-		}
-		ids = [...new Set(ids)];
+		const ids = heatmapCellNoteIds(h.nodeIds, i, j);
 		this.heatmapSelected = null;
 		this.switchToCloseup(ids);
 	}
