@@ -474,6 +474,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         whose only logic is a single settings-field toggle — extract only if a genuine
         duplicate descriptor list emerges (mirror `basesToggleRows`). Otherwise pivot to
         the `ensureNoteMenu` body-builder seams or F2.
+  - [x] Jaccard set-similarity dedup → `jaccardSimilarity(a, b)`
+        (`src/util/jaccard.ts`, next to `pluralize`) + `test/jaccard.test.ts`. The
+        intersection-over-union score `inter / union` (0 on empty union) was
+        re-derived inline in the related-notes scorer (`view.ts` — via two throwaway
+        `new Set` allocations behind a size-guard) and the redundant-tag-pair finder
+        (`insight/compute.ts` — behind an unreachable `union===0` guard, both sets
+        already size ≥ 2). Both now call the pure helper, which folds the empty-union
+        → 0 case in and iterates the smaller set. Behaviour-identical.
+        **Follow-up:** `query/bridge-finder.ts` keeps its own loop because it also
+        collects `sharedTags` while scanning; a `jaccardWithShared(a, b)` variant
+        could dedup that third site if wanted.
   - [x] pinned left-grip resize clamp dedup → the inline
         `Math.min(Math.max(NOTE_MENU_MIN.width, raw), Math.max(NOTE_MENU_MIN.width,
         Math.floor((cw||320)*0.8)))` in the pinned `lgrip` `onMove` handler was

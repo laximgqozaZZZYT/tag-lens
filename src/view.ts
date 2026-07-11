@@ -116,6 +116,7 @@ import {
 } from "./panel/settings-tabs";
 import { viewRootStyle, viewCanvasStyle } from "./view-shell-style";
 import { pluralize } from "./util/pluralize";
+import { jaccardSimilarity } from "./util/jaccard";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes } from "./panel/menu-notes";
 import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVault } from "./panel/export-image";
@@ -630,12 +631,8 @@ export class MiniGraphView extends ItemView {
 				const nodeCache = this.app.metadataCache.getFileCache(nodeFile);
 				const nodeTags = nodeCache?.tags?.map(t => t.tag.toLowerCase()) || [];
 				const nodeTagSet = new Set(nodeTags);
-
-				if (activeTagSet.size > 0 || nodeTagSet.size > 0) {
-					const intersection = new Set([...activeTagSet].filter(x => nodeTagSet.has(x)));
-					const union = new Set([...activeTagSet, ...nodeTagSet]);
-					jaccard = intersection.size / union.size;
-				}
+				// Empty union (both tag-less) → 0, matching the old size-guarded path.
+				jaccard = jaccardSimilarity(activeTagSet, nodeTagSet);
 			}
 
 			// 総合スコア算出
