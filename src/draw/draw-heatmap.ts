@@ -7,6 +7,7 @@
 import { theme, colorAlpha } from "./theme";
 import type { HeatmapMeta } from "../layout/layout";
 import { truncateToWidth } from "./canvas-utils";
+import { jaccardFromCounts } from "../util/jaccard";
 import type { TagGap } from "../query/gap-finder";
 
 export interface HeatmapGeom {
@@ -128,8 +129,7 @@ export function drawHeatmap(
 			if (cnt <= 0) continue; // background (no co-occurrence): no fill, no number
 			let intensity: number;
 			if (o.jaccard) {
-				const uni = h.tags[r].size + h.tags[c].size - cnt;
-				intensity = uni > 0 ? cnt / uni : 0;
+				intensity = jaccardFromCounts(h.tags[r].size, h.tags[c].size, cnt);
 			} else {
 				// log scale clamped at the 95th percentile so a few giant pairs
 				// don't wash out the rest.

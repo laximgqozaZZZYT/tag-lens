@@ -116,7 +116,7 @@ import {
 } from "./panel/settings-tabs";
 import { viewRootStyle, viewCanvasStyle } from "./view-shell-style";
 import { pluralize } from "./util/pluralize";
-import { jaccardSimilarity } from "./util/jaccard";
+import { jaccardSimilarity, jaccardFromCounts } from "./util/jaccard";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes } from "./panel/menu-notes";
 import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVault } from "./panel/export-image";
@@ -3917,8 +3917,7 @@ export class MiniGraphView extends ItemView {
 				// Raw intersection count + the Jaccard ratio so both the absolute
 				// and the normalised strength are readable, independent of the
 				// cell's colour scale.
-				const uni = ti.size + tj.size - cnt;
-				const jac = uni > 0 ? (cnt / uni).toFixed(2) : "0.00";
+				const jac = jaccardFromCounts(ti.size, tj.size, cnt).toFixed(2);
 				tip.createSpan({ cls: "gim-tip-title", text: `${ti.label} * ${tj.label}` });
 				tip.createSpan({ cls: "gim-tip-sub", text: `${cnt} notes (Jaccard ${jac})` });
 			}

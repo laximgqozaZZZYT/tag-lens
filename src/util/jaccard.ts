@@ -11,3 +11,12 @@ export function jaccardSimilarity<T>(a: Set<T>, b: Set<T>): number {
 	const union = a.size + b.size - inter;
 	return union === 0 ? 0 : inter / union;
 }
+
+// Jaccard from precomputed co-occurrence counts: |A ∩ B| / (|A| + |B| - |A ∩ B|),
+// returning 0 when the union is empty. Used where the two sets are never
+// materialised — the heatmap cell colour (draw-heatmap.ts) and its hover tooltip
+// (view.ts) both have `sizeA`, `sizeB`, and the intersection `count` in hand.
+export function jaccardFromCounts(sizeA: number, sizeB: number, intersection: number): number {
+	const union = sizeA + sizeB - intersection;
+	return union > 0 ? intersection / union : 0;
+}
