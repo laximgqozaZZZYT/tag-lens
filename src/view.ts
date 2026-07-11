@@ -342,8 +342,7 @@ export class MiniGraphView extends ItemView {
 			if (!this.latticeNamedKeys.has(node.key)) continue;
 			const ids = node.nodeIds.slice(0, max);
 			out[node.key] = ids.map((id) => {
-				const sep = id.indexOf("\t");
-				const path = sep >= 0 ? id.slice(sep + 1) : id;
+				const path = stripTabPrefix(id);
 				const f = this.app.vault.getAbstractFileByPath(path);
 				return f instanceof TFile ? f.basename : path;
 			});
@@ -2257,8 +2256,7 @@ export class MiniGraphView extends ItemView {
 				// to a path-tail strip inside draw-lattice when omitted, so
 				// unit tests / probes still work without a vault.
 				nameOf: (id: string) => {
-					const sep = id.indexOf("\t");
-					const path = sep >= 0 ? id.slice(sep + 1) : id;
+					const path = stripTabPrefix(id);
 					const f = this.app.vault.getAbstractFileByPath(path);
 					return f instanceof TFile ? f.basename : path;
 				},
@@ -2651,8 +2649,7 @@ export class MiniGraphView extends ItemView {
 		// display-mode and the body-line cache against the ORIGINAL id so the
 		// font scales with the node's (degree-driven) size and the cached body
 		// is found. Non-duplicated ids contain no tab → used as-is.
-		const sepIdx = n.id.indexOf("\t");
-		const baseId = sepIdx >= 0 ? n.id.slice(sepIdx + 1) : n.id;
+		const baseId = stripTabPrefix(n.id);
 		const scale = this.getCardScale(baseId);
 
 
@@ -2765,8 +2762,7 @@ export class MiniGraphView extends ItemView {
 	private openFile(id: string): void {
 		// Euler-nested copies use a `${tag}\t${origPath}` id — open the
 		// ORIGINAL file path, not the prefixed copy id.
-		const sepIdx = id.indexOf("\t");
-		const path = sepIdx >= 0 ? id.slice(sepIdx + 1) : id;
+		const path = stripTabPrefix(id);
 		this.isInternalClick = true;
 		void this.app.workspace.openLinkText(path, "", false);
 	}
@@ -3945,9 +3941,7 @@ export class MiniGraphView extends ItemView {
 		if (target.kind === "node") {
 			// Euler-nested copies carry a `${tag}\t${origPath}` id — resolve the
 			// ORIGINAL path for the file lookup + body cache.
-			const sepIdx = target.nodeId.indexOf("\t");
-			const baseId =
-				sepIdx >= 0 ? target.nodeId.slice(sepIdx + 1) : target.nodeId;
+			const baseId = stripTabPrefix(target.nodeId);
 			const file = this.app.vault.getAbstractFileByPath(baseId);
 			if (!(file instanceof TFile)) return;
 			tip.createSpan({ cls: "gim-tip-title", text: file.basename });
