@@ -485,7 +485,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         both consume — the panel-init and every live drag/resize re-apply can't drift.
         The four-call `applyRect` collapses to one `setCssStyles(noteMenuRectStyle(r))`.
         Behaviour-identical; test locks the four props + that the floating panel reuses
-        the same mapping. Mirrors the `clampPinnedWidth` chrome dedups. — PENDING
+        the same mapping. Mirrors the `clampPinnedWidth` chrome dedups. — 30d604f
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
