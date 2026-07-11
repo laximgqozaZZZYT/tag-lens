@@ -27,6 +27,7 @@ import {
 	folderCheckState,
 	folderCascadeHide,
 	checkboxAriaChecked,
+	noteMenuRowCheckboxSpec,
 	buildFolderPathKey,
 	folderToggleLabel,
 	folderDisclosure,
@@ -744,6 +745,23 @@ const advNotes: NoteRef[] = [
 		const v = checkboxAriaChecked(st);
 		ok(v === "true" || v === "false" || v === "mixed", `checkboxAriaChecked: ${st} → valid aria value`);
 	}
+}
+
+// noteMenuRowCheckboxSpec: the initial DOM descriptor for the custom tri-state
+// row checkbox span. Starts UNCHECKED, and the seeded aria-checked must match
+// what checkboxAriaChecked returns for that state (the two seeds can't drift).
+{
+	const spec = noteMenuRowCheckboxSpec();
+	ok(spec.cls === "gim-nav-cb", "rowCheckboxSpec: class is gim-nav-cb");
+	ok(spec.state === "unchecked", "rowCheckboxSpec: initial state unchecked");
+	ok(spec.attr.role === "checkbox", "rowCheckboxSpec: role=checkbox");
+	ok(spec.attr.tabindex === "0", "rowCheckboxSpec: tabindex=0 (keyboard focusable)");
+	ok(spec.attr["aria-checked"] === "false", "rowCheckboxSpec: aria-checked=false when unchecked");
+	// The aria seed must be exactly checkboxAriaChecked(state) — no drift.
+	ok(
+		spec.attr["aria-checked"] === checkboxAriaChecked(spec.state),
+		"rowCheckboxSpec: aria-checked seed derives from state",
+	);
 }
 
 // CASCADE semantics: toggling a fully-checked folder hides ALL descendants;

@@ -370,6 +370,27 @@ export function checkboxAriaChecked(state: FolderCheckState): "mixed" | "true" |
 	return state === "checked" ? "true" : "false";
 }
 
+// Initial DOM descriptor for the custom tri-state row checkbox `<span>`
+// (`gim-nav-cb`, used on every leaf + folder row): its class, the WAI-ARIA
+// checkbox attributes, and the starting `data-state`. The view creates the
+// span from this and drives later state changes via `checkboxAriaChecked` +
+// `data-state`. Seeding the initial `aria-checked` from the same `state`
+// through `checkboxAriaChecked` guarantees the two seeds can never drift
+// (both encode the "unchecked" starting contract).
+export interface NoteMenuRowCheckboxSpec {
+	cls: string;
+	state: FolderCheckState;
+	attr: { role: "checkbox"; "aria-checked": "mixed" | "true" | "false"; tabindex: string };
+}
+export function noteMenuRowCheckboxSpec(): NoteMenuRowCheckboxSpec {
+	const state: FolderCheckState = "unchecked";
+	return {
+		cls: "gim-nav-cb",
+		state,
+		attr: { role: "checkbox", "aria-checked": checkboxAriaChecked(state), tabindex: "0" },
+	};
+}
+
 // Display label for a note: the final segment of its id path (after stripping
 // any Euler-copy tab prefix so the label always shows the real filename).
 function leafLabel(note: NoteRef): string {

@@ -132,7 +132,7 @@ import {
 	positionTip as positionTipFn,
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
-import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, folderCascadeHide, checkboxAriaChecked, buildFolderPathKey, folderToggleLabel, folderDisclosure, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion, type FolderCheckState } from "./interaction/note-menu";
+import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, folderCascadeHide, checkboxAriaChecked, noteMenuRowCheckboxSpec, buildFolderPathKey, folderToggleLabel, folderDisclosure, navigatorNodeSource, suggestKeyAction, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion, type FolderCheckState } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuLeafRowHoverStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
 import { heatmapCellNoteIds } from "./interaction/heatmap-detail";
 import { heatmapCellTipText, ghostEdgeTipText, clusterTipText, aggregationGroupTipText } from "./interaction/hover-tip-text";
@@ -3238,11 +3238,9 @@ export class MiniGraphView extends ItemView {
 			// `gim-nav-cb` drives the custom tri-state rendering in styles.css
 			// (checked ✓ / empty / indeterminate –) so the partial state is
 			// unmistakable regardless of the active Obsidian theme.
-			const cb = host.createEl("span", {
-				cls: "gim-nav-cb",
-				attr: { role: "checkbox", "aria-checked": "false", tabindex: "0" },
-			});
-			cb.dataset.state = "unchecked";
+			const spec = noteMenuRowCheckboxSpec();
+			const cb = host.createEl("span", { cls: spec.cls, attr: spec.attr });
+			cb.dataset.state = spec.state;
 			cb.addEventListener("mousedown", (ev) => ev.stopPropagation());
 			cb.addEventListener("click", (ev) => { ev.stopPropagation(); onToggle(); });
 			cb.addEventListener("keydown", (ev: KeyboardEvent) => {
