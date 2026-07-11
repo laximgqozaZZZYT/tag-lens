@@ -4,7 +4,7 @@
 // (the Obsidian wiring lives in build-index.ts).
 
 import type { FileFacts } from "../query/query";
-import type { BaseElement, BaseFilter, BaseTable, BaseView } from "./types";
+import type { BaseCond, BaseElement, BaseFilter, BaseTable, BaseView } from "./types";
 
 // Evaluate a filter tree against one note's facts.
 //
@@ -46,13 +46,27 @@ function isRaw(f: BaseFilter): boolean {
 	return "raw" in f;
 }
 
-function evalCond(node: { cond: { lhs: string; op: string; rhs?: string } }, facts: FileFacts): boolean {
-	const { lhs, op, rhs } = node.cond;
+function evalCond(node: { cond: BaseCond }, facts: FileFacts): boolean {
+	const { lhs, op, rhs, args } = node.cond;
+	const isTags = /tags$/i.test(lhs);
+	// Multi-arg method forms carry `args`; fall back to the single `rhs` so a
+	// one-arg call (or a legacy cond without `args`) still works.
+	const values = args ?? (rhs != null ? [rhs] : []);
 
 	// tag membership: file.tags.contains("#tag") (leading # optional both sides).
-	if (op === "contains" && /tags$/i.test(lhs)) {
+	if (op === "contains" && isTags) {
 		const want = stripHash(rhs ?? "");
 		return facts.tags.some((t) => stripHash(t) === want);
+	}
+
+	// multi-value tag membership: containsAny/All/None over file.tags (leading #
+	// optional on both sides, matching single-value `contains`).
+	if ((op === "containsAny" || op === "containsAll" || op === "containsNone") && isTags) {
+		const wants = values.map(stripHash);
+		const has = (w: string) => facts.tags.some((t) => stripHash(t) === w);
+		if (op === "containsAny") return wants.some(has);
+		if (op === "containsAll") return wants.every(has);
+		return !wants.some(has); // containsNone
 	}
 
 	const actual = resolveLhs(lhs, facts);
@@ -61,6 +75,24 @@ function evalCond(node: { cond: { lhs: string; op: string; rhs?: string } }, fac
 		// generic contains over an array field or substring of a scalar.
 		if (Array.isArray(actual)) return actual.some((x) => String(x) === (rhs ?? ""));
 		return String(actual ?? "").includes(rhs ?? "");
+	}
+
+	// generic multi-value contains: array membership, or scalar substring.
+	if (op === "containsAny" || op === "containsAll" || op === "containsNone") {
+		const has = (w: string) =>
+			Array.isArray(actual) ? actual.some((x) => String(x) === w) : String(actual ?? "").includes(w);
+		if (op === "containsAny") return values.some(has);
+		if (op === "containsAll") return values.every(has);
+		return !values.some(has); // containsNone
+	}
+
+	if (op === "startsWith") return String(actual ?? "").startsWith(rhs ?? "");
+	if (op === "endsWith") return String(actual ?? "").endsWith(rhs ?? "");
+
+	// `x IN (a, b, …)`: actual equals any listed value (array-aware).
+	if (op === "IN") {
+		if (Array.isArray(actual)) return actual.some((x) => values.includes(String(x)));
+		return values.includes(String(actual ?? ""));
 	}
 
 	return compare(actual, op, rhs ?? "");

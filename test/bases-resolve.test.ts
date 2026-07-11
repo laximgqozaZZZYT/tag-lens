@@ -63,6 +63,60 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 	ok(!evalBaseFilter(orRaw, f), "raw under OR contributes nothing → false when no real child matches");
 }
 
+// --- multi-value tag operators (the real bug: containsAny matched 0 notes) ---
+{
+	const f = facts("a.md", ["書籍", "wip"]);
+	ok(
+		evalBaseFilter(parseBaseFilter('file.tags.containsAny("書籍", "小説")'), f),
+		"containsAny: one arg present → true",
+	);
+	ok(
+		!evalBaseFilter(parseBaseFilter('file.tags.containsAny("小説", "漫画")'), f),
+		"containsAny: none present → false",
+	);
+	ok(
+		!evalBaseFilter(parseBaseFilter('file.tags.containsAll("書籍", "小説")'), f),
+		"containsAll: missing one → false",
+	);
+	ok(
+		evalBaseFilter(parseBaseFilter('file.tags.containsAll("書籍", "wip")'), f),
+		"containsAll: all present → true",
+	);
+	ok(
+		evalBaseFilter(parseBaseFilter('file.tags.containsNone("小説", "漫画")'), f),
+		"containsNone: none present → true",
+	);
+	ok(
+		!evalBaseFilter(parseBaseFilter('file.tags.containsNone("書籍")'), f),
+		"containsNone: one present → false",
+	);
+	// leading # optional on both sides, matching single-value contains.
+	ok(evalBaseFilter(parseBaseFilter('file.tags.containsAny("#書籍")'), f), "containsAny: # optional");
+}
+
+// --- startsWith / endsWith over scalar fields ---
+{
+	const f = facts("dir/Report 2026.md", [], { title: "Weekly Report" });
+	ok(evalBaseFilter(parseBaseFilter('file.basename.startsWith("Report")'), f), "startsWith true");
+	ok(!evalBaseFilter(parseBaseFilter('file.basename.startsWith("xyz")'), f), "startsWith false");
+	ok(evalBaseFilter(parseBaseFilter('note.title.endsWith("Report")'), f), "endsWith true");
+	ok(!evalBaseFilter(parseBaseFilter('note.title.endsWith("Daily")'), f), "endsWith false");
+}
+
+// --- containsAny over a non-tag array frontmatter field ---
+{
+	const f = facts("a.md", [], { authors: ["Ada", "Grace"] });
+	ok(evalBaseFilter(parseBaseFilter('note.authors.containsAny("Grace", "Alan")'), f), "array field containsAny");
+	ok(!evalBaseFilter(parseBaseFilter('note.authors.containsAll("Grace", "Alan")'), f), "array field containsAll false");
+}
+
+// --- unknown operator falls back to false (never throws) ---
+{
+	const f = facts("a.md", ["a"]);
+	// a cond with an unrecognised op is parsed but must not throw and must not match.
+	ok(!evalBaseFilter({ cond: { lhs: "note.x", op: "wat", rhs: "y" } }, f), "unknown operator → false (no throw)");
+}
+
 // --- null filter matches everything ---
 {
 	ok(evalBaseFilter(null, facts("x.md", [])), "null filter → true");
