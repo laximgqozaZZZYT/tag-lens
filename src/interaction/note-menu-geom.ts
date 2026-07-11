@@ -487,6 +487,16 @@ export function noteMenuLeafHighlight(isCurrent: boolean): {
 		: { rowBg: "" };
 }
 
+// The hover background swap for a Tree-pane leaf row: on mouseenter the row gets
+// the modifier-border wash, on mouseleave it restores to `rowBg` (the leaf's
+// resting background — either the current-note highlight from noteMenuLeafHighlight
+// or "" for a plain row). Pure so the magic hover CSS var (shared with
+// noteMenuSuggestSelectionStyle) lives in one place; the view wires the two
+// mouse listeners and passes the live `rowBg`.
+export function noteMenuLeafRowHoverStyle(hover: boolean, rowBg: string): Partial<CSSStyleDeclaration> {
+	return { background: hover ? "var(--background-modifier-border)" : rowBg };
+}
+
 // Data ▸ JSON tab chrome: the three repeated style blocks in renderDataJsonBody
 // (the export/import section labels, the read-only/paste textareas, and the
 // Copy/Save · Import/Bundled button rows) collapse onto these pure builders.
