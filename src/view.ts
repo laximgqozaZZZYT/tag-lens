@@ -121,6 +121,7 @@ import { pluralize } from "./util/pluralize";
 import { jaccardSimilarity } from "./util/jaccard";
 import { clampZoom } from "./util/clamp-zoom";
 import { pointInRect } from "./util/point-in-rect";
+import { legendScrollbarGeom } from "./interaction/legend-scrollbar";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes } from "./panel/menu-notes";
 import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVault } from "./panel/export-image";
@@ -3959,13 +3960,12 @@ export class MiniGraphView extends ItemView {
 					// Detect scrollbar drag
 					if (this.legendMaxScrollY > 0 && sx >= pr.x + pr.w - 12) {
 						// Calculate absolute scroll position based on click Y coordinate
-						const trackTop = this.exportDprMul === 1 ? 20 : 4;
-						const trackH = pr.h - trackTop - 4;
-						const thumbMinH = 20;
-						const boxH = pr.h + this.legendMaxScrollY;
-						const thumbH = Math.max(thumbMinH, trackH * (pr.h / boxH));
-						const maxThumbY = trackH - thumbH;
-						
+						const { trackTop, thumbH, maxThumbY } = legendScrollbarGeom(
+							pr.h,
+							this.legendMaxScrollY,
+							this.exportDprMul === 1,
+						);
+
 						// Thumb's current physical position
 						const curScrollY = this.legendScrollY[this.settings.viewMode] ?? 0;
 						const curThumbY = pr.y + trackTop + (maxThumbY > 0 ? (curScrollY / this.legendMaxScrollY) * maxThumbY : 0);
@@ -4029,12 +4029,11 @@ export class MiniGraphView extends ItemView {
 				// panel is laid out, which is the same path that assigns
 				// legendPanelRect — so it is non-null whenever we get here.
 				const pr = this.legendPanelRect!;
-				const trackTop = this.exportDprMul === 1 ? 20 : 4;
-				const trackH = pr.h - trackTop - 4;
-				const thumbMinH = 20;
-				const boxH = pr.h + this.legendMaxScrollY;
-				const thumbH = Math.max(thumbMinH, trackH * (pr.h / boxH));
-				const maxThumbY = trackH - thumbH;
+				const { maxThumbY } = legendScrollbarGeom(
+					pr.h,
+					this.legendMaxScrollY,
+					this.exportDprMul === 1,
+				);
 				const scrollDelta = maxThumbY > 0 ? (dy / maxThumbY) * this.legendMaxScrollY : 0;
 				const vmode = this.settings.viewMode;
 				this.legendScrollY[vmode] = Math.max(0, Math.min(this.legendMaxScrollY, this.legendScrollDrag.startScrollY + scrollDelta));
