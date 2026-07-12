@@ -531,6 +531,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         collapsed/detached element) are locked by the test (dpr 1/2, fractional-floor,
         zero→1×1, negative-dimension clamp with sibling unaffected). Sibling of the
         `*Fit` geometry seams; behaviour-identical. view.ts held at the 4256 ratchet.
+  - [x] click-vs-drag slop predicate → `exceedsClickSlop(dx, dy, slop = CLICK_SLOP_PX)`
+        (`src/util/click-slop.ts`, next to `point-in-rect`) + `test/click-slop.test.ts`.
+        The inline `Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY) > 4`
+        dead-zone test in the mousemove handler (`view.ts`) that flips `pointerMoved`
+        (so a released pan is never mistaken for a click that opens a file) is now a
+        thin call to a pure Manhattan-radius predicate, centralizing the magic 4px
+        slop as `CLICK_SLOP_PX`. Test locks the strict-`>` boundary (sum == 4 → inside),
+        sign-independence, custom-slop, and an inline-equivalence grid. Behaviour-identical.
+        view.ts 4256 → 4255; ratchet tightened.
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list

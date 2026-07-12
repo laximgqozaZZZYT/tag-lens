@@ -134,6 +134,7 @@ import { viewRootStyle, viewCanvasStyle } from "./view-shell-style";
 import { pluralize } from "./util/pluralize";
 import { jaccardSimilarity } from "./util/jaccard";
 import { pointInRect } from "./util/point-in-rect";
+import { exceedsClickSlop } from "./util/click-slop";
 import { clampScroll } from "./util/clamp-scroll";
 import { legendScrollbarGeom, scrollToThumbY, thumbYToScroll } from "./interaction/legend-scrollbar";
 import { renderDataTableView } from "./panel/data-table-view";
@@ -3986,9 +3987,7 @@ export class MiniGraphView extends ItemView {
 				return;
 			}
 			if (!this.dragging) return;
-			if (
-				Math.abs(e.clientX - this.downX) + Math.abs(e.clientY - this.downY) > 4
-			)
+			if (exceedsClickSlop(e.clientX - this.downX, e.clientY - this.downY))
 				this.pointerMoved = true;
 			this.panX += e.clientX - this.lastX;
 			this.panY += e.clientY - this.lastY;
