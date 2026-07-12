@@ -689,6 +689,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         mode branch now reads from a pure fit builder. Behaviour-identical: off-origin
         boxes, floor/ceiling (0.005/2) clamps, and the degenerate zero-box `Math.max(1,…)`
         guard all locked in the test. view.ts 4289 → 4277; ratchet tightened. — 47b86af
+  - [x] Icon Gallery centre-on-cell fit → `drosteFit(cell, cw, ch, cellSize)`
+        (`src/layout/droste-fit.ts`) + `test/droste-fit.test.ts`. `centerDrosteOn`'s
+        inline readable-icon zoom (~55% of the smaller canvas dim per cell, clamped
+        [0.05,3]) + the pan landing the focus cell's world centre at the canvas centre
+        is now a pure builder returning `{zoom,panX,panY}` (a single-cell sibling of the
+        whole-figure `latticeFit`/`upsetFit`/`heatmapFit`/`contentFit`); the view keeps
+        the zoom/pan assignment + requestDraw. `clampZoom` moved into the module (its last
+        view.ts use), so that import was dropped. Behaviour-identical: inline-equivalence
+        grid, zoom floor/ceiling, zero-dim `|| 1` guard, and cell-centre→canvas-centre all
+        locked in the test. view.ts 4277 → 4276; ratchet tightened. — 3bafddf
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
