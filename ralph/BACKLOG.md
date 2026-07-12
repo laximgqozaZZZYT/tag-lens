@@ -657,7 +657,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         builder returning `{zoom,panX,panY}`; the view keeps the screen-space
         `upsetFooterHeight` derivation + the zoom/pan assignment. Sibling of
         `latticeFit`. Behaviour-identical (row clamp 8..20, tall stacks pan above
-        the canvas via negative panY). view.ts 4302 → 4292; ratchet tightened. — PENDING
+        the canvas via negative panY). view.ts 4302 → 4292; ratchet tightened. — f312197
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
