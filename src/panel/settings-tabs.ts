@@ -3,6 +3,7 @@ import { renderViewModeSection } from "./settings-sections";
 import { ghostJaccardInput, parseGhostJaccard } from "./jaccard-input";
 import { basesEdgeKinds } from "./bases-edge-kinds";
 import { basesToggleRows } from "./bases-toggle-rows";
+import { graphDisplayToggles } from "./graph-display-toggles";
 import { inheritFromOptions } from "./inherit-from-options";
 import { bridgeGhostEdgeToggle, legendToggle } from "./settings-toggle-rows";
 import {
@@ -257,12 +258,9 @@ export function renderSettingsDisplayTab(el: HTMLElement, deps: DisplayTabDeps):
 	renderNodeDisplaySection(el, deps);
 	renderMinFontSection(el, deps);
 
-	const gdToggles = [
-		{ key: "showNodes" as const, label: "Show nodes" },
-		{ key: "showEnclosures" as const, label: "Show enclosures" },
-		{ key: "showEdges" as const, label: "Show edges" },
-		{ key: "showGrid" as const, label: "Show grid" },
-	].filter((t) => displayToggleApplies(deps.settings.viewMode, t.key));
+	const gdToggles = graphDisplayToggles().filter((t) =>
+		displayToggleApplies(deps.settings.viewMode, t.key),
+	);
 	
 	if (gdToggles.length > 0 || isHeatmap) {
 		const gdSection = renderToggleSection(
