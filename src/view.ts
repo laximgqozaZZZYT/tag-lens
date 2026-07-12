@@ -29,6 +29,7 @@ import { CARD_CELL_W, CARD_CELL_H } from "./types";
 
 import { clusterHue, createStripeGradient, membershipStripeHues } from "./draw/canvas-utils";
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
+import { canvasBackingSize } from "./draw/canvas-backing";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
 import { contentBounds } from "./layout/content-bounds";
 import { contentFit } from "./layout/content-fit";
@@ -1676,11 +1677,10 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private resize(): void {
-		const dpr = activeWindow.devicePixelRatio || 1;
-		const w = this.canvas.clientWidth;
-		const h = this.canvas.clientHeight;
-		this.canvas.width = Math.max(1, Math.floor(w * dpr));
-		this.canvas.height = Math.max(1, Math.floor(h * dpr));
+		const c = this.canvas;
+		const b = canvasBackingSize(c.clientWidth, c.clientHeight, activeWindow.devicePixelRatio || 1);
+		c.width = b.width;
+		c.height = b.height;
 		this.requestDraw();
 	}
 

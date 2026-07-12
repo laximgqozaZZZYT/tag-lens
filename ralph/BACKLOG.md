@@ -523,6 +523,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         label/min/max preservation, zero-offset identity-clone, and non-mutation.
         Sibling of the `contentBounds`/`*Fit` layout-geometry seams; behaviour-identical.
         view.ts 4273 → 4266; ratchet tightened. — 1078a6c
+  - [x] canvas backing-store sizing → `canvasBackingSize(clientW, clientH, dpr)`
+        (`src/draw/canvas-backing.ts`) + `test/canvas-backing.test.ts`. The inline
+        `Math.max(1, Math.floor(w * dpr))` device-pixel buffer math in `resize()`
+        (`view.ts`) is now a thin call to a pure builder returning `{width, height}`;
+        the floor (integer pixel buffer) + min-1 guard (never a 0-dim canvas from a
+        collapsed/detached element) are locked by the test (dpr 1/2, fractional-floor,
+        zero→1×1, negative-dimension clamp with sibling unaffected). Sibling of the
+        `*Fit` geometry seams; behaviour-identical. view.ts held at the 4256 ratchet.
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
