@@ -141,6 +141,7 @@ import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVaul
 import { SvgRecorderContext } from "./visual/svg-recorder";
 import { findGaps, type TagGap } from "./query/gap-finder";
 import { findBridges, type BridgeCandidate } from "./query/bridge-finder";
+import { hasBidirectionalLink, relatedNoteScore } from "./query/related-score";
 import {
 	HOVER_DELAY_MS,
 	sameTarget,
@@ -637,9 +638,7 @@ export class MiniGraphView extends ItemView {
 			}
 
 			// HasLink の判定 (双方向リンクチェック)
-			const hasLinkFromActive = (resolvedLinks[activePath]?.[node.id]) ? 1 : 0;
-			const hasLinkToActive = (resolvedLinks[node.id] && resolvedLinks[node.id][activePath]) ? 1 : 0;
-			const hasLink = (hasLinkFromActive || hasLinkToActive) ? 1 : 0;
+			const hasLink = hasBidirectionalLink(resolvedLinks, activePath, node.id);
 
 			// Jaccard 係数の計算
 			const nodeFile = this.app.vault.getAbstractFileByPath(node.id);
@@ -654,7 +653,7 @@ export class MiniGraphView extends ItemView {
 			}
 
 			// 総合スコア算出
-			const score = (w_link * hasLink) + (w_tag * jaccard);
+			const score = relatedNoteScore(hasLink, jaccard, w_link, w_tag);
 			node.score = score;
 
 			if (score > 0) {

@@ -8,6 +8,7 @@ import "./note-menu.test";
 
 import "./theme.test";
 import "./query.test";
+import "./related-score.test";
 import "./image-export.test";
 import "./tag-classification.test";
 import "./lens-presets.test";

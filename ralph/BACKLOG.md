@@ -791,6 +791,18 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `drosteFit`/`contentFit` fit family. Test locks the floor snap-up, above-floor
         no-zoom-out, custom min, and node-centre→canvas-centre. Behaviour-identical
         (import offsets the shrink; ratchet holds 4259). — ce963f3
+  - [x] related-notes link predicate + score → `hasBidirectionalLink(resolvedLinks,
+        a, b)` / `relatedNoteScore(hasLink, jaccard, wLink, wTag)`
+        (`src/query/related-score.ts`) + `test/related-score.test.ts`. The drosteFocus
+        neighborhood scorer (`updateViewContextToElement`) inlined the asymmetric
+        resolved-link guard (`resolvedLinks[a]?.[b]` OR `resolvedLinks[b] &&
+        resolvedLinks[b][a]` — a real correctness edge, missing-source keys must not
+        throw) collapsed via `||` into a 0/1 flag, plus the `W_link*hasLink +
+        W_tag*jaccard` weighted formula; both now pure. The vault/tag reads +
+        top-N sort/filter stay in the view. Test locks forward/backward/both/none,
+        empty-map + zero-count → false, and the four score corners. Not a note-menu
+        seam but a clean graph-relevance seam (sibling of the `jaccard*` dedups).
+        Behaviour-identical. view.ts 4259 → 4258; ratchet tightened.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
