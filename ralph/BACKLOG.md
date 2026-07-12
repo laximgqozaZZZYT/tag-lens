@@ -790,7 +790,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         the `locatedNoteId`/highlight machinery. A *pan-to* sibling of the *frame*-style
         `drosteFit`/`contentFit` fit family. Test locks the floor snap-up, above-floor
         no-zoom-out, custom min, and node-centre→canvas-centre. Behaviour-identical
-        (import offsets the shrink; ratchet holds 4259). — cc5b5f9
+        (import offsets the shrink; ratchet holds 4259). — ce963f3
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
