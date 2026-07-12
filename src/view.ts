@@ -33,6 +33,7 @@ import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/clus
 import { contentBounds } from "./layout/content-bounds";
 import { contentFit } from "./layout/content-fit";
 import { drosteFit } from "./layout/droste-fit";
+import { locateNodeFit } from "./layout/locate-fit";
 import { heatmapFit } from "./layout/heatmap-fit";
 import { latticeFit } from "./layout/lattice-fit";
 import { upsetFit } from "./layout/upset-fit";
@@ -2790,11 +2791,10 @@ export class MiniGraphView extends ItemView {
 		const node = this.laid.nodes.find((n) => n.id === id);
 		if (!node) return;
 		const cw = this.canvas.clientWidth || 1, ch = this.canvas.clientHeight || 1;
-		// Zoom in enough to read the card, but never zoom out from the current
-		// view if it's already closer.
-		this.zoom = Math.max(this.zoom, 0.6);
-		this.panX = cw / 2 - node.x * this.zoom;
-		this.panY = ch / 2 - node.y * this.zoom;
+		const fit = locateNodeFit(node, cw, ch, this.zoom);
+		this.zoom = fit.zoom;
+		this.panX = fit.panX;
+		this.panY = fit.panY;
 		this.locatedNoteId = id;
 		// Drive the shared highlight machinery exactly like a hover would, so the
 		// node + its incident edges/clusters light up.

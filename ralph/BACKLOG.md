@@ -781,6 +781,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         the view just measures/fills the returned string. Test locks the prefix,
         the exact-cap-kept-whole vs over-cap-clamped-with-ellipsis boundary, and a
         custom max. Behaviour-identical. view.ts 4260 → 4259; ratchet tightened. — 7cf2e84
+  - [x] locate-on-canvas pan-to → `locateNodeFit(node, cw, ch, currentZoom, minZoom = 0.6)`
+        (`src/layout/locate-fit.ts`) + `test/locate-fit.test.ts`. The inline zoom-floor
+        (`Math.max(this.zoom, 0.6)` — zoom IN to a readable card, never zoom out) +
+        world-centre pan (`panX = cw/2 - node.x*zoom`, same for Y) in the view's
+        `locateNodeOnCanvas` (the navigator/menu "locate" click path) is now a pure
+        builder returning `{zoom,panX,panY}`; the view keeps the `cw/ch || 1` guard +
+        the `locatedNoteId`/highlight machinery. A *pan-to* sibling of the *frame*-style
+        `drosteFit`/`contentFit` fit family. Test locks the floor snap-up, above-floor
+        no-zoom-out, custom min, and node-centre→canvas-centre. Behaviour-identical
+        (import offsets the shrink; ratchet holds 4259). — cc5b5f9
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
