@@ -527,7 +527,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         drawEdges, drawNodesBadge, drawMaturityBadge, drawSizeBadge, drawJaccardBadge}`
         plan; the view keeps the ctx drawing + the vertical badge stacking. Deps read
         straight off settings via `{ ...this.settings, mode }` (mode last so it wins).
-        Same pattern as `computeEdgeDrawPlan`. Behaviour-identical; ratchet held (4289). — pending
+        Same pattern as `computeEdgeDrawPlan`. Behaviour-identical; ratchet held (4289). — 1126db4
   - [x] aggregation-group hit-test → `hitTestAggregationGroup(wx, wy, groups, cardW,
         cardH, zoom)` (`src/interaction/hit-test.ts`, next to `hitTest`) +
         `test/hit-test-aggregation.test.ts`. The first branch of `MiniGraphView.hitTest()`
