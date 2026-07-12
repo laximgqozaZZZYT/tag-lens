@@ -632,7 +632,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         zone; behaviour-identical (left-of-gutter or not-scrollable → panel drag, thumb →
         relative drag, track → jump-then-drag). Single-site behaviour seam, mirrors
         `hitTestAggregationGroup`/`suggestKeyAction`. view.ts 4229 → 4227; ratchet
-        tightened.
+        tightened. — dcb38f4
   - [x] hover-tooltip text builders → `heatmapCellTipText` / `ghostEdgeTipText` /
         `clusterTipText` / `aggregationGroupTipText` (`src/interaction/hover-tip-text.ts`,
         each returning `{title, sub}`) + `test/hover-tip-text.test.ts`. The four pure-data
