@@ -495,6 +495,13 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         thin calls. Behaviour-identical (edges/corners inclusive, locked by an
         inline-equivalence grid). The `{x0,y0,x1,y1}` droste-hit test at
         `view.ts:3649` keeps its own inline form (different rect shape). — 5ccef41
+  - [x] Data ▸ JSON export label → `jsonExportLabel(nodeCount, presetCount)`
+        (`src/interaction/preset-io.ts`, next to `formatJsonStatusLines`) + cases in
+        `test/preset-io.test.ts`. The inline `Export View State (${pluralize(nodeCount,
+        "node")}, ${pluralize(presetCount, "preset")})` template literal in
+        `renderDataJsonBody` (view.ts) is now a thin call to a pure text builder;
+        both counts stay pluralized (singular/plural/zero locked in the test).
+        Behaviour-identical. Mirrors the `formatJsonStatusLines` extraction.
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list

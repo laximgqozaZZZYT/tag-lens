@@ -138,7 +138,7 @@ import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, n
 import { heatmapCellNoteIds } from "./interaction/heatmap-detail";
 import { heatmapCellTipText, ghostEdgeTipText, clusterTipText, aggregationGroupTipText } from "./interaction/hover-tip-text";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
-import { buildViewStateBundle, formatJsonStatusLines, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
+import { buildViewStateBundle, formatJsonStatusLines, jsonExportLabel, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
 import { hitHeatmapCell } from "./interaction/hit-modes";
 
@@ -843,7 +843,7 @@ export class MiniGraphView extends ItemView {
 		// ── Export ──
 		const presetCount = this.settings.lensPresets.length;
 		const nodeCount = this.laid?.nodes?.length || 0;
-		const expLabel = host.createDiv({ text: `Export View State (${pluralize(nodeCount, "node")}, ${pluralize(presetCount, "preset")})` });
+		const expLabel = host.createDiv({ text: jsonExportLabel(nodeCount, presetCount) });
 		expLabel.setCssStyles(noteMenuJsonLabelStyle("4px 0 2px"));
 
 		// Node-stripping + schema/version wrapping + lensPresets split now live in

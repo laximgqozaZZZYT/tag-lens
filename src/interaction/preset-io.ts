@@ -2,6 +2,7 @@
 // mutation, never throws on bad input: parsePresets collects errors and returns
 // whatever valid presets it could recover. The UI layer (Data ▸ JSON) drives it.
 import type { GraphNode, LensPreset, MiniSettings } from "../types";
+import { pluralize } from "../util/pluralize";
 import { validatePresetName } from "./lens-presets";
 
 export const PRESET_SCHEMA = "tag-lens/presets";
@@ -58,6 +59,12 @@ export function formatJsonStatusLines(
 	const errorLines = errors.slice(0, cap).map((e) => `• ${e}`);
 	const overflow = errors.length - cap;
 	return { errorLines, moreText: overflow > 0 ? `…and ${overflow} more.` : null };
+}
+
+// Data ▸ JSON ▸ Export button caption: "Export View State (N nodes, M presets)".
+// Both counts are pluralized; pure text builder for the export label chrome.
+export function jsonExportLabel(nodeCount: number, presetCount: number): string {
+	return `Export View State (${pluralize(nodeCount, "node")}, ${pluralize(presetCount, "preset")})`;
 }
 
 // Query fields that MUST be arrays / a string for a preset to be applyLens-safe.

@@ -1,6 +1,6 @@
 // F1-1 — pure preset (de)serialization. Round-trip fidelity + tolerant parsing.
 import { ok } from "./assert";
-import { serializePresets, parsePresets, presetFileName, mergePresets, buildViewStateBundle, formatJsonStatusLines, JSON_STATUS_ERROR_CAP, PRESET_SCHEMA, PRESET_SCHEMA_VERSION } from "../src/interaction/preset-io";
+import { serializePresets, parsePresets, presetFileName, mergePresets, buildViewStateBundle, formatJsonStatusLines, jsonExportLabel, JSON_STATUS_ERROR_CAP, PRESET_SCHEMA, PRESET_SCHEMA_VERSION } from "../src/interaction/preset-io";
 import { captureLens } from "../src/interaction/lens-presets";
 import { DEFAULT_SETTINGS } from "../src/types";
 import type { GraphNode, LensPreset } from "../src/types";
@@ -149,4 +149,14 @@ const sample: LensPreset[] = [
 	const custom = formatJsonStatusLines(src, 1);
 	ok(custom.errorLines.length === 1 && custom.moreText === "…and 2 more.", "custom cap honoured");
 	ok(src.length === 3, "input array not mutated");
+}
+
+// jsonExportLabel: pluralized "Export View State (N nodes, M presets)" caption.
+{
+	// Plural both sides.
+	ok(jsonExportLabel(3, 2) === "Export View State (3 nodes, 2 presets)", "both plural");
+	// Singular both sides (1 → no trailing s).
+	ok(jsonExportLabel(1, 1) === "Export View State (1 node, 1 preset)", "both singular");
+	// Zero pluralizes ("0 nodes"), mixed singular/plural.
+	ok(jsonExportLabel(0, 1) === "Export View State (0 nodes, 1 preset)", "zero plural, mixed");
 }
