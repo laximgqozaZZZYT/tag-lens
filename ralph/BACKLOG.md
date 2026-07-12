@@ -530,6 +530,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         whose only logic is a single settings-field toggle — extract only if a genuine
         duplicate descriptor list emerges (mirror `basesToggleRows`). Otherwise pivot to
         the `ensureNoteMenu` body-builder seams or F2.
+  - [x] Graph-display checklist descriptors → `graphDisplayToggles()` /
+        `GraphDisplayToggle` (`src/panel/graph-display-toggles.ts`) +
+        `test/graph-display-toggles.test.ts`. The inline `gdToggles` literal in
+        `renderSettingsDisplayTab` (`settings-tabs.ts`) pairing showNodes/showEnclosures/
+        showEdges/showGrid with their labels is now a thin call to a pure builder; the
+        per-mode `displayToggleApplies` filter stays at the call site. Test locks
+        key/label/order against `DEFAULT_SETTINGS` (each key a real boolean field). A
+        genuine duplicate descriptor list per the guidance above; mirrors the
+        `basesEdgeKinds`/`basesToggleRows` extractions. Behaviour-identical. — 79190e6
   - [x] global display-fallback gating → `computeGlobalFallbackPlan(deps)`
         (`src/draw/global-fallback-plan.ts`) + `test/global-fallback-plan.test.ts`.
         The 7 inline per-mode `if` conditions in `drawGlobalDisplayFallbacks` (grid /
