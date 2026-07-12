@@ -633,6 +633,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         relative drag, track → jump-then-drag). Single-site behaviour seam, mirrors
         `hitTestAggregationGroup`/`suggestKeyAction`. view.ts 4229 → 4227; ratchet
         tightened. — dcb38f4
+  - [x] WheelEvent input math → `normalizeWheelDelta(deltaY, deltaMode)` /
+        `wheelZoomFactor(deltaY, sensitivity)` (`src/interaction/wheel.ts`) +
+        `test/wheel.test.ts`. The two inline pure computations in `view.ts`'s `wheel`
+        handler are now thin calls: the legend-scroll deltaMode normalization ternary
+        (`deltaMode===1 ? *20 : deltaMode===2 ? *300 : deltaY`, centralized as
+        `WHEEL_LINE_PX`/`WHEEL_PAGE_PX`) and the zoom-on-wheel `Math.exp(-deltaY*0.0015)`
+        (centralized as `WHEEL_ZOOM_SENSITIVITY`, param for testability). Test locks the
+        three deltaMode branches + unknown-mode passthrough + inline-equivalence grid, and
+        the zoom factor's identity/reciprocal-symmetry/inline-Math.exp/custom-sensitivity.
+        The single-use `factor` local was inlined into the `zoomAroundPointer` call to
+        offset the new import line. Behaviour-identical. view.ts held at the 4227 ratchet.
   - [x] hover-tooltip text builders → `heatmapCellTipText` / `ghostEdgeTipText` /
         `clusterTipText` / `aggregationGroupTipText` (`src/interaction/hover-tip-text.ts`,
         each returning `{title, sub}`) + `test/hover-tip-text.test.ts`. The four pure-data

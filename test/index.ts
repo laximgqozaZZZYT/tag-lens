@@ -119,6 +119,7 @@ import "./droste-fit.test";
 import "./locate-fit.test";
 import "./point-in-rect.test";
 import "./click-slop.test";
+import "./wheel.test";
 
 
 summary();

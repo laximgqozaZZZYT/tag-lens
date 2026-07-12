@@ -162,6 +162,7 @@ import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, moveMenuRect, resizeM
 import { heatmapCellNoteIds } from "./interaction/heatmap-detail";
 import { heatmapCellTipText, ghostEdgeTipText, clusterTipText, aggregationGroupTipText } from "./interaction/hover-tip-text";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
+import { normalizeWheelDelta, wheelZoomFactor } from "./interaction/wheel";
 import { buildViewStateBundle, formatJsonStatusLines, jsonExportLabel, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
 import { hitHeatmapCell } from "./interaction/hit-modes";
@@ -4203,7 +4204,7 @@ export class MiniGraphView extends ItemView {
 				if (this.legendMaxScrollY > 0) {
 					const vmode = this.settings.viewMode;
 					const cur = this.legendScrollY[vmode] ?? 0;
-					const dy = e.deltaMode === 1 ? e.deltaY * 20 : (e.deltaMode === 2 ? e.deltaY * 300 : e.deltaY);
+					const dy = normalizeWheelDelta(e.deltaY, e.deltaMode);
 					this.legendScrollY[vmode] = clampScroll(cur + dy, this.legendMaxScrollY);
 					this.requestDraw();
 				}
@@ -4213,8 +4214,7 @@ export class MiniGraphView extends ItemView {
 
 			// UpSet footer scroll path retired — the matrix is in world
 			// space now, so the normal zoom-on-wheel below applies.
-			const factor = Math.exp(-e.deltaY * 0.0015);
-			const t = zoomAroundPointer({ zoom: this.zoom, panX: this.panX, panY: this.panY }, factor, sx, sy);
+			const t = zoomAroundPointer({ zoom: this.zoom, panX: this.panX, panY: this.panY }, wheelZoomFactor(e.deltaY), sx, sy);
 			this.zoom = t.zoom;
 			this.panX = t.panX;
 			this.panY = t.panY;
