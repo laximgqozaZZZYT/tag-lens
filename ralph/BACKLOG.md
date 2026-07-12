@@ -771,7 +771,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         boundaries) — is now a pure builder returning `{nSpan,width,height}`; the view
         keeps the `axisLayout` call + centre-shift. Sibling of `axis-shift`. Test locks
         the 20-floor, sqrt growth, always-even nSpan over a count sweep, and independent
-        slot scaling. Behaviour-identical. view.ts 4261 → 4260; ratchet tightened. — PENDING
+        slot scaling. Behaviour-identical. view.ts 4261 → 4260; ratchet tightened. — 1a93487
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
