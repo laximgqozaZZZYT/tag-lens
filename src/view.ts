@@ -4006,8 +4006,7 @@ export class MiniGraphView extends ItemView {
 
 			if (hit && hit.kind === "node") {
 				e.preventDefault();
-				const sepIdx = hit.nodeId.indexOf("\t");
-				const baseId = sepIdx >= 0 ? hit.nodeId.slice(sepIdx + 1) : hit.nodeId;
+				const baseId = stripTabPrefix(hit.nodeId);
 				const file = this.app.vault.getAbstractFileByPath(baseId);
 				if (file instanceof TFile) {
 					const menu = new Menu();
