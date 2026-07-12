@@ -1,3 +1,5 @@
+import { jaccardWithShared } from "../util/jaccard";
+
 export interface BridgeCandidate {
 	a: string;
 	b: string;
@@ -79,22 +81,13 @@ export function findBridges(
 			seenPairs.add(pairKey);
 
 			const setB = nodeTagSets.get(idB)!;
-			
-			// Calculate Jaccard similarity (intersection / union)
-			let intersectionSize = 0;
-			const sharedTags: string[] = [];
-			for (const tag of setA) {
-				if (setB.has(tag)) {
-					intersectionSize++;
-					sharedTags.push(tag);
-				}
-			}
-			
-			const unionSize = setA.size + setB.size - intersectionSize;
-			if (unionSize === 0) continue;
-			
-			const jaccard = intersectionSize / unionSize;
-			
+
+			// Empty union (both tag sets empty) → skip, as the old inline loop did.
+			if (setA.size === 0 && setB.size === 0) continue;
+
+			// Jaccard similarity + the concrete shared tags (in setA's order).
+			const { jaccard, shared: sharedTags } = jaccardWithShared(setA, setB);
+
 			if (jaccard >= minJaccard) {
 				candidates.push({
 					a: nodeA.id < idB ? nodeA.id : idB, // Ensure consistent order for output

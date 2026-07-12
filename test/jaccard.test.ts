@@ -2,7 +2,7 @@
 // shared by the related-notes scorer (view.ts) and the redundant-tag-pair finder
 // (insight/compute.ts).
 import { approx, ok } from "./assert";
-import { jaccardFromCounts, jaccardSimilarity } from "../src/util/jaccard";
+import { jaccardFromCounts, jaccardSimilarity, jaccardWithShared } from "../src/util/jaccard";
 
 // Two empty sets → empty union → 0 (not NaN). This is the case the old
 // size-guard in view.ts protected against, now folded into the helper.
@@ -50,3 +50,36 @@ approx(
 	1e-9,
 	"count variant matches set variant",
 );
+
+// jaccardWithShared(a, b) — the bridge-finder variant that also returns the shared
+// elements (in `a`'s iteration order).
+
+// Two empty sets → empty union → 0 with no shared elements (the old `unionSize === 0` skip).
+{
+	const r = jaccardWithShared(new Set<string>(), new Set<string>());
+	ok(r.jaccard === 0 && r.shared.length === 0, "empty ∪ empty → 0, no shared");
+}
+
+// Score matches the plain helper, and shared holds the intersection.
+{
+	const a = new Set(["a", "b", "c"]);
+	const b = new Set(["b", "c", "d"]);
+	const r = jaccardWithShared(a, b);
+	approx(r.jaccard, 0.5, 1e-9, "shared variant half overlap");
+	approx(r.jaccard, jaccardSimilarity(a, b), 1e-9, "shared variant matches plain score");
+	ok(r.shared.join(",") === "b,c", "shared in a's order: b,c");
+}
+
+// Shared list follows `a`'s iteration order, not the smaller set's — order flips with args.
+{
+	const a = new Set(["c", "b", "a"]);
+	const b = new Set(["a", "b"]);
+	ok(jaccardWithShared(a, b).shared.join(",") === "b,a", "shared in a's order (c,b,a) → b,a");
+	ok(jaccardWithShared(b, a).shared.join(",") === "a,b", "swapped args → b's order a,b");
+}
+
+// Disjoint → 0 with empty shared.
+{
+	const r = jaccardWithShared(new Set(["a"]), new Set(["b"]));
+	ok(r.jaccard === 0 && r.shared.length === 0, "disjoint → 0, no shared");
+}
