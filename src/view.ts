@@ -135,7 +135,7 @@ import { pluralize } from "./util/pluralize";
 import { jaccardSimilarity } from "./util/jaccard";
 import { pointInRect } from "./util/point-in-rect";
 import { clampScroll } from "./util/clamp-scroll";
-import { legendScrollbarGeom } from "./interaction/legend-scrollbar";
+import { legendScrollbarGeom, scrollToThumbY, thumbYToScroll } from "./interaction/legend-scrollbar";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes } from "./panel/menu-notes";
 import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVault } from "./panel/export-image";
@@ -3902,7 +3902,7 @@ export class MiniGraphView extends ItemView {
 
 						// Thumb's current physical position
 						const curScrollY = this.legendScrollY[this.settings.viewMode] ?? 0;
-						const curThumbY = pr.y + trackTop + (maxThumbY > 0 ? (curScrollY / this.legendMaxScrollY) * maxThumbY : 0);
+						const curThumbY = pr.y + trackTop + scrollToThumbY(curScrollY, this.legendMaxScrollY, maxThumbY);
 						
 						// If clicking directly on the thumb, do relative drag
 						if (sy >= curThumbY && sy <= curThumbY + thumbH) {
@@ -3911,7 +3911,7 @@ export class MiniGraphView extends ItemView {
 							// Clicking on the track outside the thumb: jump to position
 							// Center the thumb at the clicked Y coordinate
 							const targetThumbY = clampScroll((sy - pr.y - trackTop) - thumbH / 2, maxThumbY);
-							const newScrollY = maxThumbY > 0 ? (targetThumbY / maxThumbY) * this.legendMaxScrollY : 0;
+							const newScrollY = thumbYToScroll(targetThumbY, maxThumbY, this.legendMaxScrollY);
 							
 							const vmode = this.settings.viewMode;
 							this.legendScrollY[vmode] = newScrollY;
@@ -3967,7 +3967,7 @@ export class MiniGraphView extends ItemView {
 					this.legendMaxScrollY,
 					this.exportDprMul === 1,
 				);
-				const scrollDelta = maxThumbY > 0 ? (dy / maxThumbY) * this.legendMaxScrollY : 0;
+				const scrollDelta = thumbYToScroll(dy, maxThumbY, this.legendMaxScrollY);
 				const vmode = this.settings.viewMode;
 				this.legendScrollY[vmode] = clampScroll(this.legendScrollDrag.startScrollY + scrollDelta, this.legendMaxScrollY);
 				this.requestDraw();

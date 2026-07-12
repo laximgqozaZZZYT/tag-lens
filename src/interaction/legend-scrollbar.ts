@@ -36,3 +36,17 @@ export function legendScrollbarGeom(
 	const maxThumbY = trackH - thumbH;
 	return { trackTop, trackH, thumbH, maxThumbY };
 }
+
+// Convert a thumb-Y travel (0..`maxThumbY`) into a scroll offset (0..`maxScrollY`).
+// Guards on `maxThumbY` (no travel → offset 0); `legendScrollbarGeom` only yields
+// `maxThumbY > 0` when there is real overflow, so `maxScrollY > 0` at every call.
+// Shared by the mousedown click-to-jump and the mousemove drag handlers in `view.ts`.
+export function thumbYToScroll(thumbY: number, maxThumbY: number, maxScrollY: number): number {
+	return maxThumbY > 0 ? (thumbY / maxThumbY) * maxScrollY : 0;
+}
+
+// Inverse of `thumbYToScroll`: map a scroll offset back onto the thumb's Y travel,
+// used by mousedown to find the thumb's current position (thumb-drag vs track-jump).
+export function scrollToThumbY(scrollY: number, maxScrollY: number, maxThumbY: number): number {
+	return maxThumbY > 0 ? (scrollY / maxScrollY) * maxThumbY : 0;
+}
