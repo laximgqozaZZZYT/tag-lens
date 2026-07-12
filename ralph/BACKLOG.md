@@ -668,7 +668,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         zoom-independent, so the original three `heatmapGeom` reads (one at zoom 1
         for the fit, two at the fitted zoom for the pins) collapse into one, and the
         clampZoom ceiling (2) / floor (0.05) both round-trip in the test. `heatmapGeom`
-        stays imported for `clampPan`. view.ts 4292 → 4289; ratchet tightened. — cad24a0
+        stays imported for `clampPan`. view.ts 4292 → 4289; ratchet tightened. — 945ee2f
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
