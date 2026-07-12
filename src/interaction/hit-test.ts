@@ -112,6 +112,26 @@ export function hitTest(
 			}
 		}
 	}
-	
+
+	return null;
+}
+
+// One clickable cell rect in the Icon Gallery (Droste) hit region, in device
+// pixels: the AABB spans [x0,x1]×[y0,y1] and carries the cell's node `id`.
+export type DrosteHitRect = { id: string; x0: number; y0: number; x1: number; y1: number };
+
+// Topmost Droste cell under a device-pixel point (dx, dy), or null when the
+// point misses every cell. Scans in REVERSE so a rect painted later (drawn on
+// top) wins over an earlier one it overlaps — matching the inline scan in
+// MiniGraphView.drosteHitTest(). Bounds are inclusive on all four edges.
+export function hitDrosteRect(
+	dx: number,
+	dy: number,
+	rects: readonly DrosteHitRect[],
+): string | null {
+	for (let i = rects.length - 1; i >= 0; i--) {
+		const r = rects[i];
+		if (dx >= r.x0 && dx <= r.x1 && dy >= r.y0 && dy <= r.y1) return r.id;
+	}
 	return null;
 }

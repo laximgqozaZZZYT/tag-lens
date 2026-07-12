@@ -558,6 +558,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         branch stays inline (needs a vault lookup). `jaccardFromCounts` moved into the
         heatmap builder, so its now-unused `view.ts` import was dropped. Not an
         `ensureNoteMenu` seam but a clean self-contained draw/hover seam. Behaviour-identical. — 0201e7e
+  - [x] Droste (Icon Gallery) cell hit-test → `hitDrosteRect(dx, dy, rects)`
+        + `DrosteHitRect` type (`src/interaction/hit-test.ts`, next to `hitTest` /
+        `hitTestAggregationGroup`) + `test/hit-droste-rect.test.ts`. The reverse-scan
+        AABB loop inside `MiniGraphView.drosteHitTest()` (topmost/last-painted rect wins,
+        all four edges inclusive) is now a pure function; the view keeps the dpr scaling
+        (`sx*dpr, sy*dpr`) + the `drosteGallery` guard. `this.drosteHit` is retyped to
+        `DrosteHitRect[]`. Test locks empty→null, inside/outside, four-corner inclusivity,
+        overlap-topmost-wins, and disjoint/gap cases. Not an `ensureNoteMenu` CSS seam but
+        a clean self-contained interaction hit-test seam. Behaviour-identical.
+        view.ts 4276 → 4273; ratchet tightened.
   - [x] count-based Jaccard dedup → `jaccardFromCounts(sizeA, sizeB, intersection)`
         (`src/util/jaccard.ts`, next to `jaccardSimilarity`) + cases in
         `test/jaccard.test.ts`. The intersection-over-union-from-counts score

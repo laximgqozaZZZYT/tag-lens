@@ -93,9 +93,11 @@ import { drawLegend } from "./draw/legend-layout";
 import { buildModeLegend, legendAnchor, type ModeLegendInput } from "./draw/mode-legend";
 import { computeModeLegendInput } from "./draw/mode-legend-input";
 import {
+	hitDrosteRect,
 	hitTest as hitTestFn,
 	hitTestAggregationGroup,
 	screenToWorld as screenToWorldFn,
+	type DrosteHitRect,
 	type HoverTarget,
 } from "./interaction/hit-test";
 import {
@@ -234,7 +236,7 @@ export class MiniGraphView extends ItemView {
 	private hoveredNodeId: string | null = null;
 	// Clickable card rects (device px) recorded by the grid-mode Droste renderer,
 	// so grid-mode hit-testing reuses the drawn geometry instead of re-deriving it.
-	private drosteHit: { id: string; x0: number; y0: number; x1: number; y1: number }[] = [];
+	private drosteHit: DrosteHitRect[] = [];
 	// Containment lens: the full pre-LIMIT graph, so the lens + focus picker cover the
 	// whole vault (not just the LIMIT-trimmed subset).
 	private drosteData: GraphData | null = null;
@@ -3594,12 +3596,7 @@ export class MiniGraphView extends ItemView {
 	private drosteHitTest(sx: number, sy: number): string | null {
 		if (!this.laid.drosteGallery) return null;
 		const dpr = activeWindow.devicePixelRatio || 1;
-		const dx = sx * dpr, dy = sy * dpr;
-		for (let i = this.drosteHit.length - 1; i >= 0; i--) {
-			const r = this.drosteHit[i];
-			if (dx >= r.x0 && dx <= r.x1 && dy >= r.y0 && dy <= r.y1) return r.id;
-		}
-		return null;
+		return hitDrosteRect(sx * dpr, sy * dpr, this.drosteHit);
 	}
 
 
