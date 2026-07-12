@@ -892,3 +892,14 @@ export function suggestKeyAction(key: string, state: SuggestKeyState): SuggestKe
 			return { type: "none" };
 	}
 }
+
+// Screen-space banner text for a non-fatal navigator failure (drawn as a small
+// canvas overlay in view.ts's draw() so the cause is visible on mobile, where
+// the console isn't reachable). Prefixes the raw error with a warning glyph and
+// caps the whole line at `max` chars, appending an ellipsis on overflow so a
+// long message/stack can't run off the canvas edge.
+export const NOTE_MENU_ERROR_MAX = 140;
+export function noteMenuErrorText(err: string, max = NOTE_MENU_ERROR_MAX): string {
+	const msg = `⚠ Note menu disabled: ${err}`;
+	return msg.length > max ? `${msg.slice(0, max - 1)}…` : msg;
+}

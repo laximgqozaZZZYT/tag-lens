@@ -32,6 +32,8 @@ import {
 	folderToggleLabel,
 	folderDisclosure,
 	suggestKeyAction,
+	noteMenuErrorText,
+	NOTE_MENU_ERROR_MAX,
 	type NoteRef,
 	type TreeNode,
 } from "../src/interaction/note-menu";
@@ -1055,4 +1057,26 @@ const advNotes: NoteRef[] = [
 
 	// Any other key is inert.
 	ok(suggestKeyAction("a", openSel1).type === "none", "suggestKey: unrelated key → none");
+}
+
+// ── noteMenuErrorText: warning-glyph prefix + 140-char cap for the banner ────
+{
+	// Short error → full "⚠ Note menu disabled: …" line, no ellipsis.
+	const short = noteMenuErrorText("boom");
+	ok(short === "⚠ Note menu disabled: boom", "errorText: short → prefixed line");
+	ok(!short.endsWith("…"), "errorText: short → no ellipsis");
+
+	// A line of exactly the cap length is kept whole; one char more is truncated
+	// to cap length WITH a trailing ellipsis (slice(0, cap-1) + "…").
+	const prefixLen = "⚠ Note menu disabled: ".length;
+	const atCap = noteMenuErrorText("x".repeat(NOTE_MENU_ERROR_MAX - prefixLen));
+	ok(atCap.length === NOTE_MENU_ERROR_MAX, "errorText: exactly cap → kept whole");
+	ok(!atCap.endsWith("…"), "errorText: exactly cap → no ellipsis");
+
+	const overCap = noteMenuErrorText("x".repeat(NOTE_MENU_ERROR_MAX - prefixLen + 1));
+	ok(overCap.length === NOTE_MENU_ERROR_MAX, "errorText: over cap → clamped to cap length");
+	ok(overCap.endsWith("…"), "errorText: over cap → ellipsis");
+
+	// Custom max is honoured (boundary math parameterised).
+	ok(noteMenuErrorText("abc", 5) === "⚠ No…", "errorText: custom max clamps + ellipsis");
 }

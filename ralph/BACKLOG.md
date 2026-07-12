@@ -772,6 +772,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         keeps the `axisLayout` call + centre-shift. Sibling of `axis-shift`. Test locks
         the 20-floor, sqrt growth, always-even nSpan over a count sweep, and independent
         slot scaling. Behaviour-identical. view.ts 4261 → 4260; ratchet tightened. — 1a93487
+  - [x] navigator error-banner text → `noteMenuErrorText(err, max = NOTE_MENU_ERROR_MAX)`
+        (`src/interaction/note-menu.ts`, next to `suggestKeyAction`) + cases in
+        `test/note-menu.test.ts`. The `draw()` on-canvas banner for a non-fatal
+        navigator failure (visible on mobile where the console isn't reachable)
+        inlined the `⚠ Note menu disabled: ${err}` prefix + the `msg.length > 140 ?
+        slice(0,139)+"…" : msg` char-cap; now one pure builder (cap parameterised),
+        the view just measures/fills the returned string. Test locks the prefix,
+        the exact-cap-kept-whole vs over-cap-clamped-with-ellipsis boundary, and a
+        custom max. Behaviour-identical. view.ts 4260 → 4259; ratchet tightened. — 7cf2e84
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
