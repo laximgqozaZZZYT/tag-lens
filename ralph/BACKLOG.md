@@ -519,6 +519,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         inclusive bounds, slack-scales-with-1/zoom, first-match, and empty/miss cases. Not
         an `ensureNoteMenu` CSS seam but a clean pure hit-test seam discovered while
         seam-hunting. Behaviour-identical. view.ts 4328 → 4324; ratchet tightened. — 0e3e945
+  - [x] legend scrollbar thumb geometry → `legendScrollbarGeom(panelH, maxScrollY,
+        showClose)` (`src/interaction/legend-scrollbar.ts`) + `test/legend-scrollbar.test.ts`.
+        The 6-line trackTop/trackH/thumbH/maxThumbY block was byte-identical between the
+        legend scrollbar's mousedown (click-to-jump / thumb-drag start) and mousemove
+        (drag) handlers in `attachInputs`; now one pure builder both destructure.
+        Behaviour-identical (20/4 top gap, 4px bottom, 20px thumb floor, proportional
+        thumbH). Not a note-menu seam but a clean self-contained interaction-geometry
+        seam. view.ts 4324 → 4323; ratchet tightened. — b921ca8
+        **Follow-up:** `draw/legend-layout.ts:257` paints the thumb with the same rule
+        in its own render-space vars (`showClose`, `box.height`, `drawHeight`); a 3rd
+        dedup would need `draw/` → `interaction/` import (layering question).
   - [x] hover-tooltip text builders → `heatmapCellTipText` / `ghostEdgeTipText` /
         `clusterTipText` / `aggregationGroupTipText` (`src/interaction/hover-tip-text.ts`,
         each returning `{title, sub}`) + `test/hover-tip-text.test.ts`. The four pure-data
