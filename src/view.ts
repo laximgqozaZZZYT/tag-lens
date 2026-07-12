@@ -29,6 +29,7 @@ import { clusterHue, createStripeGradient, membershipStripeHues } from "./draw/c
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
 import { contentBounds } from "./layout/content-bounds";
+import { heatmapFit } from "./layout/heatmap-fit";
 import { latticeFit } from "./layout/lattice-fit";
 import { upsetFit } from "./layout/upset-fit";
 import { runAggregateSnap } from "./layout/aggregate-snap";
@@ -1950,14 +1951,10 @@ export class MiniGraphView extends ItemView {
 		if (this.laid.heatmap) {
 			// Square n×n grid: fit all cells into the smaller of the two data-area
 			// dimensions; pin the origin just past the frozen label bands.
-			const h = this.laid.heatmap;
-			const g = heatmapGeom(h, 1, this.canvas.clientWidth);
-			const availW = Math.max(1, this.canvas.clientWidth - g.labelBand);
-			const availH = Math.max(1, this.canvas.clientHeight - g.headerH);
-			const fit = Math.min(availW, availH) / Math.max(1, h.n * h.cell);
-			this.zoom = clampZoom(fit, 0.05);
-			this.panX = heatmapGeom(h, this.zoom, this.canvas.clientWidth).labelBand;
-			this.panY = heatmapGeom(h, this.zoom, this.canvas.clientWidth).headerH;
+			const fit = heatmapFit(this.laid.heatmap, this.canvas.clientWidth, this.canvas.clientHeight);
+			this.zoom = fit.zoom;
+			this.panX = fit.panX;
+			this.panY = fit.panY;
 			this.requestDraw();
 			return;
 		}

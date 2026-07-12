@@ -658,6 +658,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `upsetFooterHeight` derivation + the zoom/pan assignment. Sibling of
         `latticeFit`. Behaviour-identical (row clamp 8..20, tall stacks pan above
         the canvas via negative panY). view.ts 4302 → 4292; ratchet tightened. — f312197
+  - [x] heatmap initial-fit geometry → `heatmapFit(h, canvasW, canvasH)`
+        (`src/layout/heatmap-fit.ts`) + `test/heatmap-fit.test.ts`. The inline
+        `heatmapGeom`-derived availW/availH fit + `clampZoom(…, 0.05)` floor and the
+        band-pinned pans (`panX = labelBand`, `panY = headerH`) in the view's
+        initial-fit `laid.heatmap` branch are now a pure builder returning
+        `{zoom,panX,panY}`; the view keeps only the zoom/pan assignment. Sibling of
+        `latticeFit`/`upsetFit`. Behaviour-identical: labelBand/headerH are
+        zoom-independent, so the original three `heatmapGeom` reads (one at zoom 1
+        for the fit, two at the fitted zoom for the pins) collapse into one, and the
+        clampZoom ceiling (2) / floor (0.05) both round-trip in the test. `heatmapGeom`
+        stays imported for `clampPan`. view.ts 4292 → 4289; ratchet tightened. — cad24a0
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
