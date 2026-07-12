@@ -502,6 +502,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `renderDataJsonBody` (view.ts) is now a thin call to a pure text builder;
         both counts stay pluralized (singular/plural/zero locked in the test).
         Behaviour-identical. Mirrors the `formatJsonStatusLines` extraction.
+  - [x] UpSet horizontal pan clamp → `clampUpsetPanX(panX, contentW, canvasW, leftBandPx)`
+        (`src/interaction/upset-pan.ts`, a sibling of `clampSpreadsheetPan`) +
+        `test/upset-pan.test.ts`. The inline availableW/maxPanX/minPanX + fits-vs-clamp
+        branch in `clampPan()`'s UpSet arm (`view.ts`) is now a thin call to a pure
+        function; the user-spec 2026-05-26 edge rule (cards pinned to the right of the
+        row-label band, never revealing empty canvas past their edges) is locked by the
+        test (fits→pin, in-range passthrough, both edges, inline-equivalence grid).
+        Not a note-menu seam but a clean self-contained interaction-geometry seam.
+        Behaviour-identical. view.ts 4323 → 4316; ratchet tightened. — 847d43a
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list

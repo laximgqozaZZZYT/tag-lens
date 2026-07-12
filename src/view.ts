@@ -63,6 +63,7 @@ import {
 } from "./draw/draw-upset";
 import { drawHeatmap, heatmapGeom } from "./draw/draw-heatmap";
 import { clampSpreadsheetPan } from "./interaction/spreadsheet-pan";
+import { clampUpsetPanX } from "./interaction/upset-pan";
 import { drawDroste } from "./draw/draw-droste";
 import {
 	drawLattice,
@@ -2051,24 +2052,16 @@ export class MiniGraphView extends ItemView {
 		// canvas beyond them.
 		if (!this.laid.upset) return;
 		const u = this.laid.upset;
-		const contentW = u.cardsWorldWidth * this.zoom;
-		const canvasW = this.canvas.clientWidth;
 		// Cards (= the "Pareto-shaped" card-stack columns) and their
 		// matching matrix dots must start at the RIGHT edge of the
 		// footer's row-label band (`UPSET_LEFT_BAND_PX`), never to
 		// the left of it — per user spec (2026-05-26).
-		const availableW = canvasW - UPSET_LEFT_BAND_PX;
-		// maxPanX = panX that places cards' world-x=0 at screen-x=LEFT_BAND_PX.
-		const maxPanX = UPSET_LEFT_BAND_PX;
-		// minPanX = panX that places cards' right edge at canvas right.
-		const minPanX = canvasW - contentW;
-		if (contentW <= availableW) {
-			// Cards fit in the area RIGHT of the label band — pin to
-			// the left of that area (no panning needed).
-			this.panX = maxPanX;
-		} else {
-			this.panX = Math.max(minPanX, Math.min(maxPanX, this.panX));
-		}
+		this.panX = clampUpsetPanX(
+			this.panX,
+			u.cardsWorldWidth * this.zoom,
+			this.canvas.clientWidth,
+			UPSET_LEFT_BAND_PX,
+		);
 	}
 
 	private drawGlobalDisplayFallbacks(ctx: CanvasRenderingContext2D, dpr: number, mode: string): void {

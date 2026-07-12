@@ -99,6 +99,7 @@ import "./tab-prefix.test";
 import "./heatmap-detail.test";
 import "./hover-tip-text.test";
 import "./clamp-zoom.test";
+import "./upset-pan.test";
 import "./content-bounds.test";
 import "./point-in-rect.test";
 
