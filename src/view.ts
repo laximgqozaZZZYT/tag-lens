@@ -5,7 +5,8 @@ import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
 
 import type { EncContext, EncNode, NodeDrawParams, EncodingBinding } from "./encoding/types";
 import { scatterAxisDefaults } from "./encoding/scatter-axis-defaults";
-import { axisLayout, type AxisSpec, type AxisBand, type AxisTick } from "./layout/axis-layout";
+import { axisLayout } from "./layout/axis-layout";
+import { shiftAxisSpec } from "./layout/axis-shift";
 import { assignGalleryAxes } from "./layout/droste-axis";
 import { LaneRegistry, routeZ } from "./layout/edge-routing";
 import { buildIdToRect, buildRouteObstacles } from "./layout/layout-shared";
@@ -1424,17 +1425,9 @@ export class MiniGraphView extends ItemView {
 			}
 		}
 
-		const shiftSpec = (spec: AxisSpec | undefined, offset: number): AxisSpec | undefined => {
-			if (!spec) return undefined;
-			const out = { ...spec };
-			if (out.bands) out.bands = out.bands.map((b: AxisBand) => ({ ...b, start: b.start - offset, end: b.end - offset, center: b.center - offset }));
-			if (out.ticks) out.ticks = out.ticks.map((t: AxisTick) => ({ ...t, pos: t.pos - offset }));
-			return out;
-		};
-
 		this.laid.axes = {
-			x: shiftSpec(axes.x, cx),
-			y: shiftSpec(axes.y, cy),
+			x: shiftAxisSpec(axes.x, cx),
+			y: shiftAxisSpec(axes.y, cy),
 		};
 
 		if (this.laid.clusters && this.laid.clusters.length > 0) {

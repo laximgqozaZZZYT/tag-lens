@@ -511,6 +511,18 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         test (fits→pin, in-range passthrough, both edges, inline-equivalence grid).
         Not a note-menu seam but a clean self-contained interaction-geometry seam.
         Behaviour-identical. view.ts 4323 → 4316; ratchet tightened. — 847d43a
+  - [x] applyAxisLayout world-centre shift → `shiftAxisSpec(spec, offset)`
+        (`src/layout/axis-shift.ts`, next to `axisLayout`) + `test/axis-shift.test.ts`.
+        The inline `shiftSpec` closure in `applyAxisLayout` (`view.ts`) — which
+        re-anchors the `axisLayout` bands/ticks into world space by subtracting the
+        figure-centre `cx`/`cy` from every positional field (band start/end/center,
+        tick pos) so the axis stays aligned with the world-centred dots — is now a
+        pure, non-mutating module. The `AxisSpec`/`AxisBand`/`AxisTick` type imports
+        moved out of `view.ts` (now only in the pure module). Test locks
+        undefined-passthrough, per-field categorical + quantitative offsets,
+        label/min/max preservation, zero-offset identity-clone, and non-mutation.
+        Sibling of the `contentBounds`/`*Fit` layout-geometry seams; behaviour-identical.
+        view.ts 4273 → 4266; ratchet tightened.
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
