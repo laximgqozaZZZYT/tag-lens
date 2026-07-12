@@ -89,6 +89,7 @@ import "./heatmap-draw-input.test";
 import "./upset-draw-input.test";
 import "./enclosure-draw-input.test";
 import "./edge-draw-plan.test";
+import "./global-fallback-plan.test";
 import "./node-draw-list.test";
 import "./junihitoe-stack-list.test";
 import "./aggregate-stack-list.test";

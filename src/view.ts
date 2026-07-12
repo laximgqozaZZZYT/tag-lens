@@ -79,6 +79,7 @@ import { computeLatticeDrawInput } from "./draw/lattice-draw-input";
 import { computeDrosteDrawInput } from "./draw/droste-draw-input";
 import { computeEnclosureDrawInput } from "./draw/enclosure-draw-input";
 import { computeEdgeDrawPlan } from "./draw/edge-draw-plan";
+import { computeGlobalFallbackPlan } from "./draw/global-fallback-plan";
 import { computeHeatmapDrawInput } from "./draw/heatmap-draw-input";
 import { computeUpsetDrawInput } from "./draw/upset-draw-input";
 import { computeAggregateStackList } from "./draw/aggregate-stack-list";
@@ -2043,13 +2044,14 @@ export class MiniGraphView extends ItemView {
 		ctx.save();
 		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 		const baseAlpha = 0.05;
-
-		const isEuler = mode === "euler" || mode === "bubblesets";
+		// Pure per-mode gating for every overlay layer/badge below (`mode` last so
+		// it wins over any settings.mode).
+		const plan = computeGlobalFallbackPlan({ ...this.settings, mode });
 
 		// 1. showGrid: draw a subtle background grid.
 		// Exclude euler since it natively draws a strong grid. Droste draws its own
 		// Cartesian cell grid (drawDefaultGrid / drawAxisGrid). Matrix/Heatmap don't have native grid.
-		if (this.settings.showGrid && !isEuler && mode !== "droste") {
+		if (plan.drawGrid) {
 			ctx.strokeStyle = `rgba(128, 128, 128, ${baseAlpha * 2})`;
 			ctx.lineWidth = 1;
 			ctx.beginPath();
@@ -2060,7 +2062,7 @@ export class MiniGraphView extends ItemView {
 
 		// 2. showEnclosures: draw a bounding box around the canvas
 		// Exclude euler since it natively has enclosures.
-		if (this.settings.showEnclosures && !isEuler) {
+		if (plan.drawEnclosures) {
 			ctx.strokeStyle = `rgba(255, 128, 0, ${baseAlpha * 4})`;
 			ctx.lineWidth = 4;
 			ctx.strokeRect(4, 4, cw / dpr - 8, ch / dpr - 8);
@@ -2068,7 +2070,7 @@ export class MiniGraphView extends ItemView {
 
 		// 3. showEdges: decorative faint connecting lines from corners
 		// Exclude euler since it draws native edges.
-		if (this.settings.showEdges && !isEuler) {
+		if (plan.drawEdges) {
 			ctx.strokeStyle = `rgba(0, 128, 255, ${baseAlpha})`;
 			ctx.lineWidth = 2;
 			ctx.beginPath();
@@ -2079,7 +2081,7 @@ export class MiniGraphView extends ItemView {
 
 		// 4. showNodes: small badge in top right
 		// Exclude euler/upset/bubblesets since they natively draw nodes.
-		if (this.settings.showNodes && !isEuler && mode !== "upset") {
+		if (plan.drawNodesBadge) {
 			ctx.fillStyle = `rgba(100, 100, 100, ${baseAlpha * 10})`;
 			const tw = ctx.measureText(`${this.laid.nodes?.length ?? 0} nodes`).width;
 			ctx.fillRect(cw / dpr - tw - 20, 10, tw + 10, 20);
@@ -2101,15 +2103,13 @@ export class MiniGraphView extends ItemView {
 			badgeY += 24;
 		};
 
-		if (this.settings.showMaturity) drawBadge("Maturity: ON", "rgba(0, 150, 0, 0.8)");
+		if (plan.drawMaturityBadge) drawBadge("Maturity: ON", "rgba(0, 150, 0, 0.8)");
 		// Node size fallback badge for modes that don't scale cards natively
-		if (!isEuler && mode !== "upset") {
-			if (this.settings.nodeRows !== 1 || this.settings.nodeCols !== 1) {
-				drawBadge(`Size: ${this.settings.nodeRows}x${this.settings.nodeCols}`, "rgba(50, 150, 200, 0.8)");
-			}
+		if (plan.drawSizeBadge) {
+			drawBadge(`Size: ${this.settings.nodeRows}x${this.settings.nodeCols}`, "rgba(50, 150, 200, 0.8)");
 		}
 
-		if (mode === "heatmap" && this.settings.heatmapJaccard) {
+		if (plan.drawJaccardBadge) {
 			drawBadge("Jaccard: ON", "rgba(100, 100, 100, 0.8)");
 		}
 

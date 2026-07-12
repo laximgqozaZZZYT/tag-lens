@@ -518,6 +518,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         whose only logic is a single settings-field toggle — extract only if a genuine
         duplicate descriptor list emerges (mirror `basesToggleRows`). Otherwise pivot to
         the `ensureNoteMenu` body-builder seams or F2.
+  - [x] global display-fallback gating → `computeGlobalFallbackPlan(deps)`
+        (`src/draw/global-fallback-plan.ts`) + `test/global-fallback-plan.test.ts`.
+        The 7 inline per-mode `if` conditions in `drawGlobalDisplayFallbacks` (grid /
+        enclosure frame / decorative edges / node-count badge / maturity+size+jaccard
+        meta badges) — all gated on the same `isEuler = euler|bubblesets` +
+        `mode !== droste|upset` rules — now read from a pure `{drawGrid, drawEnclosures,
+        drawEdges, drawNodesBadge, drawMaturityBadge, drawSizeBadge, drawJaccardBadge}`
+        plan; the view keeps the ctx drawing + the vertical badge stacking. Deps read
+        straight off settings via `{ ...this.settings, mode }` (mode last so it wins).
+        Same pattern as `computeEdgeDrawPlan`. Behaviour-identical; ratchet held (4289). — pending
   - [x] aggregation-group hit-test → `hitTestAggregationGroup(wx, wy, groups, cardW,
         cardH, zoom)` (`src/interaction/hit-test.ts`, next to `hitTest`) +
         `test/hit-test-aggregation.test.ts`. The first branch of `MiniGraphView.hitTest()`
