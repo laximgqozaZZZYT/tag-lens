@@ -589,6 +589,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         **Follow-up:** `draw/legend-layout.ts:257` paints the thumb with the same rule
         in its own render-space vars (`showClose`, `box.height`, `drawHeight`); a 3rd
         dedup would need `draw/` → `interaction/` import (layering question).
+  - [x] legend scrollbar thumb↔scroll conversions → `scrollToThumbY` / `thumbYToScroll`
+        (`src/interaction/legend-scrollbar.ts`, next to `legendScrollbarGeom`) + cases in
+        `test/legend-scrollbar.test.ts`. The proportional thumb-travel ↔ scroll-offset
+        map was re-derived inline 3× in `view.ts`'s legend scrollbar handlers: scroll→
+        thumbY once (mousedown, to locate the current thumb for thumb-drag-vs-track-jump)
+        and thumbY→scroll twice, byte-identical (mousedown track-jump + mousemove drag).
+        All three now call the pure inverse pair; test locks the inverse pairing, the
+        `maxThumbY === 0` no-travel guard (never divides by 0), and a scroll round-trip.
+        Behaviour-identical (same `maxThumbY > 0 ? … : 0` divide guard). view.ts held at
+        the 4256 ratchet (each 1-line inline expr → 1-line call). — e778373
   - [x] hover-tooltip text builders → `heatmapCellTipText` / `ghostEdgeTipText` /
         `clusterTipText` / `aggregationGroupTipText` (`src/interaction/hover-tip-text.ts`,
         each returning `{title, sub}`) + `test/hover-tip-text.test.ts`. The four pure-data
