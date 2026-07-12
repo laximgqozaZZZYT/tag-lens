@@ -718,6 +718,11 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         cross-layer `draw/`→`interaction/` import). New `test/tab-prefix.test.ts`
         locks the behaviour (first-tab split, plain-path passthrough).
         Behaviour-identical. — a85a37c
+  - [x] 7th strip dedup → the node-contextmenu ("Set maturity") handler in
+        `attachInputs` still re-derived the same `indexOf("\t")` + slice inline
+        (`sepIdx`/`baseId`), missed by the a85a37c sweep; collapsed into a thin
+        `stripTabPrefix(hit.nodeId)` call. Behaviour-identical. view.ts 4230 →
+        4229; ratchet tightened. — c325f23
   - [x] panorama-fit content bounds → `contentBounds(clusters, nodes)`
         (`src/layout/content-bounds.ts`) + `test/content-bounds.test.ts`. The inline
         min/max accumulation over `laid.clusters` (top-left `x,y,width,height`) + a
