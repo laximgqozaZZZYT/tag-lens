@@ -549,6 +549,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         plan; the view keeps the ctx drawing + the vertical badge stacking. Deps read
         straight off settings via `{ ...this.settings, mode }` (mode last so it wins).
         Same pattern as `computeEdgeDrawPlan`. Behaviour-identical; ratchet held (4289). — 1126db4
+  - [x] meta indicator badges → `metaBadges(plan, nodeRows, nodeCols)` /
+        `MetaBadge`/`MetaBadgeGates` (`src/draw/meta-badges.ts`) +
+        `test/meta-badges.test.ts`. The three inline Maturity/Size/Jaccard
+        `drawBadge(...)` `if` blocks in `drawGlobalDisplayFallbacks` now read their
+        label/colour/stacking-order from a pure builder (takes the existing
+        `GlobalFallbackPlan` structurally for its three `draw*Badge` gates); the view
+        keeps the `drawBadge` ctx fillRect/fillText loop. Test locks label/colour/order
+        + Size `RxC` interpolation + the gate-skip hole-close. Companion to
+        `computeGlobalFallbackPlan` (which decides *whether* each badge fires; this
+        decides *what* it says). Behaviour-identical. view.ts 4266 → 4261; ratchet
+        tightened. — 53674e8
   - [x] aggregation-group hit-test → `hitTestAggregationGroup(wx, wy, groups, cardW,
         cardH, zoom)` (`src/interaction/hit-test.ts`, next to `hitTest`) +
         `test/hit-test-aggregation.test.ts`. The first branch of `MiniGraphView.hitTest()`
