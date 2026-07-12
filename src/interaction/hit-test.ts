@@ -1,3 +1,4 @@
+import type { AggregationGroup } from "../aggregation/types";
 import type { PositionedNode, ClusterRect } from "../layout/layout";
 
 // Output of a cursor → scene hit-test. `null` means the cursor is over
@@ -23,6 +24,33 @@ export function screenToWorld(
 	zoom: number,
 ): { x: number; y: number } {
 	return { x: (sx - panX) / zoom, y: (sy - panY) / zoom };
+}
+
+// Hit-test the node aggregation groups (Junihitoe stacks) that win over the
+// regular card/cluster hit-test. Each stack occupies roughly one card's
+// footprint (`cardW × cardH`, matching drawJunihitoeStack's subW/subH) centred
+// on the group position; `slackPx = 1 / zoom` widens the AABB by one screen
+// pixel so the stroke itself counts as inside. Returns the first containing
+// group in iteration order, or null when the point misses every group.
+export function hitTestAggregationGroup(
+	wx: number,
+	wy: number,
+	groups: Iterable<AggregationGroup>,
+	cardW: number,
+	cardH: number,
+	zoom: number,
+): Extract<HoverTarget, { kind: "aggregationGroup" }> | null {
+	const slackPx = 1 / zoom;
+	for (const group of groups) {
+		const left = group.x - cardW / 2 - slackPx;
+		const right = group.x + cardW / 2 + slackPx;
+		const top = group.y - cardH / 2 - slackPx;
+		const bottom = group.y + cardH / 2 + slackPx;
+		if (wx >= left && wx <= right && wy >= top && wy <= bottom) {
+			return { kind: "aggregationGroup", groupKey: group.key, nodeIds: group.nodeIds };
+		}
+	}
+	return null;
 }
 
 // Cards-first hit-test. Picks the smallest-distance card hit so two

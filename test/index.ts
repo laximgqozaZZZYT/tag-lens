@@ -57,6 +57,7 @@ import "./inherit-from-options.test";
 import "./settings-toggle-rows.test";
 import "./zoom-math.test";
 import "./hit-modes.test";
+import "./hit-test-aggregation.test";
 import "./settings-parity.test";
 import "./attribute-propagation.test";
 import "./euler-true-stripes.test";

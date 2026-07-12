@@ -87,6 +87,7 @@ import { buildModeLegend, legendAnchor, type ModeLegendInput } from "./draw/mode
 import { computeModeLegendInput } from "./draw/mode-legend-input";
 import {
 	hitTest as hitTestFn,
+	hitTestAggregationGroup,
 	screenToWorld as screenToWorldFn,
 	type HoverTarget,
 } from "./interaction/hit-test";
@@ -2717,21 +2718,16 @@ export class MiniGraphView extends ItemView {
 	private hitTest(wx: number, wy: number): HoverTarget {
 		// 1. Check node aggregation groups (Junihitoe stacks) first
 		if (this.aggregationState.groups.size > 0 && this.laid.nodes.length > 0) {
-			const slackPx = 1 / this.zoom;
 			// Stacks are roughly the same size as cards (subW/subH in drawJunihitoeStack)
-			const cardW = this.laid.nodes[0].width;
-			const cardH = this.laid.nodes[0].height;
-			
-			for (const group of this.aggregationState.groups.values()) {
-				const left = group.x - cardW / 2 - slackPx;
-				const right = group.x + cardW / 2 + slackPx;
-				const top = group.y - cardH / 2 - slackPx;
-				const bottom = group.y + cardH / 2 + slackPx;
-				
-				if (wx >= left && wx <= right && wy >= top && wy <= bottom) {
-					return { kind: "aggregationGroup", groupKey: group.key, nodeIds: group.nodeIds };
-				}
-			}
+			const hit = hitTestAggregationGroup(
+				wx,
+				wy,
+				this.aggregationState.groups.values(),
+				this.laid.nodes[0].width,
+				this.laid.nodes[0].height,
+				this.zoom,
+			);
+			if (hit) return hit;
 		}
 
 		return hitTestFn(
