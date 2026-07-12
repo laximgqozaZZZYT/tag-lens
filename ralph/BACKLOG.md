@@ -522,7 +522,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         undefined-passthrough, per-field categorical + quantitative offsets,
         label/min/max preservation, zero-offset identity-clone, and non-mutation.
         Sibling of the `contentBounds`/`*Fit` layout-geometry seams; behaviour-identical.
-        view.ts 4273 → 4266; ratchet tightened.
+        view.ts 4273 → 4266; ratchet tightened. — 1078a6c
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
