@@ -679,6 +679,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         for the fit, two at the fitted zoom for the pins) collapse into one, and the
         clampZoom ceiling (2) / floor (0.05) both round-trip in the test. `heatmapGeom`
         stays imported for `clampPan`. view.ts 4292 → 4289; ratchet tightened. — 945ee2f
+  - [x] default card-figure initial-fit → `contentFit(bounds, visW, visH)`
+        (`src/layout/content-fit.ts`) + `test/content-fit.test.ts`. The last inline
+        `*Fit` in `fitToView` — the euler/bubblesets/scatter/panorama branch's padded
+        fit (side 20 / top 36 / bottom 20), `clampZoom(…, 0.005)` floor, and
+        world-centre pan — is now a pure builder returning `{zoom,panX,panY}`; the view
+        keeps the visW/visH derivation (panel-width subtraction) + the zoom/pan
+        assignment. Sibling of `latticeFit`/`upsetFit`/`heatmapFit`, so every `fitToView`
+        mode branch now reads from a pure fit builder. Behaviour-identical: off-origin
+        boxes, floor/ceiling (0.005/2) clamps, and the degenerate zero-box `Math.max(1,…)`
+        guard all locked in the test. view.ts 4289 → 4277; ratchet tightened. — 47b86af
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
