@@ -509,6 +509,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         whose only logic is a single settings-field toggle — extract only if a genuine
         duplicate descriptor list emerges (mirror `basesToggleRows`). Otherwise pivot to
         the `ensureNoteMenu` body-builder seams or F2.
+  - [x] aggregation-group hit-test → `hitTestAggregationGroup(wx, wy, groups, cardW,
+        cardH, zoom)` (`src/interaction/hit-test.ts`, next to `hitTest`) +
+        `test/hit-test-aggregation.test.ts`. The first branch of `MiniGraphView.hitTest()`
+        inlined the Junihitoe-stack AABB scan (each stack = one card footprint centred on
+        the group position, widened by `slackPx = 1/zoom`, first containing group wins);
+        now a pure function returning the `aggregationGroup` HoverTarget or null, the view
+        keeps the card-size source (`nodes[0]`) + the size/non-empty guard. Test locks the
+        inclusive bounds, slack-scales-with-1/zoom, first-match, and empty/miss cases. Not
+        an `ensureNoteMenu` CSS seam but a clean pure hit-test seam discovered while
+        seam-hunting. Behaviour-identical. view.ts 4328 → 4324; ratchet tightened. — 0e3e945
   - [x] hover-tooltip text builders → `heatmapCellTipText` / `ghostEdgeTipText` /
         `clusterTipText` / `aggregationGroupTipText` (`src/interaction/hover-tip-text.ts`,
         each returning `{title, sub}`) + `test/hover-tip-text.test.ts`. The four pure-data
