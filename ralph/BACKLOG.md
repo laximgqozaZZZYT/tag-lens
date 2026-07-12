@@ -802,7 +802,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         top-N sort/filter stay in the view. Test locks forward/backward/both/none,
         empty-map + zero-count → false, and the four score corners. Not a note-menu
         seam but a clean graph-relevance seam (sibling of the `jaccard*` dedups).
-        Behaviour-identical. view.ts 4259 → 4258; ratchet tightened.
+        Behaviour-identical. view.ts 4259 → 4258; ratchet tightened. — 1cf6723
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
