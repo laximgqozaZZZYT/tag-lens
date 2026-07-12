@@ -734,6 +734,9 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `fee6321`) shrank `view.ts` to 4374 without lowering the ratchet, leaving
         104 lines of slack; tightened `BASELINE` to the current 4374 (the test's
         own documented companion action) to lock in the gains. No src change. — f358fa3
+  - [x] **ratchet tighten 4374 → 4328.** Further pure-module seam extractions shrank
+        `view.ts` to 4328 (46 lines of slack under the old baseline); tightened
+        `BASELINE` to lock in the gains. Test-only change. — 451026f
 - [x] **P1 — cognitive-complexity baseline.** Enabled
       `complexity/noExcessiveCognitiveComplexity` at `warn` in `biome.json` (warnings
       don't fail `biome lint`, so verify stays green); baseline **111 offenders**
