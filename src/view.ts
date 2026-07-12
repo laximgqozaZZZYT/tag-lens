@@ -29,6 +29,7 @@ import { clusterHue, createStripeGradient, membershipStripeHues } from "./draw/c
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
 import { contentBounds } from "./layout/content-bounds";
+import { contentFit } from "./layout/content-fit";
 import { heatmapFit } from "./layout/heatmap-fit";
 import { latticeFit } from "./layout/lattice-fit";
 import { upsetFit } from "./layout/upset-fit";
@@ -1966,29 +1967,16 @@ export class MiniGraphView extends ItemView {
 		}
 		const bounds = contentBounds(this.laid.clusters, this.laid.nodes);
 		if (!bounds) return;
-		const { minX, minY, maxX, maxY } = bounds;
 		// The settings panel overlays the right side of the canvas without
 		// pushing it, so subtract its width from the effective fit area and
 		// centre against the visible half.
 		const panelW = this.pinnedMenuWidth();
 		const visW = Math.max(1, this.canvas.clientWidth - panelW);
 		const visH = this.canvas.clientHeight;
-		// Reserve canvas-pixel padding (zoom-independent). Top gets extra room
-		// for cluster labels which sit ~20 canvas px above each enclosure.
-		const padX = 20;
-		const padTop = 36;
-		const padBottom = 20;
-		const fitW = Math.max(1, visW - 2 * padX);
-		const fitH = Math.max(1, visH - padTop - padBottom);
-		const zx = fitW / Math.max(1, maxX - minX);
-		const zy = fitH / Math.max(1, maxY - minY);
-		// Min floor is intentionally very low so huge vaults still fit on
-		// screen; the user can zoom in interactively as needed.
-		this.zoom = clampZoom(Math.min(zx, zy), 0.005);
-		const worldCenterX = (minX + maxX) / 2;
-		const worldCenterY = (minY + maxY) / 2;
-		this.panX = padX + fitW / 2 - worldCenterX * this.zoom;
-		this.panY = padTop + fitH / 2 - worldCenterY * this.zoom;
+		const fit = contentFit(bounds, visW, visH);
+		this.zoom = fit.zoom;
+		this.panX = fit.panX;
+		this.panY = fit.panY;
 		this.requestDraw();
 	}
 
