@@ -83,6 +83,7 @@ import { computeDrosteDrawInput } from "./draw/droste-draw-input";
 import { computeEnclosureDrawInput } from "./draw/enclosure-draw-input";
 import { computeEdgeDrawPlan } from "./draw/edge-draw-plan";
 import { computeGlobalFallbackPlan } from "./draw/global-fallback-plan";
+import { metaBadges } from "./draw/meta-badges";
 import { computeHeatmapDrawInput } from "./draw/heatmap-draw-input";
 import { computeUpsetDrawInput } from "./draw/upset-draw-input";
 import { computeAggregateStackList } from "./draw/aggregate-stack-list";
@@ -2087,14 +2088,8 @@ export class MiniGraphView extends ItemView {
 			badgeY += 24;
 		};
 
-		if (plan.drawMaturityBadge) drawBadge("Maturity: ON", "rgba(0, 150, 0, 0.8)");
-		// Node size fallback badge for modes that don't scale cards natively
-		if (plan.drawSizeBadge) {
-			drawBadge(`Size: ${this.settings.nodeRows}x${this.settings.nodeCols}`, "rgba(50, 150, 200, 0.8)");
-		}
-
-		if (plan.drawJaccardBadge) {
-			drawBadge("Jaccard: ON", "rgba(100, 100, 100, 0.8)");
+		for (const badge of metaBadges(plan, this.settings.nodeRows, this.settings.nodeCols)) {
+			drawBadge(badge.label, badge.color);
 		}
 
 		// F5: per-mode on-canvas legend. Pure overlay — never affects figure/selection.
