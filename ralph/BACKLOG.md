@@ -599,6 +599,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         **Follow-up:** `query/bridge-finder.ts` keeps its own loop because it also
         collects `sharedTags` while scanning; a `jaccardWithShared(a, b)` variant
         could dedup that third site if wanted.
+  - [x] count-with-shared Jaccard dedup → `jaccardWithShared(a, b)`
+        (`src/util/jaccard.ts`, next to `jaccardSimilarity`) returning `{jaccard,
+        shared}` + cases in `test/jaccard.test.ts`. Closes the follow-up above: the
+        bridge-finder (`query/bridge-finder.ts`) re-derived intersection-over-union
+        inline behind its own scan because it also collects `sharedTags`. The variant
+        iterates the first arg so `shared` keeps `a`'s order (no smaller-set shortcut);
+        the inline loop + `unionSize === 0` skip collapse into a thin call plus an
+        explicit `setA.size === 0 && setB.size === 0` empty-union guard (exactly
+        equivalent). Test locks score-parity, a's-order shared, arg-order flip,
+        empty-union, and disjoint. Behaviour-identical. — 7ea099c
   - [x] pinned left-grip resize clamp dedup → the inline
         `Math.min(Math.max(NOTE_MENU_MIN.width, raw), Math.max(NOTE_MENU_MIN.width,
         Math.floor((cw||320)*0.8)))` in the pinned `lgrip` `onMove` handler was
