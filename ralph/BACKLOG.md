@@ -762,6 +762,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         max-0 locked in the test). The import cost was offset by inlining the now-clamped
         thumb-Y expression, so the ratchet holds (4266). Mirrors the `clampZoom`/
         `pointInRect` util dedups.
+  - [x] pre-axis fallback world span → `axisFallbackSpan(nodeCount, slotW, slotH)`
+        (`src/layout/axis-fallback-span.ts`) + `test/axis-fallback-span.test.ts`. The
+        inline `nSpan = max(20, ceil(sqrt(n))*4)` + force-even + `nSpan * slotW/slotH`
+        block in `applyAxisLayout` (`view.ts`) — the default figure box `axisLayout`
+        falls back to (sized off node count, forced EVEN so the world-centre
+        `cx=width/2`/`cy=height/2` fed to `shiftAxisSpec` land on integer cell
+        boundaries) — is now a pure builder returning `{nSpan,width,height}`; the view
+        keeps the `axisLayout` call + centre-shift. Sibling of `axis-shift`. Test locks
+        the 20-floor, sqrt growth, always-even nSpan over a count sweep, and independent
+        slot scaling. Behaviour-identical. view.ts 4261 → 4260; ratchet tightened. — PENDING
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —

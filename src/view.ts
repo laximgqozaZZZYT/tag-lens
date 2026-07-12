@@ -6,6 +6,7 @@ import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
 import type { EncContext, EncNode, NodeDrawParams, EncodingBinding } from "./encoding/types";
 import { scatterAxisDefaults } from "./encoding/scatter-axis-defaults";
 import { axisLayout } from "./layout/axis-layout";
+import { axisFallbackSpan } from "./layout/axis-fallback-span";
 import { shiftAxisSpec } from "./layout/axis-shift";
 import { assignGalleryAxes } from "./layout/droste-axis";
 import { LaneRegistry, routeZ } from "./layout/edge-routing";
@@ -1402,10 +1403,8 @@ export class MiniGraphView extends ItemView {
 			return;
 		}
 
-		let nSpan = Math.max(20, Math.ceil(Math.sqrt(this.laid.nodes.length)) * 4);
-		if (nSpan % 2 !== 0) nSpan += 1; // Force even to ensure integer cx/cy
-		const fallbackWidth = nSpan * this.laid.slotW;
-		const fallbackHeight = nSpan * this.laid.slotH;
+		const { width: fallbackWidth, height: fallbackHeight } =
+			axisFallbackSpan(this.laid.nodes.length, this.laid.slotW, this.laid.slotH);
 
 		const { positions, axes, width: finalWidth, height: finalHeight } = axisLayout(this.laid.nodes, encCtx, {
 			bindingX: bindingX?.enabled ? bindingX : undefined,
