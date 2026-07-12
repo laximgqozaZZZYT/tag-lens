@@ -2,7 +2,9 @@
 // geometry shared by the mousedown + mousemove legend handlers in view.ts.
 import { approx, ok } from "./assert";
 import {
+	LEGEND_SCROLLBAR_GUTTER_PX,
 	legendScrollbarGeom,
+	legendScrollbarZone,
 	scrollToThumbY,
 	thumbYToScroll,
 } from "../src/interaction/legend-scrollbar";
@@ -67,6 +69,31 @@ import {
 		const back = thumbYToScroll(scrollToThumbY(s, maxScrollY, maxThumbY), maxThumbY, maxScrollY);
 		approx(back, s, 1e-9, `round-trip preserves scroll ${s}`);
 	}
+}
+
+// legendScrollbarZone — where a legend-panel mousedown lands relative to the
+// vertical scrollbar. Panel spans x∈[100,300); the gutter is the rightmost
+// LEGEND_SCROLLBAR_GUTTER_PX; the thumb band is [thumbTop, thumbTop+thumbH].
+{
+	const panel = { x: 100, w: 200 }; // right edge 300, gutter starts at 288.
+	const thumbTop = 50;
+	const thumbH = 40; // thumb band 50..90.
+	const gutterLeft = 300 - LEGEND_SCROLLBAR_GUTTER_PX;
+	ok(gutterLeft === 288, "gutter starts 12px in from the right edge");
+
+	// Left of the gutter → null (caller treats as a panel drag), whatever the Y.
+	ok(legendScrollbarZone(200, 60, panel, thumbTop, thumbH) === null, "panel body → null");
+	ok(legendScrollbarZone(287, 60, panel, thumbTop, thumbH) === null, "just left of gutter → null");
+
+	// In the gutter, inside the thumb band → thumb; outside → track.
+	ok(legendScrollbarZone(288, 60, panel, thumbTop, thumbH) === "thumb", "gutter + on thumb → thumb");
+	ok(legendScrollbarZone(295, 50, panel, thumbTop, thumbH) === "thumb", "thumb band top edge inclusive");
+	ok(legendScrollbarZone(295, 90, panel, thumbTop, thumbH) === "thumb", "thumb band bottom edge inclusive");
+	ok(legendScrollbarZone(295, 10, panel, thumbTop, thumbH) === "track", "gutter above thumb → track");
+	ok(legendScrollbarZone(295, 120, panel, thumbTop, thumbH) === "track", "gutter below thumb → track");
+
+	// Custom gutter width widens/narrows the clickable column.
+	ok(legendScrollbarZone(280, 60, panel, thumbTop, thumbH, 40) === "thumb", "wider gutter catches an earlier x");
 }
 
 ok(true, "legend-scrollbar cases done");

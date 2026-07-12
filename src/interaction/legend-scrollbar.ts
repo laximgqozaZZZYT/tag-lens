@@ -50,3 +50,27 @@ export function thumbYToScroll(thumbY: number, maxThumbY: number, maxScrollY: nu
 export function scrollToThumbY(scrollY: number, maxScrollY: number, maxThumbY: number): number {
 	return maxThumbY > 0 ? (scrollY / maxScrollY) * maxThumbY : 0;
 }
+
+// Clickable width (px) of the legend scrollbar gutter, right-aligned inside the
+// panel. Wider than the 4px painted thumb (`draw/legend-layout.ts`) so the hit
+// target is comfortable.
+export const LEGEND_SCROLLBAR_GUTTER_PX = 12;
+
+// Where a legend-panel mousedown at panel-local (sx, sy) lands relative to the
+// vertical scrollbar. `null` = left of the right-edge gutter (caller treats it as
+// a panel drag); `"thumb"` = inside the current thumb band (relative drag);
+// `"track"` = in the gutter but off the thumb (jump-to-click). The caller must
+// have already established the panel is scrollable and the point is inside the
+// panel rect; `thumbTop`/`thumbH` come from `legendScrollbarGeom` + `scrollToThumbY`.
+export type LegendScrollbarZone = "thumb" | "track" | null;
+export function legendScrollbarZone(
+	sx: number,
+	sy: number,
+	panel: { x: number; w: number },
+	thumbTop: number,
+	thumbH: number,
+	gutterPx = LEGEND_SCROLLBAR_GUTTER_PX,
+): LegendScrollbarZone {
+	if (sx < panel.x + panel.w - gutterPx) return null;
+	return sy >= thumbTop && sy <= thumbTop + thumbH ? "thumb" : "track";
+}

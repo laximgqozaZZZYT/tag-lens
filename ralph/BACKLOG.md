@@ -619,6 +619,20 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `maxThumbY === 0` no-travel guard (never divides by 0), and a scroll round-trip.
         Behaviour-identical (same `maxThumbY > 0 ? … : 0` divide guard). view.ts held at
         the 4256 ratchet (each 1-line inline expr → 1-line call). — e778373
+  - [x] legend scrollbar mousedown zone classifier → `legendScrollbarZone(sx, sy,
+        panel, thumbTop, thumbH, gutterPx = LEGEND_SCROLLBAR_GUTTER_PX)` /
+        `LegendScrollbarZone` (`src/interaction/legend-scrollbar.ts`, next to the geom
+        + thumb↔scroll maps) + cases in `test/legend-scrollbar.test.ts`. The two magic-
+        number decisions in the legend mousedown handler (`attachInputs`) — the
+        right-edge gutter test `sx >= pr.x + pr.w - 12` and the inclusive thumb-band
+        test `sy ∈ [curThumbY, curThumbY+thumbH]` — are now one pure classifier
+        returning `"thumb"`/`"track"`/`null` (null → panel drag). The `12`px gutter is
+        centralized as `LEGEND_SCROLLBAR_GUTTER_PX` (wider than the 4px painted thumb).
+        The handler restructures to compute geom whenever scrollable, then branch on the
+        zone; behaviour-identical (left-of-gutter or not-scrollable → panel drag, thumb →
+        relative drag, track → jump-then-drag). Single-site behaviour seam, mirrors
+        `hitTestAggregationGroup`/`suggestKeyAction`. view.ts 4229 → 4227; ratchet
+        tightened.
   - [x] hover-tooltip text builders → `heatmapCellTipText` / `ghostEdgeTipText` /
         `clusterTipText` / `aggregationGroupTipText` (`src/interaction/hover-tip-text.ts`,
         each returning `{title, sub}`) + `test/hover-tip-text.test.ts`. The four pure-data

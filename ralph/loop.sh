@@ -2,20 +2,41 @@
 # Ralph loop for Tag Lens — runs the headless agent on a fixed prompt until the
 # backlog is empty, an iteration cap is hit, or a STOP sentinel appears.
 #
-#   ralph/loop.sh [MAX_ITERS]      # default 20
+#   ralph/loop.sh [MAX_ITERS]      # default 12
 #
 # Env knobs:
-#   RALPH_MODEL    model alias/name passed to `claude --model` (default: opus)
-#   RALPH_BRANCH   working branch (default: ralph/auto)
+#   RALPH_MODEL         model alias/name passed to `claude --model` (default: opus)
+#   RALPH_BRANCH        working branch (default: ralph/auto)
+#   RALPH_COOLDOWN      seconds to idle between iterations (default: 20) — turns the
+#                       batch into a series of gentle bursts instead of one sustained
+#                       all-core pin, giving CPU temps/power draw room to settle
+#   RALPH_NODE_HEAP_MB  per-Node-process heap cap (default: 4096) — keeps a runaway
+#                       tsc/knip/esbuild from exhausting RAM and thrashing swap
 #
 # Safety model: dedicated branch, never pushes, the agent commits only when
-# `npm run verify` is green and reverts otherwise. Stop any time with:
+# `npm run verify` is green and reverts otherwise. The whole batch runs at the
+# lowest CPU + idle IO priority so it can never starve the desktop/system. Stop
+# any time with:
 #   touch ralph/STOP      (or Ctrl-C)
 set -uo pipefail
 
+# Keep the machine responsive under sustained work: re-exec the entire batch —
+# and thus every heavy child (claude, tsc, biome, knip, esbuild, deploy) — at the
+# lowest CPU and idle IO priority. The RALPH_NICED guard makes this a one-shot.
+if [[ -z "${RALPH_NICED:-}" ]]; then
+  export RALPH_NICED=1
+  ionice_prefix=(); command -v ionice >/dev/null 2>&1 && ionice_prefix=(ionice -c 3)
+  command -v nice >/dev/null 2>&1 && exec nice -n 19 "${ionice_prefix[@]}" "$0" "$@"
+fi
+
+# Cap each Node process's heap so a runaway tool can't eat all RAM → swap thrash
+# → freeze. Additive to any pre-set NODE_OPTIONS.
+export NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=${RALPH_NODE_HEAP_MB:-4096}"
+
 cd "$(dirname "$0")/.." || exit 1            # repo root
 ROOT="$(pwd)"
-MAX_ITERS="${1:-20}"
+MAX_ITERS="${1:-12}"
+COOLDOWN="${RALPH_COOLDOWN:-20}"
 MODEL="${RALPH_MODEL:-opus}"
 BRANCH="${RALPH_BRANCH:-ralph/auto}"
 LOG_DIR="ralph/logs"
@@ -80,6 +101,17 @@ for ((i = 1; i <= MAX_ITERS; i++)); do
   if grep -qiE "hit your (session|usage) limit|usage limit reached|rate limit|reset(s)? at" "$log"; then
     echo "ralph: usage/session limit reached — ending this batch; next run resumes." | tee -a "$log"
     break
+  fi
+
+  # Cool-down between iterations: back-to-back claude+verify+deploy bursts are what
+  # pin every core for the whole batch. A short idle gap lets the machine breathe.
+  # Skipped after the final iteration and whenever a STOP appears mid-wait.
+  if (( i < MAX_ITERS )) && (( COOLDOWN > 0 )); then
+    echo "ralph: cooling down ${COOLDOWN}s before iteration $((i + 1))." | tee -a "$log"
+    for ((s = 0; s < COOLDOWN; s++)); do
+      [[ -e ralph/STOP ]] && break
+      sleep 1
+    done
   fi
 done
 

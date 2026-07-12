@@ -137,7 +137,12 @@ import { jaccardSimilarity } from "./util/jaccard";
 import { pointInRect } from "./util/point-in-rect";
 import { exceedsClickSlop } from "./util/click-slop";
 import { clampScroll } from "./util/clamp-scroll";
-import { legendScrollbarGeom, scrollToThumbY, thumbYToScroll } from "./interaction/legend-scrollbar";
+import {
+	legendScrollbarGeom,
+	legendScrollbarZone,
+	scrollToThumbY,
+	thumbYToScroll,
+} from "./interaction/legend-scrollbar";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes } from "./panel/menu-notes";
 import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVault } from "./panel/export-image";
@@ -3867,43 +3872,36 @@ export class MiniGraphView extends ItemView {
 				const pr = this.legendPanelRect, cr0 = this.legendCloseRect;
 				const inClose = !!cr0 && pointInRect(sx, sy, cr0);
 				if (pr && !inClose && pointInRect(sx, sy, pr)) {
-					// Detect scrollbar drag
-					if (this.legendMaxScrollY > 0 && sx >= pr.x + pr.w - 12) {
-						// Calculate absolute scroll position based on click Y coordinate
-						const { trackTop, thumbH, maxThumbY } = legendScrollbarGeom(
-							pr.h,
-							this.legendMaxScrollY,
-							this.exportDprMul === 1,
-						);
-
-						// Thumb's current physical position
-						const curScrollY = this.legendScrollY[this.settings.viewMode] ?? 0;
-						const curThumbY = pr.y + trackTop + scrollToThumbY(curScrollY, this.legendMaxScrollY, maxThumbY);
-						
-						// If clicking directly on the thumb, do relative drag
-						if (sy >= curThumbY && sy <= curThumbY + thumbH) {
-							this.legendScrollDrag = { startY: sy, startScrollY: curScrollY };
-						} else {
-							// Clicking on the track outside the thumb: jump to position
-							// Center the thumb at the clicked Y coordinate
-							const targetThumbY = clampScroll((sy - pr.y - trackTop) - thumbH / 2, maxThumbY);
-							const newScrollY = thumbYToScroll(targetThumbY, maxThumbY, this.legendMaxScrollY);
-							
-							const vmode = this.settings.viewMode;
-							this.legendScrollY[vmode] = newScrollY;
-							this.requestDraw();
-							
-							// Allow dragging to continue from the new jumped position
-							this.legendScrollDrag = { startY: sy, startScrollY: newScrollY };
+						// Scrollbar (right-edge gutter) → thumb drag / track jump when the
+						// legend is scrollable; anywhere else in the panel → panel drag.
+						let onScrollbar = false;
+						if (this.legendMaxScrollY > 0) {
+							const { trackTop, thumbH, maxThumbY } = legendScrollbarGeom(
+								pr.h,
+								this.legendMaxScrollY,
+								this.exportDprMul === 1,
+							);
+							const curScrollY = this.legendScrollY[this.settings.viewMode] ?? 0;
+							const curThumbY = pr.y + trackTop + scrollToThumbY(curScrollY, this.legendMaxScrollY, maxThumbY);
+							const zone = legendScrollbarZone(sx, sy, pr, curThumbY, thumbH);
+							onScrollbar = zone !== null;
+							if (zone === "thumb") {
+								this.legendScrollDrag = { startY: sy, startScrollY: curScrollY };
+							} else if (zone === "track") {
+								// Center the thumb at the clicked Y, then keep dragging from there.
+								const targetThumbY = clampScroll((sy - pr.y - trackTop) - thumbH / 2, maxThumbY);
+								const newScrollY = thumbYToScroll(targetThumbY, maxThumbY, this.legendMaxScrollY);
+								this.legendScrollY[this.settings.viewMode] = newScrollY;
+								this.requestDraw();
+								this.legendScrollDrag = { startY: sy, startScrollY: newScrollY };
+							}
 						}
-						
+						if (!onScrollbar) {
+							this.legendDrag = { dx: sx - pr.x, dy: sy - pr.y };
+							this.pointerMoved = false;
+						}
 						e.preventDefault();
 						return;
-					}
-					this.legendDrag = { dx: sx - pr.x, dy: sy - pr.y };
-					this.pointerMoved = false;
-					e.preventDefault();
-					return;
 				}
 			}
 			// Footer drag/scroll handlers retired — UpSet matrix is now
