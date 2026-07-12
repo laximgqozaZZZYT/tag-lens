@@ -30,6 +30,7 @@ import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
 import { contentBounds } from "./layout/content-bounds";
 import { contentFit } from "./layout/content-fit";
+import { drosteFit } from "./layout/droste-fit";
 import { heatmapFit } from "./layout/heatmap-fit";
 import { latticeFit } from "./layout/lattice-fit";
 import { upsetFit } from "./layout/upset-fit";
@@ -125,7 +126,6 @@ import {
 import { viewRootStyle, viewCanvasStyle } from "./view-shell-style";
 import { pluralize } from "./util/pluralize";
 import { jaccardSimilarity } from "./util/jaccard";
-import { clampZoom } from "./util/clamp-zoom";
 import { pointInRect } from "./util/point-in-rect";
 import { legendScrollbarGeom } from "./interaction/legend-scrollbar";
 import { renderDataTableView } from "./panel/data-table-view";
@@ -2709,11 +2709,10 @@ export class MiniGraphView extends ItemView {
 		if (!g) return;
 		const cell = g.cells.find((c) => c.id === id) ?? g.cells[0];
 		if (!cell) return;
-		const cw = this.canvas.clientWidth || 1, ch = this.canvas.clientHeight || 1;
-		this.zoom = clampZoom((Math.min(cw, ch) * 0.55) / DROSTE_CELL, 0.05, 3);
-		const wx = (cell.col + 0.5) * DROSTE_CELL, wy = (cell.row + 0.5) * DROSTE_CELL;
-		this.panX = cw / 2 - wx * this.zoom;
-		this.panY = ch / 2 - wy * this.zoom;
+		const fit = drosteFit(cell, this.canvas.clientWidth, this.canvas.clientHeight, DROSTE_CELL);
+		this.zoom = fit.zoom;
+		this.panX = fit.panX;
+		this.panY = fit.panY;
 		this.requestDraw();
 	}
 
