@@ -130,6 +130,7 @@ import { viewRootStyle, viewCanvasStyle } from "./view-shell-style";
 import { pluralize } from "./util/pluralize";
 import { jaccardSimilarity } from "./util/jaccard";
 import { pointInRect } from "./util/point-in-rect";
+import { clampScroll } from "./util/clamp-scroll";
 import { legendScrollbarGeom } from "./interaction/legend-scrollbar";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes } from "./panel/menu-notes";
@@ -3919,8 +3920,7 @@ export class MiniGraphView extends ItemView {
 						} else {
 							// Clicking on the track outside the thumb: jump to position
 							// Center the thumb at the clicked Y coordinate
-							let targetThumbY = (sy - pr.y - trackTop) - thumbH / 2;
-							targetThumbY = Math.max(0, Math.min(maxThumbY, targetThumbY));
+							const targetThumbY = clampScroll((sy - pr.y - trackTop) - thumbH / 2, maxThumbY);
 							const newScrollY = maxThumbY > 0 ? (targetThumbY / maxThumbY) * this.legendMaxScrollY : 0;
 							
 							const vmode = this.settings.viewMode;
@@ -3979,7 +3979,7 @@ export class MiniGraphView extends ItemView {
 				);
 				const scrollDelta = maxThumbY > 0 ? (dy / maxThumbY) * this.legendMaxScrollY : 0;
 				const vmode = this.settings.viewMode;
-				this.legendScrollY[vmode] = Math.max(0, Math.min(this.legendMaxScrollY, this.legendScrollDrag.startScrollY + scrollDelta));
+				this.legendScrollY[vmode] = clampScroll(this.legendScrollDrag.startScrollY + scrollDelta, this.legendMaxScrollY);
 				this.requestDraw();
 				return;
 			}
@@ -4243,7 +4243,7 @@ export class MiniGraphView extends ItemView {
 					const vmode = this.settings.viewMode;
 					const cur = this.legendScrollY[vmode] ?? 0;
 					const dy = e.deltaMode === 1 ? e.deltaY * 20 : (e.deltaMode === 2 ? e.deltaY * 300 : e.deltaY);
-					this.legendScrollY[vmode] = Math.max(0, Math.min(this.legendMaxScrollY, cur + dy));
+					this.legendScrollY[vmode] = clampScroll(cur + dy, this.legendMaxScrollY);
 					this.requestDraw();
 				}
 				e.stopPropagation();

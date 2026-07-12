@@ -103,6 +103,7 @@ import "./tab-prefix.test";
 import "./heatmap-detail.test";
 import "./hover-tip-text.test";
 import "./clamp-zoom.test";
+import "./clamp-scroll.test";
 import "./upset-pan.test";
 import "./content-bounds.test";
 import "./content-fit.test";

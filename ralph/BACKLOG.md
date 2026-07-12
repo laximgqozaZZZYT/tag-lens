@@ -740,6 +740,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         view.ts use), so that import was dropped. Behaviour-identical: inline-equivalence
         grid, zoom floor/ceiling, zero-dim `|| 1` guard, and cell-centre→canvas-centre all
         locked in the test. view.ts 4277 → 4276; ratchet tightened. — 3bafddf
+  - [x] legend scrollbar `[0, max]` clamp dedup → `clampScroll(value, max)`
+        (`src/util/clamp-scroll.ts`, next to `clampZoom`) + `test/clamp-scroll.test.ts`.
+        The `Math.max(0, Math.min(max, value))` offset clamp was re-derived inline 3× in
+        the on-canvas legend scrollbar machinery (`view.ts`): the track click-to-jump
+        thumb-Y (`[0, maxThumbY]`) plus the thumb-drag and wheel-scroll positions (both
+        `[0, maxScrollY]`); all now thin calls. Distinct from `clampZoom` (two-sided
+        readable-zoom clamp with a default max) — this always floors at 0 and takes the
+        ceiling explicitly. Behaviour-identical (inline-equivalence grid + degenerate
+        max-0 locked in the test). The import cost was offset by inlining the now-clamped
+        thumb-Y expression, so the ratchet holds (4266). Mirrors the `clampZoom`/
+        `pointInRect` util dedups.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
