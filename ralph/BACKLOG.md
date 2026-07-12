@@ -647,6 +647,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         (zoom still capped at clampZoom's default max 2; degenerate zero-world
         stays finite via the `Math.max(1, …)` guards). view.ts 4316 → 4302;
         ratchet tightened. — 1f804d0
+  - [x] UpSet initial-fit geometry → `upsetFit(cardSlotH, cardsWorldHeight,
+        cardsWorldWidth, footerH, canvasW, canvasH, leftBandPx)`
+        (`src/layout/upset-fit.ts`) + `test/upset-fit.test.ts`. The inline
+        ~8–20-row vertical fit + past-the-row-label-band horizontal fit
+        (`min(zoomFromRows, zoomFromW)` with clampZoom floor 0.05 / ceiling 2)
+        plus the bottom-anchored `panY = cardsBandH - cardsWorldHeight*zoom` and
+        `panX = 0` in the view's `fitToView` `laid.upset` branch is now a pure
+        builder returning `{zoom,panX,panY}`; the view keeps the screen-space
+        `upsetFooterHeight` derivation + the zoom/pan assignment. Sibling of
+        `latticeFit`. Behaviour-identical (row clamp 8..20, tall stacks pan above
+        the canvas via negative panY). view.ts 4302 → 4292; ratchet tightened. — PENDING
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —

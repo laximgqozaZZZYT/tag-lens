@@ -30,6 +30,7 @@ import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
 import { contentBounds } from "./layout/content-bounds";
 import { latticeFit } from "./layout/lattice-fit";
+import { upsetFit } from "./layout/upset-fit";
 import { runAggregateSnap } from "./layout/aggregate-snap";
 import {
 	drawCardGrid as drawCardGridFn,
@@ -1906,36 +1907,25 @@ export class MiniGraphView extends ItemView {
 			const u = this.laid.upset;
 			// UpSet fit: cards occupy the canvas ABOVE the footer
 			// (full canvas width). Footer is screen-fixed at bottom.
-			// Zoom to show ~15 card rows vertically; horizontal zoom
-			// fits all columns into the canvas width.
-			const slotH = u.cardSlotH;
+			// Zoom to show ~8–20 card rows vertically; horizontal zoom
+			// fits all columns into the canvas width. panX is set by
+			// clampPan() (called inside requestDraw) — upsetFit returns 0.
 			const footerH = upsetFooterHeight(
 				this.canvas.clientHeight,
 				u.sets.length,
 			);
-			const cardsBandH = this.canvas.clientHeight - footerH;
-			const targetVisibleRows = Math.max(
-				8,
-				Math.min(20, u.cardsWorldHeight / slotH),
+			const fit = upsetFit(
+				u.cardSlotH,
+				u.cardsWorldHeight,
+				u.cardsWorldWidth,
+				footerH,
+				this.canvas.clientWidth,
+				this.canvas.clientHeight,
+				UPSET_LEFT_BAND_PX,
 			);
-			const zoomFromRows = cardsBandH / (targetVisibleRows * slotH);
-			// Cards START at the right edge of the row-label band, so
-			// the horizontal fit area excludes that band.
-			const padX = 8;
-			const visW = Math.max(
-				1,
-				this.canvas.clientWidth - UPSET_LEFT_BAND_PX - padX,
-			);
-			const zoomFromW = visW / Math.max(1, u.cardsWorldWidth);
-			this.zoom = clampZoom(Math.min(zoomFromRows, zoomFromW), 0.05);
-			// Cards bottom (= world y = cardsWorldHeight) anchored at
-			// the top of the footer; tall stacks extend above the
-			// canvas and are reachable by panning.
-			this.panY = cardsBandH - u.cardsWorldHeight * this.zoom;
-			// panX is set by clampPan() (called inside requestDraw).
-			// Provide an initial value of 0; clamp will center or pin
-			// as appropriate.
-			this.panX = 0;
+			this.zoom = fit.zoom;
+			this.panX = fit.panX;
+			this.panY = fit.panY;
 			this.requestDraw();
 			return;
 		}

@@ -102,6 +102,7 @@ import "./clamp-zoom.test";
 import "./upset-pan.test";
 import "./content-bounds.test";
 import "./lattice-fit.test";
+import "./upset-fit.test";
 import "./point-in-rect.test";
 
 
