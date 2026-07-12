@@ -57,6 +57,19 @@ export function noteMenuRectStyle(rect: MenuRect): Partial<CSSStyleDeclaration> 
 	};
 }
 
+// Drag-delta rect math for the floating panel, shared by the two mouse-drag
+// affordances the view wires (`wireNoteMenuDrag`). `start` is the mousedown
+// snapshot rect, `dx`/`dy` the pointer delta since; both return a fresh rect
+// (input untouched) that the view feeds through `clampRect` + applies.
+//   moveMenuRect   — header drag: translate left/top, keep the size.
+//   resizeMenuRect — SE-corner drag: keep left/top, grow width/height.
+export function moveMenuRect(start: MenuRect, dx: number, dy: number): MenuRect {
+	return { left: start.left + dx, top: start.top + dy, width: start.width, height: start.height };
+}
+export function resizeMenuRect(start: MenuRect, dx: number, dy: number): MenuRect {
+	return { left: start.left, top: start.top, width: start.width + dx, height: start.height + dy };
+}
+
 // Panel-container CSS for the note-navigator. Two looks, no DOM:
 //   pinned   — docked to the right edge: full height, fixed width, square corners,
 //              a left border only (like a standard docked side panel).

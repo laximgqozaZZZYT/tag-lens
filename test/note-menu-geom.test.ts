@@ -2,7 +2,7 @@
 // Asserts the rect priority/clamp and the pinned-width clamp behave exactly as
 // the old inline math did.
 import { ok } from "./assert";
-import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuLeafRowHoverStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, noteMenuRectStyle, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
+import { defaultMenuRect, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuLeafRowHoverStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, noteMenuRectStyle, moveMenuRect, resizeMenuRect, NOTE_MENU_MIN } from "../src/interaction/note-menu-geom";
 import type { MenuRect } from "../src/interaction/note-menu";
 
 // defaultMenuRect: top-left, 320 wide, ~full container height, never below min.
@@ -95,6 +95,23 @@ import type { MenuRect } from "../src/interaction/note-menu";
 	// Can't drift from the floating panel's rect props.
 	const floating = noteMenuPanelStyle(false, rect, 256);
 	ok(floating.left === s.left && floating.top === s.top && floating.width === s.width && floating.height === s.height, "floating panel reuses the same rect mapping");
+}
+
+// moveMenuRect / resizeMenuRect: the two drag-delta rect transforms shared by
+// wireNoteMenuDrag. move translates left/top (size fixed); resize grows
+// width/height (position fixed). Both are pure (start untouched).
+{
+	const start: MenuRect = { left: 10, top: 20, width: 300, height: 400 };
+	const moved = moveMenuRect(start, 5, -7);
+	ok(moved.left === 15 && moved.top === 13, `move translates position (got ${moved.left},${moved.top})`);
+	ok(moved.width === 300 && moved.height === 400, "move keeps the size");
+	const resized = resizeMenuRect(start, 5, -7);
+	ok(resized.left === 10 && resized.top === 20, "resize keeps the position");
+	ok(resized.width === 305 && resized.height === 393, `resize grows the size (got ${resized.width}×${resized.height})`);
+	// Zero delta is an identity clone; input never mutated.
+	const id0 = moveMenuRect(start, 0, 0);
+	ok(id0.left === 10 && id0.top === 20 && id0.width === 300 && id0.height === 400, "zero move = identity");
+	ok(start.left === 10 && start.top === 20 && start.width === 300 && start.height === 400, "start untouched");
 }
 
 // noteMenuHeadStyle: cursor is the only difference — move when floating (drag handle),
