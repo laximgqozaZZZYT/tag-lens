@@ -803,6 +803,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         empty-map + zero-count → false, and the four score corners. Not a note-menu
         seam but a clean graph-relevance seam (sibling of the `jaccard*` dedups).
         Behaviour-identical. view.ts 4259 → 4258; ratchet tightened. — 1cf6723
+  - [x] note-menu drag-delta rect math → `moveMenuRect(start, dx, dy)` /
+        `resizeMenuRect(start, dx, dy)` (`src/interaction/note-menu-geom.ts`, next to
+        `noteMenuRectStyle`) + cases in `test/note-menu-geom.test.ts`. The two `onMove`
+        handlers in `wireNoteMenuDrag` (`view.ts`) inlined near-duplicate rect-from-delta
+        math: header MOVE translates left/top keeping the size, SE-corner RESIZE keeps the
+        position growing width/height. Both now read from pure builders; `start` is already
+        the immutable mousedown snapshot rect (applyRect assigns a NEW `noteMenuRect`, never
+        mutating it), so the throwaway `baseLeft`/`baseTop` and `baseW`/`baseH` consts drop
+        out. Test locks the two transforms + zero-delta identity + non-mutation.
+        Behaviour-identical. view.ts 4258 → 4256; ratchet tightened. — 34fc6a2
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
