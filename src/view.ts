@@ -29,6 +29,7 @@ import { clusterHue, createStripeGradient, membershipStripeHues } from "./draw/c
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
 import { contentBounds } from "./layout/content-bounds";
+import { latticeFit } from "./layout/lattice-fit";
 import { runAggregateSnap } from "./layout/aggregate-snap";
 import {
 	drawCardGrid as drawCardGridFn,
@@ -1949,25 +1950,10 @@ export class MiniGraphView extends ItemView {
 			const panelW = this.pinnedMenuWidth();
 			const visW = Math.max(1, this.canvas.clientWidth - panelW);
 			const visH = Math.max(1, this.canvas.clientHeight);
-			const pad = 8;
-			const usableW = Math.max(1, visW - LATTICE_TIER_GUTTER - pad);
-			const zoomY = (visH - pad * 2) / Math.max(1, L.worldHeight);
-			const zoomX = usableW / Math.max(1, L.worldWidth);
-			// Floor below which header text would shrink below ~10 screen px
-			// (HEADER_H = 22 world × 0.45 ≈ 10 px).
-			const MIN_READABLE = 0.45;
-			const zoom = clampZoom(Math.min(zoomY, zoomX), MIN_READABLE);
-			this.zoom = zoom;
-			// PinPin the leftmost node just past the gutter. Centre on the
-			// gutter-right side when the whole lattice fits horizontally.
-			const worldShownW = L.worldWidth * zoom;
-			this.panX = worldShownW <= usableW
-				? LATTICE_TIER_GUTTER + (usableW - worldShownW) / 2
-				: LATTICE_TIER_GUTTER;
-			const worldShownH = L.worldHeight * zoom;
-			this.panY = worldShownH <= visH - pad * 2
-				? pad + (visH - pad * 2 - worldShownH) / 2
-				: pad;
+			const fit = latticeFit(L.worldWidth, L.worldHeight, visW, visH, LATTICE_TIER_GUTTER);
+			this.zoom = fit.zoom;
+			this.panX = fit.panX;
+			this.panY = fit.panY;
 			this.requestDraw();
 			return;
 		}

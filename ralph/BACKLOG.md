@@ -636,6 +636,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         (`min <= max` at every site makes the clamp order-independent, so both old
         spellings fold in; droste passes an explicit `max` of 3). Mirrors the
         `clampPinnedWidth`/`pluralize` util dedups. — a17e1a9
+  - [x] lattice initial-fit geometry → `latticeFit(worldWidth, worldHeight, visW,
+        visH, gutter)` (`src/layout/lattice-fit.ts`) + `test/lattice-fit.test.ts`.
+        The inline vertical-first fit (`zoomY`/`zoomX` + readability-floor
+        `clampZoom`) plus the per-axis centre-if-fits-else-pin pan math (X pinned
+        past the tier gutter, Y pinned to the top pad) in the view's initial-fit
+        `laid.lattice` branch is now a pure builder returning `{zoom,panX,panY}`;
+        the view keeps the panel-width/visW/visH derivation + the zoom/pan
+        assignment. Sibling of `contentBounds`/`heatmapGeom`. Behaviour-identical
+        (zoom still capped at clampZoom's default max 2; degenerate zero-world
+        stays finite via the `Math.max(1, …)` guards). view.ts 4316 → 4302;
+        ratchet tightened. — 1f804d0
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —

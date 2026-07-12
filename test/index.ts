@@ -101,6 +101,7 @@ import "./hover-tip-text.test";
 import "./clamp-zoom.test";
 import "./upset-pan.test";
 import "./content-bounds.test";
+import "./lattice-fit.test";
 import "./point-in-rect.test";
 
 
