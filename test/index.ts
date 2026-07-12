@@ -39,6 +39,7 @@ import "./encoding-migrate.test";
 import "./axis-layout.test";
 import "./axis-shift.test";
 import "./axis-fallback-span.test";
+import "./layout-signature.test";
 import "./scatter-axis-defaults.test";
 import "./droste-axis.test";
 import "./spreadsheet-pan.test";

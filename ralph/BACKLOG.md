@@ -547,6 +547,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         whose only logic is a single settings-field toggle — extract only if a genuine
         duplicate descriptor list emerges (mirror `basesToggleRows`). Otherwise pivot to
         the `ensureNoteMenu` body-builder seams or F2.
+  - [x] layout signature → `layoutSignature(s)` / `DISPLAY_ONLY_KEYS`
+        (`src/layout/layout-signature.ts`) + `test/layout-signature.test.ts`. The
+        private static `DISPLAY_ONLY_KEYS` set + private `layoutSignature` method in
+        `view.ts` (sort keys → drop display-only → JSON.stringify, so a display-only
+        toggle produces the SAME signature and `updateSettings` skips the relayout) are
+        now a pure module; all three `this.layoutSignature(...)` call sites became thin
+        `layoutSignature(...)` calls, removing the method + static wholesale. Test locks
+        key-order stability, display-only-toggle invariance, a layout-key change flipping
+        the signature, each display-only key being a real settings field + excluded from
+        the JSON, and non-mutation. Behaviour-identical. view.ts 4255 → 4230; ratchet
+        tightened.
   - [x] Graph-display checklist descriptors → `graphDisplayToggles()` /
         `GraphDisplayToggle` (`src/panel/graph-display-toggles.ts`) +
         `test/graph-display-toggles.test.ts`. The inline `gdToggles` literal in

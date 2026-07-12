@@ -11,6 +11,7 @@ import { shiftAxisSpec } from "./layout/axis-shift";
 import { assignGalleryAxes } from "./layout/droste-axis";
 import { LaneRegistry, routeZ } from "./layout/edge-routing";
 import { buildIdToRect, buildRouteObstacles } from "./layout/layout-shared";
+import { layoutSignature } from "./layout/layout-signature";
 
 import { buildBaseIndex } from "./bases/build-index";
 import { scanBaseFiles } from "./bases/parser";
@@ -1017,35 +1018,9 @@ export class MiniGraphView extends ItemView {
 		return resolveFromClusterFn(setKey, { ...base, overrides, supersetsOf: supers });
 	}
 
-	// Settings that only affect WHAT is painted, not the placement. Toggling
-	// these must NOT relayout — the positions stay identical to the all-on
-	// layout; we just repaint.
-	private static readonly DISPLAY_ONLY_KEYS = new Set([
-		"showNodes",
-		"showEnclosures",
-		"showEdges",
-		"showGrid",
-		"showBody",
-		// Heatmap colour scale (Jaccard vs raw) only changes cell shading.
-		"heatmapJaccard",
-		// Lattice subset links only affect the back-layer of drawLattice —
-		// toggling repaints without re-bucketing intersections.
-		"latticeShowSubsetLinks",
-	]);
-
-	private layoutSignature(s: MiniSettings): string {
-		const out: Record<string, unknown> = {};
-		const rec = s as unknown as Record<string, unknown>;
-		for (const k of Object.keys(rec).sort()) {
-			if (MiniGraphView.DISPLAY_ONLY_KEYS.has(k)) continue;
-			out[k] = rec[k];
-		}
-		return JSON.stringify(out);
-	}
-
 	updateSettings(s: MiniSettings): void {
 		this.settings = s;
-		const sig = this.layoutSignature(s);
+		const sig = layoutSignature(s);
 		if (sig !== this.lastLayoutSig) {
 			// A layout-affecting setting changed → recompute placement.
 			this.lastLayoutSig = sig;
@@ -1136,7 +1111,7 @@ export class MiniGraphView extends ItemView {
 			n: data.nodes.map((n) => [n.id, n.label, n.memberships ?? []]),
 			e: data.edges.map((e) => [e.source, e.target]),
 			c: [...clusterLabels.entries()],
-			s: this.layoutSignature(this.settings),
+			s: layoutSignature(this.settings),
 		});
 		if (rebuildSig === this.lastRebuildSig) return;
 		this.lastRebuildSig = rebuildSig;
@@ -1358,7 +1333,7 @@ export class MiniGraphView extends ItemView {
 		this.clearStaleSelection();
 		// Baseline the layout signature so subsequent display-only toggles
 		// (which leave this unchanged) repaint without relaying out.
-		this.lastLayoutSig = this.layoutSignature(this.settings);
+		this.lastLayoutSig = layoutSignature(this.settings);
 		const modeChanged = this.lastFramedMode !== this.settings.viewMode;
 		this.lastFramedMode = this.settings.viewMode;
 		const isDroste = this.settings.viewMode === "droste";
