@@ -606,6 +606,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         its own inline form (picks the tuple, not the joined key). Test locks argument-
         order independence, self-pair, and lexical (not numeric) ordering.
         Behaviour-identical. view.ts 4182 → 4181; ratchet tightened.
+  - [x] visible fit-area width dedup → `visibleFitWidth(clientWidth, panelWidth)`
+        (`src/layout/visible-fit-width.ts`, sibling of the `*Fit` builders that
+        consume it) + `test/visible-fit-width.test.ts`. The `Math.max(1,
+        this.canvas.clientWidth - panelW)` fit-area width (canvas client width minus
+        the docked note-menu panel, floored at 1 so the `*Fit` builders never divide
+        by ≤0) was re-derived inline in both `fitToView` mode branches (lattice at
+        1880–1881 + default card at 1910–1911), each preceded by a throwaway `panelW =
+        this.pinnedMenuWidth()` const; both collapse to one thin call that inlines the
+        `pinnedMenuWidth()` read. Test locks the subtract, panel-0 passthrough, and the
+        floor-to-1 when the panel meets/exceeds the width. Behaviour-identical.
+        view.ts 4181 → 4180; ratchet tightened.
   - [x] navigator error-banner box → `noteMenuErrorBannerBox(measuredTextWidth,
         clientWidth)` / `NoteMenuErrorBanner` (`src/interaction/note-menu.ts`, next to
         `noteMenuErrorText`) + cases in `test/note-menu.test.ts`. The inline padX/padY

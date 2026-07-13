@@ -40,6 +40,7 @@ import { locateNodeFit } from "./layout/locate-fit";
 import { heatmapFit } from "./layout/heatmap-fit";
 import { latticeFit } from "./layout/lattice-fit";
 import { upsetFit } from "./layout/upset-fit";
+import { visibleFitWidth } from "./layout/visible-fit-width";
 import { runAggregateSnap } from "./layout/aggregate-snap";
 import {
 	drawCardGrid as drawCardGridFn,
@@ -1877,8 +1878,7 @@ export class MiniGraphView extends ItemView {
 			// initial panX anchors the leftmost node just past the gutter so
 			// the gutter never overlaps any node at default zoom.
 			const L = this.laid.lattice;
-			const panelW = this.pinnedMenuWidth();
-			const visW = Math.max(1, this.canvas.clientWidth - panelW);
+			const visW = visibleFitWidth(this.canvas.clientWidth, this.pinnedMenuWidth());
 			const visH = Math.max(1, this.canvas.clientHeight);
 			const fit = latticeFit(L.worldWidth, L.worldHeight, visW, visH, LATTICE_TIER_GUTTER);
 			this.zoom = fit.zoom;
@@ -1907,8 +1907,7 @@ export class MiniGraphView extends ItemView {
 		// The settings panel overlays the right side of the canvas without
 		// pushing it, so subtract its width from the effective fit area and
 		// centre against the visible half.
-		const panelW = this.pinnedMenuWidth();
-		const visW = Math.max(1, this.canvas.clientWidth - panelW);
+		const visW = visibleFitWidth(this.canvas.clientWidth, this.pinnedMenuWidth());
 		const visH = this.canvas.clientHeight;
 		const fit = contentFit(bounds, visW, visH);
 		this.zoom = fit.zoom;
