@@ -36,6 +36,31 @@ export function computeDegreeMaps(edges: GraphEdge[]): DegreeMaps {
 	return { degreeMap, inDegreeMap, outDegreeMap };
 }
 
+// EncContext.degreeOf: resolve one node's total + directional degree from the
+// DegreeMaps. Presence keys off the TOTAL-degree map — a node incident to no
+// edge (or absent from the graph) has no total entry, so the field-source
+// accessors read `?? null` and the encoding treats it as unbound. When present,
+// a missing directional count means that direction never occurred (a pure
+// source has no inDegree entry, a pure sink no outDegree entry) → default 0.
+export interface DegreeInfo {
+	inDeg: number;
+	outDeg: number;
+	degree: number;
+}
+
+export function degreeInfoOf(
+	id: string,
+	maps: DegreeMaps,
+): DegreeInfo | undefined {
+	const degree = maps.degreeMap.get(id);
+	if (degree == null) return undefined;
+	return {
+		inDeg: maps.inDegreeMap.get(id) ?? 0,
+		outDeg: maps.outDegreeMap.get(id) ?? 0,
+		degree,
+	};
+}
+
 // ────────────────────────────────────────────────────────────────────
 // Stage 3: edge re-filter after a node-set shrink
 // ────────────────────────────────────────────────────────────────────

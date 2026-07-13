@@ -112,6 +112,7 @@ import {
 } from "./interaction/hit-test";
 import {
 	computeDegreeMaps,
+	degreeInfoOf,
 	buildAdjacency,
 	filterLayoutData,
 } from "./query/rebuild-pipeline";
@@ -390,7 +391,6 @@ export class MiniGraphView extends ItemView {
 		return f instanceof TFile ? f.basename : path;
 	}
 	private displayMode: Map<string, "full" | "brief"> = new Map();
-	private degreeMap: Map<string, number> = new Map();
 	// Visual Encoding output (computed per rebuild): per-node draw params + legends.
 	private encParams: Map<string, NodeDrawParams> = new Map();
 	private encLegends: BindingLegend[] = [];
@@ -407,10 +407,6 @@ export class MiniGraphView extends ItemView {
 	private legendScrollDrag: { startY: number; startScrollY: number } | null = null;
 	private legendScrollY: Partial<Record<ViewMode, number>> = {};
 	private legendMaxScrollY = 0;
-	// Per-direction degree counters used by nodeSizeMode = indegree / outdegree.
-	// Refreshed every rebuild from data.edges.
-	private inDegreeMap: Map<string, number> = new Map();
-	private outDegreeMap: Map<string, number> = new Map();
 	// trulyAgg from the rebuild's aggregate processing. The draw layer reads
 	// this — NOT a recomputed "every membership in aggSet" — so that a node
 	// the rebuild considers "effectively aggregated" (e.g. via the parent-
@@ -1136,10 +1132,9 @@ export class MiniGraphView extends ItemView {
 		this.removeNoteMenu();
 		this.locatedNoteId = null;
 
+		// Total + directional degree, computed once per rebuild so the encoding
+		// resolvers can do O(1) lookups via `degreeInfoOf` in EncContext.degreeOf.
 		const degrees = computeDegreeMaps(data.edges);
-		this.degreeMap = degrees.degreeMap;
-		this.inDegreeMap = degrees.inDegreeMap;
-		this.outDegreeMap = degrees.outDegreeMap;
 
 		const modes = new Map<string, "full" | "brief">();
 		for (const n of data.nodes) modes.set(n.id, "full");
@@ -1172,15 +1167,7 @@ export class MiniGraphView extends ItemView {
 		// (derived from `sizeScale`) are available to the layout engine.
 		const encCtx: EncContext = {
 			nowMs: Date.now(),
-			degreeOf: (id) => {
-				const d = this.degreeMap.get(id);
-				if (d == null) return undefined;
-				return {
-					inDeg: this.inDegreeMap.get(id) ?? 0,
-					outDeg: this.outDegreeMap.get(id) ?? 0,
-					degree: d,
-				};
-			},
+			degreeOf: (id) => degreeInfoOf(id, degrees),
 			frontmatterOf: (id) => this.frontmatterRecordOf(id),
 		};
 		const effEnc = this.settings.encoding ?? [];

@@ -1116,6 +1116,19 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `frontmatterRecordOf`/`applyTransform` private-method dedups; `tsc` covers it.
         The sibling `mtimeOf` closure (returns `stat.mtime`, different type) stays
         inline. Behaviour-identical. view.ts 4131 → 4129; ratchet tightened. — 2a2e2d9
+  - [x] EncContext degree lookup → `degreeInfoOf(id, maps)` / `DegreeInfo`
+        (`src/query/rebuild-pipeline.ts`, next to `computeDegreeMaps` which produces
+        the `DegreeMaps`) + `test/degree-info.test.ts`. The inline `degreeOf` closure
+        in `buildGraph`'s `EncContext` (`view.ts`) — total-degree presence gate then
+        `?? 0`-defaulted directional counts — is now a pure lookup the closure calls
+        with the local `degrees` struct. **Bonus**: this exposed that `this.degreeMap`/
+        `this.inDegreeMap`/`this.outDegreeMap` were write-only (the removed closure was
+        their sole reader — encoding's field-sources now read degree via
+        `ctx.degreeOf`), so all three persisted fields + their assignments were removed
+        (`degrees` stays a rebuild-local). Test locks total+directional resolve, pure-
+        sink→outDeg 0, absent→undefined, presence-keys-off-total (a directional-only
+        ghost → undefined), and zero-total-still-present. Behaviour-identical.
+        view.ts 4123 → 4110; ratchet tightened.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
