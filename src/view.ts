@@ -375,13 +375,18 @@ export class MiniGraphView extends ItemView {
 		for (const node of meta.nodes) {
 			if (!this.latticeNamedKeys.has(node.key)) continue;
 			const ids = node.nodeIds.slice(0, max);
-			out[node.key] = ids.map((id) => {
-				const path = stripTabPrefix(id);
-				const f = this.app.vault.getAbstractFileByPath(path);
-				return f instanceof TFile ? f.basename : path;
-			});
+			out[node.key] = ids.map((id) => this.basenameOrPath(stripTabPrefix(id)));
 		}
 		return out;
+	}
+
+	// Resolve a vault path to its file basename, falling back to the path
+	// itself when nothing resolves (or it is not a TFile). Centralises the
+	// `getAbstractFileByPath → instanceof TFile ? basename : path` idiom the
+	// lattice/base label closures re-derived identically.
+	private basenameOrPath(path: string): string {
+		const f = this.app.vault.getAbstractFileByPath(path);
+		return f instanceof TFile ? f.basename : path;
 	}
 	private displayMode: Map<string, "full" | "brief"> = new Map();
 	private degreeMap: Map<string, number> = new Map();
@@ -1082,10 +1087,7 @@ export class MiniGraphView extends ItemView {
 						injectBaseEnclosures: this.settings.viewMode === "bubblesets",
 						focusNodeIds: this.settings.focusNodeIds,
 						edgeKinds,
-						labelOf: (notePath) => {
-							const f = this.app.vault.getAbstractFileByPath(notePath);
-							return f instanceof TFile ? f.basename : notePath;
-						},
+						labelOf: (notePath) => this.basenameOrPath(notePath),
 						mtimeOf: (notePath) => {
 							const f = this.app.vault.getAbstractFileByPath(notePath);
 							return f instanceof TFile ? f.stat.mtime : undefined;
@@ -2080,11 +2082,7 @@ export class MiniGraphView extends ItemView {
 				// Closure: id → file basename via the live vault. Falls back
 				// to a path-tail strip inside draw-lattice when omitted, so
 				// unit tests / probes still work without a vault.
-				nameOf: (id: string) => {
-					const path = stripTabPrefix(id);
-					const f = this.app.vault.getAbstractFileByPath(path);
-					return f instanceof TFile ? f.basename : path;
-				},
+				nameOf: (id: string) => this.basenameOrPath(stripTabPrefix(id)),
 			}));
 			this.drawGlobalDisplayFallbacks(ctx, dpr, "lattice");
 			return;
