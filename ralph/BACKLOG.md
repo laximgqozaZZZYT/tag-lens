@@ -1050,6 +1050,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         keep their own inline form (different ceiling). Test locks both endpoints,
         floor/ceiling, and an inline-equivalence grid. Behaviour-identical. Mirrors
         the `clampScroll`/`clampZoom`/`jaccard` util dedups. — 02d975e
+  - [x] Tree-pane bulk Select/Deselect-all button descriptors → `noteMenuBulkActions()`
+        (`src/interaction/note-menu-geom.ts`, next to `noteMenuGroupOptions`) + a case
+        in `test/note-menu-geom.test.ts`. The two byte-identical `mkBulkBtn` calls in
+        `ensureNoteMenu` differed only in the `hide` boolean passed to `bulkSetHidden`
+        and the label; both now render from one loop over a pure `{ label, hide }[]`
+        descriptor list sharing a single handler. Test locks labels + hide-flag + order
+        (Select shows/hide false first, Deselect hides/hide true) — a flipped flag would
+        invert the buttons. Mirrors the `noteMenuGroupOptions` extraction. — b6d4a9c
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
