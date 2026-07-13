@@ -1077,6 +1077,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         arrow. A `this`-coupled Obsidian-adapter seam (no pure module/test — the helper is
         pure Obsidian calls, covered by tsc, like `applyTransform`), not a pure builder;
         `src/util/` stays Obsidian-free. Behaviour-identical. — 89feacc
+  - [x] colour-fill tag-based predicate → `colorIsTagBased(bindings)`
+        (`src/encoding/color-tag-based.ts`) + `test/color-tag-based.test.ts`. The
+        multi-tag stripe / legend-lie guard in `buildGraph` (`view.ts`) — `!colorBinding
+        || colorBinding.fieldId === "tag"` over the enabled `color` binding, deciding
+        whether the card fill stays free for a note's per-tag stripe hues — is now a pure
+        predicate; the `this.colorIsTagBased` assignment collapses to a thin call (the
+        throwaway `colorBinding` const drops). Test locks empty→tag-based, color→tag→
+        tag-based, color→other→not, disabled-color→inert→tag-based, and non-color-channels
+        -ignored. Behaviour-identical (import offsets the shrink; view.ts held at 4131). — 0ad6c20
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
