@@ -568,7 +568,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `action.format` to `exportImage`/`exportSvg`. `ExportMenuAction` stays module-
         private (inferred at the call site) so knip is clean. Test locks order (4 PNG,
         separator at idx 4, 3 SVG), the first/last item's exact title/icon/action, and
-        the single 4× entry. Behaviour-identical. view.ts 4217 → 4197; ratchet tightened.
+        the single 4× entry. Behaviour-identical. view.ts 4217 → 4197; ratchet tightened. — 1930556
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
