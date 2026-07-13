@@ -198,6 +198,16 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 	ok(!evalBaseFilter(parseBaseFilter('file.hasProperty("missing")'), f), "hasProperty: absent key → false");
 }
 
+// --- file.folder property (was undefined → folder filters dropped every note) ---
+{
+	const f = facts("Projects/sub/n.md", []);
+	ok(evalBaseFilter(parseBaseFilter('file.folder == "Projects/sub"'), f), "file.folder == parent folder → true");
+	ok(!evalBaseFilter(parseBaseFilter('file.folder == "Projects"'), f), "file.folder is the full parent path, not an ancestor");
+	ok(evalBaseFilter(parseBaseFilter('file.folder.contains("Projects")'), f), "file.folder.contains works");
+	ok(evalBaseFilter(parseBaseFilter('file.folder.startsWith("Proj")'), f), "file.folder.startsWith works");
+	ok(evalBaseFilter(parseBaseFilter('file.folder == ""'), facts("root.md", [])), "vault-root file → folder is \"\"");
+}
+
 // --- isEmpty(): empty/absent value (was unhandled → always false, dropped notes) ---
 {
 	ok(evalBaseFilter(parseBaseFilter("note.foo.isEmpty()"), facts("a.md", [], {})), "isEmpty: unset field → true");

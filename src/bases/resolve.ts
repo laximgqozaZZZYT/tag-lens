@@ -140,6 +140,8 @@ function resolveLhs(lhs: string, facts: FileFacts): unknown {
 			return basename;
 		case "file.ext":
 			return ext;
+		case "file.folder":
+			return folderOf(facts.path);
 		case "file.tags":
 			return facts.tags;
 	}
@@ -189,6 +191,12 @@ function stripHash(t: string): string {
 	return t.startsWith("#") ? t.slice(1) : t;
 }
 
+// Parent folder path of a note ("" for a vault-root file). Used by both the
+// `file.folder` accessor and the `file.inFolder()` predicate.
+function folderOf(path: string): string {
+	return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+}
+
 // Named boolean predicates from the official Bases function set (hasTag /
 // inFolder / hasProperty / isEmpty). Returns null when `op` is not one of them
 // so the caller falls through to the operator table.
@@ -199,7 +207,7 @@ function evalNamedPredicate(op: string, lhs: string, values: string[], facts: Fi
 		return facts.tags.some((t) => wants.some((w) => isTagOrSubtag(stripHash(t), w)));
 	}
 	if (op === "inFolder") {
-		const folder = facts.path.includes("/") ? facts.path.slice(0, facts.path.lastIndexOf("/")) : "";
+		const folder = folderOf(facts.path);
 		return values.some((raw) => {
 			const f = raw.replace(/\/+$/, "");
 			return f === "" || folder === f || folder.startsWith(`${f}/`);
