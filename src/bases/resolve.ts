@@ -46,7 +46,14 @@ function isRaw(f: BaseFilter): boolean {
 	return "raw" in f;
 }
 
+// Evaluate a leaf, honouring `negate` (from `!pred` or `pred == false`) by
+// flipping the operator result in one place.
 function evalCond(node: { cond: BaseCond }, facts: FileFacts): boolean {
+	const r = evalCondInner(node, facts);
+	return node.cond.negate ? !r : r;
+}
+
+function evalCondInner(node: { cond: BaseCond }, facts: FileFacts): boolean {
 	const { lhs, op, rhs, args } = node.cond;
 	const isTags = /tags$/i.test(lhs);
 	// Multi-arg method forms carry `args`; fall back to the single `rhs` so a
@@ -131,12 +138,15 @@ function compare(actual: unknown, op: string, rhs: string): boolean {
 	const an = typeof actual === "number" ? actual : Number(actual);
 	const rn = Number(rhs);
 	const numeric = !Number.isNaN(an) && !Number.isNaN(rn) && rhs.trim() !== "";
+	// Numeric equality only for scalar actuals — arrays keep string membership so
+	// `note.authors == "Grace"` still matches a list member.
+	const numEq = numeric && !Array.isArray(actual);
 
 	switch (op) {
 		case "==":
-			return arrAwareEq(actual, rhs);
+			return numEq ? an === rn : arrAwareEq(actual, rhs);
 		case "!=":
-			return !arrAwareEq(actual, rhs);
+			return numEq ? an !== rn : !arrAwareEq(actual, rhs);
 		case ">":
 			return numeric ? an > rn : String(actual ?? "") > rhs;
 		case "<":

@@ -126,4 +126,39 @@ import type { BaseFilter } from "../src/bases/types";
 	ok(c9?.op === "isEmpty" && c9?.args?.length === 0 && c9?.rhs === "", "no-arg method → empty args, rhs \"\"");
 }
 
+// --- negation: leading `!`, double-negation, boolean-predicate form ---
+{
+	const n1 = parseCond('!file.tags.contains("書籍")');
+	ok(
+		n1?.op === "contains" && n1?.rhs === "書籍" && n1?.negate === true,
+		"leading ! → contains cond with negate:true (NOT dropped to raw)",
+	);
+
+	const n2 = parseCond('!!file.tags.contains("書籍")');
+	ok(n2?.op === "contains" && !n2?.negate, "double negation cancels → no negate flag");
+
+	// Bases-native `<pred> == false` negates the inner predicate.
+	const n3 = parseCond('file.tags.contains("x") == false');
+	ok(n3?.op === "contains" && n3?.rhs === "x" && n3?.negate === true, "`pred == false` → inner cond negate:true");
+
+	const n4 = parseCond('file.tags.contains("x") == true');
+	ok(n4?.op === "contains" && !n4?.negate, "`pred == true` → inner cond, no negation");
+
+	const n5 = parseCond('file.tags.contains("x") != false');
+	ok(n5?.op === "contains" && !n5?.negate, "`pred != false` keeps the predicate (no negation)");
+
+	// `!(pred == false)` — the `!` cancels the `== false` negation.
+	const n6 = parseCond('!file.tags.contains("x") == false');
+	ok(n6?.op === "contains" && !n6?.negate, "! over `pred == false` cancels back to plain");
+}
+
+// --- mis-split inline compound degrades to raw, not a wrong constraint ---
+{
+	const bad = parseCond('file.tags.contains("#a") AND file.name != "b"');
+	ok(bad === null, "inline `a AND b` → null (spaces/parens in lhs rejected) → caller keeps { raw }");
+
+	const wrapped = parseBaseFilter('file.tags.contains("#a") AND file.name != "b"');
+	ok(wrapped != null && "raw" in wrapped, "…and parseBaseFilter wraps it as { raw } (ignored at eval)");
+}
+
 console.log("bases-parser tests passed");

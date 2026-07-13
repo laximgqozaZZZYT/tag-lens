@@ -110,6 +110,36 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 	ok(!evalBaseFilter(parseBaseFilter('note.authors.containsAll("Grace", "Alan")'), f), "array field containsAll false");
 }
 
+// --- negation: `!pred` and `pred == false` must EXCLUDE, not pass everything ---
+{
+	const book = facts("book.md", ["書籍"]);
+	const other = facts("other.md", ["雑記"]);
+	// The real bug: a negated exclusion was dropped to { raw } → ignored → true.
+	ok(!evalBaseFilter(parseBaseFilter('!file.tags.contains("書籍")'), book), "!contains excludes the tagged note");
+	ok(evalBaseFilter(parseBaseFilter('!file.tags.contains("書籍")'), other), "!contains keeps the untagged note");
+	// Bases-native boolean-predicate form behaves the same.
+	ok(!evalBaseFilter(parseBaseFilter('file.tags.contains("書籍") == false'), book), "`== false` excludes tagged");
+	ok(evalBaseFilter(parseBaseFilter('file.tags.contains("書籍") == false'), other), "`== false` keeps untagged");
+	// Negation composes under and/or: a true predicate AND its negation → false
+	// (pre-fix the negated child was raw-ignored, so the AND wrongly stayed true).
+	ok(
+		!evalBaseFilter(parseBaseFilter({ and: ['file.tags.contains("書籍")', '!file.tags.contains("書籍")'] }), book),
+		"negated child actually constrains an AND",
+	);
+}
+
+// --- numeric == / != coerce (were string-only, so 3 !== 3.0) ---
+{
+	const f = facts("n.md", [], { count: 3 });
+	ok(evalBaseFilter(parseBaseFilter("note.count == 3"), f), "== 3 matches number 3");
+	ok(evalBaseFilter(parseBaseFilter("note.count == 3.0"), f), "== 3.0 matches number 3 (numeric)");
+	ok(!evalBaseFilter(parseBaseFilter("note.count != 3.0"), f), "!= 3.0 is false for number 3");
+	ok(!evalBaseFilter(parseBaseFilter("note.count == 4"), f), "== 4 does not match 3");
+	// regression: array field == keeps string membership (not numeric).
+	const g = facts("g.md", [], { authors: ["Grace", "Ada"] });
+	ok(evalBaseFilter(parseBaseFilter('note.authors == "Grace"'), g), "array == keeps string membership");
+}
+
 // --- unknown operator falls back to false (never throws) ---
 {
 	const f = facts("a.md", ["a"]);

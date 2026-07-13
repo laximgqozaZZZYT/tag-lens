@@ -13,11 +13,17 @@
 // (backward compatible) and multi-arg operators read `args`; a method form may
 // populate both (`args[0]` mirrored into `rhs`) so single-value consumers keep
 // working unchanged.
+//
+// `negate` inverts the whole leaf, e.g. `!file.tags.contains("x")` or the
+// Bases-native `file.tags.contains("x") == false`. A negated condition is kept
+// as a real `cond` (NOT dropped to `{ raw }`) so the negation is honoured under
+// `and`/`or` instead of being silently ignored — evalCond flips the result.
 export interface BaseCond {
 	lhs: string;
 	op: string;
 	rhs?: string;
 	args?: string[];
+	negate?: boolean;
 }
 
 // Recursive filter tree. `and`/`or` are the boolean nodes; `cond` is a parsed

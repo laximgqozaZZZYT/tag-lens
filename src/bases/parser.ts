@@ -143,36 +143,78 @@ function mapChildren(arr: unknown[]): BaseFilter[] {
 
 // Decompose a single string condition. Returns null when the shape is unknown
 // (caller wraps it as { raw }).
-//   method form: <lhs>.contains("rhs")  /  <lhs>.contains('rhs')  / unquoted
-//   compare form: <lhs> <op> <rhs>      op ∈ == != >= <= > <
+//   method form:  <lhs>.contains("rhs")  /  <lhs>.contains('rhs')  / unquoted
+//   compare form: <lhs> <op> <rhs>       op ∈ == != >= <= > <
+//   negation:     leading `!` (double-negation cancels) and the Bases-native
+//                 boolean-predicate form `<pred> == false` / `<pred> != true`.
+// A negated leaf keeps its `cond` (with `negate:true`) rather than degrading to
+// `{ raw }`, so the negation is honoured instead of silently ignored at eval.
 export function parseCond(text: string): BaseCond | null {
-	const s = text.trim();
-
-	// method form, e.g. file.tags.contains("#tag") or the multi-arg
-	// file.tags.containsAny("書籍", "小説"). Split the arg list on top-level
-	// commas (quoted commas preserved) so each argument is unquoted independently.
-	const m = s.match(/^([A-Za-z0-9_.]+)\.([A-Za-z_]+)\((.*)\)\s*$/);
-	if (m) {
-		const lhs = m[1];
-		const op = m[2];
-		const args = splitArgs(m[3]).map((a) => unquote(a.trim()));
-		// Mirror the first arg into `rhs` so single-value consumers keep working;
-		// multi-arg operators read the full `args` list.
-		return { lhs, op, rhs: args[0] ?? "", args };
+	// Strip leading `!` negations first (even count → no net negation), then
+	// parse the remainder. The core parser may itself flag negation (the
+	// `<pred> == false` form), which withNegate XORs in.
+	let s = text.trim();
+	let negate = false;
+	while (s.startsWith("!")) {
+		negate = !negate;
+		s = s.slice(1).trim();
 	}
+	const cond = parseMethod(s) ?? parseCompare(s);
+	return cond ? withNegate(cond, negate) : null;
+}
 
-	// compare form. Longest operators first so `>=` isn't split as `>`.
+// Fold `neg` into `cond.negate` (XOR with any existing flag). Clears the flag
+// when the net negation is even. Mutates and returns the same object.
+function withNegate(cond: BaseCond, neg: boolean): BaseCond {
+	if (neg !== Boolean(cond.negate)) cond.negate = true;
+	else if (cond.negate) cond.negate = undefined;
+	return cond;
+}
+
+// method form, e.g. file.tags.contains("#tag") or the multi-arg
+// file.tags.containsAny("書籍", "小説"). Split the arg list on top-level commas
+// (quoted commas preserved) so each argument is unquoted independently.
+function parseMethod(s: string): BaseCond | null {
+	const m = s.match(/^([A-Za-z0-9_.]+)\.([A-Za-z_]+)\((.*)\)\s*$/);
+	if (!m) return null;
+	const args = splitArgs(m[3]).map((a) => unquote(a.trim()));
+	// Mirror the first arg into `rhs` so single-value consumers keep working;
+	// multi-arg operators read the full `args` list.
+	return { lhs: m[1], op: m[2], rhs: args[0] ?? "", args };
+}
+
+// compare form: `<lhs> <op> <rhs>`, longest operators first so `>=` isn't split
+// as `>`. Also handles the boolean-predicate negation `<pred> == false`.
+function parseCompare(s: string): BaseCond | null {
 	const ops = ["==", "!=", ">=", "<=", ">", "<"];
 	for (const op of ops) {
 		const idx = s.indexOf(op);
-		if (idx > 0) {
-			const lhs = s.slice(0, idx).trim();
-			const rhs = unquote(s.slice(idx + op.length).trim());
-			if (lhs.length > 0) return { lhs, op, rhs };
-		}
-	}
+		if (idx <= 0) continue;
+		const lhs = s.slice(0, idx).trim();
+		if (lhs.length === 0) continue;
+		const rhs = unquote(s.slice(idx + op.length).trim());
 
+		const boolPred = parseBoolPredicate(op, lhs, rhs);
+		if (boolPred) return boolPred;
+
+		// Only accept a clean field-path lhs. A mis-split inline compound such as
+		// `file.tags.contains("#a") AND file.name` (spaces/parens) is rejected →
+		// null → the caller keeps it as { raw } and ignores it, rather than
+		// imposing a wrong constraint.
+		if (/^[A-Za-z0-9_.]+$/.test(lhs)) return { lhs, op, rhs };
+	}
 	return null;
+}
+
+// Boolean-predicate negation: `<pred> == false` / `<pred> != true` → the inner
+// predicate, negated; `<pred> == true` / `<pred> != false` → it unchanged.
+// Returns null when this isn't an `== true/false` comparison.
+function parseBoolPredicate(op: string, lhs: string, rhs: string): BaseCond | null {
+	if (op !== "==" && op !== "!=") return null;
+	if (rhs !== "true" && rhs !== "false") return null;
+	const inner = parseCond(lhs);
+	if (!inner) return null;
+	return withNegate(inner, op === "==" ? rhs === "false" : rhs === "true");
 }
 
 // Split a method-call argument list on top-level commas, respecting quoted
