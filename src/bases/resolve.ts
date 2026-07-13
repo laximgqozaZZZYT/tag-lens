@@ -144,6 +144,8 @@ function resolveLhs(lhs: string, facts: FileFacts): unknown {
 			return folderOf(facts.path);
 		case "file.tags":
 			return facts.tags;
+		case "file.links":
+			return facts.links ?? [];
 	}
 
 	// note.<key> or note.frontmatter.<key>
@@ -217,7 +219,27 @@ function evalNamedPredicate(op: string, lhs: string, values: string[], facts: Fi
 	// biome noPrototypeBuiltins, and ES2020-safe unlike Object.hasOwn).
 	if (op === "hasProperty") return values.length > 0 && Object.keys(facts.frontmatter).includes(values[0]);
 	if (op === "isEmpty") return isEmptyValue(resolveLhs(lhs, facts));
+	if (op === "hasLink") return hasLinkTo(facts.links ?? [], values);
 	return null;
+}
+
+// file.hasLink(...): any-of, loose match of a forward-link target by full path,
+// path-without-extension, or basename. Args may be wikilink-wrapped / aliased.
+function hasLinkTo(links: string[], values: string[]): boolean {
+	const wants = values.map(normalizeLinkArg).filter((w) => w !== "");
+	if (wants.length === 0) return false;
+	return links.some((l) => {
+		const noExt = l.replace(/\.md$/i, "");
+		const base = noExt.split("/").pop() ?? noExt;
+		return wants.some((w) => w === l || w === noExt || w === base);
+	});
+}
+
+// Strip `[[ ]]`, drop a `|display` alias, trim, drop a trailing `.md`.
+function normalizeLinkArg(raw: string): string {
+	const inner = raw.replace(/^\[\[/, "").replace(/\]\]$/, "");
+	const target = inner.split("|")[0].trim();
+	return target.replace(/\.md$/i, "");
 }
 
 // isEmpty(): empty string, empty list, or an absent/null field value.

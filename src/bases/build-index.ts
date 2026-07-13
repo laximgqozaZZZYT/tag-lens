@@ -53,6 +53,9 @@ export async function buildBaseIndex(
 	try {
 		factsByPath = buildFacts(app);
 		forwardLinks = buildForwardLinks(app, opts.resolvedLinks);
+		// Thread forward links onto each note's facts so file.links / file.hasLink(...)
+		// resolve (the pure evaluator has no other access to link data).
+		for (const [p, f] of factsByPath) f.links = forwardLinks.get(p) ?? [];
 	} catch (e) {
 		errors.push(`facts/link build failed: ${msg(e)}`);
 		return { ...empty(), tables };

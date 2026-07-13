@@ -199,6 +199,22 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 	ok(!evalBaseFilter(parseBaseFilter('file.hasProperty("toString")'), f), "hasProperty: inherited proto key → false (own keys only)");
 }
 
+// --- file.hasLink / file.links (were unsupported → link filters dropped notes) ---
+{
+	const f: FileFacts = { ...facts("dir/n.md", []), links: ["dir/Target.md", "Other.md"] };
+	ok(evalBaseFilter(parseBaseFilter('file.hasLink("Target")'), f), "hasLink by basename");
+	ok(evalBaseFilter(parseBaseFilter('file.hasLink("dir/Target")'), f), "hasLink by path (no ext)");
+	ok(evalBaseFilter(parseBaseFilter('file.hasLink("dir/Target.md")'), f), "hasLink by full path");
+	ok(evalBaseFilter(parseBaseFilter('file.hasLink("[[Target]]")'), f), "hasLink normalises wikilink wrapping");
+	ok(evalBaseFilter(parseBaseFilter('file.hasLink("[[Target|Alias]]")'), f), "hasLink drops a display alias");
+	ok(evalBaseFilter(parseBaseFilter('file.hasLink("Nope", "Target")'), f), "hasLink is any-of");
+	ok(!evalBaseFilter(parseBaseFilter('file.hasLink("Missing")'), f), "hasLink: absent target → false");
+	ok(!evalBaseFilter(parseBaseFilter('file.hasLink("Target")'), facts("n.md", [])), "hasLink: no links field → false");
+	// file.links resolves to the array → generic list operators work.
+	ok(evalBaseFilter(parseBaseFilter('file.links.contains("dir/Target.md")'), f), "file.links.contains works");
+	ok(evalBaseFilter(parseBaseFilter('file.links.containsAny("x", "Other.md")'), f), "file.links.containsAny works");
+}
+
 // --- file.folder property (was undefined → folder filters dropped every note) ---
 {
 	const f = facts("Projects/sub/n.md", []);

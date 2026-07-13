@@ -21,6 +21,10 @@ export interface FileFacts {
 	tags: string[];
 	frontmatter: Record<string, unknown>;
 	tagProperties?: Record<string, Record<string, unknown>>;
+	// Forward-link target paths, injected by the Bases build so `.base` filters can
+	// evaluate file.links / file.hasLink(...). Absent in the main pipeline (unused
+	// there) — treat undefined as "no links".
+	links?: string[];
 }
 
 // Empty `instances` array = no match. A single empty-bindings entry = match
