@@ -913,3 +913,32 @@ export function noteMenuErrorText(err: string, max = NOTE_MENU_ERROR_MAX): strin
 	const msg = `⚠ Note menu disabled: ${err}`;
 	return msg.length > max ? `${msg.slice(0, max - 1)}…` : msg;
 }
+
+// Screen-space box for the same banner (drawn in view.ts's draw()). Given the
+// measured text width and the canvas client width, returns the fill rect + text
+// origin + a text clamp. The box hugs the text but its width can never exceed the
+// canvas (text is clamped to clientWidth − 2·padX), and the text render is clamped
+// a little tighter (clientWidth − 24) so it never runs off the right edge. Pure so
+// the geometry can't drift from the caller's fillRect/fillText args.
+export interface NoteMenuErrorBanner {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+	textX: number;
+	textY: number;
+	maxTextWidth: number;
+}
+export function noteMenuErrorBannerBox(measuredTextWidth: number, clientWidth: number): NoteMenuErrorBanner {
+	const padX = 8, padY = 5, x = 8, y = 8, h = 22;
+	const tw = Math.min(measuredTextWidth, Math.max(0, clientWidth - 16));
+	return {
+		x,
+		y,
+		w: tw + padX * 2,
+		h,
+		textX: x + padX,
+		textY: y + padY,
+		maxTextWidth: Math.max(0, clientWidth - 24),
+	};
+}

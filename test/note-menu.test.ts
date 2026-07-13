@@ -34,6 +34,7 @@ import {
 	folderDisclosure,
 	suggestKeyAction,
 	noteMenuErrorText,
+	noteMenuErrorBannerBox,
 	NOTE_MENU_ERROR_MAX,
 	type NoteRef,
 	type TreeNode,
@@ -1089,4 +1090,28 @@ const advNotes: NoteRef[] = [
 
 	// Custom max is honoured (boundary math parameterised).
 	ok(noteMenuErrorText("abc", 5) === "⚠ No…", "errorText: custom max clamps + ellipsis");
+}
+
+// ── noteMenuErrorBannerBox: screen-space box hugging the text but capped to canvas ─
+{
+	// Static origin/height + padded text origin (never depends on the inputs).
+	const wide = noteMenuErrorBannerBox(100, 400);
+	ok(wide.x === 8 && wide.y === 8, "banner: fixed 8,8 origin");
+	ok(wide.h === 22, "banner: fixed 22px height");
+	ok(wide.textX === 16 && wide.textY === 13, "banner: text origin = origin + padding");
+
+	// Text that fits → box hugs it (measured width + 2·padX = +16).
+	ok(wide.w === 116, "banner: narrow text → box width = tw + 16");
+	ok(wide.maxTextWidth === 376, "banner: maxTextWidth = clientWidth - 24");
+
+	// Text wider than the canvas → clamped so box width never exceeds clientWidth.
+	const clamped = noteMenuErrorBannerBox(1000, 200);
+	ok(clamped.w === 200, "banner: wide text → box clamped to clientWidth");
+	ok(clamped.w <= 200, "banner: box never wider than canvas");
+	ok(clamped.maxTextWidth === 176, "banner: wide text → maxTextWidth still clientWidth - 24");
+
+	// Degenerate zero-width canvas → non-negative sizes (no negative rect/clamp).
+	const zero = noteMenuErrorBannerBox(50, 0);
+	ok(zero.w === 16, "banner: cw=0 → box width = 2·padX only");
+	ok(zero.maxTextWidth === 0, "banner: cw=0 → maxTextWidth floored at 0");
 }

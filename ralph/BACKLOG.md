@@ -576,6 +576,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         whose only logic is a single settings-field toggle — extract only if a genuine
         duplicate descriptor list emerges (mirror `basesToggleRows`). Otherwise pivot to
         the `ensureNoteMenu` body-builder seams or F2.
+  - [x] navigator error-banner box → `noteMenuErrorBannerBox(measuredTextWidth,
+        clientWidth)` / `NoteMenuErrorBanner` (`src/interaction/note-menu.ts`, next to
+        `noteMenuErrorText`) + cases in `test/note-menu.test.ts`. The inline padX/padY
+        + `Math.min(measuredW, max(0, cw-16))` text clamp + `fillRect(8,8,tw+16,22)` /
+        `fillText(…, max(0, cw-24))` geometry for the non-fatal navigator error banner
+        in `draw()` (`view.ts`) is now a pure builder returning `{x,y,w,h,textX,textY,
+        maxTextWidth}`; the view keeps `ctx.measureText`/`fillRect`/`fillText`. The box
+        hugs the text yet never exceeds the canvas (text clamped to cw−16), text render
+        clamped tighter (cw−24), both floored ≥0 — all locked by the test. Sibling of the
+        `canvasBackingSize`/`*Fit` geometry seams; behaviour-identical. view.ts 4192 → 4191.
   - [x] Tree grouping-selector radios → `noteMenuGroupOptions()` / `NoteMenuGroupBy`
         (`src/interaction/note-menu-geom.ts`) + a case in `test/note-menu-geom.test.ts`.
         The inline `mkGroupRadio("folder","Folder")`/`("tag","Tag")` pair in
