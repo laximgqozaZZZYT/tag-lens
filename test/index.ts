@@ -73,6 +73,7 @@ import "./aggregation-compute.test";
 import "./aggregation-properties.test";
 import "./bases-parser.test";
 import "./bases-resolve.test";
+import "./bases-collect-tags.test";
 import "./bases-containsany-smoke.test";
 import "./bases-relations.test";
 import "./bases-project.test";

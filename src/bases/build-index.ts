@@ -3,8 +3,9 @@
 // → build relations → adjacency. The Obsidian-specific glue (facts, forward
 // links) lives here; the heavy lifting is delegated to the pure modules.
 
-import type { App, CachedMetadata, TFile } from "obsidian";
+import type { App, TFile } from "obsidian";
 import type { FileFacts } from "../query/query";
+import { collectTags } from "./collect-tags";
 import { buildRelations } from "./relations";
 import { resolveElements } from "./resolve";
 import { parseBaseFile, scanBaseFiles } from "./parser";
@@ -140,20 +141,6 @@ function buildForwardLinks(
 		map.set(src, Object.keys(resolved[src]));
 	}
 	return map;
-}
-
-function collectTags(cache: CachedMetadata | null): string[] {
-	if (!cache) return [];
-	const out: string[] = [];
-	if (cache.tags) for (const t of cache.tags) out.push(stripHash(t.tag));
-	const fm = cache.frontmatter?.tags as unknown;
-	if (Array.isArray(fm)) for (const t of fm) out.push(stripHash(String(t)));
-	else if (typeof fm === "string") out.push(stripHash(fm));
-	return out;
-}
-
-function stripHash(t: string): string {
-	return t.startsWith("#") ? t.slice(1) : t;
 }
 
 function msg(e: unknown): string {
