@@ -131,6 +131,7 @@ import "./click-slop.test";
 import "./wheel.test";
 import "./route-edges.test";
 import "./pointer-pos.test";
+import "./figure-empty.test";
 
 
 summary();

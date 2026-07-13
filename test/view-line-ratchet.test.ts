@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { ok } from "./assert";
 
 // Recorded baseline (wc -l semantics: newline-terminated lines).
-const BASELINE = 4110;
+const BASELINE = 4103;
 
 const text = readFileSync("src/view.ts", "utf8");
 const lines = text.split("\n").length - (text.endsWith("\n") ? 1 : 0);

@@ -33,6 +33,7 @@ import { CARD_CELL_W, CARD_CELL_H } from "./types";
 import { clusterHue, createStripeGradient, membershipStripeHues } from "./draw/canvas-utils";
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { canvasBackingSize } from "./draw/canvas-backing";
+import { figureIsEmpty } from "./draw/figure-empty";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
 import { contentBounds } from "./layout/content-bounds";
 import { contentFit } from "./layout/content-fit";
@@ -2109,15 +2110,7 @@ export class MiniGraphView extends ItemView {
 			this.drawGlobalDisplayFallbacks(ctx, dpr, "heatmap");
 			return;
 		}
-		const upsetHasColumns = (this.laid.upset?.columns.length ?? 0) > 0;
-		const heatmapHasCells = (this.laid.heatmap?.n ?? 0) > 0;
-		const latticeHasNodes = (this.laid.lattice?.nodes.length ?? 0) > 0;
-		if (
-			this.laid.nodes.length === 0 &&
-			!upsetHasColumns &&
-			!heatmapHasCells &&
-			!latticeHasNodes
-		) {
+		if (figureIsEmpty(this.laid)) {
 			ctx.fillStyle = theme().textFaint;
 			ctx.font = `${14 * dpr}px sans-serif`;
 			ctx.textAlign = "center";
