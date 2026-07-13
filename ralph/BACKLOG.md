@@ -1058,6 +1058,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         descriptor list sharing a single handler. Test locks labels + hide-flag + order
         (Select shows/hide false first, Deselect hides/hide true) — a flipped flag would
         invert the buttons. Mirrors the `noteMenuGroupOptions` extraction. — b6d4a9c
+  - [x] legend number formatter dedup → `formatLegendNumber(n)`
+        (`src/util/format-number.ts`, next to `clamp01` which both consumers already
+        import) + `test/format-number.test.ts`. The compact legend-label formatter
+        (non-finite → em-dash, round to 2dp, normalize a rounded `-0` → `"0"`) was
+        defined twice as byte-identical local consts: `fmt` in `draw/mode-legend.ts`
+        and `fmtNum` in `draw/legend-spec.ts`; both now call the one pure helper.
+        `svg-recorder.ts`'s `num` keeps its own form (3dp + `"0"` on non-finite —
+        distinct semantics, not folded in). Test locks non-finite→em-dash, 2dp
+        rounding, `-0`→`"0"`, and an inline-equivalence grid. Behaviour-identical.
+        Mirrors the `clamp01`/`jaccard` util dedups. — a76059d
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
