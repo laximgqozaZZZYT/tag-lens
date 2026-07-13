@@ -241,6 +241,20 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 	ok(evalBaseFilter(parseBaseFilter({ not: "some %% unparseable clause" }), book), "not of a raw/unparseable child → ignored (true)");
 }
 
+// --- inline && / || evaluate as AND / OR (were raw-ignored) ---
+{
+	const f = facts("d/n.md", ["x"], { author: "Ada" });
+	ok(evalBaseFilter(parseBaseFilter('file.hasTag("x") && note.author == "Ada"'), f), "&&: both true → true");
+	ok(!evalBaseFilter(parseBaseFilter('file.hasTag("x") && note.author == "Bob"'), f), "&&: one false → false");
+	ok(evalBaseFilter(parseBaseFilter('note.author == "Bob" || file.hasTag("x")'), f), "||: one true → true");
+	ok(!evalBaseFilter(parseBaseFilter('note.author == "Bob" || file.hasTag("y")'), f), "||: none true → false");
+	// precedence: a || b && c with a true.
+	ok(
+		evalBaseFilter(parseBaseFilter('note.author == "Ada" || file.hasTag("y") && file.hasTag("z")'), f),
+		"a || (b && c): a true short-circuits to true",
+	);
+}
+
 // --- unknown operator falls back to false (never throws) ---
 {
 	const f = facts("a.md", ["a"]);

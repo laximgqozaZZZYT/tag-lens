@@ -105,9 +105,7 @@ export function parseBaseFilter(node: unknown): BaseFilter | null {
 
 	if (typeof node === "string") {
 		const trimmed = node.trim();
-		if (trimmed.length === 0) return null;
-		const cond = parseCond(trimmed);
-		return cond ? { cond } : { raw: trimmed };
+		return trimmed.length === 0 ? null : parseStringFilter(trimmed);
 	}
 
 	if (Array.isArray(node)) {
@@ -144,6 +142,68 @@ function mapChildren(arr: unknown[]): BaseFilter[] {
 		if (f) out.push(f);
 	}
 	return out;
+}
+
+// A single filter STRING. Splits on inline boolean operators — `||` (lowest
+// precedence) then `&&` — into or/and trees; a leaf goes to parseCond. Quoted
+// text and method-call parens are protected so they never split. Parenthesised
+// grouping like `(a && b)` is NOT handled — such a leaf stays { raw } (ignored).
+function parseStringFilter(s: string): BaseFilter | null {
+	const ors = splitTopLevel(s, "||");
+	if (ors.length > 1) return boolNode("or", ors);
+	const ands = splitTopLevel(s, "&&");
+	if (ands.length > 1) return boolNode("and", ands);
+	const cond = parseCond(s);
+	return cond ? { cond } : { raw: s };
+}
+
+function boolNode(kind: "and" | "or", parts: string[]): BaseFilter | null {
+	const children: BaseFilter[] = [];
+	for (const p of parts) {
+		const f = parseStringFilter(p);
+		if (f) children.push(f);
+	}
+	if (children.length === 0) return null;
+	return kind === "and" ? { and: children } : { or: children };
+}
+
+// Split `s` on the two-char `token` (`&&` or `||`) only at bracket-depth 0 and
+// outside quotes, so `hasTag("a && b")` and `f(x) && g(y)` behave. Each piece is
+// trimmed; no split → [s]. Never throws (an unbalanced quote just runs on).
+function splitTopLevel(s: string, token: string): string[] {
+	const out: string[] = [];
+	let cur = "";
+	let depth = 0;
+	let quote = "";
+	for (let i = 0; i < s.length; i++) {
+		const ch = s[i];
+		if (quote) {
+			quote = ch === quote ? "" : quote;
+			cur += ch;
+			continue;
+		}
+		if (isQuote(ch)) quote = ch;
+		else if (ch === "(") depth++;
+		else if (ch === ")") depth = Math.max(0, depth - 1);
+		else if (depth === 0 && atToken(s, i, token)) {
+			out.push(cur.trim());
+			cur = "";
+			i++; // skip the second token char
+			continue;
+		}
+		cur += ch;
+	}
+	out.push(cur.trim());
+	return out;
+}
+
+// The two-char `token` starts at index `i` in `s`.
+function atToken(s: string, i: number, token: string): boolean {
+	return s[i] === token[0] && s[i + 1] === token[1];
+}
+
+function isQuote(c: string): boolean {
+	return c === '"' || c === "'";
 }
 
 // Decompose a single string condition. Returns null when the shape is unknown

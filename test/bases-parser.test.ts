@@ -170,6 +170,25 @@ import type { BaseFilter } from "../src/bases/types";
 	ok(i4?.op === "IN" && i4?.negate === true, "negated IN → negate:true");
 }
 
+// --- inline && / || boolean operators in a filter string (were dropped to raw) ---
+{
+	const a = parseBaseFilter('file.hasTag("x") && note.author == "Ada"');
+	ok(a != null && "and" in a && a.and.length === 2 && "cond" in a.and[0] && "cond" in a.and[1], "&& → { and: [cond, cond] }");
+
+	const o = parseBaseFilter('note.a == "1" || note.a == "2"');
+	ok(o != null && "or" in o && o.or.length === 2, "|| → { or: [...] }");
+
+	// precedence: && binds tighter than ||.
+	const p = parseBaseFilter('a == "1" || b == "2" && c == "3"');
+	ok(p != null && "or" in p && p.or.length === 2 && "and" in p.or[1], "a || b && c → { or: [a, { and: [b, c] }] }");
+
+	// quoted operator must NOT split, and method-call parens are protected.
+	const q = parseBaseFilter('note.title == "a && b"');
+	ok(q != null && "cond" in q && q.cond.rhs === "a && b", "quoted && stays inside the value");
+	const m = parseBaseFilter('file.hasTag("x") && file.inFolder("d")');
+	ok(m != null && "and" in m && m.and.length === 2, "method-call parens don't cause a mis-split");
+}
+
 // --- `not:` structured logical operator (was ignored as unknown object) ---
 {
 	const n = parseBaseFilter({ not: 'file.tags.contains("x")' });
