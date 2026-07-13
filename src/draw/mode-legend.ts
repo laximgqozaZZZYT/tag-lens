@@ -1,6 +1,7 @@
 // F5 — pick the legend spec(s) for a mode from its INTRINSIC encoding, unless the
 // user bound an encoding (then that wins — it is what the cards actually paint).
 import type { ViewMode } from "../types";
+import { clamp01 } from "../util/clamp01";
 import type { LegendSpec } from "./legend-spec";
 import type { LegendAnchor } from "./legend-layout";
 
@@ -44,8 +45,6 @@ export interface ModeLegendInput {
 	};
 	maxItems?: number;
 }
-
-const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
 
 // Heatmap diagonal in draw-heatmap.ts:
 // t = log(size+1)/log(maxSize+1), light = 28 + t*34, hsl(42,85%,light)

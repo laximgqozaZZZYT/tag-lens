@@ -3,6 +3,7 @@
 // scales emit { category, output } where output is a concrete colour string.
 // Reuses clusterHue (canvas-utils) for stable auto palettes.
 import { clusterHue } from "../draw/canvas-utils";
+import { clamp01 } from "../util/clamp01";
 import type { ScaleConfig, ScaledValue } from "./types";
 
 interface LegendEntry {
@@ -88,7 +89,7 @@ export function prepareScale(config: ScaleConfig, rawValues: (string | number | 
 			} else {
 				t = (r - min) / (max - min);
 			}
-			t = Math.max(0, Math.min(1, t));
+			t = clamp01(t);
 			return reverse ? 1 - t : t;
 		};
 

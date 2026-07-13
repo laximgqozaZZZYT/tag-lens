@@ -4,6 +4,7 @@
 import type { BindingLegend } from "../encoding/evaluate";
 import type { NodeShape } from "../encoding/shapes";
 import { shapeForKey } from "../encoding/shapes";
+import { clamp01 } from "../util/clamp01";
 
 export type LegendKind = "categorical" | "gradient" | "size";
 
@@ -19,7 +20,7 @@ export interface LegendSpec {
 // the bar can never disagree with the nodes. t in [0,1] -> dark(low)..light(high),
 // matching channels.ts.
 export function sequentialColorRamp(t: number): string {
-	const c = Math.max(0, Math.min(1, t));
+	const c = clamp01(t);
 	return `hsl(210, 70%, ${Math.round(20 + c * 55)}%)`;
 }
 

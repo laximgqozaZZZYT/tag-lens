@@ -3,6 +3,7 @@
 // the renderer paints in screen space. DOM-free + measurer-injected so it
 // unit-tests in Node.
 import type { NodeShape } from "../encoding/shapes";
+import { clamp01 } from "../util/clamp01";
 import type { LegendKind, LegendSpec } from "./legend-spec";
 import { shapeMarkerPath } from "./draw-shape";
 
@@ -294,7 +295,7 @@ export function drawLegend(
 function rampColorAt(stops: string[], t: number, fallback: string): string {
 	if (!stops.length) return fallback;
 	if (stops.length === 1) return stops[0];
-	const c = Math.max(0, Math.min(1, t));
+	const c = clamp01(t);
 	const idx = Math.round(c * (stops.length - 1));
 	return stops[idx];
 }

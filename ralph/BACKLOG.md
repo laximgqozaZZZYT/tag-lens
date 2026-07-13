@@ -1038,6 +1038,18 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `positionTip` arg re-uses (reuse an already-computed rect) and the scrollbar-drag
         `sy`-only read are left as-is. Behaviour-identical; view.ts 4137 → 4133; ratchet
         tightened.
+  - [x] unit-interval clamp dedup → `clamp01(n)` (`src/util/clamp01.ts`, next to
+        `clampScroll`/`clampZoom`) + `test/clamp01.test.ts`. The `Math.max(0,
+        Math.min(1, t))` clamp-to-`[0,1]` on a normalized interpolation/colour
+        parameter was re-derived inline across the draw/encoding layers: a local
+        `clamp01` in `draw/mode-legend.ts`, the quantitative scale normalizer
+        (`encoding/scales.ts`), the legend gradient sampler (`draw/legend-layout.ts`
+        `rampColorAt`), and the shared sequential ramp (`draw/legend-spec.ts`
+        `sequentialColorRamp`); all now call the one pure helper (the mode-legend
+        local is deleted). The `[0, canvasW-drawWidth]` clamps in `legend-layout.ts`
+        keep their own inline form (different ceiling). Test locks both endpoints,
+        floor/ceiling, and an inline-equivalence grid. Behaviour-identical. Mirrors
+        the `clampScroll`/`clampZoom`/`jaccard` util dedups. — <hash>
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
