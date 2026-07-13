@@ -1086,6 +1086,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         throwaway `colorBinding` const drops). Test locks empty→tag-based, color→tag→
         tag-based, color→other→not, disabled-color→inert→tag-based, and non-color-channels
         -ignored. Behaviour-identical (import offsets the shrink; view.ts held at 4131). — 0ad6c20
+  - [x] vault path→basename idiom dedup → private `basenameOrPath(path)` method
+        (`src/view.ts`, next to `buildLatticeNamedLabels`). The
+        `getAbstractFileByPath → instanceof TFile ? basename : path` fallback was
+        re-derived byte-identically at 3 sites (`buildLatticeNamedLabels`, the Bases
+        `labelOf` closure, the lattice `nameOf` closure); all three collapse to a thin
+        call. View-only (touches `app.vault`) so no unit test — same as the
+        `frontmatterRecordOf`/`applyTransform` private-method dedups; `tsc` covers it.
+        The sibling `mtimeOf` closure (returns `stat.mtime`, different type) stays
+        inline. Behaviour-identical. view.ts 4131 → 4129; ratchet tightened. — 2a2e2d9
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
