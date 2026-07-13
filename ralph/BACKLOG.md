@@ -1068,6 +1068,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         distinct semantics, not folded in). Test locks non-finite→em-dash, 2dp
         rounding, `-0`→`"0"`, and an inline-equivalence grid. Behaviour-identical.
         Mirrors the `clamp01`/`jaccard` util dedups. — a76059d
+  - [x] EncContext `frontmatterOf` dedup → private `frontmatterRecordOf(id)` method
+        (`src/view.ts`). The two byte-identical `frontmatterOf` closures — one in
+        `buildGraph`'s `EncContext`, one in the Icon Gallery axis pass — each ran
+        `getAbstractFileByPath` → `instanceof TFile` → `getFileCache().frontmatter as
+        Record<string,unknown>` (else undefined); both now read from one private method,
+        with each `EncContext.frontmatterOf` a thin `(id) => this.frontmatterRecordOf(id)`
+        arrow. A `this`-coupled Obsidian-adapter seam (no pure module/test — the helper is
+        pure Obsidian calls, covered by tsc, like `applyTransform`), not a pure builder;
+        `src/util/` stays Obsidian-free. Behaviour-identical. — 89feacc
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
