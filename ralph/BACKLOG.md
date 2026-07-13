@@ -578,6 +578,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `activeTags`/`nodeTags` locals drop. Undefined/absent tags → empty set (no throw),
         case-folded + deduped so the tag Jaccard compares canonically. Test locks
         undefined/empty→empty, case-fold+dedup, and distinct-lowercased. Behaviour-identical. — ad380b3
+  - [x] `draw()` empty-figure gate → `figureIsEmpty(laid)`
+        (`src/draw/figure-empty.ts`) + `test/figure-empty.test.ts`. The three inline
+        `upsetHasColumns`/`heatmapHasCells`/`latticeHasNodes` consts + the compound
+        "no nodes anywhere" condition in `draw()`'s "No nodes match current filters"
+        hint gate (`view.ts`) are now a pure predicate: empty iff every mode's content
+        slot is empty at once (world cards → `nodes`, UpSet → `upset.columns`, heatmap
+        → `heatmap.n`, lattice → `lattice.nodes`). Test locks all-empty→true, each
+        populated slot→false, and present-but-empty slots→still empty. Sibling of the
+        `computeGlobalFallbackPlan`/`figure`-shaped draw seams; behaviour-identical.
+        view.ts 4110 → 4103; ratchet tightened. — 137bc0d
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
