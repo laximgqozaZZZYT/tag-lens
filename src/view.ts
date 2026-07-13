@@ -1,5 +1,5 @@
 import { ItemView, type WorkspaceLeaf, TFile, debounce, setIcon, Notice, Menu, MarkdownView } from "obsidian";
-import { exportCanvasDims } from "./visual/image-export";
+import { exportCanvasDims, exportMenuItems } from "./visual/image-export";
 import { renderInsightTab } from "./insight/render";
 import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
 
@@ -1661,50 +1661,30 @@ export class MiniGraphView extends ItemView {
 	// so it works on minAppVersion 1.5.0.
 	private openExportMenu(evt: MouseEvent): void {
 		const menu = new Menu();
-		menu.addItem((i) =>
-			i
-				.setTitle("Copy view to clipboard")
-				.setIcon("copy")
-				.onClick(() => void this.exportImage({ scale: 2, fit: false, target: "clipboard" })),
-		);
-		menu.addItem((i) =>
-			i
-				.setTitle("Save view as PNG (2×)")
-				.setIcon("image-down")
-				.onClick(() => void this.exportImage({ scale: 2, fit: false, target: "vault" })),
-		);
-		menu.addItem((i) =>
-			i
-				.setTitle("Save view as PNG (4×)")
-				.setIcon("image-down")
-				.onClick(() => void this.exportImage({ scale: 4, fit: false, target: "vault" })),
-		);
-		menu.addItem((i) =>
-			i
-				.setTitle("Save whole figure as PNG (2×)")
-				.setIcon("maximize")
-				.onClick(() => void this.exportImage({ scale: 2, fit: true, target: "vault" })),
-		);
-		menu.addSeparator();
-		// Vector (SVG) — resolution-independent, reuses the same draw() pipeline.
-		menu.addItem((i) =>
-			i
-				.setTitle("Copy view as SVG")
-				.setIcon("copy")
-				.onClick(() => void this.exportSvg({ fit: false, target: "clipboard" })),
-		);
-		menu.addItem((i) =>
-			i
-				.setTitle("Save view as SVG")
-				.setIcon("file-code")
-				.onClick(() => void this.exportSvg({ fit: false, target: "vault" })),
-		);
-		menu.addItem((i) =>
-			i
-				.setTitle("Save whole figure as SVG")
-				.setIcon("maximize")
-				.onClick(() => void this.exportSvg({ fit: true, target: "vault" })),
-		);
+		// The item/separator descriptors (titles, icons, and which export each
+		// triggers) live in the pure exportMenuItems(); the view only maps them
+		// to Obsidian Menu calls and wires the onClick to exportImage/exportSvg.
+		for (const entry of exportMenuItems()) {
+			if (entry.kind === "separator") {
+				menu.addSeparator();
+				continue;
+			}
+			const { action } = entry;
+			menu.addItem((i) =>
+				i
+					.setTitle(entry.title)
+					.setIcon(entry.icon)
+					.onClick(() =>
+						action.format === "png"
+							? void this.exportImage({
+									scale: action.scale,
+									fit: action.fit,
+									target: action.target,
+								})
+							: void this.exportSvg({ fit: action.fit, target: action.target }),
+					),
+			);
+		}
 		menu.showAtMouseEvent(evt);
 	}
 
