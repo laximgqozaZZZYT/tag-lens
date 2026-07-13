@@ -549,6 +549,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         now thin calls to pure pluralized-text builders (mirrors the `jsonExportLabel`
         extraction). The now-only-use `pluralize` import dropped from `view.ts`.
         Behaviour-identical. view.ts 4227 → 4223; ratchet tightened. — 7ae91e0
+  - [x] drosteFocus neighborhood sort+cutoff → `partitionNeighborhood(scored, maxSize)`
+        (`src/query/related-score.ts`, next to `relatedNoteScore`) + cases in
+        `test/related-score.test.ts`. The inline `scoredNodes.sort((a,b)=>b.score-a.score)`
+        + `i < maxNeighborhoodSize` index loop in the droste focus scorer (`view.ts`) that
+        marks the top-N by relevance visible and the rest `filtered` is now a thin call to
+        a pure, non-mutating partition returning `{visible, filtered}`; the view just flips
+        each node's `filtered` flag. Stable sort (ties keep input order), maxSize≤0 filters
+        all / ≥length keeps all, input array not mutated — all locked by the test.
+        Behaviour-identical. view.ts 4223 → 4217; ratchet tightened. — 93abdb4
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list

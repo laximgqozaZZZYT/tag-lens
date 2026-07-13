@@ -148,7 +148,7 @@ import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVaul
 import { SvgRecorderContext } from "./visual/svg-recorder";
 import { findGaps, type TagGap } from "./query/gap-finder";
 import { findBridges, type BridgeCandidate } from "./query/bridge-finder";
-import { hasBidirectionalLink, relatedNoteScore } from "./query/related-score";
+import { hasBidirectionalLink, partitionNeighborhood, relatedNoteScore } from "./query/related-score";
 import {
 	HOVER_DELAY_MS,
 	sameTarget,
@@ -672,18 +672,12 @@ export class MiniGraphView extends ItemView {
 			}
 		}
 
-		// 4. スコア降順にソートして上位を絞り込み（トポロジーを維持するため配列からは間引かない）
-		scoredNodes.sort((a, b) => b.score - a.score);
-
-		for (let i = 0; i < scoredNodes.length; i++) {
-			if (i < maxNeighborhoodSize) {
-				// 上位50件は描画対象
-				scoredNodes[i].node.filtered = false;
-			} else {
-				// 50件から漏れた近傍ノードはフィルタリング（非表示/薄色）対象
-				scoredNodes[i].node.filtered = true;
-			}
-		}
+		// 4. スコア降順にソートして上位を絞り込み（トポロジーを維持するため配列からは間引かない）。
+		// ソート＋上位カットは純粋な partitionNeighborhood に切り出し済み — ここは
+		// filtered フラグの適用だけ（上位50件=描画対象、漏れた近傍=非表示/薄色）。
+		const { visible, filtered } = partitionNeighborhood(scoredNodes, maxNeighborhoodSize);
+		for (const node of visible) node.filtered = false;
+		for (const node of filtered) node.filtered = true;
 
 		// 5. 既存のレイアウトエンジン・Viewに対して安全に再描画を要求
 		// this.drosteFocus は中心にしたいノート
