@@ -189,6 +189,29 @@ import type { BaseFilter } from "../src/bases/types";
 	ok(m != null && "and" in m && m.and.length === 2, "method-call parens don't cause a mis-split");
 }
 
+// --- parenthesised grouping ( … ) and !( … ) (grouped operand was dropped to raw) ---
+{
+	const g = parseBaseFilter('(note.a == "1" || note.a == "2") && file.hasTag("x")');
+	ok(
+		g != null && "and" in g && g.and.length === 2 && "or" in g.and[0] && "cond" in g.and[1],
+		"(a || b) && c → { and: [ { or }, { cond } ] }",
+	);
+
+	const n = parseBaseFilter('!(file.hasTag("x") && file.hasTag("y"))');
+	ok(n != null && "not" in n && "and" in n.not, "!( a && b ) → { not: { and } }");
+
+	const nest = parseBaseFilter('(note.a == "1" && note.b == "2") || note.c == "3"');
+	ok(nest != null && "or" in nest && "and" in nest.or[0], "(a && b) || c → { or: [ { and }, cond ] }");
+
+	// `(a) || (b)` is NOT one wrapping group → normal or-split of two leaves.
+	const two = parseBaseFilter('(note.a == "1") || (note.b == "2")');
+	ok(two != null && "or" in two && two.or.length === 2, "(a) || (b) → or of two (each group unwrapped)");
+
+	// regression: method-call parens are not mistaken for a group.
+	const m = parseBaseFilter('file.hasTag("x") && file.inFolder("d")');
+	ok(m != null && "and" in m && m.and.length === 2, "method-call parens are not unwrapped");
+}
+
 // --- `not:` structured logical operator (was ignored as unknown object) ---
 {
 	const n = parseBaseFilter({ not: 'file.tags.contains("x")' });

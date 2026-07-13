@@ -144,17 +144,51 @@ function mapChildren(arr: unknown[]): BaseFilter[] {
 	return out;
 }
 
-// A single filter STRING. Splits on inline boolean operators — `||` (lowest
-// precedence) then `&&` — into or/and trees; a leaf goes to parseCond. Quoted
-// text and method-call parens are protected so they never split. Parenthesised
-// grouping like `(a && b)` is NOT handled — such a leaf stays { raw } (ignored).
+// A single filter STRING. Handles parenthesised grouping and `!( … )` first,
+// then splits on inline boolean operators — `||` (lowest precedence) then `&&` —
+// into or/and trees; a leaf goes to parseCond. Quoted text and method-call parens
+// are protected so they never split or get mistaken for a group.
 function parseStringFilter(s: string): BaseFilter | null {
-	const ors = splitTopLevel(s, "||");
+	const t = s.trim();
+	// `!( … )`: NOT of a parenthesised group. A unary `!` on a bare predicate is
+	// left to parseCond (which strips it); only a `!(` group is handled here.
+	if (t.startsWith("!")) {
+		const rest = t.slice(1).trim();
+		if (isFullyWrapped(rest)) {
+			const inner = parseStringFilter(unwrap(rest));
+			return inner ? { not: inner } : null;
+		}
+	}
+	// A whole-expression `( … )` group: unwrap and recurse.
+	if (isFullyWrapped(t)) return parseStringFilter(unwrap(t));
+	const ors = splitTopLevel(t, "||");
 	if (ors.length > 1) return boolNode("or", ors);
-	const ands = splitTopLevel(s, "&&");
+	const ands = splitTopLevel(t, "&&");
 	if (ands.length > 1) return boolNode("and", ands);
-	const cond = parseCond(s);
-	return cond ? { cond } : { raw: s };
+	const cond = parseCond(t);
+	return cond ? { cond } : { raw: t };
+}
+
+// True when `s` is a single parenthesised group: starts with `(`, ends with `)`,
+// and the `(` at index 0 closes at the final char (so `(a) || (b)` is false).
+// Quotes are respected so parens inside strings don't count. Never throws.
+function isFullyWrapped(s: string): boolean {
+	if (s.length < 2 || s[0] !== "(" || !s.endsWith(")")) return false;
+	let depth = 0;
+	let quote = "";
+	for (let i = 0; i < s.length; i++) {
+		const ch = s[i];
+		if (quote) {
+			quote = ch === quote ? "" : quote;
+		} else if (isQuote(ch)) quote = ch;
+		else if (ch === "(") depth++;
+		else if (ch === ")" && --depth === 0 && i !== s.length - 1) return false;
+	}
+	return depth === 0;
+}
+
+function unwrap(s: string): string {
+	return s.slice(1, -1).trim();
 }
 
 function boolNode(kind: "and" | "or", parts: string[]): BaseFilter | null {

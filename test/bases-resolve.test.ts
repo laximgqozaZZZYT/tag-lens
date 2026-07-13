@@ -282,6 +282,23 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 	);
 }
 
+// --- parenthesised grouping evaluates correctly (grouped operand was ignored) ---
+{
+	const inD = facts("d/n.md", ["a"]); // has tag a, in folder d
+	const outD = facts("e/n.md", ["a"]); // has tag a, NOT in folder d
+	const neither = facts("d/m.md", ["z"]); // in folder d, but neither a nor b
+	const expr = '(file.hasTag("a") || file.hasTag("b")) && file.inFolder("d")';
+	ok(evalBaseFilter(parseBaseFilter(expr), inD), "(a||b) && d: a & in-d → true");
+	ok(!evalBaseFilter(parseBaseFilter(expr), outD), "(a||b) && d: a but out-of-d → false");
+	ok(!evalBaseFilter(parseBaseFilter(expr), neither), "(a||b) && d: in-d but neither a nor b → false (group honoured)");
+
+	// !(a && b): true unless the note has BOTH.
+	const both = facts("x.md", ["x", "y"]);
+	const oneOnly = facts("y.md", ["x"]);
+	ok(!evalBaseFilter(parseBaseFilter('!(file.hasTag("x") && file.hasTag("y"))'), both), "!(x && y): has both → false");
+	ok(evalBaseFilter(parseBaseFilter('!(file.hasTag("x") && file.hasTag("y"))'), oneOnly), "!(x && y): has one → true");
+}
+
 // --- unknown operator falls back to false (never throws) ---
 {
 	const f = facts("a.md", ["a"]);
