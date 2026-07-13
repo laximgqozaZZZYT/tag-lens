@@ -1,4 +1,5 @@
 import { jaccardWithShared } from "../util/jaccard";
+import { undirectedPairKey } from "../util/pair-key";
 
 export interface BridgeCandidate {
 	a: string;
@@ -72,7 +73,7 @@ export function findBridges(
 		
 		for (const idB of candidatesForA) {
 			// Normalize pair key (dictionary order)
-			const pairKey = nodeA.id < idB ? `${nodeA.id}|${idB}` : `${idB}|${nodeA.id}`;
+			const pairKey = undirectedPairKey(nodeA.id, idB);
 			
 			// Skip if already processed or already linked
 			if (seenPairs.has(pairKey) || linkedPairs.has(pairKey)) {

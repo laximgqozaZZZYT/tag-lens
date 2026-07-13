@@ -107,6 +107,7 @@ import "./view-line-ratchet.test";
 import "./pluralize.test";
 import "./jaccard.test";
 import "./tab-prefix.test";
+import "./pair-key.test";
 import "./heatmap-detail.test";
 import "./hover-tip-text.test";
 import "./clamp-zoom.test";

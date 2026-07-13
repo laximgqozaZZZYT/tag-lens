@@ -595,6 +595,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         Mirrors the `jsonImportMessage`/`bundledLoadMessage` text builders. Test locks
         equal-scale→null, within-epsilon→null, real-cap→formatted, one-decimal rounding.
         Behaviour-identical. view.ts 4185 → 4182; ratchet tightened. — 0371e47
+  - [x] undirected pair-key idiom dedup → `undirectedPairKey(a, b)`
+        (`src/util/pair-key.ts`, next to `pluralize`/`jaccard`/`tab-prefix`) +
+        `test/pair-key.test.ts`. The dictionary-ordered `a < b ? `${a}|${b}` :
+        `${b}|${a}`` key that makes an unordered id pair collapse to one string was
+        re-derived inline twice: the ghost-edge `linkedPairs` builder in `buildGraph`
+        (`view.ts`, over each edge's source/target) and the bridge-finder seen-pair
+        guard (`query/bridge-finder.ts:75`, over nodeA.id/idB); both now call the pure
+        helper. The bridge-finder OUTPUT ordering (a/b lexical min/max at 93–94) keeps
+        its own inline form (picks the tuple, not the joined key). Test locks argument-
+        order independence, self-pair, and lexical (not numeric) ordering.
+        Behaviour-identical. view.ts 4182 → 4181; ratchet tightened.
   - [x] navigator error-banner box → `noteMenuErrorBannerBox(measuredTextWidth,
         clientWidth)` / `NoteMenuErrorBanner` (`src/interaction/note-menu.ts`, next to
         `noteMenuErrorText`) + cases in `test/note-menu.test.ts`. The inline padX/padY

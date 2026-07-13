@@ -138,6 +138,7 @@ import { jaccardSimilarity } from "./util/jaccard";
 import { pointInRect } from "./util/point-in-rect";
 import { exceedsClickSlop } from "./util/click-slop";
 import { clampScroll } from "./util/clamp-scroll";
+import { undirectedPairKey } from "./util/pair-key";
 import {
 	legendScrollbarGeom,
 	legendScrollbarZone,
@@ -1206,9 +1207,7 @@ export class MiniGraphView extends ItemView {
 		if (this.settings.showGhostEdges) {
 			const linkedPairs = new Set<string>();
 			for (const e of layoutData.edges) {
-				const a = e.source < e.target ? e.source : e.target;
-				const b = e.source < e.target ? e.target : e.source;
-				linkedPairs.add(`${a}|${b}`);
+				linkedPairs.add(undirectedPairKey(e.source, e.target));
 			}
 			const bridgeNodes = layoutData.nodes.map(n => ({ id: n.id, tags: n.memberships }));
 			this.currentBridges = findBridges(
