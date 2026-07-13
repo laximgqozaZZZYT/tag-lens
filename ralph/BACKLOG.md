@@ -557,7 +557,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         a pure, non-mutating partition returning `{visible, filtered}`; the view just flips
         each node's `filtered` flag. Stable sort (ties keep input order), maxSize≤0 filters
         all / ≥length keeps all, input array not mutated — all locked by the test.
-        Behaviour-identical. view.ts 4223 → 4217; ratchet tightened. — 93abdb4
+        Behaviour-identical. view.ts 4223 → 4217; ratchet tightened. — 825860b
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
