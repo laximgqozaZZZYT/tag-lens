@@ -157,7 +157,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, folderCascadeHide, checkboxAriaChecked, noteMenuRowCheckboxSpec, buildFolderPathKey, folderToggleLabel, folderDisclosure, navigatorNodeSource, suggestKeyAction, noteMenuErrorText, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion, type FolderCheckState } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, moveMenuRect, resizeMenuRect, noteMenuPanelStyle, noteMenuRectStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuLeafRowHoverStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, moveMenuRect, resizeMenuRect, noteMenuPanelStyle, noteMenuRectStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuGroupOptions, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuLeafRowHoverStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab, type NoteMenuGroupBy } from "./interaction/note-menu-geom";
 import { heatmapCellNoteIds } from "./interaction/heatmap-detail";
 import { heatmapCellTipText, ghostEdgeTipText, clusterTipText, aggregationGroupTipText } from "./interaction/hover-tip-text";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
@@ -293,7 +293,7 @@ export class MiniGraphView extends ItemView {
 	// note's GROUP_BY membership keys). Survives REBUILDS via this field and
 	// RELOADS via the optional settings.noteMenuGroupBy. A small radio group in
 	// the menu header switches it; changing it re-renders the tree.
-	private noteMenuGroupBy: "folder" | "tag" = "folder";
+	private noteMenuGroupBy: NoteMenuGroupBy = "folder";
 	// The last search query the user typed in the note navigator's search box.
 	// Saved in removeNoteMenu() and restored in ensureNoteMenu() so a rebuild
 	// triggered mid-typing (e.g. by a vault file change) doesn't blank the box.
@@ -2957,7 +2957,7 @@ export class MiniGraphView extends ItemView {
 		const groupBar = treeTab.createDiv();
 		groupBar.setCssStyles(groupBarStyle.bar);
 		const groupName = "gim-notemenu-group";
-		const mkGroupRadio = (value: "folder" | "tag", labelText: string): void => {
+		const mkGroupRadio = (value: NoteMenuGroupBy, labelText: string): void => {
 			const lab = groupBar.createEl("label");
 			lab.setCssStyles(groupBarStyle.label);
 			const radio = lab.createEl("input", { attr: { type: "radio", name: groupName, value } });
@@ -2973,8 +2973,7 @@ export class MiniGraphView extends ItemView {
 			// Don't let a click in the selector start a header MOVE drag.
 			lab.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		};
-		mkGroupRadio("folder", "Folder");
-		mkGroupRadio("tag", "Tag");
+		for (const { value, label } of noteMenuGroupOptions()) mkGroupRadio(value, label);
 		// ── Select all / Deselect all ────────────────────────────────────────────
 		// Two small buttons that (un)check EVERY note in the current menu set
 		// at once. Operate on the full `nodes` list (currentMenuNotes, already

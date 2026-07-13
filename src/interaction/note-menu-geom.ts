@@ -226,6 +226,21 @@ export function noteMenuDataSubTabs(): { key: NoteMenuDataSubTab; label: string 
 	];
 }
 
+export type NoteMenuGroupBy = "folder" | "tag";
+
+// Tree grouping-selector radio descriptors (value + visible label), in render
+// order. The tree groups notes either by FOLDER path (default) or by TAG
+// membership key. Pure builder — the view creates one radio per entry, checks
+// it against the active grouping, and wires the change handler. The exported
+// `NoteMenuGroupBy` type is the single source of truth for both the persisted
+// grouping value and the rendered radio values (mirrors noteMenuTopTabs).
+export function noteMenuGroupOptions(): { value: NoteMenuGroupBy; label: string }[] {
+	return [
+		{ value: "folder", label: "Folder" },
+		{ value: "tag", label: "Tag" },
+	];
+}
+
 // Per-pane CSS `display` values for the three top-level body panes given the
 // active tab. The Data wrapper is a flex-column (visible = "flex"); Settings and
 // Insight are scroll panes (visible = "block"); inactive panes are "none". Pure

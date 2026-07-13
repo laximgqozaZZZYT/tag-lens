@@ -576,6 +576,14 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         whose only logic is a single settings-field toggle — extract only if a genuine
         duplicate descriptor list emerges (mirror `basesToggleRows`). Otherwise pivot to
         the `ensureNoteMenu` body-builder seams or F2.
+  - [x] Tree grouping-selector radios → `noteMenuGroupOptions()` / `NoteMenuGroupBy`
+        (`src/interaction/note-menu-geom.ts`) + a case in `test/note-menu-geom.test.ts`.
+        The inline `mkGroupRadio("folder","Folder")`/`("tag","Tag")` pair in
+        `ensureNoteMenu` (`view.ts`) is now a thin loop over a pure descriptor list, and
+        the exported `NoteMenuGroupBy` type is the single source of truth for both the
+        `noteMenuGroupBy` field and the rendered radio values (mirrors
+        `noteMenuTopTabs`/`noteMenuDataSubTabs`). The label/radio DOM + change wiring stay
+        in the view. Test locks value/label/order (Folder default first). — 033da69
   - [x] layout signature → `layoutSignature(s)` / `DISPLAY_ONLY_KEYS`
         (`src/layout/layout-signature.ts`) + `test/layout-signature.test.ts`. The
         private static `DISPLAY_ONLY_KEYS` set + private `layoutSignature` method in
