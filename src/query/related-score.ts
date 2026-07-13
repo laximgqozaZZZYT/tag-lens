@@ -15,6 +15,14 @@ export function hasBidirectionalLink(resolvedLinks: ResolvedLinks, a: string, b:
 	return forward || backward;
 }
 
+// Lowercased tag set for a file, from its metadataCache `tags` array (obsidian's
+// `CachedMetadata.tags`, shape `{ tag: string }[]`). Undefined/absent → empty set.
+// Mirrors the scorer's inline `cache?.tags?.map(t => t.tag.toLowerCase()) || []`
+// then `new Set(...)`: case-folds and dedupes so tag Jaccard compares canonically.
+export function cachedTagSet(tags: { tag: string }[] | undefined): Set<string> {
+	return new Set((tags ?? []).map((t) => t.tag.toLowerCase()));
+}
+
 // Related-notes relevance score: weighted sum of the bidirectional-link flag
 // (0/1) and the tag Jaccard similarity, using the W_link / W_tag weights.
 export function relatedNoteScore(hasLink: boolean, jaccard: number, wLink: number, wTag: number): number {

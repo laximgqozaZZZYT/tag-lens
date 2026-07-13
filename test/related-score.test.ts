@@ -1,7 +1,7 @@
 // hasBidirectionalLink / relatedNoteScore — the drosteFocus neighborhood
 // scorer's pure link-predicate + weighted score, extracted from view.ts.
 import { approx, ok } from "./assert";
-import { hasBidirectionalLink, partitionNeighborhood, relatedNoteScore } from "../src/query/related-score";
+import { cachedTagSet, hasBidirectionalLink, partitionNeighborhood, relatedNoteScore } from "../src/query/related-score";
 
 // Forward link only (a → b) counts.
 ok(hasBidirectionalLink({ a: { b: 1 } }, "a", "b"), "forward link → true");
@@ -72,4 +72,18 @@ const scored = [
 	];
 	partitionNeighborhood(input, 1);
 	ok(input[0].node === "x" && input[1].node === "y", "input order preserved (non-mutating)");
+}
+
+// cachedTagSet — lowercased, deduped tag set from a metadataCache `tags` array.
+{
+	// Undefined (no cache / no tags) → empty set, never throws.
+	ok(cachedTagSet(undefined).size === 0, "undefined tags → empty set");
+	// Empty array → empty set.
+	ok(cachedTagSet([]).size === 0, "empty tags → empty set");
+	// Case-folds so #Book and #book collapse to one canonical entry.
+	const folded = cachedTagSet([{ tag: "#Book" }, { tag: "#book" }]);
+	ok(folded.size === 1 && folded.has("#book"), "case-folded + deduped");
+	// Preserves distinct tags, lowercased.
+	const set = cachedTagSet([{ tag: "#Novel" }, { tag: "#SciFi" }]);
+	ok(set.size === 2 && set.has("#novel") && set.has("#scifi"), "distinct tags lowercased");
 }

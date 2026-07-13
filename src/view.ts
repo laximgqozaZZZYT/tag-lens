@@ -150,7 +150,7 @@ import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVaul
 import { SvgRecorderContext } from "./visual/svg-recorder";
 import { findGaps, type TagGap } from "./query/gap-finder";
 import { findBridges, type BridgeCandidate } from "./query/bridge-finder";
-import { hasBidirectionalLink, partitionNeighborhood, relatedNoteScore } from "./query/related-score";
+import { cachedTagSet, hasBidirectionalLink, partitionNeighborhood, relatedNoteScore } from "./query/related-score";
 import {
 	HOVER_DELAY_MS,
 	sameTarget,
@@ -625,8 +625,7 @@ export class MiniGraphView extends ItemView {
 
 		// 1. アクティブノートのメタデータ（タグ）を取得
 		const activeCache = this.app.metadataCache.getFileCache(activeFile);
-		const activeTags = activeCache?.tags?.map(t => t.tag.toLowerCase()) || [];
-		const activeTagSet = new Set(activeTags);
+		const activeTagSet = cachedTagSet(activeCache?.tags);
 
 		// 2. 既存の解決済みリンク（双方向リンク判定用）のマップを取得
 		const resolvedLinks = this.app.metadataCache.resolvedLinks;
@@ -656,8 +655,7 @@ export class MiniGraphView extends ItemView {
 
 			if (nodeFile instanceof TFile) {
 				const nodeCache = this.app.metadataCache.getFileCache(nodeFile);
-				const nodeTags = nodeCache?.tags?.map(t => t.tag.toLowerCase()) || [];
-				const nodeTagSet = new Set(nodeTags);
+				const nodeTagSet = cachedTagSet(nodeCache?.tags);
 				// Empty union (both tag-less) → 0, matching the old size-guarded path.
 				jaccard = jaccardSimilarity(activeTagSet, nodeTagSet);
 			}
