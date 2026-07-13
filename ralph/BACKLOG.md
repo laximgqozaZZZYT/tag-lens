@@ -1014,6 +1014,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `layoutSignature`), the missing-memberships `?? []` default, and input
         non-mutation. Sibling of the `layoutSignature` extraction; behaviour-identical.
         view.ts 4192 → 4187; ratchet tightened. — 7d7c348
+  - [x] transform-apply idiom dedup → `applyTransform(t)` private method (`src/view.ts`).
+        The 9 byte-identical `this.zoom = t.zoom; this.panX = t.panX; this.panY = t.panY;`
+        blocks scattered across every fit/zoom path (`zoomBy`, `fitToRect`, the four
+        `fitToView` mode branches, `centerDrosteOn`, `locateNodeOnCanvas`, the wheel
+        handler) — each consuming a `{zoom,panX,panY}` result from `fitTransform` /
+        `zoomAroundPointer` / `*Fit` — now call one private helper, so no path can
+        copy-paste-drift into setting only two of the three fields. A `this`-mutating
+        seam (no pure module/test — covered by tsc + the render-smoke suite), unlike the
+        earlier pure-fit-builder seams that produce the `t` this consumes. Behaviour-
+        identical. view.ts 4145 → 4137; ratchet tightened.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —

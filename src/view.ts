@@ -1784,23 +1784,29 @@ export class MiniGraphView extends ItemView {
 		}
 	}
 
+	// Assign a computed {zoom, panX, panY} onto the view's transform fields.
+	// Every fit/zoom path (fitTransform / zoomAroundPointer / *Fit) yields this
+	// same triple; centralize the assignment so no path can copy-paste-drift
+	// into setting only two of the three.
+	private applyTransform(t: { zoom: number; panX: number; panY: number }): void {
+		this.zoom = t.zoom;
+		this.panX = t.panX;
+		this.panY = t.panY;
+	}
+
 	private zoomBy(factor: number): void {
 		const rect = this.canvas.getBoundingClientRect();
 		const sx = rect.width / 2;
 		const sy = rect.height / 2;
 		const t = zoomAroundPointer({ zoom: this.zoom, panX: this.panX, panY: this.panY }, factor, sx, sy);
-		this.zoom = t.zoom;
-		this.panX = t.panX;
-		this.panY = t.panY;
+		this.applyTransform(t);
 		this.cancelHover();
 		this.requestDraw();
 	}
 
 	private fitToRect(world: { minX: number; minY: number; maxX: number; maxY: number }): void {
 		const t = fitTransform(world, this.canvas.clientWidth, this.canvas.clientHeight, 24);
-		this.zoom = t.zoom;
-		this.panX = t.panX;
-		this.panY = t.panY;
+		this.applyTransform(t);
 		this.cancelHover();
 		this.requestDraw();
 	}
@@ -1829,9 +1835,7 @@ export class MiniGraphView extends ItemView {
 				this.canvas.clientHeight,
 				UPSET_LEFT_BAND_PX,
 			);
-			this.zoom = fit.zoom;
-			this.panX = fit.panX;
-			this.panY = fit.panY;
+			this.applyTransform(fit);
 			this.requestDraw();
 			return;
 		}
@@ -1846,9 +1850,7 @@ export class MiniGraphView extends ItemView {
 			const visW = visibleFitWidth(this.canvas.clientWidth, this.pinnedMenuWidth());
 			const visH = Math.max(1, this.canvas.clientHeight);
 			const fit = latticeFit(L.worldWidth, L.worldHeight, visW, visH, LATTICE_TIER_GUTTER);
-			this.zoom = fit.zoom;
-			this.panX = fit.panX;
-			this.panY = fit.panY;
+			this.applyTransform(fit);
 			this.requestDraw();
 			return;
 		}
@@ -1856,9 +1858,7 @@ export class MiniGraphView extends ItemView {
 			// Square n×n grid: fit all cells into the smaller of the two data-area
 			// dimensions; pin the origin just past the frozen label bands.
 			const fit = heatmapFit(this.laid.heatmap, this.canvas.clientWidth, this.canvas.clientHeight);
-			this.zoom = fit.zoom;
-			this.panX = fit.panX;
-			this.panY = fit.panY;
+			this.applyTransform(fit);
 			this.requestDraw();
 			return;
 		}
@@ -1875,9 +1875,7 @@ export class MiniGraphView extends ItemView {
 		const visW = visibleFitWidth(this.canvas.clientWidth, this.pinnedMenuWidth());
 		const visH = this.canvas.clientHeight;
 		const fit = contentFit(bounds, visW, visH);
-		this.zoom = fit.zoom;
-		this.panX = fit.panX;
-		this.panY = fit.panY;
+		this.applyTransform(fit);
 		this.requestDraw();
 	}
 
@@ -2603,9 +2601,7 @@ export class MiniGraphView extends ItemView {
 		const cell = g.cells.find((c) => c.id === id) ?? g.cells[0];
 		if (!cell) return;
 		const fit = drosteFit(cell, this.canvas.clientWidth, this.canvas.clientHeight, DROSTE_CELL);
-		this.zoom = fit.zoom;
-		this.panX = fit.panX;
-		this.panY = fit.panY;
+		this.applyTransform(fit);
 		this.requestDraw();
 	}
 
@@ -2695,9 +2691,7 @@ export class MiniGraphView extends ItemView {
 		if (!node) return;
 		const cw = this.canvas.clientWidth || 1, ch = this.canvas.clientHeight || 1;
 		const fit = locateNodeFit(node, cw, ch, this.zoom);
-		this.zoom = fit.zoom;
-		this.panX = fit.panX;
-		this.panY = fit.panY;
+		this.applyTransform(fit);
 		this.locatedNoteId = id;
 		// Drive the shared highlight machinery exactly like a hover would, so the
 		// node + its incident edges/clusters light up.
@@ -4133,9 +4127,7 @@ export class MiniGraphView extends ItemView {
 			// UpSet footer scroll path retired — the matrix is in world
 			// space now, so the normal zoom-on-wheel below applies.
 			const t = zoomAroundPointer({ zoom: this.zoom, panX: this.panX, panY: this.panY }, wheelZoomFactor(e.deltaY), sx, sy);
-			this.zoom = t.zoom;
-			this.panX = t.panX;
-			this.panY = t.panY;
+			this.applyTransform(t);
 			this.requestDraw();
 		}, { passive: false });
 		c.addEventListener("dblclick", () => this.fitToView());
