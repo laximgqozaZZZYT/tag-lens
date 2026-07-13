@@ -5,6 +5,7 @@ import {
 	exportFileName,
 	svgFileName,
 	exportCanvasDims,
+	exportScaleCapMessage,
 	MAX_EXPORT_DIM,
 	exportMenuItems,
 } from "../src/visual/image-export";
@@ -107,5 +108,31 @@ import {
 	ok(
 		x4.length === 1 && x4[0].kind === "item" && x4[0].title === "Save view as PNG (4×)",
 		"exactly one 4× PNG item",
+	);
+}
+
+// exportScaleCapMessage: null when the export kept the requested scale (framing
+// unchanged), and a formatted "limited to N×" notice when the cap reduced it.
+{
+	ok(
+		exportScaleCapMessage(2, 2) === null,
+		"no notice when the effective scale equals the requested scale",
+	);
+	// A float-rounding wobble under the requested scale is still "no cap".
+	ok(
+		exportScaleCapMessage(4, 4 - 1e-9) === null,
+		"no notice within the rounding epsilon of the requested scale",
+	);
+	// A real reduction (10000px side capped at 16384 → ~1.6×) surfaces the notice.
+	const capped = exportCanvasDims(10000, 5000, 4, MAX_EXPORT_DIM);
+	const msg = exportScaleCapMessage(4, capped.scale);
+	ok(
+		msg === `Tag Lens: export limited to ${capped.scale.toFixed(1)}× (canvas size cap).`,
+		"a reduced scale yields the size-cap notice with the effective scale",
+	);
+	// The reported number is the EFFECTIVE (reduced) scale, to one decimal.
+	ok(
+		exportScaleCapMessage(4, 2.66) === "Tag Lens: export limited to 2.7× (canvas size cap).",
+		"the notice rounds the effective scale to one decimal",
 	);
 }

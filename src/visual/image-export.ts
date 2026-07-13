@@ -56,6 +56,20 @@ export function exportCanvasDims(
 	};
 }
 
+// `exportCanvasDims` silently reduces the requested supersample when a side
+// would exceed the canvas cap (e.g. 4× → 2.7×). Surface that to the user as a
+// Notice. Returns the message when the effective scale fell below the requested
+// one (beyond a float-rounding epsilon), else null (framing unchanged → no
+// notice). Centralizes the epsilon + the `.toFixed(1)` format so the view just
+// shows whatever string it gets back.
+export function exportScaleCapMessage(
+	requestedScale: number,
+	effectiveScale: number,
+): string | null {
+	if (effectiveScale >= requestedScale - 1e-6) return null;
+	return `Tag Lens: export limited to ${effectiveScale.toFixed(1)}× (canvas size cap).`;
+}
+
 // The export-menu action a menu item triggers, as a plain data descriptor so
 // the wiring (which method to call, with which opts) is decided by pure code
 // rather than being duplicated across each `menu.addItem` closure in view.ts.

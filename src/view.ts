@@ -1,5 +1,5 @@
 import { ItemView, type WorkspaceLeaf, TFile, debounce, setIcon, Notice, Menu, MarkdownView } from "obsidian";
-import { exportCanvasDims, exportMenuItems } from "./visual/image-export";
+import { exportCanvasDims, exportMenuItems, exportScaleCapMessage } from "./visual/image-export";
 import { renderInsightTab } from "./insight/render";
 import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
 
@@ -1702,11 +1702,8 @@ export class MiniGraphView extends ItemView {
 		const srcW = this.canvas.width;
 		const srcH = this.canvas.height;
 		const dims = exportCanvasDims(srcW, srcH, opts.scale);
-		if (dims.scale < opts.scale - 1e-6) {
-			new Notice(
-				`Tag Lens: export limited to ${dims.scale.toFixed(1)}× (canvas size cap).`,
-			);
-		}
+		const capMsg = exportScaleCapMessage(opts.scale, dims.scale);
+		if (capMsg) new Notice(capMsg);
 
 		const off = this.canvas.ownerDocument.createElement("canvas");
 		off.width = dims.width;
