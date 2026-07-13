@@ -585,6 +585,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         whose only logic is a single settings-field toggle — extract only if a genuine
         duplicate descriptor list emerges (mirror `basesToggleRows`). Otherwise pivot to
         the `ensureNoteMenu` body-builder seams or F2.
+  - [x] `(all)` subtree guard dedup → `allFolderLeaves(node, isTagTree)`
+        (`src/interaction/note-menu.ts`) + cases in `test/note-menu.test.ts`. The
+        tag-tree-only "(all)" collapsible subtree gate (`isTag && node.folders.size
+        > 0` → `collectDescendantLeaves(node)` → non-empty check) was inlined
+        identically at both `ensureNoteMenu` call sites (root list in `draw()` +
+        each expanded folder in `openFolder()`); now one pure predicate returning
+        the leaves to list (or `[]` when the row must not appear). `collectDescendant
+        Leaves` becomes module-private (only caller is `allFolderLeaves`). Test locks
+        folder-mode→empty, tag-root lists-all-distinct, sub-folder-node→descendants,
+        leaf-only-node→empty. Behaviour-identical. — 8ce1a63
   - [x] export size-cap notice → `exportScaleCapMessage(requestedScale, effectiveScale)`
         (`src/visual/image-export.ts`, next to `exportCanvasDims`) + cases in
         `test/image-export.test.ts`. The `exportImage` handler (`view.ts`) inlined the
