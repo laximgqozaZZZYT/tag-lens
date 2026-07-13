@@ -159,7 +159,7 @@ export function parseCond(text: string): BaseCond | null {
 		negate = !negate;
 		s = s.slice(1).trim();
 	}
-	const cond = parseMethod(s) ?? parseCompare(s);
+	const cond = parseMethod(s) ?? parseIn(s) ?? parseCompare(s);
 	return cond ? withNegate(cond, negate) : null;
 }
 
@@ -181,6 +181,17 @@ function parseMethod(s: string): BaseCond | null {
 	// Mirror the first arg into `rhs` so single-value consumers keep working;
 	// multi-arg operators read the full `args` list.
 	return { lhs: m[1], op: m[2], rhs: args[0] ?? "", args };
+}
+
+// `<lhs> IN (a, b, …)`: membership against a parenthesised list. The eval side
+// (resolve.ts) is array-aware. Keyword is case-insensitive; the required
+// whitespace before IN means a `.method(` call never collides. Reuses splitArgs
+// so quoted commas inside a value are preserved.
+function parseIn(s: string): BaseCond | null {
+	const m = s.match(/^([A-Za-z0-9_.]+)\s+IN\s*\((.*)\)$/i);
+	if (!m) return null;
+	const args = splitArgs(m[2]).map((a) => unquote(a.trim()));
+	return { lhs: m[1], op: "IN", rhs: args[0] ?? "", args };
 }
 
 // compare form: `<lhs> <op> <rhs>`, longest operators first so `>=` isn't split

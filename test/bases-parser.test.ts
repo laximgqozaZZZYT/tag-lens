@@ -152,6 +152,24 @@ import type { BaseFilter } from "../src/bases/types";
 	ok(n6?.op === "contains" && !n6?.negate, "! over `pred == false` cancels back to plain");
 }
 
+// --- `IN (...)` membership operator (was unparseable → silently ignored) ---
+{
+	const i1 = parseCond('note.status IN ("done", "wip")');
+	ok(
+		i1?.op === "IN" && i1?.args?.length === 2 && i1.args[0] === "done" && i1.args[1] === "wip" && i1.rhs === "done",
+		"IN → op:IN with unquoted args + rhs mirrors args[0]",
+	);
+
+	const i2 = parseCond('note.status IN ("a,b", "c")');
+	ok(i2?.args?.length === 2 && i2.args[0] === "a,b" && i2.args[1] === "c", "IN: quoted comma preserved");
+
+	const i3 = parseCond('note.status in ("x")');
+	ok(i3?.op === "IN", "IN keyword is case-insensitive");
+
+	const i4 = parseCond('!note.status IN ("x")');
+	ok(i4?.op === "IN" && i4?.negate === true, "negated IN → negate:true");
+}
+
 // --- mis-split inline compound degrades to raw, not a wrong constraint ---
 {
 	const bad = parseCond('file.tags.contains("#a") AND file.name != "b"');

@@ -161,6 +161,25 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 	ok(evalBaseFilter(parseBaseFilter('note.authors == "Grace"'), g), "array == keeps string membership");
 }
 
+// --- IN membership: parsed end-to-end, no longer ignored ---
+{
+	ok(
+		evalBaseFilter(parseBaseFilter('note.status IN ("done", "wip")'), facts("a.md", [], { status: "done" })),
+		"IN: member value → true",
+	);
+	ok(
+		!evalBaseFilter(parseBaseFilter('note.status IN ("done", "wip")'), facts("a.md", [], { status: "other" })),
+		"IN: non-member EXCLUDES (the dead-code bug: was silently kept)",
+	);
+	// array-valued field: true when any element is listed.
+	ok(
+		evalBaseFilter(parseBaseFilter('note.authors IN ("Ada")'), facts("a.md", [], { authors: ["Ada", "Grace"] })),
+		"IN over an array field matches a listed member",
+	);
+	// empty list never matches, never throws.
+	ok(!evalBaseFilter(parseBaseFilter("note.status IN ()"), facts("a.md", [], { status: "done" })), "IN (): empty → false");
+}
+
 // --- unknown operator falls back to false (never throws) ---
 {
 	const f = facts("a.md", ["a"]);
