@@ -594,7 +594,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         just gathers `clusterKeys`/`full` and threads it into `resolveFromCluster`. Test
         locks superset attachment (+ pre-existing preserved), full-drop cascade to
         superset/global, non-full own-override retention, and input non-mutation.
-        Behaviour-identical. view.ts 4196 → 4195; ratchet held.
+        Behaviour-identical. view.ts 4196 → 4195; ratchet held. — 9d0815e
   - [x] layout signature → `layoutSignature(s)` / `DISPLAY_ONLY_KEYS`
         (`src/layout/layout-signature.ts`) + `test/layout-signature.test.ts`. The
         private static `DISPLAY_ONLY_KEYS` set + private `layoutSignature` method in
