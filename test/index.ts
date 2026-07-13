@@ -42,6 +42,7 @@ import "./axis-fallback-span.test";
 import "./layout-signature.test";
 import "./rebuild-signature.test";
 import "./scatter-axis-defaults.test";
+import "./color-tag-based.test";
 import "./droste-axis.test";
 import "./spreadsheet-pan.test";
 import "./insight-alerts.test";

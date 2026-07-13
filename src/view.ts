@@ -5,6 +5,7 @@ import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
 
 import type { EncContext, EncNode, NodeDrawParams, EncodingBinding } from "./encoding/types";
 import { scatterAxisDefaults } from "./encoding/scatter-axis-defaults";
+import { colorIsTagBased } from "./encoding/color-tag-based";
 import { axisLayout } from "./layout/axis-layout";
 import { axisFallbackSpan } from "./layout/axis-fallback-span";
 import { shiftAxisSpec } from "./layout/axis-shift";
@@ -1191,8 +1192,7 @@ export class MiniGraphView extends ItemView {
 		// binding to anything but the tag field claims the fill, so the stripe
 		// stands down (the legend would otherwise lie). No colour binding (or a
 		// `color`→`tag` binding) ⇒ tag-based ⇒ stripe is the natural fill.
-		const colorBinding = effEnc.find((b) => b.enabled && b.channelId === "color");
-		this.colorIsTagBased = !colorBinding || colorBinding.fieldId === "tag";
+		this.colorIsTagBased = colorIsTagBased(effEnc);
 
 		// Card sizes derive from the user-configured row × column span
 		// times the canonical CARD_CELL_W × CARD_CELL_H lattice step, with
