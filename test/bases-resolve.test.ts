@@ -232,6 +232,16 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 	ok(!evalBaseFilter(parseBaseFilter("file.size > 1000"), facts("x.md", [])), "unset size → false, no throw");
 }
 
+// --- file.backlinks / file.embeds (list accessors, were undefined) ---
+{
+	const f: FileFacts = { ...facts("n.md", []), backlinks: ["a.md", "b.md"], embeds: ["img/x.png"] };
+	ok(evalBaseFilter(parseBaseFilter('file.backlinks.contains("a.md")'), f), "backlinks.contains");
+	ok(!evalBaseFilter(parseBaseFilter('file.backlinks.contains("z.md")'), f), "backlinks: absent → false");
+	ok(evalBaseFilter(parseBaseFilter('file.backlinks.containsAny("z.md", "b.md")'), f), "backlinks.containsAny");
+	ok(evalBaseFilter(parseBaseFilter('file.embeds.contains("img/x.png")'), f), "embeds.contains");
+	ok(!evalBaseFilter(parseBaseFilter('file.backlinks.contains("a.md")'), facts("x.md", [])), "no backlinks field → false");
+}
+
 // --- file.folder property (was undefined → folder filters dropped every note) ---
 {
 	const f = facts("Projects/sub/n.md", []);

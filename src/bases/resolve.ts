@@ -159,6 +159,10 @@ function resolveLhs(lhs: string, facts: FileFacts): unknown {
 			return facts.ctime;
 		case "file.mtime":
 			return facts.mtime;
+		case "file.backlinks":
+			return facts.backlinks ?? [];
+		case "file.embeds":
+			return facts.embeds ?? [];
 	}
 
 	// note.<key> or note.frontmatter.<key>
