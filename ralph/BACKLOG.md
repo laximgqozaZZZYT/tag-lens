@@ -949,6 +949,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         mutating it), so the throwaway `baseLeft`/`baseTop` and `baseW`/`baseH` consts drop
         out. Test locks the two transforms + zero-delta identity + non-mutation.
         Behaviour-identical. view.ts 4258 → 4256; ratchet tightened. — 34fc6a2
+  - [x] graph-input rebuild signature → `rebuildSignature(data, clusterLabels,
+        settings)` (`src/layout/rebuild-signature.ts`, next to `layout-signature.ts`
+        which it composes) + `test/rebuild-signature.test.ts`. The inline
+        `JSON.stringify({n,e,c,s})` early-out signature in `buildGraph` (`view.ts`) —
+        node id/label/memberships + edge endpoints + `[...clusterLabels.entries()]` +
+        `layoutSignature(settings)` — is now a pure builder; the view's `rebuildSig`
+        line collapses to a thin call. Test locks input-identity stability, node/edge/
+        cluster-label change flips, the display-only-toggle invariance (inherited from
+        `layoutSignature`), the missing-memberships `?? []` default, and input
+        non-mutation. Sibling of the `layoutSignature` extraction; behaviour-identical.
+        view.ts 4192 → 4187; ratchet tightened. — 7d7c348
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
