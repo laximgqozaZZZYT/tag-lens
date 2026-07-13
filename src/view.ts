@@ -166,6 +166,7 @@ import { heatmapCellNoteIds } from "./interaction/heatmap-detail";
 import { heatmapCellTipText, ghostEdgeTipText, clusterTipText, aggregationGroupTipText } from "./interaction/hover-tip-text";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { normalizeWheelDelta, wheelZoomFactor } from "./interaction/wheel";
+import { screenPointFromRect } from "./interaction/pointer-pos";
 import { buildViewStateBundle, bundledLoadMessage, formatJsonStatusLines, jsonExportLabel, jsonImportMessage, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
 import { hitHeatmapCell } from "./interaction/hit-modes";
@@ -3575,8 +3576,7 @@ export class MiniGraphView extends ItemView {
 			return;
 		}
 		const rect = this.canvas.getBoundingClientRect();
-		const sx = e.clientX - rect.left;
-		const sy = e.clientY - rect.top;
+		const { sx, sy } = screenPointFromRect(rect, e);
 		if (this.laid.lattice) {
 			// World-space hit-test (lattice has its own per-cell hit test
 			// when zoomed into individual LOD; otherwise the whole node box).
@@ -3778,8 +3778,7 @@ export class MiniGraphView extends ItemView {
 		c.addEventListener("mousedown", (e) => {
 			if (e.button !== 0) return;
 			const rect = c.getBoundingClientRect();
-			const sx = e.clientX - rect.left;
-			const sy = e.clientY - rect.top;
+			const { sx, sy } = screenPointFromRect(rect, e);
 			// F5: begin dragging the legend panel (but not its × button).
 			{
 				const pr = this.legendPanelRect, cr0 = this.legendCloseRect;
@@ -3863,7 +3862,7 @@ export class MiniGraphView extends ItemView {
 			// F5: move the legend panel; persists on mouseup.
 			if (this.legendDrag) {
 				const rect = c.getBoundingClientRect();
-				const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+				const { sx, sy } = screenPointFromRect(rect, e);
 				this.settings.legendPos = {
 					...this.settings.legendPos,
 					[this.settings.viewMode]: { x: sx - this.legendDrag.dx, y: sy - this.legendDrag.dy },
@@ -3910,8 +3909,7 @@ export class MiniGraphView extends ItemView {
 				return;
 			}
 			const rect = c.getBoundingClientRect();
-			const sx = e.clientX - rect.left;
-			const sy = e.clientY - rect.top;
+			const { sx, sy } = screenPointFromRect(rect, e);
 			const { x: wx, y: wy } = this.screenToWorld(sx, sy);
 			const hit = this.hitTest(wx, wy);
 
@@ -3950,8 +3948,7 @@ export class MiniGraphView extends ItemView {
 			// so scrolling the matrix never jumps to a file.
 			if (this.pointerMoved) return;
 			const rect = c.getBoundingClientRect();
-			const sx = e.clientX - rect.left;
-			const sy = e.clientY - rect.top;
+			const { sx, sy } = screenPointFromRect(rect, e);
 			// F5: the on-canvas legend's × dismisses the legend for the current mode.
 			// Screen-space, checked first so it wins over any canvas content beneath.
 			const cr = this.legendCloseRect;
@@ -4108,8 +4105,7 @@ export class MiniGraphView extends ItemView {
 			e.preventDefault();
 			this.cancelHover();
 			const rect = c.getBoundingClientRect();
-			const sx = e.clientX - rect.left;
-			const sy = e.clientY - rect.top;
+			const { sx, sy } = screenPointFromRect(rect, e);
 
 			const lr = this.legendPanelRect;
 			if (lr && pointInRect(sx, sy, lr)) {

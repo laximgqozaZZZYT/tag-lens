@@ -1024,6 +1024,20 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         seam (no pure module/test — covered by tsc + the render-smoke suite), unlike the
         earlier pure-fit-builder seams that produce the `t` this consumes. Behaviour-
         identical. view.ts 4145 → 4137; ratchet tightened.
+  - [x] canvas-local pointer coords dedup → `screenPointFromRect(rect, e)` /
+        `RectOrigin`/`ClientPoint`/`ScreenPoint` (`src/interaction/pointer-pos.ts`) +
+        `test/pointer-pos.test.ts`. The 3-line `const sx = e.clientX - rect.left; const
+        sy = e.clientY - rect.top;` (plus one comma-joined variant) that every input
+        handler in `view.ts` re-derived after its `getBoundingClientRect()` read —
+        mousemove hover-hit (`this.canvas`), the legend mousedown drag-start, the legend
+        mousemove pan, the canvas-content mousemove hit, the mouseup click, and the wheel
+        handler (all on the captured `c`) — now destructure one pure helper; the DOM
+        `getBoundingClientRect()` read stays at each call site. Test locks per-axis
+        independence (left↔sx, top↔sy), zero-origin passthrough, and no clamping
+        (pointer left/above the canvas → negative). The two inline `scheduleHover`/
+        `positionTip` arg re-uses (reuse an already-computed rect) and the scrollbar-drag
+        `sy`-only read are left as-is. Behaviour-identical; view.ts 4137 → 4133; ratchet
+        tightened.
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
