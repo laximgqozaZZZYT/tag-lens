@@ -540,6 +540,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         slop as `CLICK_SLOP_PX`. Test locks the strict-`>` boundary (sum == 4 → inside),
         sign-independence, custom-slop, and an inline-equivalence grid. Behaviour-identical.
         view.ts 4256 → 4255; ratchet tightened.
+  - [x] Data ▸ JSON import/bundled status messages → `jsonImportMessage(count)` /
+        `bundledLoadMessage(added)` (`src/interaction/preset-io.ts`, next to
+        `jsonExportLabel`/`formatJsonStatusLines`) + cases in `test/preset-io.test.ts`.
+        The two inline status-message templates in `renderDataJsonBody`'s Import and
+        "Load bundled presets" handlers (`view.ts`) — the `count > 0 ? Imported N presets.
+        : No valid presets found.` branch and the `Added N bundled presets.` line — are
+        now thin calls to pure pluralized-text builders (mirrors the `jsonExportLabel`
+        extraction). The now-only-use `pluralize` import dropped from `view.ts`.
+        Behaviour-identical. view.ts 4227 → 4223; ratchet tightened.
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list

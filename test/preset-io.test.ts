@@ -1,6 +1,6 @@
 // F1-1 — pure preset (de)serialization. Round-trip fidelity + tolerant parsing.
 import { ok } from "./assert";
-import { serializePresets, parsePresets, presetFileName, mergePresets, buildViewStateBundle, formatJsonStatusLines, jsonExportLabel, JSON_STATUS_ERROR_CAP, PRESET_SCHEMA, PRESET_SCHEMA_VERSION } from "../src/interaction/preset-io";
+import { serializePresets, parsePresets, presetFileName, mergePresets, buildViewStateBundle, formatJsonStatusLines, jsonExportLabel, jsonImportMessage, bundledLoadMessage, JSON_STATUS_ERROR_CAP, PRESET_SCHEMA, PRESET_SCHEMA_VERSION } from "../src/interaction/preset-io";
 import { captureLens } from "../src/interaction/lens-presets";
 import { DEFAULT_SETTINGS } from "../src/types";
 import type { GraphNode, LensPreset } from "../src/types";
@@ -159,4 +159,18 @@ const sample: LensPreset[] = [
 	ok(jsonExportLabel(1, 1) === "Export View State (1 node, 1 preset)", "both singular");
 	// Zero pluralizes ("0 nodes"), mixed singular/plural.
 	ok(jsonExportLabel(0, 1) === "Export View State (0 nodes, 1 preset)", "zero plural, mixed");
+}
+
+// jsonImportMessage: pluralized imported count, or the nothing-valid message.
+{
+	ok(jsonImportMessage(0) === "No valid presets found.", "zero → nothing-valid message");
+	ok(jsonImportMessage(1) === "Imported 1 preset.", "one → singular");
+	ok(jsonImportMessage(3) === "Imported 3 presets.", "many → plural");
+}
+
+// bundledLoadMessage: pluralized added count (0 when all already present).
+{
+	ok(bundledLoadMessage(0) === "Added 0 bundled presets.", "zero added → plural");
+	ok(bundledLoadMessage(1) === "Added 1 bundled preset.", "one → singular tail");
+	ok(bundledLoadMessage(2) === "Added 2 bundled presets.", "many → plural tail");
 }

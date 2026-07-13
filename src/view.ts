@@ -132,7 +132,6 @@ import {
 	type SettingsSubTab,
 } from "./panel/settings-tabs";
 import { viewRootStyle, viewCanvasStyle } from "./view-shell-style";
-import { pluralize } from "./util/pluralize";
 import { jaccardSimilarity } from "./util/jaccard";
 import { pointInRect } from "./util/point-in-rect";
 import { exceedsClickSlop } from "./util/click-slop";
@@ -163,7 +162,7 @@ import { heatmapCellNoteIds } from "./interaction/heatmap-detail";
 import { heatmapCellTipText, ghostEdgeTipText, clusterTipText, aggregationGroupTipText } from "./interaction/hover-tip-text";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
 import { normalizeWheelDelta, wheelZoomFactor } from "./interaction/wheel";
-import { buildViewStateBundle, formatJsonStatusLines, jsonExportLabel, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
+import { buildViewStateBundle, bundledLoadMessage, formatJsonStatusLines, jsonExportLabel, jsonImportMessage, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
 import { hitHeatmapCell } from "./interaction/hit-modes";
 
@@ -905,10 +904,7 @@ export class MiniGraphView extends ItemView {
 				this.syncLensCommands(this.settings.lensPresets);
 				this.refreshFilterTab();
 			}
-			const msg = presets.length > 0
-				? `Imported ${pluralize(presets.length, "preset")}.`
-				: "No valid presets found.";
-			this.renderDataJsonBody(host, { msg, errors });
+			this.renderDataJsonBody(host, { msg: jsonImportMessage(presets.length), errors });
 		});
 		const bundledBtn = impRow.createEl("button", { text: "Load bundled presets" });
 		bundledBtn.addEventListener("click", (ev) => {
@@ -919,7 +915,7 @@ export class MiniGraphView extends ItemView {
 			void this.save();
 			this.syncLensCommands(this.settings.lensPresets);
 			this.refreshFilterTab();
-			this.renderDataJsonBody(host, { msg: `Added ${pluralize(added, "bundled preset")}.`, errors: [] });
+			this.renderDataJsonBody(host, { msg: bundledLoadMessage(added), errors: [] });
 		});
 
 		// ── Status (last import / bundled-load) ──

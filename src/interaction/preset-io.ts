@@ -67,6 +67,21 @@ export function jsonExportLabel(nodeCount: number, presetCount: number): string 
 	return `Export View State (${pluralize(nodeCount, "node")}, ${pluralize(presetCount, "preset")})`;
 }
 
+// Data ▸ JSON ▸ Import status message. When at least one preset parsed, report
+// the pluralized imported count; otherwise the nothing-valid message. Pure text
+// builder — the per-error detail lines come from formatJsonStatusLines.
+export function jsonImportMessage(importedCount: number): string {
+	return importedCount > 0
+		? `Imported ${pluralize(importedCount, "preset")}.`
+		: "No valid presets found.";
+}
+
+// Data ▸ JSON ▸ "Load bundled presets" status message. Reports how many bundled
+// presets were newly added (0 when they were all already present). Pure.
+export function bundledLoadMessage(addedCount: number): string {
+	return `Added ${pluralize(addedCount, "bundled preset")}.`;
+}
+
 // Query fields that MUST be arrays / a string for a preset to be applyLens-safe.
 const QUERY_ARRAY_KEYS = ["selectedBases"] as const;
 
