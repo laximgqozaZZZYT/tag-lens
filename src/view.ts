@@ -1180,12 +1180,7 @@ export class MiniGraphView extends ItemView {
 					degree: d,
 				};
 			},
-			frontmatterOf: (id) => {
-				const f = this.app.vault.getAbstractFileByPath(id);
-				return f instanceof TFile
-					? (this.app.metadataCache.getFileCache(f)?.frontmatter as Record<string, unknown> | undefined)
-					: undefined;
-			},
+			frontmatterOf: (id) => this.frontmatterRecordOf(id),
 		};
 		const effEnc = this.settings.encoding ?? [];
 		const encRes = evaluateEncoding(layoutData.nodes, effEnc, encCtx, this.settings.viewMode);
@@ -1473,12 +1468,7 @@ export class MiniGraphView extends ItemView {
 		const ctx: EncContext = {
 			nowMs: Date.now(),
 			degreeOf,
-			frontmatterOf: (id) => {
-				const f = this.app.vault.getAbstractFileByPath(id);
-				return f instanceof TFile
-					? (this.app.metadataCache.getFileCache(f)?.frontmatter as Record<string, unknown> | undefined)
-					: undefined;
-			},
+			frontmatterOf: (id) => this.frontmatterRecordOf(id),
 		};
 
 		const res = assignGalleryAxes(
@@ -3468,6 +3458,16 @@ export class MiniGraphView extends ItemView {
 			activeWindow.addEventListener("mouseup", onUp, true);
 		});
 		return grip;
+	}
+
+	// A note's frontmatter as a plain record (or undefined when the id doesn't
+	// resolve to a markdown file). Shared by the two encoding contexts, which
+	// each expose it as `EncContext.frontmatterOf`.
+	private frontmatterRecordOf(id: string): Record<string, unknown> | undefined {
+		const f = this.app.vault.getAbstractFileByPath(id);
+		return f instanceof TFile
+			? (this.app.metadataCache.getFileCache(f)?.frontmatter as Record<string, unknown> | undefined)
+			: undefined;
 	}
 
 	private drosteHitTest(sx: number, sy: number): string | null {
