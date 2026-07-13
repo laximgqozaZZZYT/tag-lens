@@ -170,6 +170,15 @@ import type { BaseFilter } from "../src/bases/types";
 	ok(i4?.op === "IN" && i4?.negate === true, "negated IN → negate:true");
 }
 
+// --- `not:` structured logical operator (was ignored as unknown object) ---
+{
+	const n = parseBaseFilter({ not: 'file.tags.contains("x")' });
+	ok(n != null && "not" in n && "cond" in n.not, "not: → { not: { cond } }");
+
+	const nAnd = parseBaseFilter({ not: ['file.ext == "md"', 'file.tags.contains("x")'] });
+	ok(nAnd != null && "not" in nAnd && "and" in nAnd.not, "not: over an array → { not: { and: [...] } }");
+}
+
 // --- mis-split inline compound degrades to raw, not a wrong constraint ---
 {
 	const bad = parseCond('file.tags.contains("#a") AND file.name != "b"');

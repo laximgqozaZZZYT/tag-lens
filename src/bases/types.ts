@@ -32,6 +32,7 @@ export interface BaseCond {
 export type BaseFilter =
 	| { and: BaseFilter[] }
 	| { or: BaseFilter[] }
+	| { not: BaseFilter }
 	| { cond: BaseCond }
 	| { raw: string };
 

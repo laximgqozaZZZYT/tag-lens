@@ -125,6 +125,11 @@ export function parseBaseFilter(node: unknown): BaseFilter | null {
 			const children = mapChildren(node["or"] as unknown[]);
 			return children.length > 0 ? { or: children } : null;
 		}
+		if (node["not"] != null) {
+			// `not:` inverts a single child (a bare array becomes an implicit AND).
+			const child = parseBaseFilter(node["not"]);
+			return child ? { not: child } : null;
+		}
 		// Unknown object shape — preserve as raw for visibility.
 		return { raw: safeStringify(node) };
 	}

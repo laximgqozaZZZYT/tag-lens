@@ -4,6 +4,7 @@
 // (the Obsidian wiring lives in build-index.ts).
 
 import type { FileFacts } from "../query/query";
+import { isTagOrSubtag } from "../insight/tag-path";
 import type { BaseCond, BaseElement, BaseFilter, BaseTable, BaseView } from "./types";
 
 // Evaluate a filter tree against one note's facts.
@@ -21,20 +22,14 @@ import type { BaseCond, BaseElement, BaseFilter, BaseTable, BaseView } from "./t
 export function evalBaseFilter(filter: BaseFilter | null, facts: FileFacts): boolean {
 	if (filter == null) return true;
 
-	if ("and" in filter) {
-		for (const c of filter.and) {
-			if (isRaw(c)) continue; // raw → no constraint
-			if (!evalBaseFilter(c, facts)) return false;
-		}
-		return true;
-	}
+	if ("and" in filter) return evalAll(filter.and, facts);
+	if ("or" in filter) return evalAny(filter.or, facts);
 
-	if ("or" in filter) {
-		for (const c of filter.or) {
-			if (isRaw(c)) continue; // raw contributes nothing to an OR
-			if (evalBaseFilter(c, facts)) return true;
-		}
-		return false;
+	if ("not" in filter) {
+		// `not:` inverts its child. An unparseable child ({ raw }) is treated as
+		// "no constraint" (true), so `not` of it is also no-constraint (true) —
+		// we never exclude everything because of a condition we couldn't parse.
+		return isRaw(filter.not) ? true : !evalBaseFilter(filter.not, facts);
 	}
 
 	if ("raw" in filter) return true; // standalone raw → no constraint
@@ -44,6 +39,24 @@ export function evalBaseFilter(filter: BaseFilter | null, facts: FileFacts): boo
 
 function isRaw(f: BaseFilter): boolean {
 	return "raw" in f;
+}
+
+// AND: every non-raw child holds (raw children are skipped = no constraint).
+function evalAll(children: BaseFilter[], facts: FileFacts): boolean {
+	for (const c of children) {
+		if (isRaw(c)) continue;
+		if (!evalBaseFilter(c, facts)) return false;
+	}
+	return true;
+}
+
+// OR: at least one non-raw child holds (raw children contribute nothing).
+function evalAny(children: BaseFilter[], facts: FileFacts): boolean {
+	for (const c of children) {
+		if (isRaw(c)) continue;
+		if (evalBaseFilter(c, facts)) return true;
+	}
+	return false;
 }
 
 // Evaluate a leaf, honouring `negate` (from `!pred` or `pred == false`) by
@@ -78,6 +91,10 @@ function evalCondInner(node: { cond: BaseCond }, facts: FileFacts): boolean {
 		if (op === "containsAll") return wants.every(has);
 		return !wants.some(has); // containsNone
 	}
+
+	// Official Bases predicates: file.hasTag / file.inFolder / file.hasProperty / isEmpty.
+	const pred = evalNamedPredicate(op, lhs, values, facts);
+	if (pred !== null) return pred;
 
 	const actual = resolveLhs(lhs, facts);
 
@@ -170,6 +187,35 @@ function arrAwareEq(actual: unknown, rhs: string): boolean {
 
 function stripHash(t: string): string {
 	return t.startsWith("#") ? t.slice(1) : t;
+}
+
+// Named boolean predicates from the official Bases function set (hasTag /
+// inFolder / hasProperty / isEmpty). Returns null when `op` is not one of them
+// so the caller falls through to the operator table.
+function evalNamedPredicate(op: string, lhs: string, values: string[], facts: FileFacts): boolean | null {
+	if (op === "hasTag") {
+		// any-of, nested-aware (hasTag("a") matches the tag "a/b"), # optional.
+		const wants = values.map(stripHash);
+		return facts.tags.some((t) => wants.some((w) => isTagOrSubtag(stripHash(t), w)));
+	}
+	if (op === "inFolder") {
+		const folder = facts.path.includes("/") ? facts.path.slice(0, facts.path.lastIndexOf("/")) : "";
+		return values.some((raw) => {
+			const f = raw.replace(/\/+$/, "");
+			return f === "" || folder === f || folder.startsWith(`${f}/`);
+		});
+	}
+	if (op === "hasProperty")
+		return values.length > 0 && Object.prototype.hasOwnProperty.call(facts.frontmatter, values[0]);
+	if (op === "isEmpty") return isEmptyValue(resolveLhs(lhs, facts));
+	return null;
+}
+
+// isEmpty(): empty string, empty list, or an absent/null field value.
+function isEmptyValue(v: unknown): boolean {
+	if (v == null || v === "") return true;
+	if (Array.isArray(v)) return v.length === 0;
+	return false;
 }
 
 // Resolve all matched notes of a view into BaseElements.

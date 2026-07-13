@@ -180,6 +180,40 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 	ok(!evalBaseFilter(parseBaseFilter("note.status IN ()"), facts("a.md", [], { status: "done" })), "IN (): empty → false");
 }
 
+// --- official Bases file predicates: hasTag / inFolder / hasProperty ---
+{
+	const f = facts("Projects/sub/note.md", ["書籍/新刊"], { author: "Ada" });
+	ok(evalBaseFilter(parseBaseFilter('file.hasTag("書籍")'), f), "hasTag is nested-aware (書籍 matches 書籍/新刊)");
+	ok(evalBaseFilter(parseBaseFilter('file.hasTag("書籍/新刊")'), f), "hasTag exact match");
+	ok(!evalBaseFilter(parseBaseFilter('file.hasTag("小説")'), f), "hasTag: absent tag → false");
+	ok(evalBaseFilter(parseBaseFilter('file.hasTag("小説", "書籍")'), f), "hasTag: multi-arg is any-of");
+
+	ok(evalBaseFilter(parseBaseFilter('file.inFolder("Projects")'), f), "inFolder matches an ancestor folder");
+	ok(evalBaseFilter(parseBaseFilter('file.inFolder("Projects/sub")'), f), "inFolder matches the exact folder");
+	ok(!evalBaseFilter(parseBaseFilter('file.inFolder("Proj")'), f), "inFolder is not a bare prefix match");
+	ok(!evalBaseFilter(parseBaseFilter('file.inFolder("Other")'), f), "inFolder: different folder → false");
+	ok(evalBaseFilter(parseBaseFilter('file.inFolder("")'), facts("root.md", [])), "inFolder(\"\") matches vault root");
+
+	ok(evalBaseFilter(parseBaseFilter('file.hasProperty("author")'), f), "hasProperty: present key → true");
+	ok(!evalBaseFilter(parseBaseFilter('file.hasProperty("missing")'), f), "hasProperty: absent key → false");
+}
+
+// --- isEmpty(): empty/absent value (was unhandled → always false, dropped notes) ---
+{
+	ok(evalBaseFilter(parseBaseFilter("note.foo.isEmpty()"), facts("a.md", [], {})), "isEmpty: unset field → true");
+	ok(evalBaseFilter(parseBaseFilter("note.foo.isEmpty()"), facts("a.md", [], { foo: "" })), "isEmpty: empty string → true");
+	ok(evalBaseFilter(parseBaseFilter("note.foo.isEmpty()"), facts("a.md", [], { foo: [] })), "isEmpty: empty list → true");
+	ok(!evalBaseFilter(parseBaseFilter("note.foo.isEmpty()"), facts("a.md", [], { foo: "x" })), "isEmpty: value present → false");
+}
+
+// --- not: structured operator inverts; raw child is ignored (not exclude-all) ---
+{
+	const book = facts("book.md", ["書籍"]);
+	ok(!evalBaseFilter(parseBaseFilter({ not: 'file.hasTag("書籍")' }), book), "not hasTag excludes the tagged note");
+	ok(evalBaseFilter(parseBaseFilter({ not: 'file.hasTag("小説")' }), book), "not hasTag keeps the untagged note");
+	ok(evalBaseFilter(parseBaseFilter({ not: "some %% unparseable clause" }), book), "not of a raw/unparseable child → ignored (true)");
+}
+
 // --- unknown operator falls back to false (never throws) ---
 {
 	const f = facts("a.md", ["a"]);
