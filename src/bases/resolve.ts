@@ -122,6 +122,13 @@ function evalCondInner(node: { cond: BaseCond }, facts: FileFacts): boolean {
 		return values.includes(String(actual ?? ""));
 	}
 
+	// Date fields (epoch-ms) vs a date-string rhs need epoch coercion, else the
+	// generic compare would string-compare the epoch number.
+	if (lhs === "file.ctime" || lhs === "file.mtime") {
+		const dc = evalDateCompare(op, rhs ?? "", actual);
+		if (dc !== null) return dc;
+	}
+
 	return compare(actual, op, rhs ?? "");
 }
 
@@ -146,6 +153,12 @@ function resolveLhs(lhs: string, facts: FileFacts): unknown {
 			return facts.tags;
 		case "file.links":
 			return facts.links ?? [];
+		case "file.size":
+			return facts.size;
+		case "file.ctime":
+			return facts.ctime;
+		case "file.mtime":
+			return facts.mtime;
 	}
 
 	// note.<key> or note.frontmatter.<key>
@@ -187,6 +200,57 @@ function compare(actual: unknown, op: string, rhs: string): boolean {
 function arrAwareEq(actual: unknown, rhs: string): boolean {
 	if (Array.isArray(actual)) return actual.some((x) => String(x) === rhs);
 	return String(actual ?? "") === rhs;
+}
+
+// Compare an epoch-ms date field against a date-ish rhs. Returns null when either
+// side isn't a usable epoch (→ caller falls back to the generic compare).
+function evalDateCompare(op: string, rhs: string, actual: unknown): boolean | null {
+	const a = typeof actual === "number" ? actual : NaN;
+	const b = coerceDateRhs(rhs);
+	if (Number.isNaN(a) || Number.isNaN(b)) return null;
+	switch (op) {
+		case "==":
+			return a === b;
+		case "!=":
+			return a !== b;
+		case ">":
+			return a > b;
+		case "<":
+			return a < b;
+		case ">=":
+			return a >= b;
+		case "<=":
+			return a <= b;
+		default:
+			return null;
+	}
+}
+
+// Resolve a filter rhs to an epoch-ms number: now()/today()/date("X")/"X"/ISO
+// string, or a bare epoch number. Unparseable → NaN. Date arithmetic is not
+// handled here (out of scope).
+function coerceDateRhs(rhs: string): number {
+	const s = rhs.trim();
+	if (s === "now()") return Date.now();
+	if (s === "today()") {
+		const d = new Date();
+		d.setHours(0, 0, 0, 0);
+		return d.getTime();
+	}
+	const dateCall = s.match(/^date\((.*)\)$/);
+	const inner = dateCall ? unquoteLoose(dateCall[1]) : s;
+	if (inner.trim() !== "" && !Number.isNaN(Number(inner))) return Number(inner);
+	return Date.parse(inner);
+}
+
+// Strip one layer of matching quotes if present (rhs pieces are already unquoted
+// by the parser, but date("...") keeps its inner quotes).
+function unquoteLoose(v: string): string {
+	const t = v.trim();
+	if (t.length >= 2 && ((t[0] === '"' && t.endsWith('"')) || (t[0] === "'" && t.endsWith("'")))) {
+		return t.slice(1, -1);
+	}
+	return t;
 }
 
 function stripHash(t: string): string {

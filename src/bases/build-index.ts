@@ -127,6 +127,9 @@ function buildFacts(app: App): Map<string, FileFacts> {
 			tags: collectTags(cache),
 			frontmatter: (cache?.frontmatter as Record<string, unknown>) ?? {},
 			tagProperties,
+			size: f.stat.size,
+			ctime: f.stat.ctime,
+			mtime: f.stat.mtime,
 		});
 	}
 	return map;

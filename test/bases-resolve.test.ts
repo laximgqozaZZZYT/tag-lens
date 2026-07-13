@@ -215,6 +215,23 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 	ok(evalBaseFilter(parseBaseFilter('file.links.containsAny("x", "Other.md")'), f), "file.links.containsAny works");
 }
 
+// --- file.size / file.ctime / file.mtime (stat) + date-aware comparison ---
+{
+	const jan2025 = Date.parse("2025-01-01");
+	const f: FileFacts = { ...facts("n.md", []), size: 2048, mtime: jan2025, ctime: jan2025 };
+	ok(evalBaseFilter(parseBaseFilter("file.size > 1000"), f), "file.size numeric compare");
+	ok(!evalBaseFilter(parseBaseFilter("file.size < 1000"), f), "file.size < false");
+	// date-string rhs is coerced to epoch (would string-compare without the fix).
+	ok(evalBaseFilter(parseBaseFilter('file.mtime > "2024-06-01"'), f), "mtime > earlier date-string → true");
+	ok(!evalBaseFilter(parseBaseFilter('file.mtime > "2025-06-01"'), f), "mtime > later date-string → false");
+	ok(evalBaseFilter(parseBaseFilter('file.mtime == date("2025-01-01")'), f), 'mtime == date("...") → true');
+	ok(evalBaseFilter(parseBaseFilter("file.mtime < now()"), f), "mtime < now() → true");
+	ok(evalBaseFilter(parseBaseFilter("file.ctime <= today()"), f), "ctime <= today() → true (past file)");
+	ok(evalBaseFilter(parseBaseFilter("file.mtime >= 100"), f), "bare epoch rhs still compares numerically");
+	// unset stat → no throw, comparison false.
+	ok(!evalBaseFilter(parseBaseFilter("file.size > 1000"), facts("x.md", [])), "unset size → false, no throw");
+}
+
 // --- file.folder property (was undefined → folder filters dropped every note) ---
 {
 	const f = facts("Projects/sub/n.md", []);
