@@ -55,7 +55,10 @@ function evalCond(node: { cond: BaseCond }, facts: FileFacts): boolean {
 
 function evalCondInner(node: { cond: BaseCond }, facts: FileFacts): boolean {
 	const { lhs, op, rhs, args } = node.cond;
-	const isTags = /tags$/i.test(lhs);
+	// ONLY the canonical tag fields address the note's tag set. A loose `/tags$/`
+	// wrongly captured any `*tags` frontmatter field (note.subtags, note.booktags)
+	// and evaluated it against facts.tags instead of the property — anchor it.
+	const isTags = /^(?:file|note)\.tags$/.test(lhs);
 	// Multi-arg method forms carry `args`; fall back to the single `rhs` so a
 	// one-arg call (or a legacy cond without `args`) still works.
 	const values = args ?? (rhs != null ? [rhs] : []);

@@ -110,6 +110,27 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 	ok(!evalBaseFilter(parseBaseFilter('note.authors.containsAll("Grace", "Alan")'), f), "array field containsAll false");
 }
 
+// --- `*tags` frontmatter fields must NOT be routed to file.tags ---
+{
+	// subtags is a frontmatter array; the file's real tags are ["書籍"]. The loose
+	// /tags$/ used to evaluate note.subtags against facts.tags (書籍), ignoring the
+	// property entirely.
+	const f = facts("a.md", ["書籍"], { subtags: ["x", "y"], booktags: ["a"] });
+	ok(evalBaseFilter(parseBaseFilter('note.subtags.contains("x")'), f), "note.subtags reads the frontmatter field (has x)");
+	ok(
+		!evalBaseFilter(parseBaseFilter('note.subtags.contains("書籍")'), f),
+		"note.subtags does NOT see the file tag 書籍",
+	);
+	ok(
+		evalBaseFilter(parseBaseFilter('note.booktags.containsAny("a", "b")'), f),
+		"multi-value operators on a *tags field also hit the frontmatter",
+	);
+	// regression: the canonical tag fields still address the note's tag set.
+	ok(evalBaseFilter(parseBaseFilter('file.tags.contains("書籍")'), f), "file.tags still reads file tags");
+	const g = facts("g.md", ["keep"], {});
+	ok(evalBaseFilter(parseBaseFilter('note.tags.contains("keep")'), g), "note.tags still routes to file tags");
+}
+
 // --- negation: `!pred` and `pred == false` must EXCLUDE, not pass everything ---
 {
 	const book = facts("book.md", ["書籍"]);
