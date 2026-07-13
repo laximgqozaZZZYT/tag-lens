@@ -12,6 +12,7 @@ import { assignGalleryAxes } from "./layout/droste-axis";
 import { LaneRegistry, routeZ } from "./layout/edge-routing";
 import { buildIdToRect, buildRouteObstacles } from "./layout/layout-shared";
 import { layoutSignature } from "./layout/layout-signature";
+import { rebuildSignature } from "./layout/rebuild-signature";
 
 import { buildBaseIndex } from "./bases/build-index";
 import { scanBaseFiles } from "./bases/parser";
@@ -1102,12 +1103,7 @@ export class MiniGraphView extends ItemView {
 
 		// ── Early-out: skip the (expensive) relayout/redraw/menu-rebuild when the
 		// graph INPUTS are byte-for-byte identical to the last build.
-		const rebuildSig = JSON.stringify({
-			n: data.nodes.map((n) => [n.id, n.label, n.memberships ?? []]),
-			e: data.edges.map((e) => [e.source, e.target]),
-			c: [...clusterLabels.entries()],
-			s: layoutSignature(this.settings),
-		});
+		const rebuildSig = rebuildSignature(data, clusterLabels, this.settings);
 		if (rebuildSig === this.lastRebuildSig) return;
 		this.lastRebuildSig = rebuildSig;
 
