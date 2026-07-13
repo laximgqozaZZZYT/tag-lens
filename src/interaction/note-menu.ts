@@ -326,7 +326,7 @@ export function collectDescendantNoteKeys(node: TreeNode): string[] {
 // rendering in the navigator's "(all)" subtree). De-duplicated by path
 // (stripTabPrefix), sorted label-asc then id-asc. Memoises visited nodes to
 // handle the shared-DAG structure safely.
-export function collectDescendantLeaves(node: TreeNode): TreeLeaf[] {
+function collectDescendantLeaves(node: TreeNode): TreeLeaf[] {
 	const seen = new Set<string>();
 	const out: TreeLeaf[] = [];
 	const visited = new Set<TreeNode>();
@@ -343,6 +343,17 @@ export function collectDescendantLeaves(node: TreeNode): TreeLeaf[] {
 	out.sort((a, b) =>
 		a.label < b.label ? -1 : a.label > b.label ? 1 : (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 	return out;
+}
+
+// Leaves to list in a node's collapsible "(all)" subtree. The "(all)" affordance
+// is TAG-TREE ONLY and appears under any node that HAS sub-folders, flat-listing
+// every DISTINCT descendant note. Returns [] when it must not appear (folder tree,
+// or a node with no sub-folders), so the caller renders the "(all)" folder iff the
+// result is non-empty — the same guard the view applied inline at both call sites
+// (root list + each expanded folder).
+export function allFolderLeaves(node: TreeNode, isTagTree: boolean): TreeLeaf[] {
+	if (!isTagTree || node.folders.size === 0) return [];
+	return collectDescendantLeaves(node);
 }
 
 // Tri-state for a folder/group/combo checkbox from its descendant note keys:

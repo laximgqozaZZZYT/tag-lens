@@ -25,6 +25,7 @@ import {
 	nodeIsHidden,
 	bulkSetHidden,
 	collectDescendantNoteKeys,
+	allFolderLeaves,
 	folderCheckState,
 	folderCascadeHide,
 	checkboxAriaChecked,
@@ -733,6 +734,33 @@ const advNotes: NoteRef[] = [
 	const ft = buildFolderTree(notes);
 	const keys = collectDescendantNoteKeys(ft.folders.get("notes")!).sort();
 	ok(keys.join(",") === "notes/MyNote.md,notes/Other.md", "collectDescendantNoteKeys: Euler copies dedupe to one path key");
+}
+
+// allFolderLeaves: the collapsible "(all)" subtree is TAG-TREE ONLY and appears
+// only under a node that HAS sub-folders; returns [] otherwise so the caller
+// renders the "(all)" row iff the result is non-empty (same guard the view
+// applied inline at both the root and per-folder call sites).
+{
+	const notes: NoteRef[] = [
+		{ id: "n1.md", label: "n1", memberships: ["a", "b"] },
+		{ id: "n2.md", label: "n2", memberships: ["a"] },
+		{ id: "s.md", label: "s", memberships: ["solo"] },
+	];
+	const tt = buildTagTree(notes);
+	// Folder-tree mode: never show "(all)", even for a node with sub-folders.
+	ok(allFolderLeaves(tt, false).length === 0, "allFolderLeaves: folder-tree mode → empty");
+	// Tag-tree root has sub-folders (#a, #b, #solo) → lists every distinct note once.
+	const rootAll = allFolderLeaves(tt, true).map((l) => l.id).sort();
+	ok(rootAll.join(",") === "n1.md,n2.md,s.md", "allFolderLeaves: tag-tree root lists all distinct descendants");
+	// #a hosts the {a,b} combo subgroup → has sub-folders → lists n1 + n2 (deduped).
+	const aNode = tt.folders.get("a")!;
+	ok(aNode.folders.size > 0, "precondition: #a has a combo sub-folder");
+	const aAll = allFolderLeaves(aNode, true).map((l) => l.id).sort();
+	ok(aAll.join(",") === "n1.md,n2.md", "allFolderLeaves: node with sub-folders → distinct descendant leaves");
+	// #solo is a leaf-only tag group (no sub-folders) → no "(all)" even in tag mode.
+	const soloNode = tt.folders.get("solo")!;
+	ok(soloNode.folders.size === 0, "precondition: #solo has no sub-folders");
+	ok(allFolderLeaves(soloNode, true).length === 0, "allFolderLeaves: leaf-only node → empty even in tag mode");
 }
 
 // folderCheckState: tri-state over descendant keys.

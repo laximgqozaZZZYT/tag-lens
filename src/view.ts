@@ -161,7 +161,7 @@ import {
 	positionTip as positionTipFn,
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
-import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, noteMenuHeaderOnlyHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, folderCascadeHide, checkboxAriaChecked, noteMenuRowCheckboxSpec, buildFolderPathKey, folderToggleLabel, folderDisclosure, navigatorNodeSource, suggestKeyAction, noteMenuErrorText, noteMenuErrorBannerBox, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion, type FolderCheckState } from "./interaction/note-menu";
+import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, noteMenuHeaderOnlyHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, allFolderLeaves, folderCheckState, folderCascadeHide, checkboxAriaChecked, noteMenuRowCheckboxSpec, buildFolderPathKey, folderToggleLabel, folderDisclosure, navigatorNodeSource, suggestKeyAction, noteMenuErrorText, noteMenuErrorBannerBox, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion, type FolderCheckState } from "./interaction/note-menu";
 import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, moveMenuRect, resizeMenuRect, noteMenuPanelStyle, noteMenuRectStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuGroupOptions, noteMenuBulkActions, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuLeafRowHoverStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab, type NoteMenuGroupBy } from "./interaction/note-menu-geom";
 import { heatmapCellNoteIds } from "./interaction/heatmap-detail";
 import { heatmapCellTipText, ghostEdgeTipText, clusterTipText, aggregationGroupTipText } from "./interaction/hover-tip-text";
@@ -3222,11 +3222,9 @@ export class MiniGraphView extends ItemView {
 					if (!built) {
 						// (all) subtree: in tag-tree mode, folders with sub-folders get a
 						// collapsible "(all)" at the top listing every descendant note.
-						if (isTagTree && child.folders.size > 0) {
-							const allLeaves = collectDescendantLeaves(child);
-							if (allLeaves.length > 0) {
-								renderAllFolder(kids, allLeaves, depth + 1, folderPath);
-							}
+						const allLeaves = allFolderLeaves(child, isTagTree);
+						if (allLeaves.length > 0) {
+							renderAllFolder(kids, allLeaves, depth + 1, folderPath);
 						}
 						renderTree(kids, child, depth + 1, folderPath, isTagTree);
 						built = true;
@@ -3263,11 +3261,9 @@ export class MiniGraphView extends ItemView {
 				const tree = isTag ? buildTagTree(nodes, this.clusterLabels) : buildFolderTree(nodes);
 				// Root-level (all): in tag-tree mode, insert a top-level (all)
 				// listing every note in the navigator before the tag folders.
-				if (isTag && tree.folders.size > 0) {
-					const allLeaves = collectDescendantLeaves(tree);
-					if (allLeaves.length > 0) {
-						renderAllFolder(body, allLeaves, 0, "");
-					}
+				const allLeaves = allFolderLeaves(tree, isTag);
+				if (allLeaves.length > 0) {
+					renderAllFolder(body, allLeaves, 0, "");
 				}
 				renderTree(body, tree, 0, "", isTag);
 			}
