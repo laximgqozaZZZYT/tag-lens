@@ -125,6 +125,7 @@ import "./locate-fit.test";
 import "./point-in-rect.test";
 import "./click-slop.test";
 import "./wheel.test";
+import "./route-edges.test";
 
 
 summary();

@@ -9,8 +9,8 @@ import { axisLayout } from "./layout/axis-layout";
 import { axisFallbackSpan } from "./layout/axis-fallback-span";
 import { shiftAxisSpec } from "./layout/axis-shift";
 import { assignGalleryAxes } from "./layout/droste-axis";
-import { LaneRegistry, routeZ } from "./layout/edge-routing";
-import { buildIdToRect, buildRouteObstacles } from "./layout/layout-shared";
+import { LaneRegistry } from "./layout/edge-routing";
+import { buildIdToRect, buildRouteObstacles, routeEdges } from "./layout/layout-shared";
 import { layoutSignature } from "./layout/layout-signature";
 import { rebuildSignature } from "./layout/rebuild-signature";
 
@@ -1415,45 +1415,10 @@ export class MiniGraphView extends ItemView {
 			const idToRect = buildIdToRect(this.laid.nodes);
 			const routeObstacles = buildRouteObstacles(this.laid.nodes, this.laid.slotW, this.laid.slotH);
 			const lanes = new LaneRegistry();
-			for (const e of this.laid.edges) {
-				const a = idToRect.get(e.source);
-				const b = idToRect.get(e.target);
-				if (!a || !b) continue;
-				let path = routeZ(
-					a,
-					b,
-					lanes,
-					this.laid.slotW,
-					this.laid.slotH,
-					this.laid.channelW,
-					this.laid.channelH,
-					routeObstacles,
-					e.source,
-					e.target,
-				);
-				if (!path || path.length < 2) path = [{ x: a.x, y: a.y }, { x: b.x, y: b.y }];
-				e.path = path;
-			}
+			const { slotW, slotH, channelW, channelH } = this.laid;
+			routeEdges(this.laid.edges, idToRect, lanes, slotW, slotH, channelW, channelH, routeObstacles);
 			if (this.laid.ghostEdges) {
-				for (const e of this.laid.ghostEdges) {
-					const a = idToRect.get(e.source);
-					const b = idToRect.get(e.target);
-					if (!a || !b) continue;
-					let path = routeZ(
-						a,
-						b,
-						lanes,
-						this.laid.slotW,
-						this.laid.slotH,
-						this.laid.channelW,
-						this.laid.channelH,
-						routeObstacles,
-						e.source,
-						e.target,
-					);
-					if (!path || path.length < 2) path = [{ x: a.x, y: a.y }, { x: b.x, y: b.y }];
-					e.path = path;
-				}
+				routeEdges(this.laid.ghostEdges, idToRect, lanes, slotW, slotH, channelW, channelH, routeObstacles);
 			}
 		}
 	}

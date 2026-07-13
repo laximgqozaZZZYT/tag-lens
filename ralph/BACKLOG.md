@@ -617,6 +617,19 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `pinnedMenuWidth()` read. Test locks the subtract, panel-0 passthrough, and the
         floor-to-1 when the panel meets/exceeds the width. Behaviour-identical.
         view.ts 4181 → 4180; ratchet tightened.
+  - [x] Euler edge-routing loop dedup → `routeEdges(edges, idToRect, lanes, slotW,
+        slotH, channelW, channelH, obstacles)` (`src/layout/layout-shared.ts`, next to
+        `buildIdToRect`/`buildRouteObstacles`) + `test/route-edges.test.ts`. The two
+        byte-identical `for (const e of …edges)` loops in `applyEulerLayout` (`view.ts`)
+        — the real-edges pass and the ghostEdges pass, each a `routeZ(...)` call with the
+        `<2-point → straight [a,b]` fallback writing `e.path` — are now one thin in-place
+        batch router (minimal `RoutableEdge = {source,target,path}` so `layout-shared`
+        stays free of a `layout` value import); the view keeps `new LaneRegistry()` and
+        threads the SAME `lanes` across both calls so parallel wires still fan apart
+        across real+ghost. `routeZ` import dropped from `view.ts`. Test locks valid→
+        multi-point, missing-endpoint→path-untouched, coincident→2-point [a,b] fallback,
+        in-place mutation, and shared-lanes-across-batches. Behaviour-identical.
+        view.ts 4180 → 4145; ratchet tightened. — <commit>
   - [x] navigator error-banner box → `noteMenuErrorBannerBox(measuredTextWidth,
         clientWidth)` / `NoteMenuErrorBanner` (`src/interaction/note-menu.ts`, next to
         `noteMenuErrorText`) + cases in `test/note-menu.test.ts`. The inline padX/padY

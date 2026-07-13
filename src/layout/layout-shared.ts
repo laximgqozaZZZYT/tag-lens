@@ -3,7 +3,7 @@
 // barycenter helper. (The former snapAndBuildRouteData / routeAllEdges
 // one-shot pipeline was unused and removed.)
 import type { PositionedNode } from "./layout";
-import type { RouteObstacle, RouteRect } from "./edge-routing";
+import { LaneRegistry, routeZ, type RouteObstacle, type RouteRect } from "./edge-routing";
 
 // Build an `idToRect` map from the current `(x, y, width, height)` of
 // each positioned node. Pure read.
@@ -42,6 +42,36 @@ export function buildRouteObstacles(
 	return out;
 }
 
+// Route a batch of positioned edges through a shared LaneRegistry, writing each
+// edge's Manhattan channel path into `e.path` in place. Endpoints missing from
+// `idToRect` are skipped (their existing path is left untouched); a degenerate
+// (<2-point) route falls back to a straight A→B segment so an edge is never a
+// single point. Thread the SAME `lanes` across successive batches (real edges
+// then ghost edges) so parallel wires keep fanning apart across both.
+export interface RoutableEdge {
+	source: string;
+	target: string;
+	path: { x: number; y: number }[];
+}
+export function routeEdges(
+	edges: RoutableEdge[],
+	idToRect: Map<string, RouteRect>,
+	lanes: LaneRegistry,
+	slotW: number,
+	slotH: number,
+	channelW: number,
+	channelH: number,
+	obstacles: RouteObstacle[],
+): void {
+	for (const e of edges) {
+		const a = idToRect.get(e.source);
+		const b = idToRect.get(e.target);
+		if (!a || !b) continue;
+		let path = routeZ(a, b, lanes, slotW, slotH, channelW, channelH, obstacles, e.source, e.target);
+		if (!path || path.length < 2) path = [{ x: a.x, y: a.y }, { x: b.x, y: b.y }];
+		e.path = path;
+	}
+}
 
 // Bipartite barycenter seriation. Alternately reorders columns by the mean
 // position of their member rows and rows by the mean position of their member
