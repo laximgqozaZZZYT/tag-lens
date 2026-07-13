@@ -1049,7 +1049,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         local is deleted). The `[0, canvasW-drawWidth]` clamps in `legend-layout.ts`
         keep their own inline form (different ceiling). Test locks both endpoints,
         floor/ceiling, and an inline-equivalence grid. Behaviour-identical. Mirrors
-        the `clampScroll`/`clampZoom`/`jaccard` util dedups. — <hash>
+        the `clampScroll`/`clampZoom`/`jaccard` util dedups. — 02d975e
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
