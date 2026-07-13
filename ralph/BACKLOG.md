@@ -629,7 +629,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         across real+ghost. `routeZ` import dropped from `view.ts`. Test locks valid→
         multi-point, missing-endpoint→path-untouched, coincident→2-point [a,b] fallback,
         in-place mutation, and shared-lanes-across-batches. Behaviour-identical.
-        view.ts 4180 → 4145; ratchet tightened. — <commit>
+        view.ts 4180 → 4145; ratchet tightened. — c9be296
   - [x] navigator error-banner box → `noteMenuErrorBannerBox(measuredTextWidth,
         clientWidth)` / `NoteMenuErrorBanner` (`src/interaction/note-menu.ts`, next to
         `noteMenuErrorText`) + cases in `test/note-menu.test.ts`. The inline padX/padY
