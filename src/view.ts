@@ -57,6 +57,7 @@ import type { AggregationState, AggregationGroup } from "./aggregation/types";
 import {
 	resolveNodeDisplay as resolveNodeDisplayFn,
 	resolveFromCluster as resolveFromClusterFn,
+	setLayerDeps,
 	visualScale,
 	UNION_LAYER_KEY,
 	INTERSECTION_LAYER_KEY,
@@ -1003,15 +1004,13 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private resolveSetLayer(setKey: string): NodeDisplay {
-		const base = this.nodeDisplayDeps();
-		const supers = new Map(base.supersetsOf);
 		// Real single-tag clusters are supersets of the set-layers.
-		supers.set(setKey, (this.laid.clusters ?? []).map((c) => c.groupKey));
+		const clusterKeys = (this.laid.clusters ?? []).map((c) => c.groupKey);
 		const full = this.settings.layerInheritFull?.includes(setKey) ?? false;
-		const overrides = full
-			? Object.fromEntries(Object.entries(base.overrides).filter(([k]) => k !== setKey))
-			: base.overrides;
-		return resolveFromClusterFn(setKey, { ...base, overrides, supersetsOf: supers });
+		return resolveFromClusterFn(
+			setKey,
+			setLayerDeps(this.nodeDisplayDeps(), setKey, clusterKeys, full),
+		);
 	}
 
 	updateSettings(s: MiniSettings): void {

@@ -584,6 +584,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `noteMenuGroupBy` field and the rendered radio values (mirrors
         `noteMenuTopTabs`/`noteMenuDataSubTabs`). The label/radio DOM + change wiring stay
         in the view. Test locks value/label/order (Folder default first). — 033da69
+  - [x] set-layer resolver deps → `setLayerDeps(base, setKey, clusterKeys, full)`
+        (`src/visual/node-display.ts`, next to `resolveFromCluster`) +
+        `test/set-layer-deps.test.ts`. The inline supersets-clone + `full`-gated
+        own-override drop in `resolveSetLayer` (`view.ts`) — which builds the modified
+        `NodeDisplayDeps` a synthetic ∩/∪ set-layer resolves against (real single-tag
+        clusters attached as its supersets; the layer's OWN override dropped only when
+        it opts into FULL inheritance) — is now a pure, non-mutating builder; the view
+        just gathers `clusterKeys`/`full` and threads it into `resolveFromCluster`. Test
+        locks superset attachment (+ pre-existing preserved), full-drop cascade to
+        superset/global, non-full own-override retention, and input non-mutation.
+        Behaviour-identical. view.ts 4196 → 4195; ratchet held.
   - [x] layout signature → `layoutSignature(s)` / `DISPLAY_ONLY_KEYS`
         (`src/layout/layout-signature.ts`) + `test/layout-signature.test.ts`. The
         private static `DISPLAY_ONLY_KEYS` set + private `layoutSignature` method in

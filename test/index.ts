@@ -55,6 +55,7 @@ import "./heatmap-min-tag-input.test";
 import "./node-size-input.test";
 import "./bases-edge-kinds.test";
 import "./graph-display-toggles.test";
+import "./set-layer-deps.test";
 import "./scatter-axis-options.test";
 import "./scatter-axis-binding.test";
 import "./bases-toggle-rows.test";
