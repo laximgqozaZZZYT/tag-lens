@@ -585,7 +585,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         maxTextWidth}`; the view keeps `ctx.measureText`/`fillRect`/`fillText`. The box
         hugs the text yet never exceeds the canvas (text clamped to cw−16), text render
         clamped tighter (cw−24), both floored ≥0 — all locked by the test. Sibling of the
-        `canvasBackingSize`/`*Fit` geometry seams; behaviour-identical. view.ts 4192 → 4191.
+        `canvasBackingSize`/`*Fit` geometry seams; behaviour-identical. view.ts 4192 → 4191. — 2e0832d
   - [x] Tree grouping-selector radios → `noteMenuGroupOptions()` / `NoteMenuGroupBy`
         (`src/interaction/note-menu-geom.ts`) + a case in `test/note-menu-geom.test.ts`.
         The inline `mkGroupRadio("folder","Folder")`/`("tag","Tag")` pair in
