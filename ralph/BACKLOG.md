@@ -593,7 +593,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         — is now pure; the view keeps the two DOM reads (`head.offsetHeight`,
         `panel.offsetHeight - panel.clientHeight`). Test locks measured-border,
         zero/negative→2px fallback, and the floor. Sibling of `noteMenuHeight`.
-        Behaviour-identical. view.ts 4195 → 4192; ratchet held.
+        Behaviour-identical. view.ts 4195 → 4192; ratchet held. — 4155b0b
   - [x] set-layer resolver deps → `setLayerDeps(base, setKey, clusterKeys, full)`
         (`src/visual/node-display.ts`, next to `resolveFromCluster`) +
         `test/set-layer-deps.test.ts`. The inline supersets-clone + `full`-gated
