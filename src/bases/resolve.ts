@@ -213,8 +213,9 @@ function evalNamedPredicate(op: string, lhs: string, values: string[], facts: Fi
 			return f === "" || folder === f || folder.startsWith(`${f}/`);
 		});
 	}
-	if (op === "hasProperty")
-		return values.length > 0 && Object.prototype.hasOwnProperty.call(facts.frontmatter, values[0]);
+	// Object.keys = own enumerable keys only (no prototype builtin access → no
+	// biome noPrototypeBuiltins, and ES2020-safe unlike Object.hasOwn).
+	if (op === "hasProperty") return values.length > 0 && Object.keys(facts.frontmatter).includes(values[0]);
 	if (op === "isEmpty") return isEmptyValue(resolveLhs(lhs, facts));
 	return null;
 }

@@ -196,6 +196,7 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 
 	ok(evalBaseFilter(parseBaseFilter('file.hasProperty("author")'), f), "hasProperty: present key → true");
 	ok(!evalBaseFilter(parseBaseFilter('file.hasProperty("missing")'), f), "hasProperty: absent key → false");
+	ok(!evalBaseFilter(parseBaseFilter('file.hasProperty("toString")'), f), "hasProperty: inherited proto key → false (own keys only)");
 }
 
 // --- file.folder property (was undefined → folder filters dropped every note) ---
