@@ -595,6 +595,17 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         Leaves` becomes module-private (only caller is `allFolderLeaves`). Test locks
         folder-mode→empty, tag-root lists-all-distinct, sub-folder-node→descendants,
         leaf-only-node→empty. Behaviour-identical. — 8ce1a63
+  - [x] Bases enabled-edge-kinds Set → `basesEnabledEdgeKinds(settings)`
+        (`src/panel/bases-edge-kinds.ts`, next to `basesEdgeKinds`) + cases in
+        `test/bases-edge-kinds.test.ts`. The inline three-`if` `Set<BaseEdgeKind>`
+        build in `buildGraph` (`view.ts`) — one `.add(kind)` per enabled
+        `basesLinkEdges`/`basesSharedTagEdges`/`basesSharedPropEdges` boolean —
+        now derives from the existing `basesEdgeKinds()` descriptor list (each
+        entry gained an `edge: BaseEdgeKind` field), so the key↔projection-kind
+        mapping has one source of truth shared by the UI checklist and the graph
+        build. The now-unused `type BaseEdgeKind` import dropped from `view.ts`.
+        Test locks all-off→∅, all-on→3, per-key gating, and the descriptor
+        edge-order. Behaviour-identical. view.ts 4125 → 4123; ratchet tightened.
   - [x] export size-cap notice → `exportScaleCapMessage(requestedScale, effectiveScale)`
         (`src/visual/image-export.ts`, next to `exportCanvasDims`) + cases in
         `test/image-export.test.ts`. The `exportImage` handler (`view.ts`) inlined the

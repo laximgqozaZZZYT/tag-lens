@@ -18,7 +18,7 @@ import { rebuildSignature } from "./layout/rebuild-signature";
 import { buildBaseIndex } from "./bases/build-index";
 import { scanBaseFiles } from "./bases/parser";
 import { ensureFallbackBase } from "./bases/fallback";
-import { projectBaseIndexToGraph, type BaseEdgeKind } from "./bases/project";
+import { projectBaseIndexToGraph } from "./bases/project";
 import type { BaseIndex } from "./bases/types";
 import {
 	layout,
@@ -147,6 +147,7 @@ import {
 	scrollToThumbY,
 	thumbYToScroll,
 } from "./interaction/legend-scrollbar";
+import { basesEnabledEdgeKinds } from "./panel/bases-edge-kinds";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes } from "./panel/menu-notes";
 import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVault } from "./panel/export-image";
@@ -1066,10 +1067,7 @@ export class MiniGraphView extends ItemView {
 
 		if (this.settings.selectedBases.length > 0) {
 			try {
-				const edgeKinds = new Set<BaseEdgeKind>();
-				if (this.settings.basesLinkEdges) edgeKinds.add("link");
-				if (this.settings.basesSharedTagEdges) edgeKinds.add("shared-tag");
-				if (this.settings.basesSharedPropEdges) edgeKinds.add("shared-property");
+				const edgeKinds = basesEnabledEdgeKinds(this.settings);
 				this.baseIndex = await buildBaseIndex(this.app, this.settings.selectedBases, {
 					link: this.settings.basesLinkEdges,
 					sharedTag: this.settings.basesSharedTagEdges,
