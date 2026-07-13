@@ -569,6 +569,15 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         private (inferred at the call site) so knip is clean. Test locks order (4 PNG,
         separator at idx 4, 3 SVG), the first/last item's exact title/icon/action, and
         the single 4× entry. Behaviour-identical. view.ts 4217 → 4197; ratchet tightened. — 1930556
+  - [x] drosteFocus scorer tag-set dedup → `cachedTagSet(tags)`
+        (`src/query/related-score.ts`, next to `jaccardSimilarity`'s callers) + cases in
+        `test/related-score.test.ts`. The scorer (`updateViewContextToElement`, `view.ts`)
+        built the lowercased tag set from a file's metadataCache twice with the same
+        inline `cache?.tags?.map(t => t.tag.toLowerCase()) || []` + `new Set(...)` (active
+        note + each candidate); both collapse to a thin call, the now-unused
+        `activeTags`/`nodeTags` locals drop. Undefined/absent tags → empty set (no throw),
+        case-folded + deduped so the tag Jaccard compares canonically. Test locks
+        undefined/empty→empty, case-fold+dedup, and distinct-lowercased. Behaviour-identical. — ad380b3
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
