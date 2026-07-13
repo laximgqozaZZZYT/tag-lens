@@ -113,6 +113,7 @@ import "./hover-tip-text.test";
 import "./clamp-zoom.test";
 import "./clamp-scroll.test";
 import "./clamp01.test";
+import "./format-number.test";
 import "./upset-pan.test";
 import "./content-bounds.test";
 import "./content-fit.test";

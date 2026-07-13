@@ -5,6 +5,7 @@ import type { BindingLegend } from "../encoding/evaluate";
 import type { NodeShape } from "../encoding/shapes";
 import { shapeForKey } from "../encoding/shapes";
 import { clamp01 } from "../util/clamp01";
+import { formatLegendNumber } from "../util/format-number";
 
 export type LegendKind = "categorical" | "gradient" | "size";
 
@@ -24,12 +25,6 @@ export function sequentialColorRamp(t: number): string {
 	return `hsl(210, 70%, ${Math.round(20 + c * 55)}%)`;
 }
 
-const fmtNum = (n: number): string => {
-	if (!Number.isFinite(n)) return "—";
-	const r = Math.round(n * 100) / 100;
-	return Object.is(r, -0) ? "0" : String(r);
-};
-
 const capitalize = (s: string): string => (s.length ? s[0].toUpperCase() + s.slice(1) : s);
 
 // Convert F4 encoding legends to specs. Categorical -> categorical; quantitative
@@ -41,7 +36,7 @@ export function encodingToSpecs(legends: BindingLegend[]): LegendSpec[] {
 		const isShape = lg.channelId === "shape";
 		if (lg.legend.kind === "quantitative") {
 			const stops = [0, 0.25, 0.5, 0.75, 1].map(sequentialColorRamp);
-			out.push({ title, kind: "gradient", ramp: { stops, minLabel: fmtNum(lg.legend.min ?? 0), maxLabel: fmtNum(lg.legend.max ?? 0) } });
+			out.push({ title, kind: "gradient", ramp: { stops, minLabel: formatLegendNumber(lg.legend.min ?? 0), maxLabel: formatLegendNumber(lg.legend.max ?? 0) } });
 		} else {
 			const all = lg.legend.entries ?? [];
 			const entries: { label: string; color?: string; shape?: NodeShape }[] = all.map((e) =>
