@@ -585,6 +585,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         whose only logic is a single settings-field toggle — extract only if a genuine
         duplicate descriptor list emerges (mirror `basesToggleRows`). Otherwise pivot to
         the `ensureNoteMenu` body-builder seams or F2.
+  - [x] export size-cap notice → `exportScaleCapMessage(requestedScale, effectiveScale)`
+        (`src/visual/image-export.ts`, next to `exportCanvasDims`) + cases in
+        `test/image-export.test.ts`. The `exportImage` handler (`view.ts`) inlined the
+        `dims.scale < opts.scale - 1e-6` cap detection + the `.toFixed(1)` "limited to
+        N×" Notice text; now a pure builder returning the message string when the
+        effective scale fell below the requested one (beyond the epsilon) else null.
+        Centralizes the epsilon + format; the view just shows whatever it gets back.
+        Mirrors the `jsonImportMessage`/`bundledLoadMessage` text builders. Test locks
+        equal-scale→null, within-epsilon→null, real-cap→formatted, one-decimal rounding.
+        Behaviour-identical. view.ts 4185 → 4182; ratchet tightened. — 0371e47
   - [x] navigator error-banner box → `noteMenuErrorBannerBox(measuredTextWidth,
         clientWidth)` / `NoteMenuErrorBanner` (`src/interaction/note-menu.ts`, next to
         `noteMenuErrorText`) + cases in `test/note-menu.test.ts`. The inline padX/padY
