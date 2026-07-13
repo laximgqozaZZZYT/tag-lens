@@ -161,7 +161,7 @@ import {
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
 import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, noteMenuHeaderOnlyHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, folderCascadeHide, checkboxAriaChecked, noteMenuRowCheckboxSpec, buildFolderPathKey, folderToggleLabel, folderDisclosure, navigatorNodeSource, suggestKeyAction, noteMenuErrorText, noteMenuErrorBannerBox, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion, type FolderCheckState } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, moveMenuRect, resizeMenuRect, noteMenuPanelStyle, noteMenuRectStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuGroupOptions, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuLeafRowHoverStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab, type NoteMenuGroupBy } from "./interaction/note-menu-geom";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, moveMenuRect, resizeMenuRect, noteMenuPanelStyle, noteMenuRectStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuGroupOptions, noteMenuBulkActions, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuLeafRowHoverStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab, type NoteMenuGroupBy } from "./interaction/note-menu-geom";
 import { heatmapCellNoteIds } from "./interaction/heatmap-detail";
 import { heatmapCellTipText, ghostEdgeTipText, clusterTipText, aggregationGroupTipText } from "./interaction/hover-tip-text";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
@@ -2942,22 +2942,20 @@ export class MiniGraphView extends ItemView {
 				handler();
 			});
 		};
-		mkBulkBtn("Select all", () => {
-			// Show all: remove every listed note's hide-key from hiddenNodes.
-			this.settings.hiddenNodes = bulkSetHidden(this.settings.hiddenNodes, nodes.map(hideKey), false);
-			void this.save();
-			this.requestDraw();
-			// Redraw the menu so checkboxes reflect the new state without rebuilding
-			// the panel (no scroll/expand collapse).
-			this.noteMenuRedraw?.();
-		});
-		mkBulkBtn("Deselect all", () => {
-			// Hide all: add every listed note's hide-key to hiddenNodes (dedup).
-			this.settings.hiddenNodes = bulkSetHidden(this.settings.hiddenNodes, nodes.map(hideKey), true);
-			void this.save();
-			this.requestDraw();
-			this.noteMenuRedraw?.();
-		});
+		// Select all → show every note (hide = false); Deselect all → hide every
+		// note (hide = true). Same bulkSetHidden→save→requestDraw→redraw handler for
+		// both; only the hide-flag differs, so drive them from a pure descriptor
+		// list. requestDraw() (not rebuild) is enough — draw()'s skipNode filter
+		// re-reads hiddenNodes fresh — and noteMenuRedraw refreshes the checkboxes
+		// without collapsing scroll/expand state.
+		for (const { label, hide } of noteMenuBulkActions()) {
+			mkBulkBtn(label, () => {
+				this.settings.hiddenNodes = bulkSetHidden(this.settings.hiddenNodes, nodes.map(hideKey), hide);
+				void this.save();
+				this.requestDraw();
+				this.noteMenuRedraw?.();
+			});
+		}
 		// Search input for filtering the tree. Static chrome from a pure builder.
 		const searchStyle = noteMenuSearchStyle();
 		const searchWrap = treeTab.createDiv();

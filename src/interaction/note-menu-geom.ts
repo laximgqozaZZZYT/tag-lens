@@ -241,6 +241,19 @@ export function noteMenuGroupOptions(): { value: NoteMenuGroupBy; label: string 
 	];
 }
 
+// Bulk visibility-toggle button descriptors (label + the `hide` boolean it
+// applies to every listed note), in render order. "Select all" shows every note
+// (hide = false); "Deselect all" hides every note (hide = true). Pure builder —
+// the view creates one button per entry and wires the same
+// bulkSetHidden→save→requestDraw→redraw handler with this `hide` flag (mirrors
+// noteMenuGroupOptions).
+export function noteMenuBulkActions(): { label: string; hide: boolean }[] {
+	return [
+		{ label: "Select all", hide: false },
+		{ label: "Deselect all", hide: true },
+	];
+}
+
 // Per-pane CSS `display` values for the three top-level body panes given the
 // active tab. The Data wrapper is a flex-column (visible = "flex"); Settings and
 // Insight are scroll panes (visible = "block"); inactive panes are "none". Pure
