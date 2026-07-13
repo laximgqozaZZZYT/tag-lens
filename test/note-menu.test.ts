@@ -10,6 +10,7 @@ import {
 	menuClickAction,
 	clampRect,
 	noteMenuHeight,
+	noteMenuHeaderOnlyHeight,
 	buildFolderTree,
 	buildTagTree,
 	searchNotes,
@@ -192,6 +193,15 @@ const MIN = { width: 180, height: 120 };
 // Restored height can never be shorter than the header bar.
 {
 	ok(noteMenuHeight(false, 30, 10, 5) === 30, "noteMenuHeight: restore floored to header height");
+}
+
+// ── noteMenuHeaderOnlyHeight: collapse-to-header height ───────────────────────
+// Header bar + measured border; a 0 border measurement falls back to 2px.
+{
+	ok(noteMenuHeaderOnlyHeight(30, 4) === 34, "headerOnly: header + measured border");
+	ok(noteMenuHeaderOnlyHeight(30, 0) === 32, "headerOnly: zero border → 2px fallback");
+	ok(noteMenuHeaderOnlyHeight(30, -3) === 32, "headerOnly: negative border → 2px fallback");
+	ok(noteMenuHeaderOnlyHeight(0, 0) === 2, "headerOnly: floored positive even with no header");
 }
 
 // ── Navigator grouping: folder tree / tag tree / search dedupe ───────────────

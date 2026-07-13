@@ -584,6 +584,16 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         `noteMenuGroupBy` field and the rendered radio values (mirrors
         `noteMenuTopTabs`/`noteMenuDataSubTabs`). The label/radio DOM + change wiring stay
         in the view. Test locks value/label/order (Folder default first). — 033da69
+  - [x] minimize collapse-to-header height → `noteMenuHeaderOnlyHeight(headHeight,
+        panelBorder)` (`src/interaction/note-menu.ts`, next to `noteMenuHeight`) +
+        cases in `test/note-menu.test.ts`. The inline `headerOnlyHeight` closure in
+        `ensureNoteMenu` (`view.ts`) — header bar + the panel's measured top+bottom
+        border, with the 0-measurement→2px fallback and the floor-to-1 guard so a
+        detached/unstyled panel never collapses to a header-clipping or 0-height box
+        — is now pure; the view keeps the two DOM reads (`head.offsetHeight`,
+        `panel.offsetHeight - panel.clientHeight`). Test locks measured-border,
+        zero/negative→2px fallback, and the floor. Sibling of `noteMenuHeight`.
+        Behaviour-identical. view.ts 4195 → 4192; ratchet held.
   - [x] set-layer resolver deps → `setLayerDeps(base, setKey, clusterKeys, full)`
         (`src/visual/node-display.ts`, next to `resolveFromCluster`) +
         `test/set-layer-deps.test.ts`. The inline supersets-clone + `full`-gated

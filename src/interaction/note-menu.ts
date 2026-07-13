@@ -165,6 +165,16 @@ export function noteMenuHeight(
 	return Math.max(headerHeight, target);
 }
 
+// The panel height to collapse to when minimized: the header bar plus the panel's
+// top+bottom border. `panelBorder` is the measured `offsetHeight - clientHeight`;
+// a detached/unstyled element can report 0, so fall back to a 2px border so the
+// collapsed panel never clips its header's bottom edge. Floored to 1 so a
+// zero-height measurement can never produce a 0-height (invisible) panel.
+// Pure: no DOM, no mutation.
+export function noteMenuHeaderOnlyHeight(headHeight: number, panelBorder: number): number {
+	return Math.max(1, headHeight + (panelBorder > 0 ? panelBorder : 2));
+}
+
 // ── Navigator tree model + grouping/search (pure, DOM-less) ──────────────────
 // The navigator body renders a collapsible tree. Two groupings are supported:
 //   • "folder" — group by the note id path (split on "/"), one leaf per note.
