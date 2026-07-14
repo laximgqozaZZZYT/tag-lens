@@ -609,6 +609,20 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         whose only logic is a single settings-field toggle — extract only if a genuine
         duplicate descriptor list emerges (mirror `basesToggleRows`). Otherwise pivot to
         the `ensureNoteMenu` body-builder seams or F2.
+  - [x] lattice stale-key prune → `pruneLatticeKeys(nodeKeys, namedKeys, selectedKey)`
+        (`src/layout/lattice-key-prune.ts`) + `test/lattice-key-prune.test.ts`. The
+        inline named-checkbox-key delete loop + selected-key clear in
+        `clearStaleSelection` (`view.ts`) — which prunes `latticeNamedKeys` and
+        `latticeSelectedKey` against the surviving lattice-node keys after a relayout
+        re-buckets the intersections (tier culled by Min size / signature top-N
+        collapsed into "Other") so the named set never grows unboundedly and a stale
+        selection can't linger — is now a pure, non-mutating builder returning
+        `{namedKeys, selectedKey}`; the view reassigns both fields + keeps the
+        `latticeHoverKey = null` reset. The empty-string selection is left untouched to
+        mirror the view's original truthy `&&` short-circuit. Test locks named-key
+        survival, selected keep/clear/null, empty-string passthrough, non-mutation, and
+        empty-node total-clear. Behaviour-identical. view.ts 4103 → 4102; ratchet
+        tightened.
   - [x] `(all)` subtree guard dedup → `allFolderLeaves(node, isTagTree)`
         (`src/interaction/note-menu.ts`) + cases in `test/note-menu.test.ts`. The
         tag-tree-only "(all)" collapsible subtree gate (`isTag && node.folders.size

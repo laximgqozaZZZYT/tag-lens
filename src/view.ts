@@ -42,6 +42,7 @@ import { drosteFit } from "./layout/droste-fit";
 import { locateNodeFit } from "./layout/locate-fit";
 import { heatmapFit } from "./layout/heatmap-fit";
 import { latticeFit } from "./layout/lattice-fit";
+import { pruneLatticeKeys } from "./layout/lattice-key-prune";
 import { upsetFit } from "./layout/upset-fit";
 import { visibleFitWidth } from "./layout/visible-fit-width";
 import { runAggregateSnap } from "./layout/aggregate-snap";
@@ -3526,18 +3527,16 @@ export class MiniGraphView extends ItemView {
 		}
 		// Lattice: a relayout re-buckets intersections; selected key may no
 		// longer exist. Clear and close any open list overlay tied to it.
-		const latticeKeys = new Set(this.laid.lattice?.nodes.map((n) => n.key) ?? []);
 		this.latticeHoverKey = null;
-		// Prune named-checkbox keys for nodes that no longer exist after the
-		// relayout (e.g. a tier was culled by Min intersection size, or the
-		// signature was top-N collapsed into an "Other" bundle whose key
-		// differs). Keeps `latticeNamedKeys` from growing unboundedly.
-		for (const k of [...this.latticeNamedKeys]) {
-			if (!latticeKeys.has(k)) this.latticeNamedKeys.delete(k);
-		}
-		if (this.latticeSelectedKey && !latticeKeys.has(this.latticeSelectedKey)) {
-			this.latticeSelectedKey = null;
-		}
+		// Prune named-checkbox keys + the selected key against the surviving
+		// lattice nodes after the relayout (see pruneLatticeKeys).
+		const pruned = pruneLatticeKeys(
+			this.laid.lattice?.nodes.map((n) => n.key) ?? [],
+			this.latticeNamedKeys,
+			this.latticeSelectedKey,
+		);
+		this.latticeNamedKeys = pruned.namedKeys;
+		this.latticeSelectedKey = pruned.selectedKey;
 	}
 
 	private onPointerMove(e: MouseEvent): void {

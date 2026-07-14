@@ -121,6 +121,7 @@ import "./upset-pan.test";
 import "./content-bounds.test";
 import "./content-fit.test";
 import "./lattice-fit.test";
+import "./lattice-key-prune.test";
 import "./upset-fit.test";
 import "./heatmap-fit.test";
 import "./canvas-backing.test";
