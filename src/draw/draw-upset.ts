@@ -16,6 +16,7 @@
 // nothing is visible.
 import { theme, colorAlpha } from "./theme";
 import type { LaidOut } from "../layout/layout";
+import { upsetColumnKey } from "../layout/upset-layout";
 import { clusterHue } from "./canvas-utils";
 
 const FONT_PX = 12;
@@ -286,7 +287,7 @@ function drawMatrixDots(
 		// clickable).
 		const dotR = sqrtScale(col.size, maxColSize, DOT_R_MIN, DOT_R_MAX);
 		const inCol = new Set(col.signature);
-		const key = col.signature.join("|");
+		const key = upsetColumnKey(col.signature);
 		const highlighted = key === selectedSignatureKey;
 		let topY = Infinity;
 		let botY = -Infinity;

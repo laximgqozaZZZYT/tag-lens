@@ -14,6 +14,7 @@ import { LaneRegistry } from "./layout/edge-routing";
 import { buildIdToRect, buildRouteObstacles, routeEdges } from "./layout/layout-shared";
 import { layoutSignature } from "./layout/layout-signature";
 import { rebuildSignature } from "./layout/rebuild-signature";
+import { upsetColumnKey } from "./layout/upset-layout";
 
 import { buildBaseIndex } from "./bases/build-index";
 import { scanBaseFiles } from "./bases/parser";
@@ -434,9 +435,8 @@ export class MiniGraphView extends ItemView {
 	private settingsSubTab: SettingsSubTab = "view";
 	private dataSubTab: NoteMenuDataSubTab = "logic";
 	private insightSubTab: "overview" | "alerts" | "suggest" = "overview";
-	// UpSet mode: signature key (= `signature.join("|")`) of the column
-	// currently selected by the user (highlighted in the matrix; drives
-	// the detail panel listing in Phase C). null = nothing selected.
+	// UpSet mode: `upsetColumnKey` of the user-selected column (highlighted in
+	// the matrix; drives the detail panel listing). null = nothing selected.
 	private upsetSelectedSignatureKey: string | null = null;
 	// Lattice mode: selected / hovered node key (signature key) for highlight
 	// and the floating note-list overlay. Cleared when the selected key no
@@ -3511,7 +3511,7 @@ export class MiniGraphView extends ItemView {
 		if (
 			this.upsetSelectedSignatureKey != null &&
 			!this.laid.upset?.columns.some(
-				(c) => c.signature.join("|") === this.upsetSelectedSignatureKey,
+				(c) => upsetColumnKey(c.signature) === this.upsetSelectedSignatureKey,
 			)
 		)
 			this.upsetSelectedSignatureKey = null;

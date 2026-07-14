@@ -46,6 +46,16 @@ interface Sized {
 	height: number;
 }
 
+// Stable identity key for an UpSet intersection column, derived from its
+// (sorted) tag signature. The "|" separator avoids the {ab,c}/{a,bc}
+// collision a naive `.join("")` would produce. This is the single source of
+// truth for the key contract: the bucketing pass here, the draw-upset
+// highlight match, and the view's stale-selection guard all go through it, so
+// a selected column can be re-found (or dropped) verbatim after a relayout.
+export function upsetColumnKey(signature: string[]): string {
+	return signature.join("|");
+}
+
 export function layoutUpset(
 	data: GraphData,
 	sized: Sized[],
@@ -72,7 +82,7 @@ export function layoutUpset(
 	for (const n of data.nodes) {
 		if (n.memberships.length === 0) continue;
 		const sorted = [...n.memberships].sort();
-		const key = sorted.join("|");
+		const key = upsetColumnKey(sorted);
 		const entry = sigToBucket.get(key);
 		if (entry) entry.nodeIds.push(n.id);
 		else sigToBucket.set(key, { signature: sorted, nodeIds: [n.id] });
