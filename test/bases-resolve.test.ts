@@ -258,6 +258,33 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 	ok(evalBaseFilter(parseBaseFilter("note.foo.isEmpty()"), facts("a.md", [], { foo: "" })), "isEmpty: empty string → true");
 	ok(evalBaseFilter(parseBaseFilter("note.foo.isEmpty()"), facts("a.md", [], { foo: [] })), "isEmpty: empty list → true");
 	ok(!evalBaseFilter(parseBaseFilter("note.foo.isEmpty()"), facts("a.md", [], { foo: "x" })), "isEmpty: value present → false");
+	// empty object (e.g. a frontmatter record with no keys) was always false (bug).
+	ok(evalBaseFilter(parseBaseFilter("note.meta.isEmpty()"), facts("a.md", [], { meta: {} })), "isEmpty: empty object → true");
+	ok(!evalBaseFilter(parseBaseFilter("note.meta.isEmpty()"), facts("a.md", [], { meta: { k: 1 } })), "isEmpty: non-empty object → false");
+}
+
+// --- file.properties and file.properties.<key> ---
+{
+	const f = facts("n.md", [], { author: "Alice", year: 2025 });
+	ok(evalBaseFilter(parseBaseFilter('file.properties.author == "Alice"'), f), "file.properties.<key> maps to frontmatter");
+	ok(!evalBaseFilter(parseBaseFilter('file.properties.author == "Bob"'), f), "file.properties.<key> mismatch → false");
+	// file.properties itself is the frontmatter object → isEmpty() checks object emptiness.
+	ok(evalBaseFilter(parseBaseFilter("file.properties.isEmpty()"), facts("e.md", [], {})), "file.properties.isEmpty() → true on empty frontmatter");
+	ok(!evalBaseFilter(parseBaseFilter("file.properties.isEmpty()"), f), "file.properties.isEmpty() → false when frontmatter has keys");
+}
+
+// --- .length property on list / string fields ---
+{
+	const f = facts("n.md", ["a", "b", "c"], { authors: ["X", "Y"], title: "Hello" });
+	ok(evalBaseFilter(parseBaseFilter("file.tags.length >= 3"), f), "file.tags.length >= 3 → true");
+	ok(!evalBaseFilter(parseBaseFilter("file.tags.length > 3"), f), "file.tags.length > 3 → false (exactly 3)");
+	ok(evalBaseFilter(parseBaseFilter("note.authors.length == 2"), f), "note.authors.length == 2 → true");
+	ok(evalBaseFilter(parseBaseFilter("note.title.length > 0"), f), "note.title.length > 0 (string) → true");
+	// empty list → length 0.
+	const empty = facts("e.md", []);
+	ok(evalBaseFilter(parseBaseFilter("file.tags.length == 0"), empty), "file.tags.length == 0 → true");
+	// unset field → length undefined → not numeric → false.
+	ok(!evalBaseFilter(parseBaseFilter("note.missing.length > 0"), empty), "unset field.length → undefined → false, no throw");
 }
 
 // --- not: structured operator inverts; raw child is ignored (not exclude-all) ---

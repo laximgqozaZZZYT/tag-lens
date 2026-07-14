@@ -138,6 +138,11 @@ function resolveLhs(lhs: string, facts: FileFacts): unknown {
 	const ext = base.includes(".") ? base.slice(base.lastIndexOf(".") + 1) : "";
 	const basename = ext ? base.slice(0, base.length - ext.length - 1) : base;
 
+	// `.length` property: resolve base field then return element/character count.
+	if (lhs.endsWith(".length")) return resolveFieldLength(lhs.slice(0, -7), facts);
+	// file.properties.<key>: note-like frontmatter access via the properties namespace.
+	if (lhs.startsWith("file.properties.")) return facts.frontmatter[lhs.slice("file.properties.".length)];
+
 	switch (lhs) {
 		case "file.path":
 			return facts.path;
@@ -163,6 +168,8 @@ function resolveLhs(lhs: string, facts: FileFacts): unknown {
 			return facts.backlinks ?? [];
 		case "file.embeds":
 			return facts.embeds ?? [];
+		case "file.properties":
+			return facts.frontmatter;
 	}
 
 	// note.<key> or note.frontmatter.<key>
@@ -172,6 +179,15 @@ function resolveLhs(lhs: string, facts: FileFacts): unknown {
 	else if (!lhs.includes(".")) key = lhs; // bare frontmatter field
 
 	if (key != null) return facts.frontmatter[key];
+	return undefined;
+}
+
+// `.length` property accessor: returns the element count of an array field or the
+// character count of a string field. Returns undefined for non-list/string actuals.
+function resolveFieldLength(baseLhs: string, facts: FileFacts): number | undefined {
+	const v = resolveLhs(baseLhs, facts);
+	if (Array.isArray(v)) return v.length;
+	if (typeof v === "string") return v.length;
 	return undefined;
 }
 
@@ -344,10 +360,11 @@ function normalizeLinkArg(raw: string): string {
 	return target.replace(/\.md$/i, "");
 }
 
-// isEmpty(): empty string, empty list, or an absent/null field value.
+// isEmpty(): absent/null, empty string, empty array, or empty object.
 function isEmptyValue(v: unknown): boolean {
 	if (v == null || v === "") return true;
 	if (Array.isArray(v)) return v.length === 0;
+	if (typeof v === "object") return Object.keys(v as object).length === 0;
 	return false;
 }
 
