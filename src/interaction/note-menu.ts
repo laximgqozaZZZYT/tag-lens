@@ -1,3 +1,5 @@
+import { stripTabPrefix } from "../util/tab-prefix";
+
 // Pure (DOM-less) decision logic for the mode-agnostic note navigator.
 //
 // The navigator (folder tree + search panel, built in view.ts) is shown in
@@ -163,6 +165,16 @@ export function noteMenuHeight(
 	return Math.max(headerHeight, target);
 }
 
+// The panel height to collapse to when minimized: the header bar plus the panel's
+// top+bottom border. `panelBorder` is the measured `offsetHeight - clientHeight`;
+// a detached/unstyled element can report 0, so fall back to a 2px border so the
+// collapsed panel never clips its header's bottom edge. Floored to 1 so a
+// zero-height measurement can never produce a 0-height (invisible) panel.
+// Pure: no DOM, no mutation.
+export function noteMenuHeaderOnlyHeight(headHeight: number, panelBorder: number): number {
+	return Math.max(1, headHeight + (panelBorder > 0 ? panelBorder : 2));
+}
+
 // ── Navigator tree model + grouping/search (pure, DOM-less) ──────────────────
 // The navigator body renders a collapsible tree. Two groupings are supported:
 //   • "folder" — group by the note id path (split on "/"), one leaf per note.
@@ -195,15 +207,11 @@ function emptyTree(): TreeNode {
 	return { folders: new Map(), leaves: [] };
 }
 
-// Strip the Euler-nested-copy prefix from an id.
-// Euler/bubbles layout duplicates a note that appears in N intersection regions
-// by creating copies with id `${tag}\t${originalPath}`. All other modes use the
-// plain file path with no tab. Stripping the prefix lets the folder tree, the
-// leaf display label, and the search deduplicator work on the real file path.
-export function stripTabPrefix(id: string): string {
-	const tab = id.indexOf("\t");
-	return tab >= 0 ? id.slice(tab + 1) : id;
-}
+// Strip the Euler-nested-copy prefix from an id. The canonical definition lives
+// in the neutral `util/tab-prefix` module so `draw/` can share it without a
+// cross-layer import; re-exported here so the navigator's many call sites (and
+// its downstream importers) keep the stable `interaction/note-menu` API.
+export { stripTabPrefix };
 
 // ── Per-row graph-visibility checkboxes (pure, DOM-less) ─────────────────────
 // Every navigator row (note leaf + folder/tag/combo group) carries a checkbox.
@@ -222,6 +230,22 @@ export function stripTabPrefix(id: string): string {
 // The persisted hide key for a note: its real path (Euler tab prefix stripped).
 export function hideKey(note: NoteRef): string {
 	return stripTabPrefix(note.id);
+}
+
+// Bulk Select-all / Deselect-all over the note-menu's current note set: returns
+// the NEXT `hiddenNodes` array (pure — no mutation of the input). `hide=true`
+// (Deselect all) appends every key not already present, preserving the original
+// push order and de-duplicating; `hide=false` (Select all) removes every key.
+// Because the per-checkbox path keys are added de-duped, removing all occurrences
+// is equivalent to the legacy first-occurrence-per-node splice.
+export function bulkSetHidden(current: string[], keys: string[], hide: boolean): string[] {
+	if (hide) {
+		const out = current.slice();
+		for (const k of keys) if (!out.includes(k)) out.push(k);
+		return out;
+	}
+	const remove = new Set(keys);
+	return current.filter((k) => !remove.has(k));
 }
 
 // Is an on-canvas node id hidden by `hiddenSet`? Matches either the FULL id
@@ -243,6 +267,31 @@ export function nodeIsHidden(id: string, hiddenSet: Set<string>): boolean {
 // Exported so the logic is unit-testable independently of the DOM.
 export function buildFolderPathKey(parentPath: string, name: string): string {
 	return parentPath ? `${parentPath}/${name}` : name;
+}
+
+// Build the navigator folder-row label, prefixing the display text with a
+// disclosure triangle that reflects the open/closed state: ▾ (U+25BE) when open,
+// ▸ (U+25B8) when closed. Centralises the glyph choice that the tree builder
+// repeats for every collapsible row (regular folders and the "(all)" subtree
+// header) and at both initial render and each open/close toggle.
+//
+// Exported so the glyph mapping is unit-testable independently of the DOM.
+export function folderToggleLabel(text: string, open: boolean): string {
+	return `${open ? "▾" : "▸"} ${text}`;
+}
+
+// Disclosure descriptor for a collapsible navigator row: pairs the kids-div
+// `display` (open → "block", closed → "none") with the triangle-prefixed label
+// from folderToggleLabel. The tree builder inlines this exact pair four times
+// (openAll/closeAll for the "(all)" header, openFolder/closeFolder for regular
+// folders); centralising it here keeps the block↔open / none↔closed mapping in
+// one place (mirrors the noteMenuTopTabDisplay / noteMenuMinimizeDisplay maps).
+// The view applies `display` to the kids-div and `label` to the row's label
+// span; all event wiring stays in the view.
+//
+// Exported so the open↔display mapping is unit-testable independently of the DOM.
+export function folderDisclosure(text: string, open: boolean): { display: string; label: string } {
+	return { display: open ? "block" : "none", label: folderToggleLabel(text, open) };
 }
 
 // All DISTINCT descendant note hide-keys under a tree node, recursively across
@@ -277,7 +326,7 @@ export function collectDescendantNoteKeys(node: TreeNode): string[] {
 // rendering in the navigator's "(all)" subtree). De-duplicated by path
 // (stripTabPrefix), sorted label-asc then id-asc. Memoises visited nodes to
 // handle the shared-DAG structure safely.
-export function collectDescendantLeaves(node: TreeNode): TreeLeaf[] {
+function collectDescendantLeaves(node: TreeNode): TreeLeaf[] {
 	const seen = new Set<string>();
 	const out: TreeLeaf[] = [];
 	const visited = new Set<TreeNode>();
@@ -296,6 +345,17 @@ export function collectDescendantLeaves(node: TreeNode): TreeLeaf[] {
 	return out;
 }
 
+// Leaves to list in a node's collapsible "(all)" subtree. The "(all)" affordance
+// is TAG-TREE ONLY and appears under any node that HAS sub-folders, flat-listing
+// every DISTINCT descendant note. Returns [] when it must not appear (folder tree,
+// or a node with no sub-folders), so the caller renders the "(all)" folder iff the
+// result is non-empty — the same guard the view applied inline at both call sites
+// (root list + each expanded folder).
+export function allFolderLeaves(node: TreeNode, isTagTree: boolean): TreeLeaf[] {
+	if (!isTagTree || node.folders.size === 0) return [];
+	return collectDescendantLeaves(node);
+}
+
 // Tri-state for a folder/group/combo checkbox from its descendant note keys:
 //   • "checked"        — NO descendant is hidden (all visible). Also the state
 //                        for an EMPTY group (no descendants) → defaults checked.
@@ -311,6 +371,45 @@ export function folderCheckState(descendantKeys: string[], hiddenSet: Set<string
 	if (hidden === 0) return "checked";
 	if (hidden === descendantKeys.length) return "unchecked";
 	return "indeterminate";
+}
+
+// Cascade decision for a group (folder/tag) checkbox toggle: `true` = hide every
+// descendant, `false` = show every descendant. A fully-checked group (all visible)
+// hides on toggle; an unchecked OR indeterminate group shows all — so a single
+// click always resolves a partial group to fully-visible first. Mirrors the
+// standard tri-state "click clears the mixed state toward on" affordance.
+export function folderCascadeHide(descendantKeys: string[], hiddenSet: Set<string>): boolean {
+	return folderCheckState(descendantKeys, hiddenSet) === "checked";
+}
+
+// ARIA `aria-checked` value for a tri-state checkbox. The custom `gim-nav-cb`
+// span (leaf + folder rows) carries `data-state` for the CSS glyph and this
+// matching `aria-checked` for assistive tech: indeterminate → "mixed", checked
+// → "true", unchecked → "false" (the WAI-ARIA tri-state checkbox contract).
+export function checkboxAriaChecked(state: FolderCheckState): "mixed" | "true" | "false" {
+	if (state === "indeterminate") return "mixed";
+	return state === "checked" ? "true" : "false";
+}
+
+// Initial DOM descriptor for the custom tri-state row checkbox `<span>`
+// (`gim-nav-cb`, used on every leaf + folder row): its class, the WAI-ARIA
+// checkbox attributes, and the starting `data-state`. The view creates the
+// span from this and drives later state changes via `checkboxAriaChecked` +
+// `data-state`. Seeding the initial `aria-checked` from the same `state`
+// through `checkboxAriaChecked` guarantees the two seeds can never drift
+// (both encode the "unchecked" starting contract).
+export interface NoteMenuRowCheckboxSpec {
+	cls: string;
+	state: FolderCheckState;
+	attr: { role: "checkbox"; "aria-checked": "mixed" | "true" | "false"; tabindex: string };
+}
+export function noteMenuRowCheckboxSpec(): NoteMenuRowCheckboxSpec {
+	const state: FolderCheckState = "unchecked";
+	return {
+		cls: "gim-nav-cb",
+		state,
+		attr: { role: "checkbox", "aria-checked": checkboxAriaChecked(state), tabindex: "0" },
+	};
 }
 
 // Display label for a note: the final segment of its id path (after stripping
@@ -675,6 +774,17 @@ export function currentToken(query: string): string {
 	return m ? m[1] : "";
 }
 
+// Replace the token currently being typed (the trailing non-space run) with the
+// accepted suggestion `text`, returning the new full search value. Tags/notes get
+// a trailing space (the term is complete); a "key:" completion keeps no space so
+// the user can continue typing the value. Pure: never touches the DOM.
+export function applySuggestionToken(value: string, text: string): string {
+	const tok = currentToken(value);
+	const head = value.slice(0, value.length - tok.length);
+	const trailing = text.endsWith(":") ? "" : " ";
+	return head + text + trailing;
+}
+
 // Distinct sorted tags across the note set (no '#', lowercase preserved as-is).
 function allTags(notes: NoteRef[]): string[] {
 	const set = new Set<string>();
@@ -760,4 +870,86 @@ export function suggestQuery(notes: NoteRef[], query: string): Suggestion[] {
 	// Cap notes a bit so they don't crowd out tags/fields, then merge + global cap.
 	out.push(...noteSugs.slice(0, MERGED_CAP));
 	return sortSuggestions(out).slice(0, MERGED_CAP);
+}
+
+// ── Suggestion-dropdown keyboard reducer ────────────────────────────────────
+// Pure transition for the search box's keydown handler. Given the current
+// dropdown state and the pressed key, return the action the view should take
+// (open / move the highlight / accept / run the search / close), along with
+// which default event behaviours to suppress. `selIdx` is the keyboard-
+// highlighted row (−1 = none); `count` is the number of live suggestions;
+// `open` mirrors whether the dropdown is currently shown WITH suggestions
+// (so `open` implies `count > 0`, keeping the modulo math safe).
+export interface SuggestKeyState {
+	open: boolean;
+	selIdx: number;
+	count: number;
+}
+
+export type SuggestKeyAction =
+	| { type: "none" }
+	| { type: "open" }
+	| { type: "move"; selIdx: number; preventDefault: true }
+	| { type: "accept"; index: number; preventDefault: true }
+	| { type: "search" }
+	| { type: "close"; preventDefault: true; stopPropagation: true };
+
+export function suggestKeyAction(key: string, state: SuggestKeyState): SuggestKeyAction {
+	const { open, selIdx, count } = state;
+	switch (key) {
+		case "ArrowDown":
+			if (!open) return { type: "open" };
+			return { type: "move", selIdx: (selIdx + 1) % count, preventDefault: true };
+		case "ArrowUp":
+			if (!open) return { type: "none" };
+			return { type: "move", selIdx: (selIdx - 1 + count) % count, preventDefault: true };
+		case "Enter":
+			if (open && selIdx >= 0) return { type: "accept", index: selIdx, preventDefault: true };
+			return { type: "search" };
+		case "Escape":
+			if (open) return { type: "close", preventDefault: true, stopPropagation: true };
+			return { type: "none" };
+		default:
+			return { type: "none" };
+	}
+}
+
+// Screen-space banner text for a non-fatal navigator failure (drawn as a small
+// canvas overlay in view.ts's draw() so the cause is visible on mobile, where
+// the console isn't reachable). Prefixes the raw error with a warning glyph and
+// caps the whole line at `max` chars, appending an ellipsis on overflow so a
+// long message/stack can't run off the canvas edge.
+export const NOTE_MENU_ERROR_MAX = 140;
+export function noteMenuErrorText(err: string, max = NOTE_MENU_ERROR_MAX): string {
+	const msg = `⚠ Note menu disabled: ${err}`;
+	return msg.length > max ? `${msg.slice(0, max - 1)}…` : msg;
+}
+
+// Screen-space box for the same banner (drawn in view.ts's draw()). Given the
+// measured text width and the canvas client width, returns the fill rect + text
+// origin + a text clamp. The box hugs the text but its width can never exceed the
+// canvas (text is clamped to clientWidth − 2·padX), and the text render is clamped
+// a little tighter (clientWidth − 24) so it never runs off the right edge. Pure so
+// the geometry can't drift from the caller's fillRect/fillText args.
+export interface NoteMenuErrorBanner {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+	textX: number;
+	textY: number;
+	maxTextWidth: number;
+}
+export function noteMenuErrorBannerBox(measuredTextWidth: number, clientWidth: number): NoteMenuErrorBanner {
+	const padX = 8, padY = 5, x = 8, y = 8, h = 22;
+	const tw = Math.min(measuredTextWidth, Math.max(0, clientWidth - 16));
+	return {
+		x,
+		y,
+		w: tw + padX * 2,
+		h,
+		textX: x + padX,
+		textY: y + padY,
+		maxTextWidth: Math.max(0, clientWidth - 24),
+	};
 }

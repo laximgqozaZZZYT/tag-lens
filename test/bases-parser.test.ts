@@ -98,6 +98,136 @@ import type { BaseFilter } from "../src/bases/types";
 
 	const c5 = parseCond("garbage");
 	ok(c5 === null, "no operator / no method → null");
+
+	// multi-arg method form: args split on top-level commas, each unquoted.
+	const c6 = parseCond('file.tags.containsAny("書籍", "小説")');
+	ok(
+		c6?.op === "containsAny" &&
+			c6?.args?.length === 2 &&
+			c6.args[0] === "書籍" &&
+			c6.args[1] === "小説" &&
+			c6.rhs === "書籍",
+		"containsAny multi-arg → args split + unquoted, rhs mirrors args[0]",
+	);
+
+	// quoted comma inside an argument must not split it.
+	const c7 = parseCond('file.tags.containsAll("a,b", "c")');
+	ok(
+		c7?.args?.length === 2 && c7.args[0] === "a,b" && c7.args[1] === "c",
+		"quoted comma preserved inside argument",
+	);
+
+	// single-arg method stays backward compatible via rhs and gains args[0].
+	const c8 = parseCond('file.tags.contains("#tag")');
+	ok(c8?.rhs === "#tag" && c8?.args?.length === 1 && c8.args[0] === "#tag", "single-arg method: rhs + args[0]");
+
+	// empty argument list → args empty, rhs "".
+	const c9 = parseCond("file.tags.isEmpty()");
+	ok(c9?.op === "isEmpty" && c9?.args?.length === 0 && c9?.rhs === "", "no-arg method → empty args, rhs \"\"");
+}
+
+// --- negation: leading `!`, double-negation, boolean-predicate form ---
+{
+	const n1 = parseCond('!file.tags.contains("書籍")');
+	ok(
+		n1?.op === "contains" && n1?.rhs === "書籍" && n1?.negate === true,
+		"leading ! → contains cond with negate:true (NOT dropped to raw)",
+	);
+
+	const n2 = parseCond('!!file.tags.contains("書籍")');
+	ok(n2?.op === "contains" && !n2?.negate, "double negation cancels → no negate flag");
+
+	// Bases-native `<pred> == false` negates the inner predicate.
+	const n3 = parseCond('file.tags.contains("x") == false');
+	ok(n3?.op === "contains" && n3?.rhs === "x" && n3?.negate === true, "`pred == false` → inner cond negate:true");
+
+	const n4 = parseCond('file.tags.contains("x") == true');
+	ok(n4?.op === "contains" && !n4?.negate, "`pred == true` → inner cond, no negation");
+
+	const n5 = parseCond('file.tags.contains("x") != false');
+	ok(n5?.op === "contains" && !n5?.negate, "`pred != false` keeps the predicate (no negation)");
+
+	// `!(pred == false)` — the `!` cancels the `== false` negation.
+	const n6 = parseCond('!file.tags.contains("x") == false');
+	ok(n6?.op === "contains" && !n6?.negate, "! over `pred == false` cancels back to plain");
+}
+
+// --- `IN (...)` membership operator (was unparseable → silently ignored) ---
+{
+	const i1 = parseCond('note.status IN ("done", "wip")');
+	ok(
+		i1?.op === "IN" && i1?.args?.length === 2 && i1.args[0] === "done" && i1.args[1] === "wip" && i1.rhs === "done",
+		"IN → op:IN with unquoted args + rhs mirrors args[0]",
+	);
+
+	const i2 = parseCond('note.status IN ("a,b", "c")');
+	ok(i2?.args?.length === 2 && i2.args[0] === "a,b" && i2.args[1] === "c", "IN: quoted comma preserved");
+
+	const i3 = parseCond('note.status in ("x")');
+	ok(i3?.op === "IN", "IN keyword is case-insensitive");
+
+	const i4 = parseCond('!note.status IN ("x")');
+	ok(i4?.op === "IN" && i4?.negate === true, "negated IN → negate:true");
+}
+
+// --- inline && / || boolean operators in a filter string (were dropped to raw) ---
+{
+	const a = parseBaseFilter('file.hasTag("x") && note.author == "Ada"');
+	ok(a != null && "and" in a && a.and.length === 2 && "cond" in a.and[0] && "cond" in a.and[1], "&& → { and: [cond, cond] }");
+
+	const o = parseBaseFilter('note.a == "1" || note.a == "2"');
+	ok(o != null && "or" in o && o.or.length === 2, "|| → { or: [...] }");
+
+	// precedence: && binds tighter than ||.
+	const p = parseBaseFilter('a == "1" || b == "2" && c == "3"');
+	ok(p != null && "or" in p && p.or.length === 2 && "and" in p.or[1], "a || b && c → { or: [a, { and: [b, c] }] }");
+
+	// quoted operator must NOT split, and method-call parens are protected.
+	const q = parseBaseFilter('note.title == "a && b"');
+	ok(q != null && "cond" in q && q.cond.rhs === "a && b", "quoted && stays inside the value");
+	const m = parseBaseFilter('file.hasTag("x") && file.inFolder("d")');
+	ok(m != null && "and" in m && m.and.length === 2, "method-call parens don't cause a mis-split");
+}
+
+// --- parenthesised grouping ( … ) and !( … ) (grouped operand was dropped to raw) ---
+{
+	const g = parseBaseFilter('(note.a == "1" || note.a == "2") && file.hasTag("x")');
+	ok(
+		g != null && "and" in g && g.and.length === 2 && "or" in g.and[0] && "cond" in g.and[1],
+		"(a || b) && c → { and: [ { or }, { cond } ] }",
+	);
+
+	const n = parseBaseFilter('!(file.hasTag("x") && file.hasTag("y"))');
+	ok(n != null && "not" in n && "and" in n.not, "!( a && b ) → { not: { and } }");
+
+	const nest = parseBaseFilter('(note.a == "1" && note.b == "2") || note.c == "3"');
+	ok(nest != null && "or" in nest && "and" in nest.or[0], "(a && b) || c → { or: [ { and }, cond ] }");
+
+	// `(a) || (b)` is NOT one wrapping group → normal or-split of two leaves.
+	const two = parseBaseFilter('(note.a == "1") || (note.b == "2")');
+	ok(two != null && "or" in two && two.or.length === 2, "(a) || (b) → or of two (each group unwrapped)");
+
+	// regression: method-call parens are not mistaken for a group.
+	const m = parseBaseFilter('file.hasTag("x") && file.inFolder("d")');
+	ok(m != null && "and" in m && m.and.length === 2, "method-call parens are not unwrapped");
+}
+
+// --- `not:` structured logical operator (was ignored as unknown object) ---
+{
+	const n = parseBaseFilter({ not: 'file.tags.contains("x")' });
+	ok(n != null && "not" in n && "cond" in n.not, "not: → { not: { cond } }");
+
+	const nAnd = parseBaseFilter({ not: ['file.ext == "md"', 'file.tags.contains("x")'] });
+	ok(nAnd != null && "not" in nAnd && "and" in nAnd.not, "not: over an array → { not: { and: [...] } }");
+}
+
+// --- mis-split inline compound degrades to raw, not a wrong constraint ---
+{
+	const bad = parseCond('file.tags.contains("#a") AND file.name != "b"');
+	ok(bad === null, "inline `a AND b` → null (spaces/parens in lhs rejected) → caller keeps { raw }");
+
+	const wrapped = parseBaseFilter('file.tags.contains("#a") AND file.name != "b"');
+	ok(wrapped != null && "raw" in wrapped, "…and parseBaseFilter wraps it as { raw } (ignored at eval)");
 }
 
 console.log("bases-parser tests passed");

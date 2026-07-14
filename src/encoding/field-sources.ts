@@ -27,6 +27,13 @@ function frontmatterField(key: string): FieldSource {
 	};
 }
 
+// All statically-registered field sources, in registration order. Excludes the
+// dynamic per-frontmatter-key sources (those are made on demand). A copy, so
+// callers cannot mutate the registry.
+export function listFieldSources(): FieldSource[] {
+	return [...fieldSourceRegistry];
+}
+
 // Resolve a fieldId to a FieldSource, including the dynamic "frontmatter:<key>".
 export function resolveFieldSource(fieldId: string): FieldSource | undefined {
 	const direct = fieldSourceRegistry.find((f) => f.id === fieldId);

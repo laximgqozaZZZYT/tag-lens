@@ -23,3 +23,12 @@ for (const mode of ALL_MODES) {
 		`mode '${mode}' applies every display toggle`,
 	);
 }
+
+// Scatter has no clusters/edges (layoutScatter emits neither), so the
+// enclosure/edge overlays are inert and their toggles are hidden; the rest
+// of the card toggles still apply.
+ok(!displayToggleApplies("scatter", "showEnclosures"), "scatter hides Show enclosures");
+ok(!displayToggleApplies("scatter", "showEdges"), "scatter hides Show edges");
+for (const k of ["showNodes", "showGrid", "showMaturity"] as const) {
+	ok(displayToggleApplies("scatter", k), `scatter applies '${k}'`);
+}

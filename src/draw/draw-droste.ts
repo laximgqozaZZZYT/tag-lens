@@ -2,6 +2,7 @@ import { buildIcon, type DrosteGallery, type IconDiagram } from "../layout/drost
 import type { AxisSpec } from "../layout/axis-layout";
 import { theme, colorAlpha, parseColor, relativeLuminance } from "./theme";
 import { truncateToWidth, clusterHue, createStripeGradient, stripeHuesForExtent, membershipStripeHues } from "./canvas-utils";
+import { stripTabPrefix } from "../util/tab-prefix";
 
 // Containment lens = Icon Gallery (spec 2026-06-01). Every node gets an "icon diagram"
 // (① N ∈ ② sig(N) ∈ ③ direct-superset sets ∈ …), all tiled in a grid and navigated by
@@ -529,8 +530,7 @@ export function drawDroste(ctx: CanvasRenderingContext2D, o: DrawDrosteOpts): vo
 			// toggle immediately removes the cell — matching the skipNode path
 			// used by all other view modes.
 			if (o.hiddenSet) {
-				const tab = id.indexOf("\t");
-				const path = tab >= 0 ? id.slice(tab + 1) : id;
+				const path = stripTabPrefix(id);
 				if (o.hiddenSet.has(id) || o.hiddenSet.has(path)) continue;
 			}
 			const scx = sx((col + 0.5) * cellSize), scy = sy((row + 0.5) * cellSize);

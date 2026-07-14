@@ -16,7 +16,8 @@
 //   - Never overwrite an existing file (idempotent; reuse a prior `_all.base`).
 //   - Any failure returns null and is swallowed so rebuild() is never broken.
 
-import type { App, CachedMetadata, TFile } from "obsidian";
+import type { App, TFile } from "obsidian";
+import { collectTags } from "./collect-tags";
 import { scanBaseFiles } from "./parser";
 
 // Vault-root path of the auto-generated fallback base.
@@ -44,19 +45,6 @@ export const FALLBACK_BASE_CONTENT = `views:
 // generate ONLY when there is not a single `.base` file in the vault.
 export function shouldGenerateFallback(baseFilePaths: readonly string[]): boolean {
 	return baseFilePaths.length === 0;
-}
-
-// Lightweight tag collector — originally mirrored from the legacy SQL parser,
-// now kept local to avoid depending on heavy graph-build modules.
-// Reads inline tags (cache.tags) and frontmatter tags, strips a leading '#'.
-function collectTags(cache: CachedMetadata | null): string[] {
-	if (!cache) return [];
-	const out: string[] = [];
-	if (cache.tags) for (const t of cache.tags) out.push(stripHash(t.tag));
-	const fm = (cache.frontmatter as Record<string, unknown> | undefined)?.tags;
-	if (Array.isArray(fm)) for (const t of fm) out.push(stripHash(String(t)));
-	else if (typeof fm === "string") out.push(stripHash(fm));
-	return out;
 }
 
 // Count distinct tags across the vault, deduplicating per note so a note that
@@ -160,8 +148,4 @@ export async function ensureFallbackBase(app: App): Promise<TFile | null> {
 
 function isTFile(f: unknown): f is TFile {
 	return typeof f === "object" && f !== null && "extension" in f && "stat" in f;
-}
-
-function stripHash(t: string): string {
-	return t.startsWith("#") ? t.slice(1) : t;
 }

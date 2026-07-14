@@ -12,6 +12,7 @@ import {
 	INTERSECTION_LAYER_KEY,
 	SET_LAYER_LABEL,
 } from "../visual/node-display";
+import { pluralize } from "../util/pluralize";
 
 // Pure inputs the legend builder reads off the view. Extracted verbatim from
 // MiniGraphView so the (large) data-shaping logic lives in one testable place;
@@ -102,7 +103,7 @@ export function computeModeLegendInput(deps: ModeLegendInputDeps): ModeLegendInp
 		const n = count ?? tagVisibleCount(groupKey);
 		const d = deps.resolveLayerDisplay(groupKey);
 		const parts: string[] = [`Size ${d.nodeRows}×${d.nodeCols}`];
-		if (Number.isFinite(n)) parts.push(`${n} node${n === 1 ? "" : "s"}`);
+		if (Number.isFinite(n)) parts.push(pluralize(n, "node"));
 		if (aggSet.has(groupKey)) parts.push("Aggregate (3-card stack)");
 		const inh = inheritPart(groupKey);
 		if (inh) parts.push(inh);

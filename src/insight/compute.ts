@@ -1,5 +1,6 @@
 import type { App } from "obsidian";
 import { effectiveClassification } from "../query/tag-classification";
+import { jaccardSimilarity } from "../util/jaccard";
 
 interface GlobalStats {
 	totalNotes: number;
@@ -217,11 +218,8 @@ export function findRedundantTagPairs(
 		for (let j = i + 1; j < tags.length; j++) {
 			const [bKey, bSet] = tags[j];
 			if (bSet.size < 2) continue;
-			let inter = 0;
-			for (const id of aSet) { if (bSet.has(id)) inter++; }
-			const union = aSet.size + bSet.size - inter;
-			if (union === 0) continue;
-			const jaccard = inter / union;
+			// Both sets are size ≥ 2 here, so the union is never empty.
+			const jaccard = jaccardSimilarity(aSet, bSet);
 			if (jaccard >= minJaccard) {
 				results.push({ a: aKey, b: bKey, jaccard });
 			}

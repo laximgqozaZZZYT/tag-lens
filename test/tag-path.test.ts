@@ -1,6 +1,6 @@
 // Validation tests for isValidTagName — path-injection guard in applyGolderClassification.
 import { ok } from "./assert";
-import { isValidTagName } from "../src/insight/tag-path";
+import { isTagOrSubtag, isValidTagName } from "../src/insight/tag-path";
 
 // --- 正常系 (valid) ---
 {
@@ -60,4 +60,22 @@ import { isValidTagName } from "../src/insight/tag-path";
 	ok(!isValidTagName("a‮b"),      "RTL override U+202E (bidi control) is rejected");
 	ok(!isValidTagName("親/../子"),       "traversal between multibyte segments is rejected");
 	ok(!isValidTagName("タグ\\子"),       "backslash between multibyte segments is rejected");
+}
+
+// --- isTagOrSubtag — self-or-nested-descendant match (convertToNestedTag) ---
+{
+	ok(isTagOrSubtag("foo", "foo"),        "exact match is a hit");
+	ok(isTagOrSubtag("foo/bar", "foo"),    "direct child is a hit");
+	ok(isTagOrSubtag("foo/bar/baz", "foo"),"deep descendant is a hit");
+	ok(isTagOrSubtag("親/子", "親"),         "multibyte child is a hit");
+
+	ok(!isTagOrSubtag("foobar", "foo"),    "bare prefix (no slash) is NOT a hit");
+	ok(!isTagOrSubtag("foo", "foo/bar"),   "ancestor is NOT a hit for a deeper target");
+	ok(!isTagOrSubtag("other", "foo"),     "unrelated tag is not a hit");
+	ok(!isTagOrSubtag("xfoo/bar", "foo"),  "non-prefix sharing a segment is not a hit");
+
+	// `#`-prefixed form (cache.tags entries compare against `#${tag}`)
+	ok(isTagOrSubtag("#foo", "#foo"),      "prefixed exact match is a hit");
+	ok(isTagOrSubtag("#foo/bar", "#foo"),  "prefixed child is a hit");
+	ok(!isTagOrSubtag("#foobar", "#foo"),  "prefixed bare prefix is NOT a hit");
 }

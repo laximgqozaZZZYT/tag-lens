@@ -10,20 +10,33 @@ import {
 	menuClickAction,
 	clampRect,
 	noteMenuHeight,
+	noteMenuHeaderOnlyHeight,
 	buildFolderTree,
 	buildTagTree,
 	searchNotes,
 	advancedSearch,
 	suggestQuery,
 	currentToken,
+	applySuggestionToken,
 	tagLabel,
 	comboLabel,
 	UNTAGGED_BUCKET,
 	hideKey,
 	nodeIsHidden,
+	bulkSetHidden,
 	collectDescendantNoteKeys,
+	allFolderLeaves,
 	folderCheckState,
+	folderCascadeHide,
+	checkboxAriaChecked,
+	noteMenuRowCheckboxSpec,
 	buildFolderPathKey,
+	folderToggleLabel,
+	folderDisclosure,
+	suggestKeyAction,
+	noteMenuErrorText,
+	noteMenuErrorBannerBox,
+	NOTE_MENU_ERROR_MAX,
 	type NoteRef,
 	type TreeNode,
 } from "../src/interaction/note-menu";
@@ -182,6 +195,15 @@ const MIN = { width: 180, height: 120 };
 // Restored height can never be shorter than the header bar.
 {
 	ok(noteMenuHeight(false, 30, 10, 5) === 30, "noteMenuHeight: restore floored to header height");
+}
+
+// ── noteMenuHeaderOnlyHeight: collapse-to-header height ───────────────────────
+// Header bar + measured border; a 0 border measurement falls back to 2px.
+{
+	ok(noteMenuHeaderOnlyHeight(30, 4) === 34, "headerOnly: header + measured border");
+	ok(noteMenuHeaderOnlyHeight(30, 0) === 32, "headerOnly: zero border → 2px fallback");
+	ok(noteMenuHeaderOnlyHeight(30, -3) === 32, "headerOnly: negative border → 2px fallback");
+	ok(noteMenuHeaderOnlyHeight(0, 0) === 2, "headerOnly: floored positive even with no header");
 }
 
 // ── Navigator grouping: folder tree / tag tree / search dedupe ───────────────
@@ -523,6 +545,29 @@ const advNotes: NoteRef[] = [
 	ok(currentToken("done ") === "", "currentToken: trailing space → empty token");
 }
 
+// ── applySuggestionToken ─────────────────────────────────────────────────────
+{
+	// Tag/note completions replace the trailing token and add a closing space.
+	ok(
+		applySuggestionToken("#pro", "#project") === "#project ",
+		"applySuggestionToken: tag replaces token + trailing space",
+	);
+	ok(
+		applySuggestionToken("#proj sta", "status") === "#proj status ",
+		"applySuggestionToken: only the last token is replaced",
+	);
+	// "key:" completions keep no space so the value can keep being typed.
+	ok(
+		applySuggestionToken("stat", "status:") === "status:",
+		"applySuggestionToken: key: completion adds no trailing space",
+	);
+	// Empty token (trailing space) → suggestion is appended.
+	ok(
+		applySuggestionToken("#done ", "#project") === "#done #project ",
+		"applySuggestionToken: empty token appends after the space",
+	);
+}
+
 // ── suggestQuery ─────────────────────────────────────────────────────────────
 
 // #tag partial → distinct matching tags, with '#', sorted, kind "tag".
@@ -606,6 +651,37 @@ const advNotes: NoteRef[] = [
 	ok(!nodeIsHidden("tagB\tnotes/MyNote.md", byId), "nodeIsHidden: raw-id entry does NOT hide the other copy");
 }
 
+// bulkSetHidden: the Select-all / Deselect-all transform on `hiddenNodes`.
+{
+	// Deselect all (hide=true): append every key not already present, de-duped,
+	// preserving original order then push order.
+	ok(
+		JSON.stringify(bulkSetHidden(["x.md"], ["a.md", "b.md"], true)) ===
+			JSON.stringify(["x.md", "a.md", "b.md"]),
+		"bulkSetHidden hide: appends new keys after existing in push order",
+	);
+	ok(
+		JSON.stringify(bulkSetHidden(["a.md"], ["a.md", "b.md"], true)) ===
+			JSON.stringify(["a.md", "b.md"]),
+		"bulkSetHidden hide: skips keys already present (dedup)",
+	);
+	// Select all (hide=false): remove every listed key, keeping the rest in order.
+	ok(
+		JSON.stringify(bulkSetHidden(["a.md", "x.md", "b.md"], ["a.md", "b.md"], false)) ===
+			JSON.stringify(["x.md"]),
+		"bulkSetHidden show: removes listed keys, preserves remaining order",
+	);
+	ok(
+		JSON.stringify(bulkSetHidden(["x.md"], ["a.md"], false)) === JSON.stringify(["x.md"]),
+		"bulkSetHidden show: removing an absent key is a no-op",
+	);
+	// Purity: the input array is never mutated.
+	const input = ["a.md"];
+	bulkSetHidden(input, ["b.md"], true);
+	bulkSetHidden(input, ["a.md"], false);
+	ok(JSON.stringify(input) === JSON.stringify(["a.md"]), "bulkSetHidden: input array is not mutated");
+}
+
 // LAYOUT-LEVEL CHECK (DOM-less): a PATH in the hidden set removes EVERY on-canvas
 // copy of that note from a laid result. Mirrors filterLayoutData's filter
 // (`!nodeIsHidden(id, hiddenSet)`) so we assert the hide actually drops nodes.
@@ -660,6 +736,33 @@ const advNotes: NoteRef[] = [
 	ok(keys.join(",") === "notes/MyNote.md,notes/Other.md", "collectDescendantNoteKeys: Euler copies dedupe to one path key");
 }
 
+// allFolderLeaves: the collapsible "(all)" subtree is TAG-TREE ONLY and appears
+// only under a node that HAS sub-folders; returns [] otherwise so the caller
+// renders the "(all)" row iff the result is non-empty (same guard the view
+// applied inline at both the root and per-folder call sites).
+{
+	const notes: NoteRef[] = [
+		{ id: "n1.md", label: "n1", memberships: ["a", "b"] },
+		{ id: "n2.md", label: "n2", memberships: ["a"] },
+		{ id: "s.md", label: "s", memberships: ["solo"] },
+	];
+	const tt = buildTagTree(notes);
+	// Folder-tree mode: never show "(all)", even for a node with sub-folders.
+	ok(allFolderLeaves(tt, false).length === 0, "allFolderLeaves: folder-tree mode → empty");
+	// Tag-tree root has sub-folders (#a, #b, #solo) → lists every distinct note once.
+	const rootAll = allFolderLeaves(tt, true).map((l) => l.id).sort();
+	ok(rootAll.join(",") === "n1.md,n2.md,s.md", "allFolderLeaves: tag-tree root lists all distinct descendants");
+	// #a hosts the {a,b} combo subgroup → has sub-folders → lists n1 + n2 (deduped).
+	const aNode = tt.folders.get("a")!;
+	ok(aNode.folders.size > 0, "precondition: #a has a combo sub-folder");
+	const aAll = allFolderLeaves(aNode, true).map((l) => l.id).sort();
+	ok(aAll.join(",") === "n1.md,n2.md", "allFolderLeaves: node with sub-folders → distinct descendant leaves");
+	// #solo is a leaf-only tag group (no sub-folders) → no "(all)" even in tag mode.
+	const soloNode = tt.folders.get("solo")!;
+	ok(soloNode.folders.size === 0, "precondition: #solo has no sub-folders");
+	ok(allFolderLeaves(soloNode, true).length === 0, "allFolderLeaves: leaf-only node → empty even in tag mode");
+}
+
 // folderCheckState: tri-state over descendant keys.
 {
 	const keys = ["a.md", "b.md", "c.md"];
@@ -670,26 +773,66 @@ const advNotes: NoteRef[] = [
 	ok(folderCheckState([], new Set(["x"])) === "checked", "folderCheckState: empty group → checked");
 }
 
+// checkboxAriaChecked: WAI-ARIA tri-state checkbox contract. The `data-state`
+// the view stamps maps to aria-checked: indeterminate → "mixed", checked →
+// "true", unchecked → "false".
+{
+	ok(checkboxAriaChecked("checked") === "true", "checkboxAriaChecked: checked → true");
+	ok(checkboxAriaChecked("unchecked") === "false", "checkboxAriaChecked: unchecked → false");
+	ok(checkboxAriaChecked("indeterminate") === "mixed", "checkboxAriaChecked: indeterminate → mixed");
+	// Round-trips with folderCheckState — every tri-state it can return has an
+	// aria value (no "undefined"/empty leak to assistive tech).
+	for (const st of ["checked", "unchecked", "indeterminate"] as const) {
+		const v = checkboxAriaChecked(st);
+		ok(v === "true" || v === "false" || v === "mixed", `checkboxAriaChecked: ${st} → valid aria value`);
+	}
+}
+
+// noteMenuRowCheckboxSpec: the initial DOM descriptor for the custom tri-state
+// row checkbox span. Starts UNCHECKED, and the seeded aria-checked must match
+// what checkboxAriaChecked returns for that state (the two seeds can't drift).
+{
+	const spec = noteMenuRowCheckboxSpec();
+	ok(spec.cls === "gim-nav-cb", "rowCheckboxSpec: class is gim-nav-cb");
+	ok(spec.state === "unchecked", "rowCheckboxSpec: initial state unchecked");
+	ok(spec.attr.role === "checkbox", "rowCheckboxSpec: role=checkbox");
+	ok(spec.attr.tabindex === "0", "rowCheckboxSpec: tabindex=0 (keyboard focusable)");
+	ok(spec.attr["aria-checked"] === "false", "rowCheckboxSpec: aria-checked=false when unchecked");
+	// The aria seed must be exactly checkboxAriaChecked(state) — no drift.
+	ok(
+		spec.attr["aria-checked"] === checkboxAriaChecked(spec.state),
+		"rowCheckboxSpec: aria-checked seed derives from state",
+	);
+}
+
 // CASCADE semantics: toggling a fully-checked folder hides ALL descendants;
-// toggling an indeterminate/unchecked folder shows ALL. Modelled with a plain
-// Set mutation that mirrors the view's per-key toggleArrayMember loop.
+// toggling an indeterminate/unchecked folder shows ALL. Driven by the pure
+// folderCascadeHide predicate (true = hide-all) the view now calls, mutating a
+// Set that mirrors the view's per-key toggleArrayMember loop.
 {
 	const keys = ["a.md", "b.md", "c.md"];
 	const hidden = new Set<string>();
+	// The view evaluates the cascade decision ONCE (before the toggle loop), so the
+	// mid-loop state change never flips it — mirror that here.
 	// fully checked → cascade HIDE all.
-	const wasChecked1 = folderCheckState(keys, hidden) === "checked";
-	for (const k of keys) { if (wasChecked1) hidden.add(k); else hidden.delete(k); }
+	const hide1 = folderCascadeHide(keys, hidden);
+	ok(hide1 === true, "folderCascadeHide: checked folder → hide");
+	for (const k of keys) { if (hide1) hidden.add(k); else hidden.delete(k); }
 	ok(folderCheckState(keys, hidden) === "unchecked", "cascade: checked folder → uncheck-all (all hidden)");
 	// now unchecked → cascade SHOW all.
-	const wasChecked2 = folderCheckState(keys, hidden) === "checked";
-	for (const k of keys) { if (wasChecked2) hidden.add(k); else hidden.delete(k); }
+	const hide2 = folderCascadeHide(keys, hidden);
+	ok(hide2 === false, "folderCascadeHide: unchecked folder → show");
+	for (const k of keys) { if (hide2) hidden.add(k); else hidden.delete(k); }
 	ok(folderCheckState(keys, hidden) === "checked", "cascade: unchecked folder → check-all (all visible)");
 	// indeterminate → cascade SHOW all (not "checked", so hide=false branch).
 	hidden.clear(); hidden.add("b.md");
 	ok(folderCheckState(keys, hidden) === "indeterminate", "cascade: precondition mixed → indeterminate");
-	const wasChecked3 = folderCheckState(keys, hidden) === "checked";
-	for (const k of keys) { if (wasChecked3) hidden.add(k); else hidden.delete(k); }
+	const hide3 = folderCascadeHide(keys, hidden);
+	ok(hide3 === false, "folderCascadeHide: indeterminate folder → show");
+	for (const k of keys) { if (hide3) hidden.add(k); else hidden.delete(k); }
 	ok(folderCheckState(keys, hidden) === "checked", "cascade: indeterminate folder → check-all (all visible)");
+	// empty group defaults checked → hide.
+	ok(folderCascadeHide([], new Set()) === true, "folderCascadeHide: empty group → hide (defaults checked)");
 }
 
 // MENU STILL LISTS A HIDDEN NOTE: the displayed list is the universal menuNotes,
@@ -844,6 +987,30 @@ const advNotes: NoteRef[] = [
 	ok(buildFolderPathKey("tag=proj", "combo:aabb") === "tag=proj/combo:aabb", "buildFolderPathKey: tag-tree combo subgroup key");
 }
 
+// ── folderToggleLabel: disclosure-triangle prefix for collapsible rows ────────
+// The navigator tree builder repeats this glyph choice for every collapsible row
+// (regular folders + the "(all)" subtree header) at initial render and on each
+// open/close. Open → ▾ (U+25BE), closed → ▸ (U+25B8), one space then the text.
+{
+	ok(folderToggleLabel("Area", false) === "▸ Area", "folderToggleLabel: closed folder uses ▸");
+	ok(folderToggleLabel("Area", true) === "▾ Area", "folderToggleLabel: open folder uses ▾");
+	ok(folderToggleLabel("(all)", false) === "▸ (all)", "folderToggleLabel: closed (all) header");
+	ok(folderToggleLabel("(all)", true) === "▾ (all)", "folderToggleLabel: open (all) header");
+	// Glyph + single space + text exactly; the open/closed forms differ only by glyph.
+	ok(folderToggleLabel("X", true).slice(1) === folderToggleLabel("X", false).slice(1), "folderToggleLabel: only the leading glyph differs");
+}
+
+// ── folderDisclosure: kids-div display paired with the toggle label ──────────
+// The four open/close handlers (openAll/closeAll, openFolder/closeFolder) inline
+// the same {display, label} pair; open → "block", closed → "none", label from
+// folderToggleLabel. Centralises the block↔open / none↔closed mapping.
+{
+	ok(folderDisclosure("Area", true).display === "block", "folderDisclosure: open → block");
+	ok(folderDisclosure("Area", false).display === "none", "folderDisclosure: closed → none");
+	ok(folderDisclosure("Area", true).label === folderToggleLabel("Area", true), "folderDisclosure: open label matches folderToggleLabel");
+	ok(folderDisclosure("(all)", false).label === folderToggleLabel("(all)", false), "folderDisclosure: closed label matches folderToggleLabel");
+}
+
 // ── STATE-PRESERVATION CONTRACT (pure invariant) ─────────────────────────────
 // Regression tests for the folder-expand / checkbox-toggle state preservation.
 // The DOM mechanism works like this:
@@ -888,4 +1055,91 @@ const advNotes: NoteRef[] = [
 	ok(expandedPaths.has(buildFolderPathKey("Area", "Sub")), "state-preservation: snapshot 'Area/Sub' found at depth 1");
 	// A folder NOT in the snapshot (e.g. a different sibling) is not restored.
 	ok(!expandedPaths.has(buildFolderPathKey("", "Other")), "state-preservation: unlisted folder NOT in snapshot");
+}
+
+// ── suggestKeyAction: search-box dropdown keyboard reducer ───────────────────
+// Pure transition mirroring the keydown handler in view.ts. `open` implies the
+// dropdown is shown WITH suggestions (count > 0).
+{
+	const closed = { open: false, selIdx: -1, count: 0 };
+	const openTop = { open: true, selIdx: -1, count: 3 };
+	const openSel1 = { open: true, selIdx: 1, count: 3 };
+
+	// ArrowDown closed → open the dropdown (no preventDefault action).
+	ok(suggestKeyAction("ArrowDown", closed).type === "open", "suggestKey: ArrowDown closed → open");
+
+	// ArrowDown open → move highlight forward (wraps), preventing default.
+	const dn = suggestKeyAction("ArrowDown", openSel1);
+	ok(dn.type === "move" && dn.selIdx === 2 && dn.preventDefault === true, "suggestKey: ArrowDown open → move to next");
+	const dnWrap = suggestKeyAction("ArrowDown", { open: true, selIdx: 2, count: 3 });
+	ok(dnWrap.type === "move" && dnWrap.selIdx === 0, "suggestKey: ArrowDown wraps to 0 at end");
+	const dnFromNone = suggestKeyAction("ArrowDown", openTop);
+	ok(dnFromNone.type === "move" && dnFromNone.selIdx === 0, "suggestKey: ArrowDown from −1 → 0");
+
+	// ArrowUp closed → nothing; open → move backward (wraps).
+	ok(suggestKeyAction("ArrowUp", closed).type === "none", "suggestKey: ArrowUp closed → none");
+	const up = suggestKeyAction("ArrowUp", openSel1);
+	ok(up.type === "move" && up.selIdx === 0, "suggestKey: ArrowUp open → move to prev");
+	const upWrap = suggestKeyAction("ArrowUp", { open: true, selIdx: 0, count: 3 });
+	ok(upWrap.type === "move" && upWrap.selIdx === 2, "suggestKey: ArrowUp wraps to last from 0");
+
+	// Enter with a highlighted row → accept that index; otherwise → run search.
+	const acc = suggestKeyAction("Enter", openSel1);
+	ok(acc.type === "accept" && acc.index === 1 && acc.preventDefault === true, "suggestKey: Enter highlighted → accept index");
+	ok(suggestKeyAction("Enter", openTop).type === "search", "suggestKey: Enter open w/o highlight → search");
+	ok(suggestKeyAction("Enter", closed).type === "search", "suggestKey: Enter closed → search");
+
+	// Escape open → close (suppress default + propagation); closed → nothing.
+	const esc = suggestKeyAction("Escape", openSel1);
+	ok(esc.type === "close" && esc.preventDefault === true && esc.stopPropagation === true, "suggestKey: Escape open → close");
+	ok(suggestKeyAction("Escape", closed).type === "none", "suggestKey: Escape closed → none");
+
+	// Any other key is inert.
+	ok(suggestKeyAction("a", openSel1).type === "none", "suggestKey: unrelated key → none");
+}
+
+// ── noteMenuErrorText: warning-glyph prefix + 140-char cap for the banner ────
+{
+	// Short error → full "⚠ Note menu disabled: …" line, no ellipsis.
+	const short = noteMenuErrorText("boom");
+	ok(short === "⚠ Note menu disabled: boom", "errorText: short → prefixed line");
+	ok(!short.endsWith("…"), "errorText: short → no ellipsis");
+
+	// A line of exactly the cap length is kept whole; one char more is truncated
+	// to cap length WITH a trailing ellipsis (slice(0, cap-1) + "…").
+	const prefixLen = "⚠ Note menu disabled: ".length;
+	const atCap = noteMenuErrorText("x".repeat(NOTE_MENU_ERROR_MAX - prefixLen));
+	ok(atCap.length === NOTE_MENU_ERROR_MAX, "errorText: exactly cap → kept whole");
+	ok(!atCap.endsWith("…"), "errorText: exactly cap → no ellipsis");
+
+	const overCap = noteMenuErrorText("x".repeat(NOTE_MENU_ERROR_MAX - prefixLen + 1));
+	ok(overCap.length === NOTE_MENU_ERROR_MAX, "errorText: over cap → clamped to cap length");
+	ok(overCap.endsWith("…"), "errorText: over cap → ellipsis");
+
+	// Custom max is honoured (boundary math parameterised).
+	ok(noteMenuErrorText("abc", 5) === "⚠ No…", "errorText: custom max clamps + ellipsis");
+}
+
+// ── noteMenuErrorBannerBox: screen-space box hugging the text but capped to canvas ─
+{
+	// Static origin/height + padded text origin (never depends on the inputs).
+	const wide = noteMenuErrorBannerBox(100, 400);
+	ok(wide.x === 8 && wide.y === 8, "banner: fixed 8,8 origin");
+	ok(wide.h === 22, "banner: fixed 22px height");
+	ok(wide.textX === 16 && wide.textY === 13, "banner: text origin = origin + padding");
+
+	// Text that fits → box hugs it (measured width + 2·padX = +16).
+	ok(wide.w === 116, "banner: narrow text → box width = tw + 16");
+	ok(wide.maxTextWidth === 376, "banner: maxTextWidth = clientWidth - 24");
+
+	// Text wider than the canvas → clamped so box width never exceeds clientWidth.
+	const clamped = noteMenuErrorBannerBox(1000, 200);
+	ok(clamped.w === 200, "banner: wide text → box clamped to clientWidth");
+	ok(clamped.w <= 200, "banner: box never wider than canvas");
+	ok(clamped.maxTextWidth === 176, "banner: wide text → maxTextWidth still clientWidth - 24");
+
+	// Degenerate zero-width canvas → non-negative sizes (no negative rect/clamp).
+	const zero = noteMenuErrorBannerBox(50, 0);
+	ok(zero.w === 16, "banner: cw=0 → box width = 2·padX only");
+	ok(zero.maxTextWidth === 0, "banner: cw=0 → maxTextWidth floored at 0");
 }

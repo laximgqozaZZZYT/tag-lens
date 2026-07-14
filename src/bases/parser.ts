@@ -105,9 +105,7 @@ export function parseBaseFilter(node: unknown): BaseFilter | null {
 
 	if (typeof node === "string") {
 		const trimmed = node.trim();
-		if (trimmed.length === 0) return null;
-		const cond = parseCond(trimmed);
-		return cond ? { cond } : { raw: trimmed };
+		return trimmed.length === 0 ? null : parseStringFilter(trimmed);
 	}
 
 	if (Array.isArray(node)) {
@@ -125,6 +123,11 @@ export function parseBaseFilter(node: unknown): BaseFilter | null {
 			const children = mapChildren(node["or"] as unknown[]);
 			return children.length > 0 ? { or: children } : null;
 		}
+		if (node["not"] != null) {
+			// `not:` inverts a single child (a bare array becomes an implicit AND).
+			const child = parseBaseFilter(node["not"]);
+			return child ? { not: child } : null;
+		}
 		// Unknown object shape — preserve as raw for visibility.
 		return { raw: safeStringify(node) };
 	}
@@ -141,34 +144,215 @@ function mapChildren(arr: unknown[]): BaseFilter[] {
 	return out;
 }
 
+// A single filter STRING. Handles parenthesised grouping and `!( … )` first,
+// then splits on inline boolean operators — `||` (lowest precedence) then `&&` —
+// into or/and trees; a leaf goes to parseCond. Quoted text and method-call parens
+// are protected so they never split or get mistaken for a group.
+function parseStringFilter(s: string): BaseFilter | null {
+	const t = s.trim();
+	// `!( … )`: NOT of a parenthesised group. A unary `!` on a bare predicate is
+	// left to parseCond (which strips it); only a `!(` group is handled here.
+	if (t.startsWith("!")) {
+		const rest = t.slice(1).trim();
+		if (isFullyWrapped(rest)) {
+			const inner = parseStringFilter(unwrap(rest));
+			return inner ? { not: inner } : null;
+		}
+	}
+	// A whole-expression `( … )` group: unwrap and recurse.
+	if (isFullyWrapped(t)) return parseStringFilter(unwrap(t));
+	const ors = splitTopLevel(t, "||");
+	if (ors.length > 1) return boolNode("or", ors);
+	const ands = splitTopLevel(t, "&&");
+	if (ands.length > 1) return boolNode("and", ands);
+	const cond = parseCond(t);
+	return cond ? { cond } : { raw: t };
+}
+
+// True when `s` is a single parenthesised group: starts with `(`, ends with `)`,
+// and the `(` at index 0 closes at the final char (so `(a) || (b)` is false).
+// Quotes are respected so parens inside strings don't count. Never throws.
+function isFullyWrapped(s: string): boolean {
+	if (s.length < 2 || s[0] !== "(" || !s.endsWith(")")) return false;
+	let depth = 0;
+	let quote = "";
+	for (let i = 0; i < s.length; i++) {
+		const ch = s[i];
+		if (quote) {
+			quote = ch === quote ? "" : quote;
+		} else if (isQuote(ch)) quote = ch;
+		else if (ch === "(") depth++;
+		else if (ch === ")" && --depth === 0 && i !== s.length - 1) return false;
+	}
+	return depth === 0;
+}
+
+function unwrap(s: string): string {
+	return s.slice(1, -1).trim();
+}
+
+function boolNode(kind: "and" | "or", parts: string[]): BaseFilter | null {
+	const children: BaseFilter[] = [];
+	for (const p of parts) {
+		const f = parseStringFilter(p);
+		if (f) children.push(f);
+	}
+	if (children.length === 0) return null;
+	return kind === "and" ? { and: children } : { or: children };
+}
+
+// Split `s` on the two-char `token` (`&&` or `||`) only at bracket-depth 0 and
+// outside quotes, so `hasTag("a && b")` and `f(x) && g(y)` behave. Each piece is
+// trimmed; no split → [s]. Never throws (an unbalanced quote just runs on).
+function splitTopLevel(s: string, token: string): string[] {
+	const out: string[] = [];
+	let cur = "";
+	let depth = 0;
+	let quote = "";
+	for (let i = 0; i < s.length; i++) {
+		const ch = s[i];
+		if (quote) {
+			quote = ch === quote ? "" : quote;
+			cur += ch;
+			continue;
+		}
+		if (isQuote(ch)) quote = ch;
+		else if (ch === "(") depth++;
+		else if (ch === ")") depth = Math.max(0, depth - 1);
+		else if (depth === 0 && atToken(s, i, token)) {
+			out.push(cur.trim());
+			cur = "";
+			i++; // skip the second token char
+			continue;
+		}
+		cur += ch;
+	}
+	out.push(cur.trim());
+	return out;
+}
+
+// The two-char `token` starts at index `i` in `s`.
+function atToken(s: string, i: number, token: string): boolean {
+	return s[i] === token[0] && s[i + 1] === token[1];
+}
+
+function isQuote(c: string): boolean {
+	return c === '"' || c === "'";
+}
+
 // Decompose a single string condition. Returns null when the shape is unknown
 // (caller wraps it as { raw }).
-//   method form: <lhs>.contains("rhs")  /  <lhs>.contains('rhs')  / unquoted
-//   compare form: <lhs> <op> <rhs>      op ∈ == != >= <= > <
+//   method form:  <lhs>.contains("rhs")  /  <lhs>.contains('rhs')  / unquoted
+//   compare form: <lhs> <op> <rhs>       op ∈ == != >= <= > <
+//   negation:     leading `!` (double-negation cancels) and the Bases-native
+//                 boolean-predicate form `<pred> == false` / `<pred> != true`.
+// A negated leaf keeps its `cond` (with `negate:true`) rather than degrading to
+// `{ raw }`, so the negation is honoured instead of silently ignored at eval.
 export function parseCond(text: string): BaseCond | null {
-	const s = text.trim();
-
-	// method form, e.g. file.tags.contains("#tag")
-	const m = s.match(/^([A-Za-z0-9_.]+)\.([A-Za-z_]+)\((.*)\)\s*$/);
-	if (m) {
-		const lhs = m[1];
-		const op = m[2];
-		const rhs = unquote(m[3].trim());
-		return { lhs, op, rhs };
+	// Strip leading `!` negations first (even count → no net negation), then
+	// parse the remainder. The core parser may itself flag negation (the
+	// `<pred> == false` form), which withNegate XORs in.
+	let s = text.trim();
+	let negate = false;
+	while (s.startsWith("!")) {
+		negate = !negate;
+		s = s.slice(1).trim();
 	}
+	const cond = parseMethod(s) ?? parseIn(s) ?? parseCompare(s);
+	return cond ? withNegate(cond, negate) : null;
+}
 
-	// compare form. Longest operators first so `>=` isn't split as `>`.
+// Fold `neg` into `cond.negate` (XOR with any existing flag). Clears the flag
+// when the net negation is even. Mutates and returns the same object.
+function withNegate(cond: BaseCond, neg: boolean): BaseCond {
+	if (neg !== Boolean(cond.negate)) cond.negate = true;
+	else if (cond.negate) cond.negate = undefined;
+	return cond;
+}
+
+// method form, e.g. file.tags.contains("#tag") or the multi-arg
+// file.tags.containsAny("書籍", "小説"). Split the arg list on top-level commas
+// (quoted commas preserved) so each argument is unquoted independently.
+function parseMethod(s: string): BaseCond | null {
+	const m = s.match(/^([A-Za-z0-9_.]+)\.([A-Za-z_]+)\((.*)\)\s*$/);
+	if (!m) return null;
+	const args = splitArgs(m[3]).map((a) => unquote(a.trim()));
+	// Mirror the first arg into `rhs` so single-value consumers keep working;
+	// multi-arg operators read the full `args` list.
+	return { lhs: m[1], op: m[2], rhs: args[0] ?? "", args };
+}
+
+// `<lhs> IN (a, b, …)`: membership against a parenthesised list. The eval side
+// (resolve.ts) is array-aware. Keyword is case-insensitive; the required
+// whitespace before IN means a `.method(` call never collides. Reuses splitArgs
+// so quoted commas inside a value are preserved.
+function parseIn(s: string): BaseCond | null {
+	const m = s.match(/^([A-Za-z0-9_.]+)\s+IN\s*\((.*)\)$/i);
+	if (!m) return null;
+	const args = splitArgs(m[2]).map((a) => unquote(a.trim()));
+	return { lhs: m[1], op: "IN", rhs: args[0] ?? "", args };
+}
+
+// compare form: `<lhs> <op> <rhs>`, longest operators first so `>=` isn't split
+// as `>`. Also handles the boolean-predicate negation `<pred> == false`.
+function parseCompare(s: string): BaseCond | null {
 	const ops = ["==", "!=", ">=", "<=", ">", "<"];
 	for (const op of ops) {
 		const idx = s.indexOf(op);
-		if (idx > 0) {
-			const lhs = s.slice(0, idx).trim();
-			const rhs = unquote(s.slice(idx + op.length).trim());
-			if (lhs.length > 0) return { lhs, op, rhs };
+		if (idx <= 0) continue;
+		const lhs = s.slice(0, idx).trim();
+		if (lhs.length === 0) continue;
+		const rhs = unquote(s.slice(idx + op.length).trim());
+
+		const boolPred = parseBoolPredicate(op, lhs, rhs);
+		if (boolPred) return boolPred;
+
+		// Only accept a clean field-path lhs. A mis-split inline compound such as
+		// `file.tags.contains("#a") AND file.name` (spaces/parens) is rejected →
+		// null → the caller keeps it as { raw } and ignores it, rather than
+		// imposing a wrong constraint.
+		if (/^[A-Za-z0-9_.]+$/.test(lhs)) return { lhs, op, rhs };
+	}
+	return null;
+}
+
+// Boolean-predicate negation: `<pred> == false` / `<pred> != true` → the inner
+// predicate, negated; `<pred> == true` / `<pred> != false` → it unchanged.
+// Returns null when this isn't an `== true/false` comparison.
+function parseBoolPredicate(op: string, lhs: string, rhs: string): BaseCond | null {
+	if (op !== "==" && op !== "!=") return null;
+	if (rhs !== "true" && rhs !== "false") return null;
+	const inner = parseCond(lhs);
+	if (!inner) return null;
+	return withNegate(inner, op === "==" ? rhs === "false" : rhs === "true");
+}
+
+// Split a method-call argument list on top-level commas, respecting quoted
+// strings so `containsAny("A", "B,C")` yields ['"A"', ' "B,C"']. Blank input
+// yields []. Never throws: an unbalanced quote just runs to the end of the
+// segment (the caller unquotes each piece leniently).
+function splitArgs(raw: string): string[] {
+	const s = raw.trim();
+	if (s.length === 0) return [];
+	const out: string[] = [];
+	let cur = "";
+	let quote: string | null = null;
+	for (const ch of s) {
+		if (quote) {
+			cur += ch;
+			if (ch === quote) quote = null;
+		} else if (ch === '"' || ch === "'") {
+			quote = ch;
+			cur += ch;
+		} else if (ch === ",") {
+			out.push(cur);
+			cur = "";
+		} else {
+			cur += ch;
 		}
 	}
-
-	return null;
+	out.push(cur);
+	return out;
 }
 
 function unquote(v: string): string {

@@ -1,7 +1,8 @@
 // F1-1 — pure (de)serialization for Lens/Encoding presets. No DOM, no settings
 // mutation, never throws on bad input: parsePresets collects errors and returns
 // whatever valid presets it could recover. The UI layer (Data ▸ JSON) drives it.
-import type { LensPreset } from "../types";
+import type { GraphNode, LensPreset, MiniSettings } from "../types";
+import { pluralize } from "../util/pluralize";
 import { validatePresetName } from "./lens-presets";
 
 export const PRESET_SCHEMA = "tag-lens/presets";
@@ -11,6 +12,74 @@ interface PresetBundle {
 	schema: string;
 	version: number;
 	presets: LensPreset[];
+}
+
+// The richer "View State" export bundle (Data ▸ JSON ▸ Export). Carries the
+// current node set + settings alongside the presets, unlike serializePresets.
+export interface ViewStateBundle {
+	schema: string;
+	version: number;
+	nodes: Partial<GraphNode>[];
+	settings: Omit<MiniSettings, "lensPresets">;
+	presets: LensPreset[];
+}
+
+// Build the View State export bundle. Volatile/derived per-node fields (ageDays,
+// mtime) are stripped — they are recomputed on import — and lensPresets is split
+// out of settings into `presets` so the bundle re-imports through the same preset
+// path. Pure: the inputs are never mutated.
+export function buildViewStateBundle(nodes: GraphNode[], settings: MiniSettings): ViewStateBundle {
+	const { lensPresets, ...settingsWithoutPresets } = settings;
+	const exportNodes = nodes.map((n) => {
+		const rest: Partial<GraphNode> = { ...n };
+		delete rest.ageDays;
+		delete rest.mtime;
+		return rest;
+	});
+	return {
+		schema: PRESET_SCHEMA,
+		version: PRESET_SCHEMA_VERSION,
+		nodes: exportNodes,
+		settings: settingsWithoutPresets,
+		presets: lensPresets,
+	};
+}
+
+// Default cap on how many import/bundled-load error lines the JSON status block
+// renders before collapsing the rest into a "…and N more." summary.
+export const JSON_STATUS_ERROR_CAP = 20;
+
+// Format the Data ▸ JSON status block error list: bullet-prefix up to `cap`
+// errors, then a single "…and N more." line for any overflow (null when none).
+// Pure presentation — the input array is never mutated.
+export function formatJsonStatusLines(
+	errors: string[],
+	cap: number = JSON_STATUS_ERROR_CAP,
+): { errorLines: string[]; moreText: string | null } {
+	const errorLines = errors.slice(0, cap).map((e) => `• ${e}`);
+	const overflow = errors.length - cap;
+	return { errorLines, moreText: overflow > 0 ? `…and ${overflow} more.` : null };
+}
+
+// Data ▸ JSON ▸ Export button caption: "Export View State (N nodes, M presets)".
+// Both counts are pluralized; pure text builder for the export label chrome.
+export function jsonExportLabel(nodeCount: number, presetCount: number): string {
+	return `Export View State (${pluralize(nodeCount, "node")}, ${pluralize(presetCount, "preset")})`;
+}
+
+// Data ▸ JSON ▸ Import status message. When at least one preset parsed, report
+// the pluralized imported count; otherwise the nothing-valid message. Pure text
+// builder — the per-error detail lines come from formatJsonStatusLines.
+export function jsonImportMessage(importedCount: number): string {
+	return importedCount > 0
+		? `Imported ${pluralize(importedCount, "preset")}.`
+		: "No valid presets found.";
+}
+
+// Data ▸ JSON ▸ "Load bundled presets" status message. Reports how many bundled
+// presets were newly added (0 when they were all already present). Pure.
+export function bundledLoadMessage(addedCount: number): string {
+	return `Added ${pluralize(addedCount, "bundled preset")}.`;
 }
 
 // Query fields that MUST be arrays / a string for a preset to be applyLens-safe.

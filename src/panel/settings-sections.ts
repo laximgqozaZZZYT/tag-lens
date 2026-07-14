@@ -1,6 +1,9 @@
 import type { MiniSettings } from "../types";
 import { VIEW_MODES, isCloseup } from "../types";
 import type { NodeDisplay } from "../visual/node-display";
+import { clampHeatmapMinTag, heatmapMinTagInput } from "./heatmap-min-tag-input";
+import { clampMinFont, minFontInput } from "./min-font-input";
+import { nodeSizeInput, parseNodeSize } from "./node-size-input";
 import { partitionViewModePicker } from "./view-mode-picker";
 
 export interface MinFontSectionDeps {
@@ -15,7 +18,7 @@ export function renderMinFontSection(parent: HTMLElement, deps: MinFontSectionDe
 	const wrap = section.createDiv({ cls: "gim-min-font-row" });
 	const input = wrap.createEl("input", {
 		type: "number",
-		attr: { min: "0", max: "48", step: "1" },
+		attr: minFontInput().attr,
 	});
 	input.value = String(deps.settings.minFontPx);
 	input.setCssStyles({ width: "60px" });
@@ -27,7 +30,7 @@ export function renderMinFontSection(parent: HTMLElement, deps: MinFontSectionDe
 	hint.setCssStyles({ color: "var(--text-muted, #7a8aa0)" });
 	hint.setCssStyles({ fontSize: "11px" });
 	input.addEventListener("change", () => {
-		const v = Math.max(0, Math.min(48, Math.floor(Number(input.value) || 0)));
+		const v = clampMinFont(input.value);
 		input.value = String(v);
 		if (deps.settings.minFontPx === v) return;
 		deps.settings.minFontPx = v;
@@ -76,14 +79,12 @@ export function renderNodeDisplaySection(
 	// "Size (m × n)". For layer scope, empty value means "use inherited".
 	const sizeRow = section.createDiv({ cls: "gim-order-row" });
 	sizeRow.createSpan({ text: "Size (m × n)", cls: "gim-order-field" });
-	const mIn = sizeRow.createEl("input", { type: "number" });
+	const sizeAttr = nodeSizeInput().attr;
+	const mIn = sizeRow.createEl("input", { type: "number", attr: sizeAttr });
 	const nIn = (() => {
 		sizeRow.createSpan({ text: "×" });
-		return sizeRow.createEl("input", { type: "number" });
+		return sizeRow.createEl("input", { type: "number", attr: sizeAttr });
 	})();
-	mIn.min = nIn.min = "1";
-	mIn.max = nIn.max = "8";
-	mIn.step = nIn.step = "1";
 	mIn.setCssStyles({ width: "50px" });
 	nIn.setCssStyles({ width: "50px" });
 	if (scope) {
@@ -97,13 +98,13 @@ export function renderNodeDisplaySection(
 		nIn.value = String(deps.settings.nodeCols);
 	}
 	const applySize = (): void => {
-		const m = parseInt(mIn.value, 10);
-		const n = parseInt(nIn.value, 10);
 		if (scope) {
 			const ov = overrideFor();
-			if (Number.isFinite(m) && m >= 1 && m <= 8) ov.nodeRows = m;
+			const m = parseNodeSize(mIn.value, 8);
+			const n = parseNodeSize(nIn.value, 8);
+			if (m !== null) ov.nodeRows = m;
 			else delete ov.nodeRows;
-			if (Number.isFinite(n) && n >= 1 && n <= 8) ov.nodeCols = n;
+			if (n !== null) ov.nodeCols = n;
 			else delete ov.nodeCols;
 			if (
 				ov.nodeRows === undefined &&
@@ -112,8 +113,10 @@ export function renderNodeDisplaySection(
 				delete deps.settings.nodeDisplayOverrides[scope.groupKey];
 			}
 		} else {
-			if (Number.isFinite(m) && m >= 1 && m <= 12) deps.settings.nodeRows = m;
-			if (Number.isFinite(n) && n >= 1 && n <= 12) deps.settings.nodeCols = n;
+			const m = parseNodeSize(mIn.value, 12);
+			const n = parseNodeSize(nIn.value, 12);
+			if (m !== null) deps.settings.nodeRows = m;
+			if (n !== null) deps.settings.nodeCols = n;
 		}
 		deps.clearCardCache();
 		deps.save();
@@ -269,12 +272,11 @@ export interface GenericSectionDeps {
 export function renderHeatmapMinTagControl(section: HTMLElement, deps: GenericSectionDeps): void {
 	const row = section.createDiv({ cls: "gim-order-row" });
 	row.createSpan({ text: "Min tag size", cls: "gim-order-field" });
-	const inp = row.createEl("input", { type: "number" });
-	inp.min = "1";
+	const inp = row.createEl("input", { type: "number", attr: heatmapMinTagInput().attr });
 	inp.setCssStyles({ width: "56px" });
 	inp.value = String(deps.settings.heatmapMinTagSize);
 	inp.addEventListener("change", () => {
-		const v = Math.max(1, Math.floor(Number(inp.value) || 1));
+		const v = clampHeatmapMinTag(inp.value);
 		deps.settings.heatmapMinTagSize = v;
 		inp.value = String(v);
 		deps.save();

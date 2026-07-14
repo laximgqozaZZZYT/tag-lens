@@ -3,7 +3,18 @@ import { renderViewModeSection } from "./settings-sections";
 import { ghostJaccardInput, parseGhostJaccard } from "./jaccard-input";
 import { basesEdgeKinds } from "./bases-edge-kinds";
 import { basesToggleRows } from "./bases-toggle-rows";
+import { graphDisplayToggles } from "./graph-display-toggles";
+import { inheritFromOptions } from "./inherit-from-options";
 import { bridgeGhostEdgeToggle, legendToggle } from "./settings-toggle-rows";
+import {
+	scatterAxisFieldOptions,
+	scatterAxisScaleOptions,
+} from "./scatter-axis-options";
+import {
+	scatterAxisSelection,
+	setScatterAxisBinding,
+	type ScatterAxisChannel,
+} from "./scatter-axis-binding";
 import { setIcon, AbstractInputSuggest, type App, type TFile } from "obsidian";
 import { scanBaseFiles } from "../bases/parser";
 import { addBaseFileToSelected, removeBaseFileFromSelected } from "../bases/selection";
@@ -247,12 +258,9 @@ export function renderSettingsDisplayTab(el: HTMLElement, deps: DisplayTabDeps):
 	renderNodeDisplaySection(el, deps);
 	renderMinFontSection(el, deps);
 
-	const gdToggles = [
-		{ key: "showNodes" as const, label: "Show nodes" },
-		{ key: "showEnclosures" as const, label: "Show enclosures" },
-		{ key: "showEdges" as const, label: "Show edges" },
-		{ key: "showGrid" as const, label: "Show grid" },
-	].filter((t) => displayToggleApplies(deps.settings.viewMode, t.key));
+	const gdToggles = graphDisplayToggles().filter((t) =>
+		displayToggleApplies(deps.settings.viewMode, t.key),
+	);
 	
 	if (gdToggles.length > 0 || isHeatmap) {
 		const gdSection = renderToggleSection(
@@ -381,7 +389,61 @@ export function renderSettingsEncodeTab(el: HTMLElement, deps: EncodeTabDeps): v
 	});
 	legendRow.createSpan({ text: legend.label });
 
+	// Scatter (F2.6) X/Y axis pickers — surfaced only in scatter mode, where the
+	// two quantitative axes define the plot. Writes the axisX/axisY encoding
+	// bindings (shared with the euler/bubblesets overlay) and relays out.
+	if (deps.settings.viewMode === "scatter") {
+		renderScatterAxisSection(el, deps);
+	}
+
 	renderLayersSubSection(el, deps);
+}
+
+function renderScatterAxisSection(el: HTMLElement, deps: EncodeTabDeps): void {
+	const section = el.createDiv({ cls: "gim-panel-section" });
+	section.createEl("h4", { text: "Scatter axes" });
+	renderScatterAxisRow(section, deps, "axisX", "X axis");
+	renderScatterAxisRow(section, deps, "axisY", "Y axis");
+}
+
+function renderScatterAxisRow(
+	section: HTMLElement,
+	deps: EncodeTabDeps,
+	channel: ScatterAxisChannel,
+	label: string,
+): void {
+	const sel = scatterAxisSelection(deps.settings.encoding);
+	const choice = channel === "axisX" ? sel.x : sel.y;
+
+	const row = section.createDiv({ cls: "gim-order-row" });
+	row.createSpan({ text: label, cls: "gim-order-field" });
+
+	// setScatterAxisBinding preserves the unspecified side from the current
+	// effective selection, so each select only sends its own changed dimension.
+	const attrSel = row.createEl("select", { cls: "gim-order-dir" });
+	for (const o of scatterAxisFieldOptions()) {
+		const opt = attrSel.createEl("option", { value: o.value, text: o.label });
+		if (o.value === choice.fieldId) opt.selected = true;
+	}
+	attrSel.addEventListener("change", () => {
+		deps.settings.encoding = setScatterAxisBinding(deps.settings.encoding, channel, {
+			fieldId: attrSel.value,
+		});
+		deps.save();
+		void deps.rebuild();
+	});
+
+	const scaleSel = row.createEl("select", { cls: "gim-order-dir" });
+	for (const o of scatterAxisScaleOptions()) {
+		const opt = scaleSel.createEl("option", { value: o.value, text: o.label });
+		if (o.value === choice.scale) opt.selected = true;
+	}
+	scaleSel.addEventListener("change", () => {
+		const scale = scatterAxisScaleOptions().find((o) => o.value === scaleSel.value)?.value;
+		deps.settings.encoding = setScatterAxisBinding(deps.settings.encoding, channel, { scale });
+		deps.save();
+		void deps.rebuild();
+	});
 }
 
 function renderLayersSubSection(el: HTMLElement, deps: EncodeTabDeps): void {
@@ -635,12 +697,10 @@ function renderSetLayerTab(el: HTMLElement, setKey: string, deps: EncodeTabDeps,
 	const inhRow = togs.createDiv({ cls: "gim-order-row" });
 	inhRow.createSpan({ text: "Inherit from", cls: "gim-order-field" });
 	const inhSel = inhRow.createEl("select", { cls: "gim-order-dir" });
-	const noneOpt = inhSel.createEl("option", { value: "", text: "(none)" });
 	const current = deps.settings.inheritFrom[setKey] ?? "";
-	if (current === "") noneOpt.selected = true;
-	for (const other of deps.laid.clusters) {
-		const opt = inhSel.createEl("option", { value: other.groupKey, text: other.label });
-		if (other.groupKey === current) opt.selected = true;
+	for (const o of inheritFromOptions(deps.laid.clusters, current)) {
+		const opt = inhSel.createEl("option", { value: o.value, text: o.text });
+		if (o.selected) opt.selected = true;
 	}
 	inhSel.addEventListener("change", () => {
 		if (inhSel.value === "") delete deps.settings.inheritFrom[setKey];
@@ -727,16 +787,10 @@ function renderLayerTab(el: HTMLElement, groupKey: string, deps: EncodeTabDeps):
 	const inhRow = togs.createDiv({ cls: "gim-order-row" });
 	inhRow.createSpan({ text: "Inherit from", cls: "gim-order-field" });
 	const inhSel = inhRow.createEl("select", { cls: "gim-order-dir" });
-	const noneOpt = inhSel.createEl("option", { value: "", text: "(none)" });
 	const current = deps.settings.inheritFrom[groupKey] ?? "";
-	if (current === "") noneOpt.selected = true;
-	for (const other of deps.laid.clusters) {
-		if (other.groupKey === groupKey) continue;
-		const opt = inhSel.createEl("option", {
-			value: other.groupKey,
-			text: other.label,
-		});
-		if (other.groupKey === current) opt.selected = true;
+	for (const o of inheritFromOptions(deps.laid.clusters, current, groupKey)) {
+		const opt = inhSel.createEl("option", { value: o.value, text: o.text });
+		if (o.selected) opt.selected = true;
 	}
 	inhSel.addEventListener("change", () => {
 		if (inhSel.value === "") {

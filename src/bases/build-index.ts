@@ -5,6 +5,7 @@
 
 import type { App, CachedMetadata, TFile } from "obsidian";
 import type { FileFacts } from "../query/query";
+import { collectTags } from "./collect-tags";
 import { buildRelations } from "./relations";
 import { resolveElements } from "./resolve";
 import { parseBaseFile, scanBaseFiles } from "./parser";
@@ -52,6 +53,14 @@ export async function buildBaseIndex(
 	try {
 		factsByPath = buildFacts(app);
 		forwardLinks = buildForwardLinks(app, opts.resolvedLinks);
+		// Thread link data onto each note's facts so file.links / file.hasLink /
+		// file.backlinks resolve (the pure evaluator has no other access to it).
+		// Embeds are already set inside buildFacts (needs the per-file cache).
+		const backlinks = invertLinks(forwardLinks);
+		for (const [p, f] of factsByPath) {
+			f.links = forwardLinks.get(p) ?? [];
+			f.backlinks = backlinks.get(p) ?? [];
+		}
 	} catch (e) {
 		errors.push(`facts/link build failed: ${msg(e)}`);
 		return { ...empty(), tables };
@@ -123,6 +132,10 @@ function buildFacts(app: App): Map<string, FileFacts> {
 			tags: collectTags(cache),
 			frontmatter: (cache?.frontmatter as Record<string, unknown>) ?? {},
 			tagProperties,
+			size: f.stat.size,
+			ctime: f.stat.ctime,
+			mtime: f.stat.mtime,
+			embeds: collectEmbeds(app, cache, f.path),
 		});
 	}
 	return map;
@@ -142,18 +155,32 @@ function buildForwardLinks(
 	return map;
 }
 
-function collectTags(cache: CachedMetadata | null): string[] {
-	if (!cache) return [];
-	const out: string[] = [];
-	if (cache.tags) for (const t of cache.tags) out.push(stripHash(t.tag));
-	const fm = cache.frontmatter?.tags as unknown;
-	if (Array.isArray(fm)) for (const t of fm) out.push(stripHash(String(t)));
-	else if (typeof fm === "string") out.push(stripHash(fm));
-	return out;
+// Invert forward links (note → targets) into backlinks (note → sources).
+function invertLinks(forward: Map<string, string[]>): Map<string, string[]> {
+	const map = new Map<string, string[]>();
+	for (const [src, targets] of forward) {
+		for (const t of targets) {
+			const arr = map.get(t);
+			if (arr) arr.push(src);
+			else map.set(t, [src]);
+		}
+	}
+	return map;
 }
 
-function stripHash(t: string): string {
-	return t.startsWith("#") ? t.slice(1) : t;
+// Resolved embed target paths for one note. Strips a `#subpath` / `|display`, then
+// resolves each embed link against the source. Unresolvable embeds are skipped.
+function collectEmbeds(app: App, cache: CachedMetadata | null, srcPath: string): string[] {
+	const embeds = cache?.embeds;
+	if (!embeds || embeds.length === 0) return [];
+	const out: string[] = [];
+	for (const e of embeds) {
+		const linkpath = e.link.split("#")[0].split("|")[0].trim();
+		if (linkpath === "") continue;
+		const dest = app.metadataCache.getFirstLinkpathDest(linkpath, srcPath);
+		if (dest) out.push(dest.path);
+	}
+	return out;
 }
 
 function msg(e: unknown): string {

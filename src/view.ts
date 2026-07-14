@@ -1,18 +1,25 @@
 import { ItemView, type WorkspaceLeaf, TFile, debounce, setIcon, Notice, Menu, MarkdownView } from "obsidian";
-import { exportCanvasDims } from "./visual/image-export";
+import { exportCanvasDims, exportMenuItems, exportScaleCapMessage } from "./visual/image-export";
 import { renderInsightTab } from "./insight/render";
 import { evaluateEncoding, type BindingLegend } from "./encoding/evaluate";
 
 import type { EncContext, EncNode, NodeDrawParams, EncodingBinding } from "./encoding/types";
-import { axisLayout, type AxisSpec, type AxisBand, type AxisTick } from "./layout/axis-layout";
+import { scatterAxisDefaults } from "./encoding/scatter-axis-defaults";
+import { colorIsTagBased } from "./encoding/color-tag-based";
+import { axisLayout } from "./layout/axis-layout";
+import { axisFallbackSpan } from "./layout/axis-fallback-span";
+import { shiftAxisSpec } from "./layout/axis-shift";
 import { assignGalleryAxes } from "./layout/droste-axis";
-import { LaneRegistry, routeZ } from "./layout/edge-routing";
-import { buildIdToRect, buildRouteObstacles } from "./layout/layout-shared";
+import { LaneRegistry } from "./layout/edge-routing";
+import { buildIdToRect, buildRouteObstacles, routeEdges } from "./layout/layout-shared";
+import { layoutSignature } from "./layout/layout-signature";
+import { rebuildSignature } from "./layout/rebuild-signature";
+import { upsetColumnKey } from "./layout/upset-layout";
 
 import { buildBaseIndex } from "./bases/build-index";
 import { scanBaseFiles } from "./bases/parser";
 import { ensureFallbackBase } from "./bases/fallback";
-import { projectBaseIndexToGraph, type BaseEdgeKind } from "./bases/project";
+import { projectBaseIndexToGraph } from "./bases/project";
 import type { BaseIndex } from "./bases/types";
 import {
 	layout,
@@ -26,7 +33,19 @@ import { CARD_CELL_W, CARD_CELL_H } from "./types";
 
 import { clusterHue, createStripeGradient, membershipStripeHues } from "./draw/canvas-utils";
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
+import { canvasBackingSize } from "./draw/canvas-backing";
+import { figureIsEmpty } from "./draw/figure-empty";
+import { worldTransform } from "./draw/world-transform";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
+import { contentBounds } from "./layout/content-bounds";
+import { contentFit } from "./layout/content-fit";
+import { drosteFit } from "./layout/droste-fit";
+import { locateNodeFit } from "./layout/locate-fit";
+import { heatmapFit } from "./layout/heatmap-fit";
+import { latticeFit } from "./layout/lattice-fit";
+import { pruneLatticeKeys } from "./layout/lattice-key-prune";
+import { upsetFit } from "./layout/upset-fit";
+import { visibleFitWidth } from "./layout/visible-fit-width";
 import { runAggregateSnap } from "./layout/aggregate-snap";
 import {
 	drawCardGrid as drawCardGridFn,
@@ -45,6 +64,7 @@ import type { AggregationState, AggregationGroup } from "./aggregation/types";
 import {
 	resolveNodeDisplay as resolveNodeDisplayFn,
 	resolveFromCluster as resolveFromClusterFn,
+	setLayerDeps,
 	visualScale,
 	UNION_LAYER_KEY,
 	INTERSECTION_LAYER_KEY,
@@ -61,6 +81,7 @@ import {
 } from "./draw/draw-upset";
 import { drawHeatmap, heatmapGeom } from "./draw/draw-heatmap";
 import { clampSpreadsheetPan } from "./interaction/spreadsheet-pan";
+import { clampUpsetPanX } from "./interaction/upset-pan";
 import { drawDroste } from "./draw/draw-droste";
 import {
 	drawLattice,
@@ -73,6 +94,8 @@ import { computeLatticeDrawInput } from "./draw/lattice-draw-input";
 import { computeDrosteDrawInput } from "./draw/droste-draw-input";
 import { computeEnclosureDrawInput } from "./draw/enclosure-draw-input";
 import { computeEdgeDrawPlan } from "./draw/edge-draw-plan";
+import { computeGlobalFallbackPlan } from "./draw/global-fallback-plan";
+import { metaBadges } from "./draw/meta-badges";
 import { computeHeatmapDrawInput } from "./draw/heatmap-draw-input";
 import { computeUpsetDrawInput } from "./draw/upset-draw-input";
 import { computeAggregateStackList } from "./draw/aggregate-stack-list";
@@ -84,12 +107,16 @@ import { drawLegend } from "./draw/legend-layout";
 import { buildModeLegend, legendAnchor, type ModeLegendInput } from "./draw/mode-legend";
 import { computeModeLegendInput } from "./draw/mode-legend-input";
 import {
+	hitDrosteRect,
 	hitTest as hitTestFn,
+	hitTestAggregationGroup,
 	screenToWorld as screenToWorldFn,
+	type DrosteHitRect,
 	type HoverTarget,
 } from "./interaction/hit-test";
 import {
 	computeDegreeMaps,
+	degreeInfoOf,
 	buildAdjacency,
 	filterLayoutData,
 } from "./query/rebuild-pipeline";
@@ -113,12 +140,26 @@ import {
 	settingsSubTabs,
 	type SettingsSubTab,
 } from "./panel/settings-tabs";
+import { viewRootStyle, viewCanvasStyle } from "./view-shell-style";
+import { jaccardSimilarity } from "./util/jaccard";
+import { pointInRect } from "./util/point-in-rect";
+import { exceedsClickSlop } from "./util/click-slop";
+import { clampScroll } from "./util/clamp-scroll";
+import { undirectedPairKey } from "./util/pair-key";
+import {
+	legendScrollbarGeom,
+	legendScrollbarZone,
+	scrollToThumbY,
+	thumbYToScroll,
+} from "./interaction/legend-scrollbar";
+import { basesEnabledEdgeKinds } from "./panel/bases-edge-kinds";
 import { renderDataTableView } from "./panel/data-table-view";
 import { projectMenuNotes } from "./panel/menu-notes";
 import { copyBlobToClipboard, saveBlobToVault, copySvgToClipboard, saveSvgToVault } from "./panel/export-image";
 import { SvgRecorderContext } from "./visual/svg-recorder";
 import { findGaps, type TagGap } from "./query/gap-finder";
 import { findBridges, type BridgeCandidate } from "./query/bridge-finder";
+import { cachedTagSet, hasBidirectionalLink, partitionNeighborhood, relatedNoteScore } from "./query/related-score";
 import {
 	HOVER_DELAY_MS,
 	sameTarget,
@@ -126,10 +167,14 @@ import {
 	positionTip as positionTipFn,
 } from "./interaction/highlight";
 import { MarqueeController } from "./interaction/marquee-controller";
-import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, stripTabPrefix, nodeIsHidden, hideKey, collectDescendantNoteKeys, collectDescendantLeaves, folderCheckState, buildFolderPathKey, navigatorNodeSource, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion } from "./interaction/note-menu";
-import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, noteMenuPanelStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, type NoteMenuTab, type NoteMenuDataSubTab } from "./interaction/note-menu-geom";
+import { menuNoteList, menuClickAction, clampRect, noteMenuHeight, noteMenuHeaderOnlyHeight, buildFolderTree, buildTagTree, advancedSearch, suggestQuery, currentToken, applySuggestionToken, stripTabPrefix, nodeIsHidden, hideKey, bulkSetHidden, collectDescendantNoteKeys, allFolderLeaves, folderCheckState, folderCascadeHide, checkboxAriaChecked, noteMenuRowCheckboxSpec, buildFolderPathKey, folderToggleLabel, folderDisclosure, navigatorNodeSource, suggestKeyAction, noteMenuErrorText, noteMenuErrorBannerBox, type MenuRect, type NoteRef, type TreeNode, type TreeLeaf, type Suggestion, type FolderCheckState } from "./interaction/note-menu";
+import { NOTE_MENU_MIN, resolveMenuRect, clampPinnedWidth, moveMenuRect, resizeMenuRect, noteMenuPanelStyle, noteMenuRectStyle, noteMenuHeadStyle, noteMenuTabButtonStyle, noteMenuTabHoverStyle, noteMenuTitleButtons, noteMenuTitleRowStyle, noteMenuBulkBarStyle, noteMenuGroupBarStyle, noteMenuSearchStyle, noteMenuBodyPanelStyle, noteMenuTabBarStyle, noteMenuTopTabs, noteMenuDataSubTabs, noteMenuGroupOptions, noteMenuBulkActions, noteMenuTopTabDisplay, noteMenuDataSubTabDisplay, noteMenuMinimizeDisplay, suggestionKindStyle, noteMenuSuggestStyle, noteMenuSuggestSelectionStyle, noteMenuLeftGripStyle, noteMenuBottomRightGripStyle, noteMenuNotesHint, noteMenuTreeRowStyle, noteMenuLeafHighlight, noteMenuLeafRowHoverStyle, noteMenuJsonLabelStyle, noteMenuJsonTextareaStyle, noteMenuJsonButtonRowStyle, noteMenuJsonTitleStyle, noteMenuJsonStatusStyle, type NoteMenuTab, type NoteMenuDataSubTab, type NoteMenuGroupBy } from "./interaction/note-menu-geom";
+import { heatmapCellNoteIds } from "./interaction/heatmap-detail";
+import { heatmapCellTipText, ghostEdgeTipText, clusterTipText, aggregationGroupTipText } from "./interaction/hover-tip-text";
 import { zoomAroundPointer, fitTransform } from "./interaction/zoom-math";
-import { presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
+import { normalizeWheelDelta, wheelZoomFactor } from "./interaction/wheel";
+import { screenPointFromRect } from "./interaction/pointer-pos";
+import { buildViewStateBundle, bundledLoadMessage, formatJsonStatusLines, jsonExportLabel, jsonImportMessage, presetFileName, parsePresets, mergePresets } from "./interaction/preset-io";
 import { mergeBundled } from "./interaction/bundled-presets";
 import { hitHeatmapCell } from "./interaction/hit-modes";
 
@@ -217,7 +262,7 @@ export class MiniGraphView extends ItemView {
 	private hoveredNodeId: string | null = null;
 	// Clickable card rects (device px) recorded by the grid-mode Droste renderer,
 	// so grid-mode hit-testing reuses the drawn geometry instead of re-deriving it.
-	private drosteHit: { id: string; x0: number; y0: number; x1: number; y1: number }[] = [];
+	private drosteHit: DrosteHitRect[] = [];
 	// Containment lens: the full pre-LIMIT graph, so the lens + focus picker cover the
 	// whole vault (not just the LIMIT-trimmed subset).
 	private drosteData: GraphData | null = null;
@@ -260,7 +305,7 @@ export class MiniGraphView extends ItemView {
 	// note's GROUP_BY membership keys). Survives REBUILDS via this field and
 	// RELOADS via the optional settings.noteMenuGroupBy. A small radio group in
 	// the menu header switches it; changing it re-renders the tree.
-	private noteMenuGroupBy: "folder" | "tag" = "folder";
+	private noteMenuGroupBy: NoteMenuGroupBy = "folder";
 	// The last search query the user typed in the note navigator's search box.
 	// Saved in removeNoteMenu() and restored in ensureNoteMenu() so a rebuild
 	// triggered mid-typing (e.g. by a vault file change) doesn't blank the box.
@@ -336,17 +381,20 @@ export class MiniGraphView extends ItemView {
 		for (const node of meta.nodes) {
 			if (!this.latticeNamedKeys.has(node.key)) continue;
 			const ids = node.nodeIds.slice(0, max);
-			out[node.key] = ids.map((id) => {
-				const sep = id.indexOf("\t");
-				const path = sep >= 0 ? id.slice(sep + 1) : id;
-				const f = this.app.vault.getAbstractFileByPath(path);
-				return f instanceof TFile ? f.basename : path;
-			});
+			out[node.key] = ids.map((id) => this.basenameOrPath(stripTabPrefix(id)));
 		}
 		return out;
 	}
+
+	// Resolve a vault path to its file basename, falling back to the path
+	// itself when nothing resolves (or it is not a TFile). Centralises the
+	// `getAbstractFileByPath → instanceof TFile ? basename : path` idiom the
+	// lattice/base label closures re-derived identically.
+	private basenameOrPath(path: string): string {
+		const f = this.app.vault.getAbstractFileByPath(path);
+		return f instanceof TFile ? f.basename : path;
+	}
 	private displayMode: Map<string, "full" | "brief"> = new Map();
-	private degreeMap: Map<string, number> = new Map();
 	// Visual Encoding output (computed per rebuild): per-node draw params + legends.
 	private encParams: Map<string, NodeDrawParams> = new Map();
 	private encLegends: BindingLegend[] = [];
@@ -363,10 +411,6 @@ export class MiniGraphView extends ItemView {
 	private legendScrollDrag: { startY: number; startScrollY: number } | null = null;
 	private legendScrollY: Partial<Record<ViewMode, number>> = {};
 	private legendMaxScrollY = 0;
-	// Per-direction degree counters used by nodeSizeMode = indegree / outdegree.
-	// Refreshed every rebuild from data.edges.
-	private inDegreeMap: Map<string, number> = new Map();
-	private outDegreeMap: Map<string, number> = new Map();
 	// trulyAgg from the rebuild's aggregate processing. The draw layer reads
 	// this — NOT a recomputed "every membership in aggSet" — so that a node
 	// the rebuild considers "effectively aggregated" (e.g. via the parent-
@@ -393,9 +437,8 @@ export class MiniGraphView extends ItemView {
 	private settingsSubTab: SettingsSubTab = "view";
 	private dataSubTab: NoteMenuDataSubTab = "logic";
 	private insightSubTab: "overview" | "alerts" | "suggest" = "overview";
-	// UpSet mode: signature key (= `signature.join("|")`) of the column
-	// currently selected by the user (highlighted in the matrix; drives
-	// the detail panel listing in Phase C). null = nothing selected.
+	// UpSet mode: `upsetColumnKey` of the user-selected column (highlighted in
+	// the matrix; drives the detail panel listing). null = nothing selected.
 	private upsetSelectedSignatureKey: string | null = null;
 	// Lattice mode: selected / hovered node key (signature key) for highlight
 	// and the floating note-list overlay. Cleared when the selected key no
@@ -453,9 +496,7 @@ export class MiniGraphView extends ItemView {
 	async onOpen(): Promise<void> {
 		const root = this.containerEl.children[1] as HTMLElement;
 		root.empty();
-		root.setCssStyles({ padding: "0" });
-		root.setCssStyles({ overflow: "hidden" });
-		root.setCssStyles({ position: "relative" });
+		root.setCssStyles(viewRootStyle());
 		this.root = root;
 
 		// Resolve Obsidian's theme colours into concrete strings for the canvas
@@ -463,10 +504,7 @@ export class MiniGraphView extends ItemView {
 		setTheme(resolveTheme(root));
 
 		this.canvas = root.createEl("canvas");
-		this.canvas.setCssStyles({ width: "100%" });
-		this.canvas.setCssStyles({ height: "100%" });
-		this.canvas.setCssStyles({ display: "block" });
-		this.canvas.setCssStyles({ cursor: "grab" });
+		this.canvas.setCssStyles(viewCanvasStyle());
 		const ctx2d = this.canvas.getContext("2d");
 		if (!ctx2d) throw new Error("Tag Lens: 2D canvas context unavailable");
 		this.ctx = ctx2d;
@@ -596,8 +634,7 @@ export class MiniGraphView extends ItemView {
 
 		// 1. アクティブノートのメタデータ（タグ）を取得
 		const activeCache = this.app.metadataCache.getFileCache(activeFile);
-		const activeTags = activeCache?.tags?.map(t => t.tag.toLowerCase()) || [];
-		const activeTagSet = new Set(activeTags);
+		const activeTagSet = cachedTagSet(activeCache?.tags);
 
 		// 2. 既存の解決済みリンク（双方向リンク判定用）のマップを取得
 		const resolvedLinks = this.app.metadataCache.resolvedLinks;
@@ -619,9 +656,7 @@ export class MiniGraphView extends ItemView {
 			}
 
 			// HasLink の判定 (双方向リンクチェック)
-			const hasLinkFromActive = (resolvedLinks[activePath]?.[node.id]) ? 1 : 0;
-			const hasLinkToActive = (resolvedLinks[node.id] && resolvedLinks[node.id][activePath]) ? 1 : 0;
-			const hasLink = (hasLinkFromActive || hasLinkToActive) ? 1 : 0;
+			const hasLink = hasBidirectionalLink(resolvedLinks, activePath, node.id);
 
 			// Jaccard 係数の計算
 			const nodeFile = this.app.vault.getAbstractFileByPath(node.id);
@@ -629,18 +664,13 @@ export class MiniGraphView extends ItemView {
 
 			if (nodeFile instanceof TFile) {
 				const nodeCache = this.app.metadataCache.getFileCache(nodeFile);
-				const nodeTags = nodeCache?.tags?.map(t => t.tag.toLowerCase()) || [];
-				const nodeTagSet = new Set(nodeTags);
-
-				if (activeTagSet.size > 0 || nodeTagSet.size > 0) {
-					const intersection = new Set([...activeTagSet].filter(x => nodeTagSet.has(x)));
-					const union = new Set([...activeTagSet, ...nodeTagSet]);
-					jaccard = intersection.size / union.size;
-				}
+				const nodeTagSet = cachedTagSet(nodeCache?.tags);
+				// Empty union (both tag-less) → 0, matching the old size-guarded path.
+				jaccard = jaccardSimilarity(activeTagSet, nodeTagSet);
 			}
 
 			// 総合スコア算出
-			const score = (w_link * hasLink) + (w_tag * jaccard);
+			const score = relatedNoteScore(hasLink, jaccard, w_link, w_tag);
 			node.score = score;
 
 			if (score > 0) {
@@ -651,18 +681,12 @@ export class MiniGraphView extends ItemView {
 			}
 		}
 
-		// 4. スコア降順にソートして上位を絞り込み（トポロジーを維持するため配列からは間引かない）
-		scoredNodes.sort((a, b) => b.score - a.score);
-
-		for (let i = 0; i < scoredNodes.length; i++) {
-			if (i < maxNeighborhoodSize) {
-				// 上位50件は描画対象
-				scoredNodes[i].node.filtered = false;
-			} else {
-				// 50件から漏れた近傍ノードはフィルタリング（非表示/薄色）対象
-				scoredNodes[i].node.filtered = true;
-			}
-		}
+		// 4. スコア降順にソートして上位を絞り込み（トポロジーを維持するため配列からは間引かない）。
+		// ソート＋上位カットは純粋な partitionNeighborhood に切り出し済み — ここは
+		// filtered フラグの適用だけ（上位50件=描画対象、漏れた近傍=非表示/薄色）。
+		const { visible, filtered } = partitionNeighborhood(scoredNodes, maxNeighborhoodSize);
+		for (const node of visible) node.filtered = false;
+		for (const node of filtered) node.filtered = true;
 
 		// 5. 既存のレイアウトエンジン・Viewに対して安全に再描画を要求
 		// this.drosteFocus は中心にしたいノート
@@ -725,7 +749,7 @@ export class MiniGraphView extends ItemView {
 		// Sub-tab bar: View / Filter / Sort / Display / Layers. Underline style,
 		// matching the top-level Notes/Settings tabs but more compact.
 		const subBar = host.createDiv();
-		subBar.setCssStyles({ display: "flex", flexWrap: "wrap", gap: "1px", marginBottom: "6px", borderBottom: "1px solid var(--background-modifier-border)" });
+		subBar.setCssStyles(noteMenuTabBarStyle("settings"));
 		const content = host.createDiv({ cls: "gim-panel-content" });
 		const SUBS = settingsSubTabs();
 		const subBtns = new Map<string, HTMLElement>();
@@ -789,7 +813,7 @@ export class MiniGraphView extends ItemView {
 			const b = subBar.createEl("button", { text: label });
 			subBtns.set(key, b);
 			b.addEventListener("click", () => { this.settingsSubTab = key; styleSubs(); renderSub(); });
-			b.addEventListener("mouseenter", () => { if (this.settingsSubTab !== key) { b.setCssStyles({ color: "var(--text-muted)" }); b.setCssStyles({ borderBottomColor: "var(--background-modifier-border)" }); } });
+			b.addEventListener("mouseenter", () => { if (this.settingsSubTab !== key) b.setCssStyles(noteMenuTabHoverStyle()); });
 			b.addEventListener("mouseleave", () => styleSubs());
 		}
 		styleSubs();
@@ -839,45 +863,24 @@ export class MiniGraphView extends ItemView {
 		this.jsonHostEl = host;
 		host.empty();
 		const title = host.createDiv({ text: "Presets — JSON import / export" });
-		title.setCssStyles({ fontWeight: "600", fontSize: "12px", marginBottom: "6px" });
+		title.setCssStyles(noteMenuJsonTitleStyle());
 
 		// ── Export ──
-		const { lensPresets, ...settingsWithoutPresets } = this.settings;
-		const presetCount = lensPresets.length;
+		const presetCount = this.settings.lensPresets.length;
 		const nodeCount = this.laid?.nodes?.length || 0;
-		const expLabel = host.createDiv({ text: `Export View State (${nodeCount} node${nodeCount === 1 ? "" : "s"}, ${presetCount} preset${presetCount === 1 ? "" : "s"})` });
-		expLabel.setCssStyles({ fontSize: "11px", fontWeight: "600", margin: "4px 0 2px" });
+		const expLabel = host.createDiv({ text: jsonExportLabel(nodeCount, presetCount) });
+		expLabel.setCssStyles(noteMenuJsonLabelStyle("4px 0 2px"));
 
-		const exportNodes = (this.laid?.nodes || []).map((n) => {
-			// Strip derived/volatile fields (ageDays, mtime) from each node before
-			// export; they are recomputed on import. Shallow-copy then delete the
-			// two keys (instead of a rest-omit destructure) so no unused binding
-			// is left behind, while the exported object is identical to the old
-			// `...rest` result.
-			const rest: Partial<typeof n> = { ...n };
-			delete rest.ageDays;
-			delete rest.mtime;
-			return rest;
-		});
-
-		const exportData = {
-			schema: "tag-lens/presets",
-			version: 1,
-			nodes: exportNodes,
-			settings: settingsWithoutPresets,
-			presets: lensPresets,
-		};
-		const json = JSON.stringify(exportData, null, 2);
+		// Node-stripping + schema/version wrapping + lensPresets split now live in
+		// the pure buildViewStateBundle (preset-io); the view just serializes it.
+		const json = JSON.stringify(buildViewStateBundle(this.laid?.nodes || [], this.settings), null, 2);
 		const ta = host.createEl("textarea");
 		ta.value = json;
 		ta.readOnly = true;
-		ta.setCssStyles({
-			width: "100%", height: "110px", fontFamily: "var(--font-monospace, monospace)",
-			fontSize: "10px", resize: "vertical", boxSizing: "border-box",
-		});
+		ta.setCssStyles(noteMenuJsonTextareaStyle("110px"));
 		ta.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		const btnRow = host.createDiv();
-		btnRow.setCssStyles({ display: "flex", gap: "6px", marginTop: "4px" });
+		btnRow.setCssStyles(noteMenuJsonButtonRowStyle());
 		const copyBtn = btnRow.createEl("button", { text: "Copy to clipboard" });
 		copyBtn.addEventListener("click", (ev) => { ev.stopPropagation(); void this.copyTextToClipboard(json); });
 		const saveBtn = btnRow.createEl("button", { text: "Save .json to vault" });
@@ -885,16 +888,13 @@ export class MiniGraphView extends ItemView {
 
 		// ── Import ──
 		const impLabel = host.createDiv({ text: "Import" });
-		impLabel.setCssStyles({ fontSize: "11px", fontWeight: "600", margin: "12px 0 2px" });
+		impLabel.setCssStyles(noteMenuJsonLabelStyle("12px 0 2px"));
 		const impTa = host.createEl("textarea");
 		impTa.placeholder = "Paste preset JSON here (bundle or array)…";
-		impTa.setCssStyles({
-			width: "100%", height: "90px", fontFamily: "var(--font-monospace, monospace)",
-			fontSize: "10px", resize: "vertical", boxSizing: "border-box",
-		});
+		impTa.setCssStyles(noteMenuJsonTextareaStyle("90px"));
 		impTa.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		const impRow = host.createDiv();
-		impRow.setCssStyles({ display: "flex", gap: "6px", marginTop: "4px" });
+		impRow.setCssStyles(noteMenuJsonButtonRowStyle());
 		const importBtn = impRow.createEl("button", { text: "Import" });
 		importBtn.addEventListener("click", (ev) => {
 			ev.stopPropagation();
@@ -907,10 +907,7 @@ export class MiniGraphView extends ItemView {
 				this.syncLensCommands(this.settings.lensPresets);
 				this.refreshFilterTab();
 			}
-			const msg = presets.length > 0
-				? `Imported ${presets.length} preset${presets.length === 1 ? "" : "s"}.`
-				: "No valid presets found.";
-			this.renderDataJsonBody(host, { msg, errors });
+			this.renderDataJsonBody(host, { msg: jsonImportMessage(presets.length), errors });
 		});
 		const bundledBtn = impRow.createEl("button", { text: "Load bundled presets" });
 		bundledBtn.addEventListener("click", (ev) => {
@@ -921,20 +918,22 @@ export class MiniGraphView extends ItemView {
 			void this.save();
 			this.syncLensCommands(this.settings.lensPresets);
 			this.refreshFilterTab();
-			this.renderDataJsonBody(host, { msg: `Added ${added} bundled preset${added === 1 ? "" : "s"}.`, errors: [] });
+			this.renderDataJsonBody(host, { msg: bundledLoadMessage(added), errors: [] });
 		});
 
 		// ── Status (last import / bundled-load) ──
 		if (status) {
+			const statusStyle = noteMenuJsonStatusStyle(status.errors.length > 0);
 			const st = host.createDiv({ text: status.msg });
-			st.setCssStyles({ fontSize: "10.5px", marginTop: "8px", color: status.errors.length ? "var(--text-warning, var(--text-muted))" : "var(--text-muted)" });
-			for (const e of status.errors.slice(0, 20)) {
-				const line = host.createDiv({ text: `• ${e}` });
-				line.setCssStyles({ fontSize: "10px", color: "var(--text-error, var(--text-muted))", paddingLeft: "6px" });
+			st.setCssStyles(statusStyle.status);
+			const { errorLines, moreText } = formatJsonStatusLines(status.errors);
+			for (const text of errorLines) {
+				const line = host.createDiv({ text });
+				line.setCssStyles(statusStyle.errorLine);
 			}
-			if (status.errors.length > 20) {
-				const more = host.createDiv({ text: `…and ${status.errors.length - 20} more.` });
-				more.setCssStyles({ fontSize: "10px", color: "var(--text-muted)", paddingLeft: "6px" });
+			if (moreText) {
+				const more = host.createDiv({ text: moreText });
+				more.setCssStyles(statusStyle.more);
 			}
 		}
 	}
@@ -1013,46 +1012,18 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private resolveSetLayer(setKey: string): NodeDisplay {
-		const base = this.nodeDisplayDeps();
-		const supers = new Map(base.supersetsOf);
 		// Real single-tag clusters are supersets of the set-layers.
-		supers.set(setKey, (this.laid.clusters ?? []).map((c) => c.groupKey));
+		const clusterKeys = (this.laid.clusters ?? []).map((c) => c.groupKey);
 		const full = this.settings.layerInheritFull?.includes(setKey) ?? false;
-		const overrides = full
-			? Object.fromEntries(Object.entries(base.overrides).filter(([k]) => k !== setKey))
-			: base.overrides;
-		return resolveFromClusterFn(setKey, { ...base, overrides, supersetsOf: supers });
-	}
-
-	// Settings that only affect WHAT is painted, not the placement. Toggling
-	// these must NOT relayout — the positions stay identical to the all-on
-	// layout; we just repaint.
-	private static readonly DISPLAY_ONLY_KEYS = new Set([
-		"showNodes",
-		"showEnclosures",
-		"showEdges",
-		"showGrid",
-		"showBody",
-		// Heatmap colour scale (Jaccard vs raw) only changes cell shading.
-		"heatmapJaccard",
-		// Lattice subset links only affect the back-layer of drawLattice —
-		// toggling repaints without re-bucketing intersections.
-		"latticeShowSubsetLinks",
-	]);
-
-	private layoutSignature(s: MiniSettings): string {
-		const out: Record<string, unknown> = {};
-		const rec = s as unknown as Record<string, unknown>;
-		for (const k of Object.keys(rec).sort()) {
-			if (MiniGraphView.DISPLAY_ONLY_KEYS.has(k)) continue;
-			out[k] = rec[k];
-		}
-		return JSON.stringify(out);
+		return resolveFromClusterFn(
+			setKey,
+			setLayerDeps(this.nodeDisplayDeps(), setKey, clusterKeys, full),
+		);
 	}
 
 	updateSettings(s: MiniSettings): void {
 		this.settings = s;
-		const sig = this.layoutSignature(s);
+		const sig = layoutSignature(s);
 		if (sig !== this.lastLayoutSig) {
 			// A layout-affecting setting changed → recompute placement.
 			this.lastLayoutSig = sig;
@@ -1095,10 +1066,7 @@ export class MiniGraphView extends ItemView {
 
 		if (this.settings.selectedBases.length > 0) {
 			try {
-				const edgeKinds = new Set<BaseEdgeKind>();
-				if (this.settings.basesLinkEdges) edgeKinds.add("link");
-				if (this.settings.basesSharedTagEdges) edgeKinds.add("shared-tag");
-				if (this.settings.basesSharedPropEdges) edgeKinds.add("shared-property");
+				const edgeKinds = basesEnabledEdgeKinds(this.settings);
 				this.baseIndex = await buildBaseIndex(this.app, this.settings.selectedBases, {
 					link: this.settings.basesLinkEdges,
 					sharedTag: this.settings.basesSharedTagEdges,
@@ -1116,10 +1084,7 @@ export class MiniGraphView extends ItemView {
 						injectBaseEnclosures: this.settings.viewMode === "bubblesets",
 						focusNodeIds: this.settings.focusNodeIds,
 						edgeKinds,
-						labelOf: (notePath) => {
-							const f = this.app.vault.getAbstractFileByPath(notePath);
-							return f instanceof TFile ? f.basename : notePath;
-						},
+						labelOf: (notePath) => this.basenameOrPath(notePath),
 						mtimeOf: (notePath) => {
 							const f = this.app.vault.getAbstractFileByPath(notePath);
 							return f instanceof TFile ? f.stat.mtime : undefined;
@@ -1139,12 +1104,7 @@ export class MiniGraphView extends ItemView {
 
 		// ── Early-out: skip the (expensive) relayout/redraw/menu-rebuild when the
 		// graph INPUTS are byte-for-byte identical to the last build.
-		const rebuildSig = JSON.stringify({
-			n: data.nodes.map((n) => [n.id, n.label, n.memberships ?? []]),
-			e: data.edges.map((e) => [e.source, e.target]),
-			c: [...clusterLabels.entries()],
-			s: this.layoutSignature(this.settings),
-		});
+		const rebuildSig = rebuildSignature(data, clusterLabels, this.settings);
 		if (rebuildSig === this.lastRebuildSig) return;
 		this.lastRebuildSig = rebuildSig;
 
@@ -1175,10 +1135,9 @@ export class MiniGraphView extends ItemView {
 		this.removeNoteMenu();
 		this.locatedNoteId = null;
 
+		// Total + directional degree, computed once per rebuild so the encoding
+		// resolvers can do O(1) lookups via `degreeInfoOf` in EncContext.degreeOf.
 		const degrees = computeDegreeMaps(data.edges);
-		this.degreeMap = degrees.degreeMap;
-		this.inDegreeMap = degrees.inDegreeMap;
-		this.outDegreeMap = degrees.outDegreeMap;
 
 		const modes = new Map<string, "full" | "brief">();
 		for (const n of data.nodes) modes.set(n.id, "full");
@@ -1211,21 +1170,8 @@ export class MiniGraphView extends ItemView {
 		// (derived from `sizeScale`) are available to the layout engine.
 		const encCtx: EncContext = {
 			nowMs: Date.now(),
-			degreeOf: (id) => {
-				const d = this.degreeMap.get(id);
-				if (d == null) return undefined;
-				return {
-					inDeg: this.inDegreeMap.get(id) ?? 0,
-					outDeg: this.outDegreeMap.get(id) ?? 0,
-					degree: d,
-				};
-			},
-			frontmatterOf: (id) => {
-				const f = this.app.vault.getAbstractFileByPath(id);
-				return f instanceof TFile
-					? (this.app.metadataCache.getFileCache(f)?.frontmatter as Record<string, unknown> | undefined)
-					: undefined;
-			},
+			degreeOf: (id) => degreeInfoOf(id, degrees),
+			frontmatterOf: (id) => this.frontmatterRecordOf(id),
 		};
 		const effEnc = this.settings.encoding ?? [];
 		const encRes = evaluateEncoding(layoutData.nodes, effEnc, encCtx, this.settings.viewMode);
@@ -1236,8 +1182,7 @@ export class MiniGraphView extends ItemView {
 		// binding to anything but the tag field claims the fill, so the stripe
 		// stands down (the legend would otherwise lie). No colour binding (or a
 		// `color`→`tag` binding) ⇒ tag-based ⇒ stripe is the natural fill.
-		const colorBinding = effEnc.find((b) => b.enabled && b.channelId === "color");
-		this.colorIsTagBased = !colorBinding || colorBinding.fieldId === "tag";
+		this.colorIsTagBased = colorIsTagBased(effEnc);
 
 		// Card sizes derive from the user-configured row × column span
 		// times the canonical CARD_CELL_W × CARD_CELL_H lattice step, with
@@ -1249,9 +1194,7 @@ export class MiniGraphView extends ItemView {
 		if (this.settings.showGhostEdges) {
 			const linkedPairs = new Set<string>();
 			for (const e of layoutData.edges) {
-				const a = e.source < e.target ? e.source : e.target;
-				const b = e.source < e.target ? e.target : e.source;
-				linkedPairs.add(`${a}|${b}`);
+				linkedPairs.add(undirectedPairKey(e.source, e.target));
 			}
 			const bridgeNodes = layoutData.nodes.map(n => ({ id: n.id, tags: n.memberships }));
 			this.currentBridges = findBridges(
@@ -1365,7 +1308,7 @@ export class MiniGraphView extends ItemView {
 		this.clearStaleSelection();
 		// Baseline the layout signature so subsequent display-only toggles
 		// (which leave this unchanged) repaint without relaying out.
-		this.lastLayoutSig = this.layoutSignature(this.settings);
+		this.lastLayoutSig = layoutSignature(this.settings);
 		const modeChanged = this.lastFramedMode !== this.settings.viewMode;
 		this.lastFramedMode = this.settings.viewMode;
 		const isDroste = this.settings.viewMode === "droste";
@@ -1380,8 +1323,16 @@ export class MiniGraphView extends ItemView {
 		this.refreshJsonTab();
 	}
 	private applyAxisLayout(effEnc: EncodingBinding[], encCtx: EncContext): void {
-		const bindingX = effEnc.find((b) => b.channelId === "axisX");
-		const bindingY = effEnc.find((b) => b.channelId === "axisY");
+		let bindingX = effEnc.find((b) => b.channelId === "axisX");
+		let bindingY = effEnc.find((b) => b.channelId === "axisY");
+		// Scatter (F2) is DEFINED by its two quantitative axes — unlike the
+		// euler/bubblesets overlay they are always on, defaulting to degree/ageDays
+		// when the user has not bound them. The user's enabled bindings still win.
+		if (this.settings.viewMode === "scatter") {
+			const def = scatterAxisDefaults(bindingX, bindingY);
+			bindingX = def.x;
+			bindingY = def.y;
+		}
 		if (!bindingX?.enabled && !bindingY?.enabled) {
 			this.laid.axes = undefined;
 			return;
@@ -1396,17 +1347,16 @@ export class MiniGraphView extends ItemView {
 
 		const isCardMode =
 			this.settings.viewMode === "euler" ||
-			this.settings.viewMode === "bubblesets";
+			this.settings.viewMode === "bubblesets" ||
+			this.settings.viewMode === "scatter";
 
 		if (!isCardMode) {
 			this.laid.axes = undefined;
 			return;
 		}
 
-		let nSpan = Math.max(20, Math.ceil(Math.sqrt(this.laid.nodes.length)) * 4);
-		if (nSpan % 2 !== 0) nSpan += 1; // Force even to ensure integer cx/cy
-		const fallbackWidth = nSpan * this.laid.slotW;
-		const fallbackHeight = nSpan * this.laid.slotH;
+		const { width: fallbackWidth, height: fallbackHeight } =
+			axisFallbackSpan(this.laid.nodes.length, this.laid.slotW, this.laid.slotH);
 
 		const { positions, axes, width: finalWidth, height: finalHeight } = axisLayout(this.laid.nodes, encCtx, {
 			bindingX: bindingX?.enabled ? bindingX : undefined,
@@ -1428,17 +1378,9 @@ export class MiniGraphView extends ItemView {
 			}
 		}
 
-		const shiftSpec = (spec: AxisSpec | undefined, offset: number): AxisSpec | undefined => {
-			if (!spec) return undefined;
-			const out = { ...spec };
-			if (out.bands) out.bands = out.bands.map((b: AxisBand) => ({ ...b, start: b.start - offset, end: b.end - offset, center: b.center - offset }));
-			if (out.ticks) out.ticks = out.ticks.map((t: AxisTick) => ({ ...t, pos: t.pos - offset }));
-			return out;
-		};
-
 		this.laid.axes = {
-			x: shiftSpec(axes.x, cx),
-			y: shiftSpec(axes.y, cy),
+			x: shiftAxisSpec(axes.x, cx),
+			y: shiftAxisSpec(axes.y, cy),
 		};
 
 		if (this.laid.clusters && this.laid.clusters.length > 0) {
@@ -1459,45 +1401,10 @@ export class MiniGraphView extends ItemView {
 			const idToRect = buildIdToRect(this.laid.nodes);
 			const routeObstacles = buildRouteObstacles(this.laid.nodes, this.laid.slotW, this.laid.slotH);
 			const lanes = new LaneRegistry();
-			for (const e of this.laid.edges) {
-				const a = idToRect.get(e.source);
-				const b = idToRect.get(e.target);
-				if (!a || !b) continue;
-				let path = routeZ(
-					a,
-					b,
-					lanes,
-					this.laid.slotW,
-					this.laid.slotH,
-					this.laid.channelW,
-					this.laid.channelH,
-					routeObstacles,
-					e.source,
-					e.target,
-				);
-				if (!path || path.length < 2) path = [{ x: a.x, y: a.y }, { x: b.x, y: b.y }];
-				e.path = path;
-			}
+			const { slotW, slotH, channelW, channelH } = this.laid;
+			routeEdges(this.laid.edges, idToRect, lanes, slotW, slotH, channelW, channelH, routeObstacles);
 			if (this.laid.ghostEdges) {
-				for (const e of this.laid.ghostEdges) {
-					const a = idToRect.get(e.source);
-					const b = idToRect.get(e.target);
-					if (!a || !b) continue;
-					let path = routeZ(
-						a,
-						b,
-						lanes,
-						this.laid.slotW,
-						this.laid.slotH,
-						this.laid.channelW,
-						this.laid.channelH,
-						routeObstacles,
-						e.source,
-						e.target,
-					);
-					if (!path || path.length < 2) path = [{ x: a.x, y: a.y }, { x: b.x, y: b.y }];
-					e.path = path;
-				}
+				routeEdges(this.laid.ghostEdges, idToRect, lanes, slotW, slotH, channelW, channelH, routeObstacles);
 			}
 		}
 	}
@@ -1551,12 +1458,7 @@ export class MiniGraphView extends ItemView {
 		const ctx: EncContext = {
 			nowMs: Date.now(),
 			degreeOf,
-			frontmatterOf: (id) => {
-				const f = this.app.vault.getAbstractFileByPath(id);
-				return f instanceof TFile
-					? (this.app.metadataCache.getFileCache(f)?.frontmatter as Record<string, unknown> | undefined)
-					: undefined;
-			},
+			frontmatterOf: (id) => this.frontmatterRecordOf(id),
 		};
 
 		const res = assignGalleryAxes(
@@ -1686,11 +1588,10 @@ export class MiniGraphView extends ItemView {
 	}
 
 	private resize(): void {
-		const dpr = activeWindow.devicePixelRatio || 1;
-		const w = this.canvas.clientWidth;
-		const h = this.canvas.clientHeight;
-		this.canvas.width = Math.max(1, Math.floor(w * dpr));
-		this.canvas.height = Math.max(1, Math.floor(h * dpr));
+		const c = this.canvas;
+		const b = canvasBackingSize(c.clientWidth, c.clientHeight, activeWindow.devicePixelRatio || 1);
+		c.width = b.width;
+		c.height = b.height;
 		this.requestDraw();
 	}
 
@@ -1699,50 +1600,30 @@ export class MiniGraphView extends ItemView {
 	// so it works on minAppVersion 1.5.0.
 	private openExportMenu(evt: MouseEvent): void {
 		const menu = new Menu();
-		menu.addItem((i) =>
-			i
-				.setTitle("Copy view to clipboard")
-				.setIcon("copy")
-				.onClick(() => void this.exportImage({ scale: 2, fit: false, target: "clipboard" })),
-		);
-		menu.addItem((i) =>
-			i
-				.setTitle("Save view as PNG (2×)")
-				.setIcon("image-down")
-				.onClick(() => void this.exportImage({ scale: 2, fit: false, target: "vault" })),
-		);
-		menu.addItem((i) =>
-			i
-				.setTitle("Save view as PNG (4×)")
-				.setIcon("image-down")
-				.onClick(() => void this.exportImage({ scale: 4, fit: false, target: "vault" })),
-		);
-		menu.addItem((i) =>
-			i
-				.setTitle("Save whole figure as PNG (2×)")
-				.setIcon("maximize")
-				.onClick(() => void this.exportImage({ scale: 2, fit: true, target: "vault" })),
-		);
-		menu.addSeparator();
-		// Vector (SVG) — resolution-independent, reuses the same draw() pipeline.
-		menu.addItem((i) =>
-			i
-				.setTitle("Copy view as SVG")
-				.setIcon("copy")
-				.onClick(() => void this.exportSvg({ fit: false, target: "clipboard" })),
-		);
-		menu.addItem((i) =>
-			i
-				.setTitle("Save view as SVG")
-				.setIcon("file-code")
-				.onClick(() => void this.exportSvg({ fit: false, target: "vault" })),
-		);
-		menu.addItem((i) =>
-			i
-				.setTitle("Save whole figure as SVG")
-				.setIcon("maximize")
-				.onClick(() => void this.exportSvg({ fit: true, target: "vault" })),
-		);
+		// The item/separator descriptors (titles, icons, and which export each
+		// triggers) live in the pure exportMenuItems(); the view only maps them
+		// to Obsidian Menu calls and wires the onClick to exportImage/exportSvg.
+		for (const entry of exportMenuItems()) {
+			if (entry.kind === "separator") {
+				menu.addSeparator();
+				continue;
+			}
+			const { action } = entry;
+			menu.addItem((i) =>
+				i
+					.setTitle(entry.title)
+					.setIcon(entry.icon)
+					.onClick(() =>
+						action.format === "png"
+							? void this.exportImage({
+									scale: action.scale,
+									fit: action.fit,
+									target: action.target,
+								})
+							: void this.exportSvg({ fit: action.fit, target: action.target }),
+					),
+			);
+		}
 		menu.showAtMouseEvent(evt);
 	}
 
@@ -1767,11 +1648,8 @@ export class MiniGraphView extends ItemView {
 		const srcW = this.canvas.width;
 		const srcH = this.canvas.height;
 		const dims = exportCanvasDims(srcW, srcH, opts.scale);
-		if (dims.scale < opts.scale - 1e-6) {
-			new Notice(
-				`Tag Lens: export limited to ${dims.scale.toFixed(1)}× (canvas size cap).`,
-			);
-		}
+		const capMsg = exportScaleCapMessage(opts.scale, dims.scale);
+		if (capMsg) new Notice(capMsg);
 
 		const off = this.canvas.ownerDocument.createElement("canvas");
 		off.width = dims.width;
@@ -1887,23 +1765,29 @@ export class MiniGraphView extends ItemView {
 		}
 	}
 
+	// Assign a computed {zoom, panX, panY} onto the view's transform fields.
+	// Every fit/zoom path (fitTransform / zoomAroundPointer / *Fit) yields this
+	// same triple; centralize the assignment so no path can copy-paste-drift
+	// into setting only two of the three.
+	private applyTransform(t: { zoom: number; panX: number; panY: number }): void {
+		this.zoom = t.zoom;
+		this.panX = t.panX;
+		this.panY = t.panY;
+	}
+
 	private zoomBy(factor: number): void {
 		const rect = this.canvas.getBoundingClientRect();
 		const sx = rect.width / 2;
 		const sy = rect.height / 2;
 		const t = zoomAroundPointer({ zoom: this.zoom, panX: this.panX, panY: this.panY }, factor, sx, sy);
-		this.zoom = t.zoom;
-		this.panX = t.panX;
-		this.panY = t.panY;
+		this.applyTransform(t);
 		this.cancelHover();
 		this.requestDraw();
 	}
 
 	private fitToRect(world: { minX: number; minY: number; maxX: number; maxY: number }): void {
 		const t = fitTransform(world, this.canvas.clientWidth, this.canvas.clientHeight, 24);
-		this.zoom = t.zoom;
-		this.panX = t.panX;
-		this.panY = t.panY;
+		this.applyTransform(t);
 		this.cancelHover();
 		this.requestDraw();
 	}
@@ -1916,39 +1800,23 @@ export class MiniGraphView extends ItemView {
 			const u = this.laid.upset;
 			// UpSet fit: cards occupy the canvas ABOVE the footer
 			// (full canvas width). Footer is screen-fixed at bottom.
-			// Zoom to show ~15 card rows vertically; horizontal zoom
-			// fits all columns into the canvas width.
-			const slotH = u.cardSlotH;
+			// Zoom to show ~8–20 card rows vertically; horizontal zoom
+			// fits all columns into the canvas width. panX is set by
+			// clampPan() (called inside requestDraw) — upsetFit returns 0.
 			const footerH = upsetFooterHeight(
 				this.canvas.clientHeight,
 				u.sets.length,
 			);
-			const cardsBandH = this.canvas.clientHeight - footerH;
-			const targetVisibleRows = Math.max(
-				8,
-				Math.min(20, u.cardsWorldHeight / slotH),
+			const fit = upsetFit(
+				u.cardSlotH,
+				u.cardsWorldHeight,
+				u.cardsWorldWidth,
+				footerH,
+				this.canvas.clientWidth,
+				this.canvas.clientHeight,
+				UPSET_LEFT_BAND_PX,
 			);
-			const zoomFromRows = cardsBandH / (targetVisibleRows * slotH);
-			// Cards START at the right edge of the row-label band, so
-			// the horizontal fit area excludes that band.
-			const padX = 8;
-			const visW = Math.max(
-				1,
-				this.canvas.clientWidth - UPSET_LEFT_BAND_PX - padX,
-			);
-			const zoomFromW = visW / Math.max(1, u.cardsWorldWidth);
-			this.zoom = Math.max(
-				0.05,
-				Math.min(2, Math.min(zoomFromRows, zoomFromW)),
-			);
-			// Cards bottom (= world y = cardsWorldHeight) anchored at
-			// the top of the footer; tall stacks extend above the
-			// canvas and are reachable by panning.
-			this.panY = cardsBandH - u.cardsWorldHeight * this.zoom;
-			// panX is set by clampPan() (called inside requestDraw).
-			// Provide an initial value of 0; clamp will center or pin
-			// as appropriate.
-			this.panX = 0;
+			this.applyTransform(fit);
 			this.requestDraw();
 			return;
 		}
@@ -1960,42 +1828,18 @@ export class MiniGraphView extends ItemView {
 			// initial panX anchors the leftmost node just past the gutter so
 			// the gutter never overlaps any node at default zoom.
 			const L = this.laid.lattice;
-			const panelW = this.pinnedMenuWidth();
-			const visW = Math.max(1, this.canvas.clientWidth - panelW);
+			const visW = visibleFitWidth(this.canvas.clientWidth, this.pinnedMenuWidth());
 			const visH = Math.max(1, this.canvas.clientHeight);
-			const pad = 8;
-			const usableW = Math.max(1, visW - LATTICE_TIER_GUTTER - pad);
-			const zoomY = (visH - pad * 2) / Math.max(1, L.worldHeight);
-			const zoomX = usableW / Math.max(1, L.worldWidth);
-			// Floor below which header text would shrink below ~10 screen px
-			// (HEADER_H = 22 world × 0.45 ≈ 10 px).
-			const MIN_READABLE = 0.45;
-			const zoom = Math.min(2, Math.max(MIN_READABLE, Math.min(zoomY, zoomX)));
-			this.zoom = zoom;
-			// PinPin the leftmost node just past the gutter. Centre on the
-			// gutter-right side when the whole lattice fits horizontally.
-			const worldShownW = L.worldWidth * zoom;
-			this.panX = worldShownW <= usableW
-				? LATTICE_TIER_GUTTER + (usableW - worldShownW) / 2
-				: LATTICE_TIER_GUTTER;
-			const worldShownH = L.worldHeight * zoom;
-			this.panY = worldShownH <= visH - pad * 2
-				? pad + (visH - pad * 2 - worldShownH) / 2
-				: pad;
+			const fit = latticeFit(L.worldWidth, L.worldHeight, visW, visH, LATTICE_TIER_GUTTER);
+			this.applyTransform(fit);
 			this.requestDraw();
 			return;
 		}
 		if (this.laid.heatmap) {
 			// Square n×n grid: fit all cells into the smaller of the two data-area
 			// dimensions; pin the origin just past the frozen label bands.
-			const h = this.laid.heatmap;
-			const g = heatmapGeom(h, 1, this.canvas.clientWidth);
-			const availW = Math.max(1, this.canvas.clientWidth - g.labelBand);
-			const availH = Math.max(1, this.canvas.clientHeight - g.headerH);
-			const fit = Math.min(availW, availH) / Math.max(1, h.n * h.cell);
-			this.zoom = Math.min(2, Math.max(0.05, fit));
-			this.panX = heatmapGeom(h, this.zoom, this.canvas.clientWidth).labelBand;
-			this.panY = heatmapGeom(h, this.zoom, this.canvas.clientWidth).headerH;
+			const fit = heatmapFit(this.laid.heatmap, this.canvas.clientWidth, this.canvas.clientHeight);
+			this.applyTransform(fit);
 			this.requestDraw();
 			return;
 		}
@@ -2004,47 +1848,15 @@ export class MiniGraphView extends ItemView {
 			this.centerDrosteOn(this.settings.drosteFocus || this.laid.drosteGallery.cells[0]?.id || "");
 			return;
 		}
-		const hasContent =
-			this.laid.clusters.length > 0 || this.laid.nodes.length > 0;
-		if (!hasContent) return;
-		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-		for (const c of this.laid.clusters) {
-			minX = Math.min(minX, c.x);
-			minY = Math.min(minY, c.y);
-			maxX = Math.max(maxX, c.x + c.width);
-			maxY = Math.max(maxY, c.y + c.height);
-		}
-		// Cards stay visible even when no enclosure surrounds them (e.g. files
-		// that landed in NONE_BUCKET after HAVING dropped their only cluster).
-		for (const n of this.laid.nodes) {
-			minX = Math.min(minX, n.x - n.width / 2);
-			minY = Math.min(minY, n.y - n.height / 2);
-			maxX = Math.max(maxX, n.x + n.width / 2);
-			maxY = Math.max(maxY, n.y + n.height / 2);
-		}
-		if (!Number.isFinite(minX)) return;
+		const bounds = contentBounds(this.laid.clusters, this.laid.nodes);
+		if (!bounds) return;
 		// The settings panel overlays the right side of the canvas without
 		// pushing it, so subtract its width from the effective fit area and
 		// centre against the visible half.
-		const panelW = this.pinnedMenuWidth();
-		const visW = Math.max(1, this.canvas.clientWidth - panelW);
+		const visW = visibleFitWidth(this.canvas.clientWidth, this.pinnedMenuWidth());
 		const visH = this.canvas.clientHeight;
-		// Reserve canvas-pixel padding (zoom-independent). Top gets extra room
-		// for cluster labels which sit ~20 canvas px above each enclosure.
-		const padX = 20;
-		const padTop = 36;
-		const padBottom = 20;
-		const fitW = Math.max(1, visW - 2 * padX);
-		const fitH = Math.max(1, visH - padTop - padBottom);
-		const zx = fitW / Math.max(1, maxX - minX);
-		const zy = fitH / Math.max(1, maxY - minY);
-		// Min floor is intentionally very low so huge vaults still fit on
-		// screen; the user can zoom in interactively as needed.
-		this.zoom = Math.min(2, Math.max(0.005, Math.min(zx, zy)));
-		const worldCenterX = (minX + maxX) / 2;
-		const worldCenterY = (minY + maxY) / 2;
-		this.panX = padX + fitW / 2 - worldCenterX * this.zoom;
-		this.panY = padTop + fitH / 2 - worldCenterY * this.zoom;
+		const fit = contentFit(bounds, visW, visH);
+		this.applyTransform(fit);
 		this.requestDraw();
 	}
 
@@ -2082,24 +1894,16 @@ export class MiniGraphView extends ItemView {
 		// canvas beyond them.
 		if (!this.laid.upset) return;
 		const u = this.laid.upset;
-		const contentW = u.cardsWorldWidth * this.zoom;
-		const canvasW = this.canvas.clientWidth;
 		// Cards (= the "Pareto-shaped" card-stack columns) and their
 		// matching matrix dots must start at the RIGHT edge of the
 		// footer's row-label band (`UPSET_LEFT_BAND_PX`), never to
 		// the left of it — per user spec (2026-05-26).
-		const availableW = canvasW - UPSET_LEFT_BAND_PX;
-		// maxPanX = panX that places cards' world-x=0 at screen-x=LEFT_BAND_PX.
-		const maxPanX = UPSET_LEFT_BAND_PX;
-		// minPanX = panX that places cards' right edge at canvas right.
-		const minPanX = canvasW - contentW;
-		if (contentW <= availableW) {
-			// Cards fit in the area RIGHT of the label band — pin to
-			// the left of that area (no panning needed).
-			this.panX = maxPanX;
-		} else {
-			this.panX = Math.max(minPanX, Math.min(maxPanX, this.panX));
-		}
+		this.panX = clampUpsetPanX(
+			this.panX,
+			u.cardsWorldWidth * this.zoom,
+			this.canvas.clientWidth,
+			UPSET_LEFT_BAND_PX,
+		);
 	}
 
 	private drawGlobalDisplayFallbacks(ctx: CanvasRenderingContext2D, dpr: number, mode: string): void {
@@ -2108,13 +1912,14 @@ export class MiniGraphView extends ItemView {
 		ctx.save();
 		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 		const baseAlpha = 0.05;
-
-		const isEuler = mode === "euler" || mode === "bubblesets";
+		// Pure per-mode gating for every overlay layer/badge below (`mode` last so
+		// it wins over any settings.mode).
+		const plan = computeGlobalFallbackPlan({ ...this.settings, mode });
 
 		// 1. showGrid: draw a subtle background grid.
 		// Exclude euler since it natively draws a strong grid. Droste draws its own
 		// Cartesian cell grid (drawDefaultGrid / drawAxisGrid). Matrix/Heatmap don't have native grid.
-		if (this.settings.showGrid && !isEuler && mode !== "droste") {
+		if (plan.drawGrid) {
 			ctx.strokeStyle = `rgba(128, 128, 128, ${baseAlpha * 2})`;
 			ctx.lineWidth = 1;
 			ctx.beginPath();
@@ -2125,7 +1930,7 @@ export class MiniGraphView extends ItemView {
 
 		// 2. showEnclosures: draw a bounding box around the canvas
 		// Exclude euler since it natively has enclosures.
-		if (this.settings.showEnclosures && !isEuler) {
+		if (plan.drawEnclosures) {
 			ctx.strokeStyle = `rgba(255, 128, 0, ${baseAlpha * 4})`;
 			ctx.lineWidth = 4;
 			ctx.strokeRect(4, 4, cw / dpr - 8, ch / dpr - 8);
@@ -2133,7 +1938,7 @@ export class MiniGraphView extends ItemView {
 
 		// 3. showEdges: decorative faint connecting lines from corners
 		// Exclude euler since it draws native edges.
-		if (this.settings.showEdges && !isEuler) {
+		if (plan.drawEdges) {
 			ctx.strokeStyle = `rgba(0, 128, 255, ${baseAlpha})`;
 			ctx.lineWidth = 2;
 			ctx.beginPath();
@@ -2144,7 +1949,7 @@ export class MiniGraphView extends ItemView {
 
 		// 4. showNodes: small badge in top right
 		// Exclude euler/upset/bubblesets since they natively draw nodes.
-		if (this.settings.showNodes && !isEuler && mode !== "upset") {
+		if (plan.drawNodesBadge) {
 			ctx.fillStyle = `rgba(100, 100, 100, ${baseAlpha * 10})`;
 			const tw = ctx.measureText(`${this.laid.nodes?.length ?? 0} nodes`).width;
 			ctx.fillRect(cw / dpr - tw - 20, 10, tw + 10, 20);
@@ -2166,16 +1971,8 @@ export class MiniGraphView extends ItemView {
 			badgeY += 24;
 		};
 
-		if (this.settings.showMaturity) drawBadge("Maturity: ON", "rgba(0, 150, 0, 0.8)");
-		// Node size fallback badge for modes that don't scale cards natively
-		if (!isEuler && mode !== "upset") {
-			if (this.settings.nodeRows !== 1 || this.settings.nodeCols !== 1) {
-				drawBadge(`Size: ${this.settings.nodeRows}x${this.settings.nodeCols}`, "rgba(50, 150, 200, 0.8)");
-			}
-		}
-
-		if (mode === "heatmap" && this.settings.heatmapJaccard) {
-			drawBadge("Jaccard: ON", "rgba(100, 100, 100, 0.8)");
+		for (const badge of metaBadges(plan, this.settings.nodeRows, this.settings.nodeCols)) {
+			drawBadge(badge.label, badge.color);
 		}
 
 		// F5: per-mode on-canvas legend. Pure overlay — never affects figure/selection.
@@ -2273,12 +2070,7 @@ export class MiniGraphView extends ItemView {
 				// Closure: id → file basename via the live vault. Falls back
 				// to a path-tail strip inside draw-lattice when omitted, so
 				// unit tests / probes still work without a vault.
-				nameOf: (id: string) => {
-					const sep = id.indexOf("\t");
-					const path = sep >= 0 ? id.slice(sep + 1) : id;
-					const f = this.app.vault.getAbstractFileByPath(path);
-					return f instanceof TFile ? f.basename : path;
-				},
+				nameOf: (id: string) => this.basenameOrPath(stripTabPrefix(id)),
 			}));
 			this.drawGlobalDisplayFallbacks(ctx, dpr, "lattice");
 			return;
@@ -2320,15 +2112,7 @@ export class MiniGraphView extends ItemView {
 			this.drawGlobalDisplayFallbacks(ctx, dpr, "heatmap");
 			return;
 		}
-		const upsetHasColumns = (this.laid.upset?.columns.length ?? 0) > 0;
-		const heatmapHasCells = (this.laid.heatmap?.n ?? 0) > 0;
-		const latticeHasNodes = (this.laid.lattice?.nodes.length ?? 0) > 0;
-		if (
-			this.laid.nodes.length === 0 &&
-			!upsetHasColumns &&
-			!heatmapHasCells &&
-			!latticeHasNodes
-		) {
+		if (figureIsEmpty(this.laid)) {
 			ctx.fillStyle = theme().textFaint;
 			ctx.font = `${14 * dpr}px sans-serif`;
 			ctx.textAlign = "center";
@@ -2340,7 +2124,7 @@ export class MiniGraphView extends ItemView {
 			);
 			return;
 		}
-		ctx.setTransform(dpr * this.zoom, 0, 0, dpr * this.zoom, dpr * this.panX, dpr * this.panY);
+		ctx.setTransform(...worldTransform(dpr, this.zoom, this.panX, this.panY));
 
 		// Excel-style row/column underlay. Drawn first so enclosures, edges,
 		// trunks, and cards all sit on top. Cells follow card geometry and
@@ -2381,12 +2165,7 @@ export class MiniGraphView extends ItemView {
 				const offX = ti * periodX;
 				const offY = tj * periodY;
 				ctx.setTransform(
-					dpr * this.zoom,
-					0,
-					0,
-					dpr * this.zoom,
-					dpr * (this.panX + this.zoom * offX),
-					dpr * (this.panY + this.zoom * offY),
+					...worldTransform(dpr, this.zoom, this.panX + this.zoom * offX, this.panY + this.zoom * offY),
 				);
 				this.drawBodyTile(ctx, hasHighlight, skipNode);
 			}
@@ -2394,14 +2173,7 @@ export class MiniGraphView extends ItemView {
 
 		// Restore the world transform so the cluster labels (above) and
 		// header (below) draw in the canonical (0,0)-tile.
-		ctx.setTransform(
-			dpr * this.zoom,
-			0,
-			0,
-			dpr * this.zoom,
-			dpr * this.panX,
-			dpr * this.panY,
-		);
+		ctx.setTransform(...worldTransform(dpr, this.zoom, this.panX, this.panY));
 		if (this.settings.showEnclosures) {
 			this.drawClusterLabels(ctx);
 		}
@@ -2435,17 +2207,15 @@ export class MiniGraphView extends ItemView {
 		// is already drawn; this just annotates it.
 		if (this.noteMenuError) {
 			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-			const msg = `⚠ Note menu disabled: ${this.noteMenuError}`;
 			ctx.font = "12px sans-serif";
 			ctx.textBaseline = "top";
 			ctx.textAlign = "left";
-			const padX = 8, padY = 5, cw = this.canvas.clientWidth || 0;
-			const text = msg.length > 140 ? `${msg.slice(0, 139)}…` : msg;
-			const tw = Math.min(ctx.measureText(text).width, Math.max(0, cw - 16));
+			const text = noteMenuErrorText(this.noteMenuError);
+			const box = noteMenuErrorBannerBox(ctx.measureText(text).width, this.canvas.clientWidth || 0);
 			ctx.fillStyle = colorAlpha(theme().danger, 0.92);
-			ctx.fillRect(8, 8, tw + padX * 2, 22);
+			ctx.fillRect(box.x, box.y, box.w, box.h);
 			ctx.fillStyle = theme().textNormal;
-			ctx.fillText(text, 8 + padX, 8 + padY, Math.max(0, cw - 24));
+			ctx.fillText(text, box.textX, box.textY, box.maxTextWidth);
 		}
 
 
@@ -2668,8 +2438,7 @@ export class MiniGraphView extends ItemView {
 		// display-mode and the body-line cache against the ORIGINAL id so the
 		// font scales with the node's (degree-driven) size and the cached body
 		// is found. Non-duplicated ids contain no tab → used as-is.
-		const sepIdx = n.id.indexOf("\t");
-		const baseId = sepIdx >= 0 ? n.id.slice(sepIdx + 1) : n.id;
+		const baseId = stripTabPrefix(n.id);
 		const scale = this.getCardScale(baseId);
 
 
@@ -2752,21 +2521,16 @@ export class MiniGraphView extends ItemView {
 	private hitTest(wx: number, wy: number): HoverTarget {
 		// 1. Check node aggregation groups (Junihitoe stacks) first
 		if (this.aggregationState.groups.size > 0 && this.laid.nodes.length > 0) {
-			const slackPx = 1 / this.zoom;
 			// Stacks are roughly the same size as cards (subW/subH in drawJunihitoeStack)
-			const cardW = this.laid.nodes[0].width;
-			const cardH = this.laid.nodes[0].height;
-			
-			for (const group of this.aggregationState.groups.values()) {
-				const left = group.x - cardW / 2 - slackPx;
-				const right = group.x + cardW / 2 + slackPx;
-				const top = group.y - cardH / 2 - slackPx;
-				const bottom = group.y + cardH / 2 + slackPx;
-				
-				if (wx >= left && wx <= right && wy >= top && wy <= bottom) {
-					return { kind: "aggregationGroup", groupKey: group.key, nodeIds: group.nodeIds };
-				}
-			}
+			const hit = hitTestAggregationGroup(
+				wx,
+				wy,
+				this.aggregationState.groups.values(),
+				this.laid.nodes[0].width,
+				this.laid.nodes[0].height,
+				this.zoom,
+			);
+			if (hit) return hit;
 		}
 
 		return hitTestFn(
@@ -2782,8 +2546,7 @@ export class MiniGraphView extends ItemView {
 	private openFile(id: string): void {
 		// Euler-nested copies use a `${tag}\t${origPath}` id — open the
 		// ORIGINAL file path, not the prefixed copy id.
-		const sepIdx = id.indexOf("\t");
-		const path = sepIdx >= 0 ? id.slice(sepIdx + 1) : id;
+		const path = stripTabPrefix(id);
 		this.isInternalClick = true;
 		void this.app.workspace.openLinkText(path, "", false);
 	}
@@ -2794,11 +2557,8 @@ export class MiniGraphView extends ItemView {
 		if (!g) return;
 		const cell = g.cells.find((c) => c.id === id) ?? g.cells[0];
 		if (!cell) return;
-		const cw = this.canvas.clientWidth || 1, ch = this.canvas.clientHeight || 1;
-		this.zoom = Math.max(0.05, Math.min(3, (Math.min(cw, ch) * 0.55) / DROSTE_CELL));
-		const wx = (cell.col + 0.5) * DROSTE_CELL, wy = (cell.row + 0.5) * DROSTE_CELL;
-		this.panX = cw / 2 - wx * this.zoom;
-		this.panY = ch / 2 - wy * this.zoom;
+		const fit = drosteFit(cell, this.canvas.clientWidth, this.canvas.clientHeight, DROSTE_CELL);
+		this.applyTransform(fit);
 		this.requestDraw();
 	}
 
@@ -2887,11 +2647,8 @@ export class MiniGraphView extends ItemView {
 		const node = this.laid.nodes.find((n) => n.id === id);
 		if (!node) return;
 		const cw = this.canvas.clientWidth || 1, ch = this.canvas.clientHeight || 1;
-		// Zoom in enough to read the card, but never zoom out from the current
-		// view if it's already closer.
-		this.zoom = Math.max(this.zoom, 0.6);
-		this.panX = cw / 2 - node.x * this.zoom;
-		this.panY = ch / 2 - node.y * this.zoom;
+		const fit = locateNodeFit(node, cw, ch, this.zoom);
+		this.applyTransform(fit);
 		this.locatedNoteId = id;
 		// Drive the shared highlight machinery exactly like a hover would, so the
 		// node + its incident edges/clusters light up.
@@ -2931,9 +2688,6 @@ export class MiniGraphView extends ItemView {
 		panel.setCssStyles(noteMenuPanelStyle(pinned, rect, pinnedW));
 		const head = panel.createDiv();
 		head.setCssStyles(noteMenuHeadStyle(pinned));
-		// Header verb is mode-appropriate: droste focuses, other modes either
-		// locate the card on canvas or open the file.
-		const verb = isDroste ? "focus" : "locate/open";
 		// Title row: name on the left, pin + × on the right.
 		const titleRowStyle = noteMenuTitleRowStyle();
 		const titleRow = head.createDiv();
@@ -3007,10 +2761,11 @@ export class MiniGraphView extends ItemView {
 		};
 		const showDSubTab = (key: DataSubTab): void => {
 			this.dataSubTab = key;
-			logicTab.setCssStyles({ display: key === "logic" ? "block" : "none" });
-			treeTab.setCssStyles({ display: key === "tree" ? "flex" : "none" });
-			tableTab.setCssStyles({ display: key === "table" ? "block" : "none" });
-			jsonTab.setCssStyles({ display: key === "json" ? "block" : "none" });
+			const disp = noteMenuDataSubTabDisplay(key);
+			logicTab.setCssStyles({ display: disp.logic });
+			treeTab.setCssStyles({ display: disp.tree });
+			tableTab.setCssStyles({ display: disp.table });
+			jsonTab.setCssStyles({ display: disp.json });
 			if (key === "table") {
 				// Re-render table tab when activated
 				renderDataTableView(tableTab, nodes, { app: this.app, edges: this.laid.edges });
@@ -3031,7 +2786,7 @@ export class MiniGraphView extends ItemView {
 			b.addEventListener("mousedown", (ev) => ev.stopPropagation());
 			b.addEventListener("click", (ev) => { ev.stopPropagation(); showDSubTab(key); });
 			b.addEventListener("mouseenter", () => {
-				if (this.dataSubTab !== key) { b.setCssStyles({ color: "var(--text-muted)" }); b.setCssStyles({ borderBottomColor: "var(--background-modifier-border)" }); }
+				if (this.dataSubTab !== key) b.setCssStyles(noteMenuTabHoverStyle());
 			});
 			b.addEventListener("mouseleave", () => styleDSubs());
 		}
@@ -3050,9 +2805,10 @@ export class MiniGraphView extends ItemView {
 		};
 		const showTab = (key: MenuTab): void => {
 			this.activeMenuTab = key;
-			dataTabWrap.setCssStyles({ display: key === "data" ? "flex" : "none" });
-			settingsTab.setCssStyles({ display: key === "settings" ? "block" : "none" });
-			insightTab.setCssStyles({ display: key === "insight" ? "block" : "none" });
+			const disp = noteMenuTopTabDisplay(key);
+			dataTabWrap.setCssStyles({ display: disp.data });
+			settingsTab.setCssStyles({ display: disp.settings });
+			insightTab.setCssStyles({ display: disp.insight });
 			
 			if (key === "data") this.renderDataLogicBody(logicTab);
 			else this.dataHostEl = null;
@@ -3086,28 +2842,27 @@ export class MiniGraphView extends ItemView {
 			b.addEventListener("click", (ev) => { ev.stopPropagation(); showTab(key); });
 			// Hover affordance for the inactive tab (active styling wins via styleTabs).
 			b.addEventListener("mouseenter", () => {
-				if (this.activeMenuTab !== key) { b.setCssStyles({ color: "var(--text-muted)" }); b.setCssStyles({ borderBottomColor: "var(--background-modifier-border)" }); }
+				if (this.activeMenuTab !== key) b.setCssStyles(noteMenuTabHoverStyle());
 			});
 			b.addEventListener("mouseleave", () => styleTabs());
 		};
 		for (const { key, label } of TABS) mkTab(key, label);
 		// Note-count + click hint, shown at the top of the Result pane.
-		const notesHint = treeTab.createDiv({ text: `${nodes.length} notes — click to ${verb}` });
-		notesHint.setCssStyles({ fontSize: "10px", color: "var(--text-faint)", padding: "4px 8px 0" });
+		const notesHintDesc = noteMenuNotesHint(nodes.length, isDroste);
+		const notesHint = treeTab.createDiv({ text: notesHintDesc.text });
+		notesHint.setCssStyles(notesHintDesc.style);
 		// ── Grouping selector (Folder / Tag) ────────────────────────────────────
 		// A small radio group in the header switches the tree between the FOLDER
 		// tree (by note path, default) and the TAG tree (by GROUP_BY membership
 		// keys). The chosen grouping survives rebuilds (this.noteMenuGroupBy) and
 		// reloads (settings.noteMenuGroupBy). Changing it re-renders the tree.
+		const groupBarStyle = noteMenuGroupBarStyle();
 		const groupBar = treeTab.createDiv();
-		groupBar.setCssStyles({
-			display: "flex", gap: "10px", marginTop: "4px", fontWeight: "400",
-			fontSize: "11px", color: "var(--text-muted)", cursor: "default",
-		});
+		groupBar.setCssStyles(groupBarStyle.bar);
 		const groupName = "gim-notemenu-group";
-		const mkGroupRadio = (value: "folder" | "tag", labelText: string): void => {
+		const mkGroupRadio = (value: NoteMenuGroupBy, labelText: string): void => {
 			const lab = groupBar.createEl("label");
-			lab.setCssStyles({ display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer", userSelect: "none" });
+			lab.setCssStyles(groupBarStyle.label);
 			const radio = lab.createEl("input", { attr: { type: "radio", name: groupName, value } });
 			radio.checked = this.noteMenuGroupBy === value;
 			lab.createSpan({ text: labelText });
@@ -3121,8 +2876,7 @@ export class MiniGraphView extends ItemView {
 			// Don't let a click in the selector start a header MOVE drag.
 			lab.addEventListener("mousedown", (ev) => ev.stopPropagation());
 		};
-		mkGroupRadio("folder", "Folder");
-		mkGroupRadio("tag", "Tag");
+		for (const { value, label } of noteMenuGroupOptions()) mkGroupRadio(value, label);
 		// ── Select all / Deselect all ────────────────────────────────────────────
 		// Two small buttons that (un)check EVERY note in the current menu set
 		// at once. Operate on the full `nodes` list (currentMenuNotes, already
@@ -3130,18 +2884,13 @@ export class MiniGraphView extends ItemView {
 		// same key the per-row checkboxes use. Does NOT call rebuild(); a plain
 		// requestDraw() is enough because the draw() skipNode filter re-reads
 		// hiddenNodes fresh every frame.
+		const bulkBarStyle = noteMenuBulkBarStyle();
 		const bulkBar = treeTab.createDiv();
-		bulkBar.setCssStyles({
-			display: "flex", gap: "6px", marginTop: "4px",
-		});
+		bulkBar.setCssStyles(bulkBarStyle.bar);
 		const mkBulkBtn = (label: string, handler: () => void): void => {
 			const btn = bulkBar.createEl("button");
 			btn.textContent = label;
-			btn.setCssStyles({
-				fontSize: "10px", padding: "2px 6px", cursor: "pointer",
-				background: "var(--background-secondary)", border: "1px solid var(--background-modifier-border)",
-				borderRadius: "3px", color: "var(--text-muted)", lineHeight: "1.4",
-			});
+			btn.setCssStyles(bulkBarStyle.btn);
 			// Prevent the button click from starting a header move-drag.
 			btn.addEventListener("mousedown", (ev) => ev.stopPropagation());
 			btn.addEventListener("click", (ev) => {
@@ -3149,52 +2898,37 @@ export class MiniGraphView extends ItemView {
 				handler();
 			});
 		};
-		mkBulkBtn("Select all", () => {
-			// Show all: remove every listed note's hide-key from hiddenNodes.
-			for (const n of nodes) {
-				const k = hideKey(n);
-				const idx = this.settings.hiddenNodes.indexOf(k);
-				if (idx >= 0) this.settings.hiddenNodes.splice(idx, 1);
-			}
-			void this.save();
-			this.requestDraw();
-			// Redraw the menu so checkboxes reflect the new state without rebuilding
-			// the panel (no scroll/expand collapse).
-			this.noteMenuRedraw?.();
-		});
-		mkBulkBtn("Deselect all", () => {
-			// Hide all: add every listed note's hide-key to hiddenNodes (dedup).
-			for (const n of nodes) {
-				const k = hideKey(n);
-				if (!this.settings.hiddenNodes.includes(k)) {
-					this.settings.hiddenNodes.push(k);
-				}
-			}
-			void this.save();
-			this.requestDraw();
-			this.noteMenuRedraw?.();
-		});
-		// Search input for filtering the tree.
+		// Select all → show every note (hide = false); Deselect all → hide every
+		// note (hide = true). Same bulkSetHidden→save→requestDraw→redraw handler for
+		// both; only the hide-flag differs, so drive them from a pure descriptor
+		// list. requestDraw() (not rebuild) is enough — draw()'s skipNode filter
+		// re-reads hiddenNodes fresh — and noteMenuRedraw refreshes the checkboxes
+		// without collapsing scroll/expand state.
+		for (const { label, hide } of noteMenuBulkActions()) {
+			mkBulkBtn(label, () => {
+				this.settings.hiddenNodes = bulkSetHidden(this.settings.hiddenNodes, nodes.map(hideKey), hide);
+				void this.save();
+				this.requestDraw();
+				this.noteMenuRedraw?.();
+			});
+		}
+		// Search input for filtering the tree. Static chrome from a pure builder.
+		const searchStyle = noteMenuSearchStyle();
 		const searchWrap = treeTab.createDiv();
-		searchWrap.setCssStyles({ position: "relative", margin: "6px 8px", flex: "0 0 auto" });
+		searchWrap.setCssStyles(searchStyle.wrap);
 		const search = searchWrap.createEl("input", { attr: { type: "text", placeholder: "Search: word, #tag, key:value" } });
-		search.setCssStyles({ display: "block", width: "100%", boxSizing: "border-box", padding: "4px 6px", background: "var(--background-primary)", border: "1px solid var(--background-modifier-border)", borderRadius: "4px", color: "var(--text-normal)" });
+		search.setCssStyles(searchStyle.input);
 		// Restore the search query that was active before this rebuild (if any).
 		// This preserves the user's typed text across vault-change-triggered rebuilds.
 		if (this.noteMenuSearchQuery) search.value = this.noteMenuSearchQuery;
 		// Suggestion (autocomplete) dropdown — absolutely positioned under the input,
 		// same panel styling, zIndex above the body. Hidden until there are matches.
 		const suggBox = searchWrap.createDiv();
-		suggBox.setCssStyles({
-			position: "absolute", left: "0", right: "0", top: "100%", marginTop: "2px",
-			background: "var(--background-secondary)", border: "1px solid var(--background-modifier-border)", borderRadius: "4px",
-			boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "70", overflow: "auto", maxHeight: "240px",
-			display: "none",
-		});
+		suggBox.setCssStyles(searchStyle.suggBox);
 		const body = treeTab.createDiv({ cls: "gim-tree-scroll" });
 		// flex:1 1 auto + minHeight:0 → the tree scroll area grows/shrinks with the
 		// panel height (set above / on resize) instead of a fixed maxHeight.
-		body.setCssStyles({ overflow: "auto", padding: "4px 6px 8px", flex: "1 1 auto", minHeight: "0" });
+		body.setCssStyles(searchStyle.body);
 		// FLOATING: header-drag MOVE + bottom-right RESIZE + double-click MINIMIZE.
 		// PINNED: none of those (it's docked) — a left-edge handle resizes width.
 		if (!pinned) {
@@ -3206,23 +2940,19 @@ export class MiniGraphView extends ItemView {
 		// Minimized ⇒ hide the search + tree body and collapse the panel to the
 		// header bar height (width unchanged). The body height to restore to is
 		// remembered on minimize so a second double-click round-trips back.
-		const headerOnlyHeight = (): number => {
+		const headerOnlyHeight = (): number =>
 			// Header bar + the panel's borders (= total height when body is hidden).
-			const h = head.offsetHeight || 0;
-			const border = panel.offsetHeight - panel.clientHeight; // top+bottom border
-			return Math.max(1, h + (border > 0 ? border : 2));
-		};
+			noteMenuHeaderOnlyHeight(head.offsetHeight || 0, panel.offsetHeight - panel.clientHeight);
 		const applyMinimizedState = (): void => {
+			// Body/grip visibility flips with minimized; height is computed below.
+			const disp = noteMenuMinimizeDisplay(this.noteMenuMinimized);
+			bodyWrap.setCssStyles({ display: disp.body });
+			grip.setCssStyles({ display: disp.grip });
 			if (this.noteMenuMinimized) {
 				// Collapse to the header bar (title + tabs): hide the whole tab body.
-				bodyWrap.setCssStyles({ display: "none" });
-				// Resize is meaningless while collapsed — hide the grip.
-				grip.setCssStyles({ display: "none" });
 				const collapsed = noteMenuHeight(true, headerOnlyHeight(), rect.height, this.noteMenuRestoreHeight);
 				panel.setCssStyles({ height: `${collapsed}px` });
 			} else {
-				bodyWrap.setCssStyles({ display: "flex" });
-				grip.setCssStyles({ display: "" });
 				// Restore the remembered body height (fall back to the live rect).
 				const current = this.noteMenuRect?.height ?? rect.height;
 				const h = noteMenuHeight(false, headerOnlyHeight(), current, this.noteMenuRestoreHeight);
@@ -3250,10 +2980,7 @@ export class MiniGraphView extends ItemView {
 			// PINNED: a thin left-edge handle resizes the docked column width.
 			// Dragging LEFT widens; the canvas reservation + pan update live.
 			const lgrip = panel.createDiv();
-			lgrip.setCssStyles({
-				position: "absolute", left: "0", top: "0", bottom: "0", width: "6px",
-				cursor: "ew-resize", zIndex: "61", background: "transparent",
-			});
+			lgrip.setCssStyles(noteMenuLeftGripStyle());
 			lgrip.addEventListener("mousedown", (ev: MouseEvent) => {
 				if (ev.button !== 0) return;
 				ev.preventDefault();
@@ -3263,10 +2990,9 @@ export class MiniGraphView extends ItemView {
 				const onMove = (e: MouseEvent): void => {
 					const cw = this.root.clientWidth || 0;
 					const raw = startW + (startX - e.clientX); // drag left → wider
-					const w = Math.min(
-						Math.max(NOTE_MENU_MIN.width, raw),
-						Math.max(NOTE_MENU_MIN.width, Math.floor((cw || 320) * 0.8)),
-					);
+					// Same floor-to-min / ceiling-to-80%-of-container rule as the
+					// initial dock width — reuse the pure builder, never above 80%.
+					const w = clampPinnedWidth(raw, cw);
 					panel.setCssStyles({ width: `${w}px` });
 					this.settings.noteMenuPinnedWidth = w;
 					this.requestDraw(); // re-reserve canvas width + re-pan the figure
@@ -3290,21 +3016,19 @@ export class MiniGraphView extends ItemView {
 		// conflicts with Obsidian core/theme checkbox styles entirely. State is
 		// driven by `data-state` ("checked" | "unchecked" | "indeterminate")
 		// and styled in styles.css via `.gim-nav-cb[data-state="..."]`.
-		type CbState = "checked" | "unchecked" | "indeterminate";
+		type CbState = FolderCheckState;
 		const setCbState = (el: HTMLElement, state: CbState): void => {
 			el.dataset.state = state;
-			el.setAttribute("aria-checked", state === "indeterminate" ? "mixed" : state === "checked" ? "true" : "false");
+			el.setAttribute("aria-checked", checkboxAriaChecked(state));
 		};
 		const isCbChecked = (el: HTMLElement): boolean => el.dataset.state === "checked";
 		const mkRowCheckbox = (host: HTMLElement, onToggle: () => void): HTMLElement => {
 			// `gim-nav-cb` drives the custom tri-state rendering in styles.css
 			// (checked ✓ / empty / indeterminate –) so the partial state is
 			// unmistakable regardless of the active Obsidian theme.
-			const cb = host.createEl("span", {
-				cls: "gim-nav-cb",
-				attr: { role: "checkbox", "aria-checked": "false", tabindex: "0" },
-			});
-			cb.dataset.state = "unchecked";
+			const spec = noteMenuRowCheckboxSpec();
+			const cb = host.createEl("span", { cls: spec.cls, attr: spec.attr });
+			cb.dataset.state = spec.state;
 			cb.addEventListener("mousedown", (ev) => ev.stopPropagation());
 			cb.addEventListener("click", (ev) => { ev.stopPropagation(); onToggle(); });
 			cb.addEventListener("keydown", (ev: KeyboardEvent) => {
@@ -3330,11 +3054,9 @@ export class MiniGraphView extends ItemView {
 
 		const leafRow = (container: HTMLElement, id: string, label: string, depth: number): HTMLElement => {
 			const row = container.createDiv();
-			const highlightId = this.currentMenuHighlightId();
-			const baseBg = id === highlightId ? "#2d6cdf55" : "";
-			// padding must come BEFORE paddingLeft — Object.assign applies properties
-			// left-to-right; putting padding last would overwrite the depth indent.
-			row.setCssStyles({ display: "flex", alignItems: "center", padding: "2px 4px", paddingLeft: `${6 + depth * 12}px`, cursor: "pointer", borderRadius: "3px", whiteSpace: "nowrap", overflow: "hidden", background: baseBg });
+			const hl = noteMenuLeafHighlight(id === this.currentMenuHighlightId());
+			const leafStyle = noteMenuTreeRowStyle("leaf", depth, hl.rowBg);
+			row.setCssStyles(leafStyle.row);
 			// Per-note visibility checkbox. CHECKED ⇔ the note is NOT hidden. The
 			// state is GLOBAL per note (driven by hiddenNodes, keyed by PATH) so a
 			// note appearing in multiple tag groups shows the same state everywhere.
@@ -3362,10 +3084,10 @@ export class MiniGraphView extends ItemView {
 			checkboxRefreshers.push(() => { setCbState(cb, hiddenSetNow().has(noteKey) ? "unchecked" : "checked"); });
 			// The label carries the row-click behaviour (focus/locate/open) + ellipsis.
 			const lbl = row.createSpan({ text: label });
-			lbl.setCssStyles({ flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
-			if (id === highlightId) lbl.setCssStyles({ color: "var(--color-yellow)" });
-			row.addEventListener("mouseenter", () => { row.setCssStyles({ background: "var(--background-modifier-border)" }); });
-			row.addEventListener("mouseleave", () => { row.setCssStyles({ background: baseBg }); });
+			lbl.setCssStyles(leafStyle.label);
+			if (hl.labelColor) lbl.setCssStyles({ color: hl.labelColor });
+			row.addEventListener("mouseenter", () => { row.setCssStyles(noteMenuLeafRowHoverStyle(true, hl.rowBg)); });
+			row.addEventListener("mouseleave", () => { row.setCssStyles(noteMenuLeafRowHoverStyle(false, hl.rowBg)); });
 			lbl.addEventListener("click", () => this.focusNoteFromMenu(id));
 			return row;
 		};
@@ -3382,31 +3104,27 @@ export class MiniGraphView extends ItemView {
 			const allPath = buildFolderPathKey(parentPath, "(all)");
 			const row = container.createDiv();
 			row.dataset.menupath = allPath;
-			row.setCssStyles({
-				display: "flex", alignItems: "center",
-				padding: "2px 4px", paddingLeft: `${26 + depth * 12}px`,
-				color: "var(--text-faint)", fontWeight: "600", fontStyle: "italic",
-			});
+			const allStyle = noteMenuTreeRowStyle("all", depth);
+			row.setCssStyles(allStyle.row);
 			// (all) has NO checkbox — only a collapsible label
-			const lbl = row.createSpan({ text: `\u25b8 (all)` });
-			lbl.setCssStyles({
-				flex: "1 1 auto", cursor: "pointer",
-				overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-			});
+			const lbl = row.createSpan({ text: folderToggleLabel("(all)", false) });
+			lbl.setCssStyles(allStyle.label);
 			const kids = container.createDiv();
 			kids.setCssStyles({ display: "none" });
 			let built = false;
 			const openAll = (): void => {
-				kids.setCssStyles({ display: "block" });
-				lbl.textContent = `\u25be (all)`;
+				const d = folderDisclosure("(all)", true);
+				kids.setCssStyles({ display: d.display });
+				lbl.textContent = d.label;
 				if (!built) {
 					for (const lf of leaves) leafRow(kids, lf.id, lf.label, depth + 1);
 					built = true;
 				}
 			};
 			const closeAll = (): void => {
-				kids.setCssStyles({ display: "none" });
-				lbl.textContent = `\u25b8 (all)`;
+				const d = folderDisclosure("(all)", false);
+				kids.setCssStyles({ display: d.display });
+				lbl.textContent = d.label;
 			};
 			lbl.addEventListener("click", () => {
 				if (kids.style.display !== "none") closeAll(); else openAll();
@@ -3430,8 +3148,8 @@ export class MiniGraphView extends ItemView {
 				// Stamp the stable path key so removeNoteMenu() can record which
 				// folders were open and ensureNoteMenu() can re-open them.
 				row.dataset.menupath = folderPath;
-				// padding before paddingLeft — same order as leafRow (see comment there).
-				row.setCssStyles({ display: "flex", alignItems: "center", padding: "2px 4px", paddingLeft: `${6 + depth * 12}px`, color: "var(--text-muted)", fontWeight: "600" });
+				const folderStyle = noteMenuTreeRowStyle("folder", depth);
+				row.setCssStyles(folderStyle.row);
 				// Folder/group/combo checkbox — TRI-STATE over its descendant notes:
 				// checked = all visible, unchecked = all hidden, indeterminate = mixed.
 				// Toggling cascades to EVERY descendant note (check-all / uncheck-all).
@@ -3443,8 +3161,7 @@ export class MiniGraphView extends ItemView {
 					// IMPORTANT: same as the leaf checkbox — do NOT call rebuild() here.
 					// requestDraw() is enough; the draw() skipNode filter re-reads
 					// hiddenNodes fresh each frame.
-					const wasChecked = folderCheckState(descKeys, hiddenSetNow()) === "checked";
-					const hide = wasChecked;
+					const hide = folderCascadeHide(descKeys, hiddenSetNow());
 					for (const k of descKeys) this.toggleArrayMember("hiddenNodes", k, hide);
 					void this.save();
 					this.requestDraw();
@@ -3460,23 +3177,22 @@ export class MiniGraphView extends ItemView {
 				applyFolderState();
 				// Live-refresh this group's tri-state after any toggle elsewhere.
 				checkboxRefreshers.push(applyFolderState);
-				const lbl = row.createSpan({ text: `▸ ${display}` });
-				lbl.setCssStyles({ flex: "1 1 auto", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
+				const lbl = row.createSpan({ text: folderToggleLabel(display, false) });
+				lbl.setCssStyles(folderStyle.label);
 				const kids = container.createDiv();
 				kids.setCssStyles({ display: "none" });
 				let built = false;
 				// Open this folder (build children lazily if not yet built).
 				const openFolder = (): void => {
-					kids.setCssStyles({ display: "block" });
-					lbl.textContent = `▾ ${display}`;
+					const d = folderDisclosure(display, true);
+					kids.setCssStyles({ display: d.display });
+					lbl.textContent = d.label;
 					if (!built) {
 						// (all) subtree: in tag-tree mode, folders with sub-folders get a
 						// collapsible "(all)" at the top listing every descendant note.
-						if (isTagTree && child.folders.size > 0) {
-							const allLeaves = collectDescendantLeaves(child);
-							if (allLeaves.length > 0) {
-								renderAllFolder(kids, allLeaves, depth + 1, folderPath);
-							}
+						const allLeaves = allFolderLeaves(child, isTagTree);
+						if (allLeaves.length > 0) {
+							renderAllFolder(kids, allLeaves, depth + 1, folderPath);
 						}
 						renderTree(kids, child, depth + 1, folderPath, isTagTree);
 						built = true;
@@ -3484,8 +3200,9 @@ export class MiniGraphView extends ItemView {
 				};
 				// Close this folder.
 				const closeFolder = (): void => {
-					kids.setCssStyles({ display: "none" });
-					lbl.textContent = `▸ ${display}`;
+					const d = folderDisclosure(display, false);
+					kids.setCssStyles({ display: d.display });
+					lbl.textContent = d.label;
 				};
 				lbl.addEventListener("click", () => {
 					if (kids.style.display !== "none") closeFolder(); else openFolder();
@@ -3512,11 +3229,9 @@ export class MiniGraphView extends ItemView {
 				const tree = isTag ? buildTagTree(nodes, this.clusterLabels) : buildFolderTree(nodes);
 				// Root-level (all): in tag-tree mode, insert a top-level (all)
 				// listing every note in the navigator before the tag folders.
-				if (isTag && tree.folders.size > 0) {
-					const allLeaves = collectDescendantLeaves(tree);
-					if (allLeaves.length > 0) {
-						renderAllFolder(body, allLeaves, 0, "");
-					}
+				const allLeaves = allFolderLeaves(tree, isTag);
+				if (allLeaves.length > 0) {
+					renderAllFolder(body, allLeaves, 0, "");
 				}
 				renderTree(body, tree, 0, "", isTag);
 			}
@@ -3528,24 +3243,18 @@ export class MiniGraphView extends ItemView {
 		// currently being typed (substring after the last space).
 		let suggestions: Suggestion[] = [];
 		let selIdx = -1;
-		const kindGlyph: Record<Suggestion["kind"], string> = { tag: "#", field: "⊳", note: "·" };
-		const kindColor: Record<Suggestion["kind"], string> = { tag: "var(--text-accent)", field: "var(--color-purple)", note: "var(--text-muted)" };
 		// Replace the current token in the input with `text`. Tags/notes get a
 		// trailing space (term complete); "key:" stays open (no space) so the user
 		// can keep typing the value.
 		const acceptSuggestion = (text: string, _kind: Suggestion["kind"]): void => {
-			const val = search.value;
-			const tok = currentToken(val);
-			const head = val.slice(0, val.length - tok.length);
-			const trailing = text.endsWith(":") ? "" : " ";
-			search.value = head + text + trailing;
+			search.value = applySuggestionToken(search.value, text);
 			closeSuggest();
 			search.focus();
 			draw();
 		};
 		const renderSelection = (): void => {
 			const rows = Array.from(suggBox.children) as HTMLElement[];
-			rows.forEach((r, i) => { r.setCssStyles({ background: i === selIdx ? "var(--background-modifier-border)" : "" }); });
+			rows.forEach((r, i) => { r.setCssStyles(noteMenuSuggestSelectionStyle(i === selIdx)); });
 		};
 		const closeSuggest = (): void => {
 			suggBox.setCssStyles({ display: "none" });
@@ -3558,11 +3267,13 @@ export class MiniGraphView extends ItemView {
 			suggBox.empty();
 			selIdx = -1;
 			if (suggestions.length === 0) { suggBox.setCssStyles({ display: "none" }); return; }
+			const suggStyle = noteMenuSuggestStyle();
 			suggestions.forEach((s, i) => {
 				const row = suggBox.createDiv();
-				row.setCssStyles({ padding: "3px 8px", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", gap: "6px", alignItems: "center" });
-				const glyph = row.createSpan({ text: kindGlyph[s.kind] });
-				glyph.setCssStyles({ color: kindColor[s.kind], width: "10px", flex: "0 0 auto", textAlign: "center" });
+				row.setCssStyles(suggStyle.row);
+				const ks = suggestionKindStyle(s.kind);
+				const glyph = row.createSpan({ text: ks.glyph });
+				glyph.setCssStyles({ ...suggStyle.glyph, color: ks.color });
 				row.createSpan({ text: s.text });
 				row.addEventListener("mouseenter", () => { selIdx = i; renderSelection(); });
 				// mousedown (not click) so it fires before the input's blur closes the box.
@@ -3583,28 +3294,32 @@ export class MiniGraphView extends ItemView {
 		search.addEventListener("input", onInput);
 		search.addEventListener("keydown", (ev: KeyboardEvent) => {
 			const open = suggBox.style.display !== "none" && suggestions.length > 0;
-			if (ev.key === "ArrowDown") {
-				if (!open) { openSuggest(); return; }
-				ev.preventDefault();
-				selIdx = (selIdx + 1) % suggestions.length;
-				renderSelection();
-			} else if (ev.key === "ArrowUp") {
-				if (!open) return;
-				ev.preventDefault();
-				selIdx = (selIdx - 1 + suggestions.length) % suggestions.length;
-				renderSelection();
-			} else if (ev.key === "Enter") {
-				if (open && selIdx >= 0) {
+			const action = suggestKeyAction(ev.key, { open, selIdx, count: suggestions.length });
+			switch (action.type) {
+				case "open":
+					openSuggest();
+					break;
+				case "move":
 					ev.preventDefault();
-					const s = suggestions[selIdx];
+					selIdx = action.selIdx;
+					renderSelection();
+					break;
+				case "accept": {
+					ev.preventDefault();
+					const s = suggestions[action.index];
 					acceptSuggestion(s.text, s.kind);
-				} else {
+					break;
+				}
+				case "search":
 					// No highlighted suggestion → just run the search (close any box).
 					closeSuggest();
 					draw();
-				}
-			} else if (ev.key === "Escape") {
-				if (open) { ev.preventDefault(); ev.stopPropagation(); closeSuggest(); }
+					break;
+				case "close":
+					ev.preventDefault();
+					ev.stopPropagation();
+					closeSuggest();
+					break;
 			}
 		});
 		// Close on blur — small delay so a suggestion mousedown/click lands first.
@@ -3655,10 +3370,7 @@ export class MiniGraphView extends ItemView {
 			const c = containerSize();
 			const r = c.width > 0 && c.height > 0 ? clampRect(raw, c, NOTE_MENU_MIN) : raw;
 			this.noteMenuRect = r;
-			panel.setCssStyles({ left: `${r.left}px` });
-			panel.setCssStyles({ top: `${r.top}px` });
-			panel.setCssStyles({ width: `${r.width}px` });
-			panel.setCssStyles({ height: `${r.height}px` });
+			panel.setCssStyles(noteMenuRectStyle(r));
 		};
 		const persist = (): void => {
 			if (this.noteMenuRect) this.settings.noteMenuRect = { ...this.noteMenuRect };
@@ -3674,10 +3386,9 @@ export class MiniGraphView extends ItemView {
 			if (search.contains(ev.target as Node | null)) return;
 			const start = this.noteMenuRect ?? { left: 0, top: 0, width: panel.offsetWidth, height: panel.offsetHeight };
 			const ox = ev.clientX, oy = ev.clientY;
-			const baseLeft = start.left, baseTop = start.top;
 			ev.preventDefault();
 			const onMove = (e: MouseEvent): void => {
-				applyRect({ left: baseLeft + (e.clientX - ox), top: baseTop + (e.clientY - oy), width: start.width, height: start.height });
+				applyRect(moveMenuRect(start, e.clientX - ox, e.clientY - oy));
 			};
 			const onUp = (): void => {
 				activeWindow.removeEventListener("mousemove", onMove, true);
@@ -3690,21 +3401,15 @@ export class MiniGraphView extends ItemView {
 
 		// ── RESIZE: drag the invisible bottom-right corner ──────────────────────
 		const grip = panel.createDiv();
-		grip.setCssStyles({
-			position: "absolute", right: "0", bottom: "0", width: "16px", height: "16px",
-			cursor: "nwse-resize", zIndex: "61",
-			// Invisible (no icon): just a transparent hit target in the corner.
-			background: "transparent",
-		});
+		grip.setCssStyles(noteMenuBottomRightGripStyle());
 		grip.addEventListener("mousedown", (ev: MouseEvent) => {
 			if (ev.button !== 0) return;
 			const start = this.noteMenuRect ?? { left: 0, top: 0, width: panel.offsetWidth, height: panel.offsetHeight };
 			const ox = ev.clientX, oy = ev.clientY;
-			const baseW = start.width, baseH = start.height;
 			ev.preventDefault();
 			ev.stopPropagation();
 			const onMove = (e: MouseEvent): void => {
-				applyRect({ left: start.left, top: start.top, width: baseW + (e.clientX - ox), height: baseH + (e.clientY - oy) });
+				applyRect(resizeMenuRect(start, e.clientX - ox, e.clientY - oy));
 			};
 			const onUp = (): void => {
 				activeWindow.removeEventListener("mousemove", onMove, true);
@@ -3717,15 +3422,20 @@ export class MiniGraphView extends ItemView {
 		return grip;
 	}
 
+	// A note's frontmatter as a plain record (or undefined when the id doesn't
+	// resolve to a markdown file). Shared by the two encoding contexts, which
+	// each expose it as `EncContext.frontmatterOf`.
+	private frontmatterRecordOf(id: string): Record<string, unknown> | undefined {
+		const f = this.app.vault.getAbstractFileByPath(id);
+		return f instanceof TFile
+			? (this.app.metadataCache.getFileCache(f)?.frontmatter as Record<string, unknown> | undefined)
+			: undefined;
+	}
+
 	private drosteHitTest(sx: number, sy: number): string | null {
 		if (!this.laid.drosteGallery) return null;
 		const dpr = activeWindow.devicePixelRatio || 1;
-		const dx = sx * dpr, dy = sy * dpr;
-		for (let i = this.drosteHit.length - 1; i >= 0; i--) {
-			const r = this.drosteHit[i];
-			if (dx >= r.x0 && dx <= r.x1 && dy >= r.y0 && dy <= r.y1) return r.id;
-		}
-		return null;
+		return hitDrosteRect(sx * dpr, sy * dpr, this.drosteHit);
 	}
 
 
@@ -3733,15 +3443,7 @@ export class MiniGraphView extends ItemView {
 	private openHeatmapDetail(i: number, j: number, _sx: number, _sy: number): void {
 		const h = this.laid.heatmap;
 		if (!h) return;
-		const a = h.nodeIds[i] ?? [];
-		let ids: string[];
-		if (i === j) {
-			ids = a.slice();
-		} else {
-			const setB = new Set(h.nodeIds[j] ?? []);
-			ids = a.filter((id) => setB.has(id));
-		}
-		ids = [...new Set(ids)];
+		const ids = heatmapCellNoteIds(h.nodeIds, i, j);
 		this.heatmapSelected = null;
 		this.switchToCloseup(ids);
 	}
@@ -3799,7 +3501,7 @@ export class MiniGraphView extends ItemView {
 		if (
 			this.upsetSelectedSignatureKey != null &&
 			!this.laid.upset?.columns.some(
-				(c) => c.signature.join("|") === this.upsetSelectedSignatureKey,
+				(c) => upsetColumnKey(c.signature) === this.upsetSelectedSignatureKey,
 			)
 		)
 			this.upsetSelectedSignatureKey = null;
@@ -3814,18 +3516,16 @@ export class MiniGraphView extends ItemView {
 		}
 		// Lattice: a relayout re-buckets intersections; selected key may no
 		// longer exist. Clear and close any open list overlay tied to it.
-		const latticeKeys = new Set(this.laid.lattice?.nodes.map((n) => n.key) ?? []);
 		this.latticeHoverKey = null;
-		// Prune named-checkbox keys for nodes that no longer exist after the
-		// relayout (e.g. a tier was culled by Min intersection size, or the
-		// signature was top-N collapsed into an "Other" bundle whose key
-		// differs). Keeps `latticeNamedKeys` from growing unboundedly.
-		for (const k of [...this.latticeNamedKeys]) {
-			if (!latticeKeys.has(k)) this.latticeNamedKeys.delete(k);
-		}
-		if (this.latticeSelectedKey && !latticeKeys.has(this.latticeSelectedKey)) {
-			this.latticeSelectedKey = null;
-		}
+		// Prune named-checkbox keys + the selected key against the surviving
+		// lattice nodes after the relayout (see pruneLatticeKeys).
+		const pruned = pruneLatticeKeys(
+			this.laid.lattice?.nodes.map((n) => n.key) ?? [],
+			this.latticeNamedKeys,
+			this.latticeSelectedKey,
+		);
+		this.latticeNamedKeys = pruned.namedKeys;
+		this.latticeSelectedKey = pruned.selectedKey;
 	}
 
 	private onPointerMove(e: MouseEvent): void {
@@ -3834,8 +3534,7 @@ export class MiniGraphView extends ItemView {
 			return;
 		}
 		const rect = this.canvas.getBoundingClientRect();
-		const sx = e.clientX - rect.left;
-		const sy = e.clientY - rect.top;
+		const { sx, sy } = screenPointFromRect(rect, e);
 		if (this.laid.lattice) {
 			// World-space hit-test (lattice has its own per-cell hit test
 			// when zoomed into individual LOD; otherwise the whole node box).
@@ -3974,29 +3673,18 @@ export class MiniGraphView extends ItemView {
 			const ti = h.tags[target.i];
 			const tj = h.tags[target.j];
 			const cnt = h.counts[target.i * h.n + target.j];
-			if (target.i === target.j) {
-				tip.createSpan({ cls: "gim-tip-title", text: ti.label });
-				tip.createSpan({ cls: "gim-tip-sub", text: `${ti.size} notes` });
-			} else {
-				// Raw intersection count + the Jaccard ratio so both the absolute
-				// and the normalised strength are readable, independent of the
-				// cell's colour scale.
-				const uni = ti.size + tj.size - cnt;
-				const jac = uni > 0 ? (cnt / uni).toFixed(2) : "0.00";
-				tip.createSpan({ cls: "gim-tip-title", text: `${ti.label} * ${tj.label}` });
-				tip.createSpan({ cls: "gim-tip-sub", text: `${cnt} notes (Jaccard ${jac})` });
-			}
+			const cellTip = heatmapCellTipText(ti, tj, cnt, target.i === target.j);
+			tip.createSpan({ cls: "gim-tip-title", text: cellTip.title });
+			tip.createSpan({ cls: "gim-tip-sub", text: cellTip.sub });
 			this.root.appendChild(tip);
 			this.tipEl = tip;
 			this.positionTip(sx, sy, tip);
 			return;
 		}
 		if (target.kind === "ghostEdge") {
-			const b = target.bridge;
-			const tagsStr = b.sharedTags.slice(0, 3).map(t => `#${t}`).join(" ");
-			const moreTags = b.sharedTags.length > 3 ? ` (+${b.sharedTags.length - 3})` : "";
-			tip.createSpan({ cls: "gim-tip-title", text: "Suggested link" });
-			tip.createSpan({ cls: "gim-tip-sub", text: `shared tags: ${tagsStr}${moreTags} (Jaccard ${b.jaccard.toFixed(2)})` });
+			const bridgeTip = ghostEdgeTipText(target.bridge);
+			tip.createSpan({ cls: "gim-tip-title", text: bridgeTip.title });
+			tip.createSpan({ cls: "gim-tip-sub", text: bridgeTip.sub });
 			this.root.appendChild(tip);
 			this.tipEl = tip;
 			this.positionTip(sx, sy, tip);
@@ -4005,9 +3693,7 @@ export class MiniGraphView extends ItemView {
 		if (target.kind === "node") {
 			// Euler-nested copies carry a `${tag}\t${origPath}` id — resolve the
 			// ORIGINAL path for the file lookup + body cache.
-			const sepIdx = target.nodeId.indexOf("\t");
-			const baseId =
-				sepIdx >= 0 ? target.nodeId.slice(sepIdx + 1) : target.nodeId;
+			const baseId = stripTabPrefix(target.nodeId);
 			const file = this.app.vault.getAbstractFileByPath(baseId);
 			if (!(file instanceof TFile)) return;
 			tip.createSpan({ cls: "gim-tip-title", text: file.basename });
@@ -4017,11 +3703,13 @@ export class MiniGraphView extends ItemView {
 		} else if (target.kind === "cluster") {
 			const cl = this.laid.clusters.find((c) => c.groupKey === target.group);
 			if (!cl) return;
-			tip.createSpan({ cls: "gim-tip-title", text: cl.label });
-			tip.createSpan({ cls: "gim-tip-sub", text: cl.memberCount + " items" });
+			const clusterTip = clusterTipText(cl.label, cl.memberCount);
+			tip.createSpan({ cls: "gim-tip-title", text: clusterTip.title });
+			tip.createSpan({ cls: "gim-tip-sub", text: clusterTip.sub });
 		} else if (target.kind === "aggregationGroup") {
-			tip.createSpan({ cls: "gim-tip-title", text: target.groupKey.split(":")[1] });
-			tip.createSpan({ cls: "gim-tip-sub", text: target.nodeIds.length + " notes" });
+			const aggTip = aggregationGroupTipText(target.groupKey, target.nodeIds.length);
+			tip.createSpan({ cls: "gim-tip-title", text: aggTip.title });
+			tip.createSpan({ cls: "gim-tip-sub", text: aggTip.sub });
 		}
 
 		this.root.appendChild(tip);
@@ -4048,52 +3736,42 @@ export class MiniGraphView extends ItemView {
 		c.addEventListener("mousedown", (e) => {
 			if (e.button !== 0) return;
 			const rect = c.getBoundingClientRect();
-			const sx = e.clientX - rect.left;
-			const sy = e.clientY - rect.top;
+			const { sx, sy } = screenPointFromRect(rect, e);
 			// F5: begin dragging the legend panel (but not its × button).
 			{
 				const pr = this.legendPanelRect, cr0 = this.legendCloseRect;
-				const inClose = !!cr0 && sx >= cr0.x && sx <= cr0.x + cr0.w && sy >= cr0.y && sy <= cr0.y + cr0.h;
-				if (pr && !inClose && sx >= pr.x && sx <= pr.x + pr.w && sy >= pr.y && sy <= pr.y + pr.h) {
-					// Detect scrollbar drag
-					if (this.legendMaxScrollY > 0 && sx >= pr.x + pr.w - 12) {
-						// Calculate absolute scroll position based on click Y coordinate
-						const trackTop = this.exportDprMul === 1 ? 20 : 4;
-						const trackH = pr.h - trackTop - 4;
-						const thumbMinH = 20;
-						const boxH = pr.h + this.legendMaxScrollY;
-						const thumbH = Math.max(thumbMinH, trackH * (pr.h / boxH));
-						const maxThumbY = trackH - thumbH;
-						
-						// Thumb's current physical position
-						const curScrollY = this.legendScrollY[this.settings.viewMode] ?? 0;
-						const curThumbY = pr.y + trackTop + (maxThumbY > 0 ? (curScrollY / this.legendMaxScrollY) * maxThumbY : 0);
-						
-						// If clicking directly on the thumb, do relative drag
-						if (sy >= curThumbY && sy <= curThumbY + thumbH) {
-							this.legendScrollDrag = { startY: sy, startScrollY: curScrollY };
-						} else {
-							// Clicking on the track outside the thumb: jump to position
-							// Center the thumb at the clicked Y coordinate
-							let targetThumbY = (sy - pr.y - trackTop) - thumbH / 2;
-							targetThumbY = Math.max(0, Math.min(maxThumbY, targetThumbY));
-							const newScrollY = maxThumbY > 0 ? (targetThumbY / maxThumbY) * this.legendMaxScrollY : 0;
-							
-							const vmode = this.settings.viewMode;
-							this.legendScrollY[vmode] = newScrollY;
-							this.requestDraw();
-							
-							// Allow dragging to continue from the new jumped position
-							this.legendScrollDrag = { startY: sy, startScrollY: newScrollY };
+				const inClose = !!cr0 && pointInRect(sx, sy, cr0);
+				if (pr && !inClose && pointInRect(sx, sy, pr)) {
+						// Scrollbar (right-edge gutter) → thumb drag / track jump when the
+						// legend is scrollable; anywhere else in the panel → panel drag.
+						let onScrollbar = false;
+						if (this.legendMaxScrollY > 0) {
+							const { trackTop, thumbH, maxThumbY } = legendScrollbarGeom(
+								pr.h,
+								this.legendMaxScrollY,
+								this.exportDprMul === 1,
+							);
+							const curScrollY = this.legendScrollY[this.settings.viewMode] ?? 0;
+							const curThumbY = pr.y + trackTop + scrollToThumbY(curScrollY, this.legendMaxScrollY, maxThumbY);
+							const zone = legendScrollbarZone(sx, sy, pr, curThumbY, thumbH);
+							onScrollbar = zone !== null;
+							if (zone === "thumb") {
+								this.legendScrollDrag = { startY: sy, startScrollY: curScrollY };
+							} else if (zone === "track") {
+								// Center the thumb at the clicked Y, then keep dragging from there.
+								const targetThumbY = clampScroll((sy - pr.y - trackTop) - thumbH / 2, maxThumbY);
+								const newScrollY = thumbYToScroll(targetThumbY, maxThumbY, this.legendMaxScrollY);
+								this.legendScrollY[this.settings.viewMode] = newScrollY;
+								this.requestDraw();
+								this.legendScrollDrag = { startY: sy, startScrollY: newScrollY };
+							}
 						}
-						
+						if (!onScrollbar) {
+							this.legendDrag = { dx: sx - pr.x, dy: sy - pr.y };
+							this.pointerMoved = false;
+						}
 						e.preventDefault();
 						return;
-					}
-					this.legendDrag = { dx: sx - pr.x, dy: sy - pr.y };
-					this.pointerMoved = false;
-					e.preventDefault();
-					return;
 				}
 			}
 			// Footer drag/scroll handlers retired — UpSet matrix is now
@@ -4128,22 +3806,21 @@ export class MiniGraphView extends ItemView {
 				// panel is laid out, which is the same path that assigns
 				// legendPanelRect — so it is non-null whenever we get here.
 				const pr = this.legendPanelRect!;
-				const trackTop = this.exportDprMul === 1 ? 20 : 4;
-				const trackH = pr.h - trackTop - 4;
-				const thumbMinH = 20;
-				const boxH = pr.h + this.legendMaxScrollY;
-				const thumbH = Math.max(thumbMinH, trackH * (pr.h / boxH));
-				const maxThumbY = trackH - thumbH;
-				const scrollDelta = maxThumbY > 0 ? (dy / maxThumbY) * this.legendMaxScrollY : 0;
+				const { maxThumbY } = legendScrollbarGeom(
+					pr.h,
+					this.legendMaxScrollY,
+					this.exportDprMul === 1,
+				);
+				const scrollDelta = thumbYToScroll(dy, maxThumbY, this.legendMaxScrollY);
 				const vmode = this.settings.viewMode;
-				this.legendScrollY[vmode] = Math.max(0, Math.min(this.legendMaxScrollY, this.legendScrollDrag.startScrollY + scrollDelta));
+				this.legendScrollY[vmode] = clampScroll(this.legendScrollDrag.startScrollY + scrollDelta, this.legendMaxScrollY);
 				this.requestDraw();
 				return;
 			}
 			// F5: move the legend panel; persists on mouseup.
 			if (this.legendDrag) {
 				const rect = c.getBoundingClientRect();
-				const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+				const { sx, sy } = screenPointFromRect(rect, e);
 				this.settings.legendPos = {
 					...this.settings.legendPos,
 					[this.settings.viewMode]: { x: sx - this.legendDrag.dx, y: sy - this.legendDrag.dy },
@@ -4153,9 +3830,7 @@ export class MiniGraphView extends ItemView {
 				return;
 			}
 			if (!this.dragging) return;
-			if (
-				Math.abs(e.clientX - this.downX) + Math.abs(e.clientY - this.downY) > 4
-			)
+			if (exceedsClickSlop(e.clientX - this.downX, e.clientY - this.downY))
 				this.pointerMoved = true;
 			this.panX += e.clientX - this.lastX;
 			this.panY += e.clientY - this.lastY;
@@ -4192,15 +3867,13 @@ export class MiniGraphView extends ItemView {
 				return;
 			}
 			const rect = c.getBoundingClientRect();
-			const sx = e.clientX - rect.left;
-			const sy = e.clientY - rect.top;
+			const { sx, sy } = screenPointFromRect(rect, e);
 			const { x: wx, y: wy } = this.screenToWorld(sx, sy);
 			const hit = this.hitTest(wx, wy);
 
 			if (hit && hit.kind === "node") {
 				e.preventDefault();
-				const sepIdx = hit.nodeId.indexOf("\t");
-				const baseId = sepIdx >= 0 ? hit.nodeId.slice(sepIdx + 1) : hit.nodeId;
+				const baseId = stripTabPrefix(hit.nodeId);
 				const file = this.app.vault.getAbstractFileByPath(baseId);
 				if (file instanceof TFile) {
 					const menu = new Menu();
@@ -4233,12 +3906,11 @@ export class MiniGraphView extends ItemView {
 			// so scrolling the matrix never jumps to a file.
 			if (this.pointerMoved) return;
 			const rect = c.getBoundingClientRect();
-			const sx = e.clientX - rect.left;
-			const sy = e.clientY - rect.top;
+			const { sx, sy } = screenPointFromRect(rect, e);
 			// F5: the on-canvas legend's × dismisses the legend for the current mode.
 			// Screen-space, checked first so it wins over any canvas content beneath.
 			const cr = this.legendCloseRect;
-			if (cr && sx >= cr.x && sx <= cr.x + cr.w && sy >= cr.y && sy <= cr.y + cr.h) {
+			if (cr && pointInRect(sx, sy, cr)) {
 				this.sessionHiddenLegends.add(this.settings.viewMode);
 				this.draw();
 				return;
@@ -4391,16 +4063,15 @@ export class MiniGraphView extends ItemView {
 			e.preventDefault();
 			this.cancelHover();
 			const rect = c.getBoundingClientRect();
-			const sx = e.clientX - rect.left;
-			const sy = e.clientY - rect.top;
+			const { sx, sy } = screenPointFromRect(rect, e);
 
 			const lr = this.legendPanelRect;
-			if (lr && sx >= lr.x && sx <= lr.x + lr.w && sy >= lr.y && sy <= lr.y + lr.h) {
+			if (lr && pointInRect(sx, sy, lr)) {
 				if (this.legendMaxScrollY > 0) {
 					const vmode = this.settings.viewMode;
 					const cur = this.legendScrollY[vmode] ?? 0;
-					const dy = e.deltaMode === 1 ? e.deltaY * 20 : (e.deltaMode === 2 ? e.deltaY * 300 : e.deltaY);
-					this.legendScrollY[vmode] = Math.max(0, Math.min(this.legendMaxScrollY, cur + dy));
+					const dy = normalizeWheelDelta(e.deltaY, e.deltaMode);
+					this.legendScrollY[vmode] = clampScroll(cur + dy, this.legendMaxScrollY);
 					this.requestDraw();
 				}
 				e.stopPropagation();
@@ -4409,11 +4080,8 @@ export class MiniGraphView extends ItemView {
 
 			// UpSet footer scroll path retired — the matrix is in world
 			// space now, so the normal zoom-on-wheel below applies.
-			const factor = Math.exp(-e.deltaY * 0.0015);
-			const t = zoomAroundPointer({ zoom: this.zoom, panX: this.panX, panY: this.panY }, factor, sx, sy);
-			this.zoom = t.zoom;
-			this.panX = t.panX;
-			this.panY = t.panY;
+			const t = zoomAroundPointer({ zoom: this.zoom, panX: this.panX, panY: this.panY }, wheelZoomFactor(e.deltaY), sx, sy);
+			this.applyTransform(t);
 			this.requestDraw();
 		}, { passive: false });
 		c.addEventListener("dblclick", () => this.fitToView());

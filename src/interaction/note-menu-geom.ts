@@ -1,7 +1,7 @@
 // Pure geometry for the note-navigator panel (extracted from view.ts ensureNoteMenu).
 // These helpers decide WHERE and HOW BIG the panel is — no DOM, no `this`, fully
 // testable. The DOM application (setCssStyles) stays in view.ts as a thin wrapper.
-import { clampRect, type MenuRect } from "./note-menu";
+import { clampRect, type MenuRect, type Suggestion } from "./note-menu";
 
 // Minimum floating-panel size. Shared by the rect resolver, the drag/resize
 // handlers, and the pinned-width clamp so they can never disagree.
@@ -46,6 +46,30 @@ export function clampPinnedWidth(settingsWidth: number | undefined, containerWid
 	);
 }
 
+// The floating panel's absolute position/size as px CSS strings. Shared by the
+// initial `noteMenuPanelStyle` (floating branch) and every live drag/resize
+// re-apply (`applyRect`), so the rect→px mapping can't drift between them.
+// Pure builder: returns the style record the view applies via setCssStyles().
+export function noteMenuRectStyle(rect: MenuRect): Partial<CSSStyleDeclaration> {
+	return {
+		left: `${rect.left}px`, top: `${rect.top}px`,
+		width: `${rect.width}px`, height: `${rect.height}px`,
+	};
+}
+
+// Drag-delta rect math for the floating panel, shared by the two mouse-drag
+// affordances the view wires (`wireNoteMenuDrag`). `start` is the mousedown
+// snapshot rect, `dx`/`dy` the pointer delta since; both return a fresh rect
+// (input untouched) that the view feeds through `clampRect` + applies.
+//   moveMenuRect   — header drag: translate left/top, keep the size.
+//   resizeMenuRect — SE-corner drag: keep left/top, grow width/height.
+export function moveMenuRect(start: MenuRect, dx: number, dy: number): MenuRect {
+	return { left: start.left + dx, top: start.top + dy, width: start.width, height: start.height };
+}
+export function resizeMenuRect(start: MenuRect, dx: number, dy: number): MenuRect {
+	return { left: start.left, top: start.top, width: start.width + dx, height: start.height + dy };
+}
+
 // Panel-container CSS for the note-navigator. Two looks, no DOM:
 //   pinned   — docked to the right edge: full height, fixed width, square corners,
 //              a left border only (like a standard docked side panel).
@@ -72,8 +96,7 @@ export function noteMenuPanelStyle(
 	}
 	return {
 		...common,
-		left: `${rect.left}px`, top: `${rect.top}px`, right: "", bottom: "",
-		width: `${rect.width}px`, height: `${rect.height}px`,
+		...noteMenuRectStyle(rect), right: "", bottom: "",
 		border: "1px solid var(--background-modifier-border)", borderRadius: "6px",
 		boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
 	};
@@ -100,6 +123,17 @@ export function noteMenuTabButtonStyle(
 		cursor: "pointer",
 		fontSize: size.fontSize,
 		lineHeight: "1.3",
+	};
+}
+
+// Hover affordance for an inactive note-navigator tab button (both the top-level
+// bar and the Data sub-bar): muted text + a faint underline hint. Applied on
+// mouseenter only when the tab is NOT the active one; mouseleave restores the
+// full `noteMenuTabButtonStyle`. Pure builder — applied via setCssStyles().
+export function noteMenuTabHoverStyle(): Partial<CSSStyleDeclaration> {
+	return {
+		color: "var(--text-muted)",
+		borderBottomColor: "var(--background-modifier-border)",
 	};
 }
 
@@ -192,6 +226,82 @@ export function noteMenuDataSubTabs(): { key: NoteMenuDataSubTab; label: string 
 	];
 }
 
+export type NoteMenuGroupBy = "folder" | "tag";
+
+// Tree grouping-selector radio descriptors (value + visible label), in render
+// order. The tree groups notes either by FOLDER path (default) or by TAG
+// membership key. Pure builder — the view creates one radio per entry, checks
+// it against the active grouping, and wires the change handler. The exported
+// `NoteMenuGroupBy` type is the single source of truth for both the persisted
+// grouping value and the rendered radio values (mirrors noteMenuTopTabs).
+export function noteMenuGroupOptions(): { value: NoteMenuGroupBy; label: string }[] {
+	return [
+		{ value: "folder", label: "Folder" },
+		{ value: "tag", label: "Tag" },
+	];
+}
+
+// Bulk visibility-toggle button descriptors (label + the `hide` boolean it
+// applies to every listed note), in render order. "Select all" shows every note
+// (hide = false); "Deselect all" hides every note (hide = true). Pure builder —
+// the view creates one button per entry and wires the same
+// bulkSetHidden→save→requestDraw→redraw handler with this `hide` flag (mirrors
+// noteMenuGroupOptions).
+export function noteMenuBulkActions(): { label: string; hide: boolean }[] {
+	return [
+		{ label: "Select all", hide: false },
+		{ label: "Deselect all", hide: true },
+	];
+}
+
+// Per-pane CSS `display` values for the three top-level body panes given the
+// active tab. The Data wrapper is a flex-column (visible = "flex"); Settings and
+// Insight are scroll panes (visible = "block"); inactive panes are "none". Pure
+// builder — the view applies each value via setCssStyles().
+export function noteMenuTopTabDisplay(active: NoteMenuTab): {
+	data: string;
+	settings: string;
+	insight: string;
+} {
+	return {
+		data: active === "data" ? "flex" : "none",
+		settings: active === "settings" ? "block" : "none",
+		insight: active === "insight" ? "block" : "none",
+	};
+}
+
+// Per-pane CSS `display` values for the four Data sub-tab panes given the active
+// sub-tab. The Tree pane is a flex-column (visible = "flex"); Logic/Table/JSON are
+// block panes; inactive panes are "none". Pure builder — applied via setCssStyles().
+export function noteMenuDataSubTabDisplay(active: NoteMenuDataSubTab): {
+	logic: string;
+	tree: string;
+	table: string;
+	json: string;
+} {
+	return {
+		logic: active === "logic" ? "block" : "none",
+		tree: active === "tree" ? "flex" : "none",
+		table: active === "table" ? "block" : "none",
+		json: active === "json" ? "block" : "none",
+	};
+}
+
+// CSS `display` values for the two elements the minimize toggle hides/shows: the
+// whole tab `body` (a flex column when expanded) and the resize `grip` (its own
+// default display when expanded, hidden when collapsed since resize is meaningless
+// while minimized). The panel HEIGHT is computed separately by noteMenuHeight().
+// Pure builder — applied via setCssStyles().
+export function noteMenuMinimizeDisplay(minimized: boolean): {
+	body: string;
+	grip: string;
+} {
+	return {
+		body: minimized ? "none" : "flex",
+		grip: minimized ? "none" : "",
+	};
+}
+
 // Container CSS for one of the note-navigator's two tab bars. Two shapes:
 //   top — the top-level Data/Settings/Insight bar in the header: the underline
 //         divider that the active tab's accent sits on (marginBottom:-1px on the
@@ -199,7 +309,7 @@ export function noteMenuDataSubTabs(): { key: NoteMenuDataSubTab; label: string 
 //   sub — the Data sub-tab bar: wraps onto multiple rows (flexWrap) and is padded
 //         in from the pane edge; same bottom divider.
 // Neither branches on state. Pure builder — applied via setCssStyles().
-export type NoteMenuTabBarKind = "top" | "sub";
+export type NoteMenuTabBarKind = "top" | "sub" | "settings";
 
 export function noteMenuTabBarStyle(kind: NoteMenuTabBarKind): Partial<CSSStyleDeclaration> {
 	const divider = "1px solid var(--background-modifier-border)";
@@ -207,6 +317,14 @@ export function noteMenuTabBarStyle(kind: NoteMenuTabBarKind): Partial<CSSStyleD
 		return {
 			display: "flex", gap: "2px", marginTop: "8px",
 			fontWeight: "400", fontSize: "11px", borderBottom: divider,
+		};
+	}
+	if (kind === "settings") {
+		// Settings sub-tab bar (View/Filter/Sort/Display/Layers): like the Data
+		// sub bar (wrapping flex + divider) but spaced below instead of padded in.
+		return {
+			display: "flex", flexWrap: "wrap", gap: "1px",
+			borderBottom: divider, marginBottom: "6px",
 		};
 	}
 	return {
@@ -231,4 +349,270 @@ export function noteMenuBodyPanelStyle(
 		return { display, overflow: "auto", flex: "1 1 auto", minHeight: "0", padding: "4px 6px 8px" };
 	}
 	return { display, flexDirection: "column", flex: "1 1 auto", minHeight: "0" };
+}
+
+// Container CSS for the Tree pane's bulk Select-all / Deselect-all row. Two static
+// layout blocks:
+//   bar — the row holding the two buttons (small gap, top margin).
+//   btn — one bulk button: a small muted secondary-background pill.
+// Neither branches on state. Pure builder — applied via setCssStyles().
+export function noteMenuBulkBarStyle(): {
+	bar: Partial<CSSStyleDeclaration>;
+	btn: Partial<CSSStyleDeclaration>;
+} {
+	return {
+		bar: { display: "flex", gap: "6px", marginTop: "4px" },
+		btn: {
+			fontSize: "10px", padding: "2px 6px", cursor: "pointer",
+			background: "var(--background-secondary)", border: "1px solid var(--background-modifier-border)",
+			borderRadius: "3px", color: "var(--text-muted)", lineHeight: "1.4",
+		},
+	};
+}
+
+// Tree-pane "group by Folder / Tag" radio bar chrome: the muted 10px-gap flex row
+// and one inline-flex radio label (pointer cursor, no text selection). Both are
+// static layout records (no state branch); the radio/event wiring stays in the view.
+export function noteMenuGroupBarStyle(): {
+	bar: Partial<CSSStyleDeclaration>;
+	label: Partial<CSSStyleDeclaration>;
+} {
+	return {
+		bar: {
+			display: "flex", gap: "10px", marginTop: "4px", fontWeight: "400",
+			fontSize: "11px", color: "var(--text-muted)", cursor: "default",
+		},
+		label: { display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer", userSelect: "none" },
+	};
+}
+
+// Tree-pane search-box chrome: the relatively-positioned wrapper, the text input,
+// the absolutely-positioned autocomplete dropdown, and the scrollable tree body
+// below it. Four static layout records:
+//   wrap    — relative anchor for the absolute suggBox (small margins, no grow).
+//   input   — the full-width search field (panel-bg, bordered).
+//   suggBox — the dropdown pinned under the input (hidden by default; the view
+//             flips display when there are matches).
+//   body    — the tree scroll area, growing/shrinking with the panel height.
+// None branch on state. Pure builder — applied via setCssStyles().
+export function noteMenuSearchStyle(): {
+	wrap: Partial<CSSStyleDeclaration>;
+	input: Partial<CSSStyleDeclaration>;
+	suggBox: Partial<CSSStyleDeclaration>;
+	body: Partial<CSSStyleDeclaration>;
+} {
+	return {
+		wrap: { position: "relative", margin: "6px 8px", flex: "0 0 auto" },
+		input: {
+			display: "block", width: "100%", boxSizing: "border-box", padding: "4px 6px",
+			background: "var(--background-primary)", border: "1px solid var(--background-modifier-border)",
+			borderRadius: "4px", color: "var(--text-normal)",
+		},
+		suggBox: {
+			position: "absolute", left: "0", right: "0", top: "100%", marginTop: "2px",
+			background: "var(--background-secondary)", border: "1px solid var(--background-modifier-border)", borderRadius: "4px",
+			boxShadow: "0 4px 16px rgba(0,0,0,0.5)", zIndex: "70", overflow: "auto", maxHeight: "240px",
+			display: "none",
+		},
+		body: { overflow: "auto", padding: "4px 6px 8px", flex: "1 1 auto", minHeight: "0" },
+	};
+}
+
+// Tree-pane note-count hint shown at the top of the Result pane. The verb is
+// mode-appropriate: droste focuses a card, every other mode locates/opens the
+// file. Pure builder — returns the faint hint text + its static chrome; the view
+// just creates the div and applies them.
+export function noteMenuNotesHint(count: number, isDroste: boolean): {
+	text: string;
+	style: Partial<CSSStyleDeclaration>;
+} {
+	const verb = isDroste ? "focus" : "locate/open";
+	return {
+		text: `${count} notes — click to ${verb}`,
+		style: { fontSize: "10px", color: "var(--text-faint)", padding: "4px 8px 0" },
+	};
+}
+
+// Glyph + accent colour for an autocomplete suggestion row, keyed by its kind
+// (tag / field / note). Pure presentation map — the suggestion dropdown in
+// ensureNoteMenu reads this for the leading glyph span; centralises what used to
+// be two inline `Record<Suggestion["kind"], …>` literals so the glyph↔colour↔kind
+// mapping has a single source of truth.
+export function suggestionKindStyle(kind: Suggestion["kind"]): { glyph: string; color: string } {
+	switch (kind) {
+		case "tag":
+			return { glyph: "#", color: "var(--text-accent)" };
+		case "field":
+			return { glyph: "⊳", color: "var(--color-purple)" };
+		default:
+			return { glyph: "·", color: "var(--text-muted)" };
+	}
+}
+
+// Static chrome for one autocomplete suggestion row in the search dropdown:
+//   row   — the padded, single-line flex row (glyph + label) with ellipsis overflow.
+//   glyph — the fixed-width, centred leading glyph span (its `color` is supplied
+//           per-kind by suggestionKindStyle and applied on top by the view).
+// No state branch; the per-row hover highlight + mousedown wiring stay in the view.
+export function noteMenuSuggestStyle(): {
+	row: Partial<CSSStyleDeclaration>;
+	glyph: Partial<CSSStyleDeclaration>;
+} {
+	return {
+		row: {
+			padding: "3px 8px", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden",
+			textOverflow: "ellipsis", display: "flex", gap: "6px", alignItems: "center",
+		},
+		glyph: { width: "10px", flex: "0 0 auto", textAlign: "center" },
+	};
+}
+
+// The keyboard/hover selection highlight for a suggestion row: the selected row
+// gets the modifier-border background, all others clear it (empty string resets
+// to the row's default). Pure so the magic CSS var lives in one place; the view
+// loops the rows and applies it per row from the live `selIdx`.
+export function noteMenuSuggestSelectionStyle(selected: boolean): Partial<CSSStyleDeclaration> {
+	return { background: selected ? "var(--background-modifier-border)" : "" };
+}
+
+// Static chrome for a Tree-pane row + its ellipsised label. Three kinds:
+//  - "leaf":   a note row (cursor pointer, rounded, dynamic `baseBg` highlight);
+//              its label has no cursor (the row-click focus lives on the row).
+//  - "folder": a collapsible folder/group/combo row (muted, bold); its label
+//              carries the expand/collapse cursor.
+//  - "all":    the tag-tree "(all)" subtree header (faint, bold, italic, indented
+//              one checkbox-width further); its label carries the cursor too.
+// `padding` is emitted BEFORE `paddingLeft` so the depth indent is not overwritten
+// (object key order is the apply order — same gotcha as the inline blocks).
+// The per-row dynamics that vary at paint time (leaf highlight colour, hover
+// background swaps) stay in the view.
+export type NoteMenuTreeRowKind = "leaf" | "folder" | "all";
+
+export function noteMenuTreeRowStyle(
+	kind: NoteMenuTreeRowKind,
+	depth: number,
+	baseBg = "",
+): { row: Partial<CSSStyleDeclaration>; label: Partial<CSSStyleDeclaration> } {
+	if (kind === "leaf") {
+		return {
+			row: {
+				display: "flex", alignItems: "center", padding: "2px 4px",
+				paddingLeft: `${6 + depth * 12}px`, cursor: "pointer", borderRadius: "3px",
+				whiteSpace: "nowrap", overflow: "hidden", background: baseBg,
+			},
+			label: { flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+		};
+	}
+	if (kind === "all") {
+		return {
+			row: {
+				display: "flex", alignItems: "center", padding: "2px 4px",
+				paddingLeft: `${26 + depth * 12}px`, color: "var(--text-faint)",
+				fontWeight: "600", fontStyle: "italic",
+			},
+			label: { flex: "1 1 auto", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+		};
+	}
+	return {
+		row: {
+			display: "flex", alignItems: "center", padding: "2px 4px",
+			paddingLeft: `${6 + depth * 12}px`, color: "var(--text-muted)", fontWeight: "600",
+		},
+		label: { flex: "1 1 auto", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+	};
+}
+
+// The "current note" highlight for a Tree-pane leaf row: when the leaf is the
+// note the canvas is currently focused on, its row gets a translucent accent
+// wash (the same #2d6cdf accent as draw/theme.ts, at ~33% alpha) and its label
+// turns yellow. The accent hex is kept local here (not imported from the draw
+// layer) so this geometry module stays free of draw-layer deps. `rowBg` is also
+// the colour the row's mouseleave restores to. No highlight → empty bg and no
+// label-colour override.
+export function noteMenuLeafHighlight(isCurrent: boolean): {
+	rowBg: string;
+	labelColor?: string;
+} {
+	return isCurrent
+		? { rowBg: "#2d6cdf55", labelColor: "var(--color-yellow)" }
+		: { rowBg: "" };
+}
+
+// The hover background swap for a Tree-pane leaf row: on mouseenter the row gets
+// the modifier-border wash, on mouseleave it restores to `rowBg` (the leaf's
+// resting background — either the current-note highlight from noteMenuLeafHighlight
+// or "" for a plain row). Pure so the magic hover CSS var (shared with
+// noteMenuSuggestSelectionStyle) lives in one place; the view wires the two
+// mouse listeners and passes the live `rowBg`.
+export function noteMenuLeafRowHoverStyle(hover: boolean, rowBg: string): Partial<CSSStyleDeclaration> {
+	return { background: hover ? "var(--background-modifier-border)" : rowBg };
+}
+
+// Data ▸ JSON tab chrome: the three repeated style blocks in renderDataJsonBody
+// (the export/import section labels, the read-only/paste textareas, and the
+// Copy/Save · Import/Bundled button rows) collapse onto these pure builders.
+// Only the label margin and textarea height differ between the two occurrences
+// of each, so those are params; everything else is shared. The DOM creation +
+// click/mousedown wiring stays in the view.
+export function noteMenuJsonLabelStyle(margin: string): Partial<CSSStyleDeclaration> {
+	return { fontSize: "11px", fontWeight: "600", margin };
+}
+
+export function noteMenuJsonTextareaStyle(height: string): Partial<CSSStyleDeclaration> {
+	return {
+		width: "100%", height, fontFamily: "var(--font-monospace, monospace)",
+		fontSize: "10px", resize: "vertical", boxSizing: "border-box",
+	};
+}
+
+export function noteMenuJsonButtonRowStyle(): Partial<CSSStyleDeclaration> {
+	return { display: "flex", gap: "6px", marginTop: "4px" };
+}
+
+// JSON tab section heading ("Presets — JSON import / export"): a small bold
+// title with a bottom gap. Static; the DOM creation stays in the view.
+export function noteMenuJsonTitleStyle(): Partial<CSSStyleDeclaration> {
+	return { fontWeight: "600", fontSize: "12px", marginBottom: "6px" };
+}
+
+// JSON tab status block (last import / bundled-load outcome). The summary line
+// flips to a warning colour when the import produced errors; the per-error and
+// overflow ("…and N more.") lines are static. The hasErrors branch is the only
+// logic, so it lives here; the slice/loop + DOM creation stay in the view.
+export function noteMenuJsonStatusStyle(hasErrors: boolean): {
+	status: Partial<CSSStyleDeclaration>;
+	errorLine: Partial<CSSStyleDeclaration>;
+	more: Partial<CSSStyleDeclaration>;
+} {
+	return {
+		status: {
+			fontSize: "10.5px", marginTop: "8px",
+			color: hasErrors ? "var(--text-warning, var(--text-muted))" : "var(--text-muted)",
+		},
+		errorLine: { fontSize: "10px", color: "var(--text-error, var(--text-muted))", paddingLeft: "6px" },
+		more: { fontSize: "10px", color: "var(--text-muted)", paddingLeft: "6px" },
+	};
+}
+
+// Static chrome for the pinned panel's left-edge resize handle: a thin
+// transparent strip docked down the left border with an ew-resize cursor,
+// stacked above the body so the drag is always grabbable. No state branch; the
+// drag wiring (widen-on-drag-left + canvas re-reserve) stays in the view.
+export function noteMenuLeftGripStyle(): Partial<CSSStyleDeclaration> {
+	return {
+		position: "absolute", left: "0", top: "0", bottom: "0", width: "6px",
+		cursor: "ew-resize", zIndex: "61", background: "transparent",
+	};
+}
+
+// Static chrome for the bottom-right corner resize handle: an invisible 16×16
+// transparent hit target docked in the SE corner with an nwse-resize cursor,
+// stacked above the body so the drag is always grabbable. No state branch; the
+// drag wiring (resize-from-corner + rect persist) stays in the view. Mirrors
+// noteMenuLeftGripStyle.
+export function noteMenuBottomRightGripStyle(): Partial<CSSStyleDeclaration> {
+	return {
+		position: "absolute", right: "0", bottom: "0", width: "16px", height: "16px",
+		cursor: "nwse-resize", zIndex: "61", background: "transparent",
+	};
 }

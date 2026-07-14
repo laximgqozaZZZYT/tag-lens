@@ -169,3 +169,25 @@ export function resolveFromCluster(
 		nodeCols: lookup("nodeCols") ?? defaults.nodeCols,
 	};
 }
+
+// Build the resolver deps for a synthetic ∩/∪ set-layer. Real single-tag
+// clusters are SUPERSETS of the set-layers, so their keys become `setKey`'s
+// supersets (added to a clone of `base.supersetsOf`). When `full` (the layer
+// opts into FULL inheritance) the layer's OWN override is dropped so resolution
+// cascades purely through inheritFrom → superset → global; otherwise its own
+// overrides stand. Non-mutating: `base` and its maps/records are untouched.
+export function setLayerDeps(
+	base: NodeDisplayDeps,
+	setKey: string,
+	clusterKeys: string[],
+	full: boolean,
+): NodeDisplayDeps {
+	const supersetsOf = new Map(base.supersetsOf);
+	supersetsOf.set(setKey, clusterKeys);
+	const overrides = full
+		? Object.fromEntries(
+				Object.entries(base.overrides).filter(([k]) => k !== setKey),
+			)
+		: base.overrides;
+	return { ...base, overrides, supersetsOf };
+}

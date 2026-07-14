@@ -55,3 +55,46 @@ export function exportCanvasDims(
 		scale: eff,
 	};
 }
+
+// `exportCanvasDims` silently reduces the requested supersample when a side
+// would exceed the canvas cap (e.g. 4× → 2.7×). Surface that to the user as a
+// Notice. Returns the message when the effective scale fell below the requested
+// one (beyond a float-rounding epsilon), else null (framing unchanged → no
+// notice). Centralizes the epsilon + the `.toFixed(1)` format so the view just
+// shows whatever string it gets back.
+export function exportScaleCapMessage(
+	requestedScale: number,
+	effectiveScale: number,
+): string | null {
+	if (effectiveScale >= requestedScale - 1e-6) return null;
+	return `Tag Lens: export limited to ${effectiveScale.toFixed(1)}× (canvas size cap).`;
+}
+
+// The export-menu action a menu item triggers, as a plain data descriptor so
+// the wiring (which method to call, with which opts) is decided by pure code
+// rather than being duplicated across each `menu.addItem` closure in view.ts.
+type ExportMenuAction =
+	| { format: "png"; scale: number; fit: boolean; target: "vault" | "clipboard" }
+	| { format: "svg"; fit: boolean; target: "vault" | "clipboard" };
+
+// One entry in the "Export view" menu: either a visual separator or a titled,
+// iconed item carrying the action it performs. The view maps `item` entries to
+// `menu.addItem(...)` (wiring the icon/title + onClick from `action`) and
+// `separator` entries to `menu.addSeparator()`.
+export type ExportMenuEntry = { kind: "separator" } | ({ kind: "item"; title: string; icon: string } & { action: ExportMenuAction });
+
+// The full, ordered export-menu descriptor list: raster (PNG) copy/save/whole
+// options, a separator, then the vector (SVG) copy/save/whole options. Pure and
+// stateless — the view only translates it into Obsidian `Menu` calls.
+export function exportMenuItems(): ExportMenuEntry[] {
+	return [
+		{ kind: "item", title: "Copy view to clipboard", icon: "copy", action: { format: "png", scale: 2, fit: false, target: "clipboard" } },
+		{ kind: "item", title: "Save view as PNG (2×)", icon: "image-down", action: { format: "png", scale: 2, fit: false, target: "vault" } },
+		{ kind: "item", title: "Save view as PNG (4×)", icon: "image-down", action: { format: "png", scale: 4, fit: false, target: "vault" } },
+		{ kind: "item", title: "Save whole figure as PNG (2×)", icon: "maximize", action: { format: "png", scale: 2, fit: true, target: "vault" } },
+		{ kind: "separator" },
+		{ kind: "item", title: "Copy view as SVG", icon: "copy", action: { format: "svg", fit: false, target: "clipboard" } },
+		{ kind: "item", title: "Save view as SVG", icon: "file-code", action: { format: "svg", fit: false, target: "vault" } },
+		{ kind: "item", title: "Save whole figure as SVG", icon: "maximize", action: { format: "svg", fit: true, target: "vault" } },
+	];
+}

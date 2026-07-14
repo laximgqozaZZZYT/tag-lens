@@ -5,17 +5,34 @@
 // the single source of truth and unit-testable without a DOM; mirrors the
 // noteMenuTopTabs / settingsSubTabs descriptor-list extractions. Behaviour-
 // preserving: same keys, same labels, same order.
+import type { BaseEdgeKind } from "../bases/project";
+
 type BasesEdgeKindKey = "basesLinkEdges" | "basesSharedTagEdges" | "basesSharedPropEdges";
 
 export interface BasesEdgeKind {
 	key: BasesEdgeKindKey;
 	label: string;
+	/** The projection edge kind this checkbox enables (single source of truth for
+	 *  both the UI checklist and the graph-build Set). */
+	edge: BaseEdgeKind;
 }
 
 export function basesEdgeKinds(): BasesEdgeKind[] {
 	return [
-		{ key: "basesLinkEdges", label: "Internal links" },
-		{ key: "basesSharedTagEdges", label: "Shared tags" },
-		{ key: "basesSharedPropEdges", label: "Shared property" },
+		{ key: "basesLinkEdges", label: "Internal links", edge: "link" },
+		{ key: "basesSharedTagEdges", label: "Shared tags", edge: "shared-tag" },
+		{ key: "basesSharedPropEdges", label: "Shared property", edge: "shared-property" },
 	];
+}
+
+/** The set of Bases projection edge kinds enabled by the given settings, derived
+ *  from the same `basesEdgeKinds()` descriptor list so the key↔kind mapping has a
+ *  single source of truth. Extracted from the inline three-`if` Set build in
+ *  `buildGraph` (view.ts). */
+export function basesEnabledEdgeKinds(settings: Record<BasesEdgeKindKey, boolean>): Set<BaseEdgeKind> {
+	const out = new Set<BaseEdgeKind>();
+	for (const { key, edge } of basesEdgeKinds()) {
+		if (settings[key]) out.add(edge);
+	}
+	return out;
 }

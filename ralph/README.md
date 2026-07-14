@@ -49,11 +49,31 @@ moment a "session/usage limit" line appears, and the next hour resumes.
 `ralph/cron.sh` fixes the PATH for cron (nvm-node/claude/git), takes a `flock` so a
 slow batch never overlaps the next tick, and honours `ralph/STOP` as a pause switch.
 
+### Load protection (keep the host responsive)
+
+The batch runs a heavy pipeline — `claude` (opus) plus `npm run verify`
+(tsc×2 · biome · tests · knip · esbuild) plus `npm run deploy` — up to a dozen
+times back-to-back. To stop that from pinning every core and crashing the host,
+the loop is throttled:
+
+- **Idle priority.** `loop.sh` re-execs the whole batch under `nice -n 19 ionice -c 3`,
+  so every child (claude, tsc, biome, knip, esbuild) yields the CPU/disk to the
+  desktop and system — the machine stays responsive even at full tilt.
+- **Cool-down between iterations** — `RALPH_COOLDOWN` seconds (default 20) of idle
+  between bursts, so temps/power settle instead of sustaining an all-core pin.
+- **Node heap cap** — `RALPH_NODE_HEAP_MB` (default 4096) caps each Node process so a
+  runaway tool can't exhaust RAM and thrash swap.
+- **Busy-host guard** — `cron.sh` skips the tick if the 1-minute load average is
+  already ≥ the core count (override with `RALPH_LOAD_MAX`, `0` disables).
+- **Lower ceiling** — default cap is **12** iterations/batch (was 25); the loop still
+  early-breaks on the usage limit, so this is just an upper bound.
+
 ```bash
 tail -f /tmp/tag-lens-ralph.log     # watch the scheduled runs
 touch ralph/STOP                    # pause scheduled runs (no crontab edit needed)
 rm ralph/STOP                       # resume
 crontab -l | grep -A2 TAG-LENS-RALPH   # inspect the entry; edit/remove with `crontab -e`
+RALPH_COOLDOWN=45 RALPH_MAX_ITERS=6 ralph/loop.sh   # even gentler manual run
 ```
 
 > Caveat: the loop runs on branch `ralph/auto` in the main working tree. If you are

@@ -1,6 +1,8 @@
 // F5 — pick the legend spec(s) for a mode from its INTRINSIC encoding, unless the
 // user bound an encoding (then that wins — it is what the cards actually paint).
 import type { ViewMode } from "../types";
+import { clamp01 } from "../util/clamp01";
+import { formatLegendNumber } from "../util/format-number";
 import type { LegendSpec } from "./legend-spec";
 import type { LegendAnchor } from "./legend-layout";
 
@@ -45,8 +47,6 @@ export interface ModeLegendInput {
 	maxItems?: number;
 }
 
-const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
-
 // Heatmap diagonal in draw-heatmap.ts:
 // t = log(size+1)/log(maxSize+1), light = 28 + t*34, hsl(42,85%,light)
 const heatmapTagRamp = (t: number): string => `hsl(42, 85%, ${Math.round(28 + clamp01(t) * 34)}%)`;
@@ -59,12 +59,6 @@ const heatmapCoRamp = (t: number): string => `hsl(210, 72%, ${Math.round(16 + cl
 // nearest-stop; >=11 stops makes banding invisible).
 const rampStops = (f: (t: number) => string): string[] =>
 	Array.from({ length: 11 }, (_, i) => f(i / 10));
-
-const fmt = (n: number): string => {
-	if (!Number.isFinite(n)) return "—";
-	const r = Math.round(n * 100) / 100;
-	return Object.is(r, -0) ? "0" : String(r);
-};
 
 function tagKey(input: ModeLegendInput, title: string): LegendSpec {
 	const shown: { label: string; color?: string }[] = input.tags.map((t) => ({ label: t.label ?? t.key, color: t.color }));
@@ -237,8 +231,8 @@ function buildModeLegendBody(mode: ViewMode, input: ModeLegendInput): LegendSpec
 			const tagMax = input.heatmap?.tagMax ?? 1;
 			const coMax = input.heatmap?.jaccard ? 1 : (input.heatmap?.coMax ?? 1);
 			return [
-				{ title: "Tag size", kind: "gradient", ramp: { stops: rampStops(heatmapTagRamp), minLabel: fmt(tagMin), maxLabel: fmt(tagMax) } },
-				{ title: co, kind: "gradient", ramp: { stops: rampStops(heatmapCoRamp), minLabel: "0", maxLabel: fmt(coMax) } },
+				{ title: "Tag size", kind: "gradient", ramp: { stops: rampStops(heatmapTagRamp), minLabel: formatLegendNumber(tagMin), maxLabel: formatLegendNumber(tagMax) } },
+				{ title: co, kind: "gradient", ramp: { stops: rampStops(heatmapCoRamp), minLabel: "0", maxLabel: formatLegendNumber(coMax) } },
 			];
 		}
 		case "upset":

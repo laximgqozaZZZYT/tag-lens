@@ -46,3 +46,15 @@ export function isValidTagName(tag: string): boolean {
 
 	return TAG_NAME_RE.test(tag);
 }
+
+/**
+ * Returns true when `candidate` is exactly `tag` or one of its nested subtags
+ * (`tag/...`). `/` is the Obsidian nesting separator, so a bare prefix match
+ * (e.g. "foobar" vs "foo") must NOT count — only a `/`-delimited descendant.
+ *
+ * Used by `convertToNestedTag` to decide which frontmatter/inline tags to
+ * rewrite; both the candidate and `tag` are bare (no leading `#`).
+ */
+export function isTagOrSubtag(candidate: string, tag: string): boolean {
+	return candidate === tag || candidate.startsWith(`${tag}/`);
+}

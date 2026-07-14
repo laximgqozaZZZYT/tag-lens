@@ -1,9 +1,9 @@
 // F1-1 — pure preset (de)serialization. Round-trip fidelity + tolerant parsing.
 import { ok } from "./assert";
-import { serializePresets, parsePresets, presetFileName, mergePresets, PRESET_SCHEMA, PRESET_SCHEMA_VERSION } from "../src/interaction/preset-io";
+import { serializePresets, parsePresets, presetFileName, mergePresets, buildViewStateBundle, formatJsonStatusLines, jsonExportLabel, jsonImportMessage, bundledLoadMessage, JSON_STATUS_ERROR_CAP, PRESET_SCHEMA, PRESET_SCHEMA_VERSION } from "../src/interaction/preset-io";
 import { captureLens } from "../src/interaction/lens-presets";
 import { DEFAULT_SETTINGS } from "../src/types";
-import type { LensPreset } from "../src/types";
+import type { GraphNode, LensPreset } from "../src/types";
 
 const sample: LensPreset[] = [
 	{ name: "Alpha", query: { ...captureLens(DEFAULT_SETTINGS), viewMode: "lattice", selectedBases: ["a"] } },
@@ -102,4 +102,75 @@ const sample: LensPreset[] = [
 	const { presets, errors } = parsePresets(withEnc);
 	ok(errors.length === 0 && presets.length === 1, "encoding-bearing preset parses");
 	ok(Array.isArray((presets[0] as { encoding?: unknown[] }).encoding), "encoding array preserved");
+}
+
+// buildViewStateBundle: schema/version wrapping, node-stripping, preset split.
+{
+	const nodes: GraphNode[] = [
+		{ id: "a", label: "A", memberships: ["t"], mtime: 123, ageDays: 4, score: 2 },
+		{ id: "b", label: "B", memberships: ["t"] },
+	];
+	const settings = { ...DEFAULT_SETTINGS, lensPresets: sample };
+	const bundle = buildViewStateBundle(nodes, settings);
+	ok(bundle.schema === PRESET_SCHEMA, "schema tag present");
+	ok(bundle.version === PRESET_SCHEMA_VERSION, "version present");
+	ok(bundle.presets === sample, "lensPresets split out as presets");
+	ok(!("lensPresets" in bundle.settings), "lensPresets removed from settings");
+	ok(bundle.nodes.length === 2, "all nodes carried");
+	ok(!("mtime" in bundle.nodes[0]) && !("ageDays" in bundle.nodes[0]), "volatile node fields stripped");
+	ok(bundle.nodes[0].score === 2 && bundle.nodes[0].id === "a", "other node fields kept");
+	// Inputs untouched (shallow copies).
+	ok(nodes[0].mtime === 123 && nodes[0].ageDays === 4, "input node not mutated");
+	ok("lensPresets" in settings, "input settings not mutated");
+}
+
+// formatJsonStatusLines: bullet-prefix up to the cap, overflow → "…and N more.".
+{
+	// Empty → no lines, no overflow.
+	const none = formatJsonStatusLines([]);
+	ok(none.errorLines.length === 0 && none.moreText === null, "empty errors → no lines/more");
+
+	// Under cap → every error bulleted, no "more".
+	const few = formatJsonStatusLines(["bad name", "missing query"]);
+	ok(few.errorLines.length === 2 && few.moreText === null, "under-cap → all bulleted, no more");
+	ok(few.errorLines[0] === "• bad name", "errors are bullet-prefixed");
+
+	// Exactly cap → all shown, no overflow line.
+	const exact = formatJsonStatusLines(Array.from({ length: JSON_STATUS_ERROR_CAP }, (_, i) => `e${i}`));
+	ok(exact.errorLines.length === JSON_STATUS_ERROR_CAP && exact.moreText === null, "exactly cap → no more line");
+
+	// Over cap → capped lines + "…and N more.".
+	const over = formatJsonStatusLines(Array.from({ length: JSON_STATUS_ERROR_CAP + 3 }, (_, i) => `e${i}`));
+	ok(over.errorLines.length === JSON_STATUS_ERROR_CAP, "over-cap → lines capped at cap");
+	ok(over.moreText === "…and 3 more.", "overflow summarized");
+
+	// Custom cap honoured; input array not mutated.
+	const src = ["a", "b", "c"];
+	const custom = formatJsonStatusLines(src, 1);
+	ok(custom.errorLines.length === 1 && custom.moreText === "…and 2 more.", "custom cap honoured");
+	ok(src.length === 3, "input array not mutated");
+}
+
+// jsonExportLabel: pluralized "Export View State (N nodes, M presets)" caption.
+{
+	// Plural both sides.
+	ok(jsonExportLabel(3, 2) === "Export View State (3 nodes, 2 presets)", "both plural");
+	// Singular both sides (1 → no trailing s).
+	ok(jsonExportLabel(1, 1) === "Export View State (1 node, 1 preset)", "both singular");
+	// Zero pluralizes ("0 nodes"), mixed singular/plural.
+	ok(jsonExportLabel(0, 1) === "Export View State (0 nodes, 1 preset)", "zero plural, mixed");
+}
+
+// jsonImportMessage: pluralized imported count, or the nothing-valid message.
+{
+	ok(jsonImportMessage(0) === "No valid presets found.", "zero → nothing-valid message");
+	ok(jsonImportMessage(1) === "Imported 1 preset.", "one → singular");
+	ok(jsonImportMessage(3) === "Imported 3 presets.", "many → plural");
+}
+
+// bundledLoadMessage: pluralized added count (0 when all already present).
+{
+	ok(bundledLoadMessage(0) === "Added 0 bundled presets.", "zero added → plural");
+	ok(bundledLoadMessage(1) === "Added 1 bundled preset.", "one → singular tail");
+	ok(bundledLoadMessage(2) === "Added 2 bundled presets.", "many → plural tail");
 }

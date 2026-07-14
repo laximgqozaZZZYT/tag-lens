@@ -1,3 +1,4 @@
+import type { AggregationGroup } from "../aggregation/types";
 import type { PositionedNode, ClusterRect } from "../layout/layout";
 
 // Output of a cursor → scene hit-test. `null` means the cursor is over
@@ -23,6 +24,33 @@ export function screenToWorld(
 	zoom: number,
 ): { x: number; y: number } {
 	return { x: (sx - panX) / zoom, y: (sy - panY) / zoom };
+}
+
+// Hit-test the node aggregation groups (Junihitoe stacks) that win over the
+// regular card/cluster hit-test. Each stack occupies roughly one card's
+// footprint (`cardW × cardH`, matching drawJunihitoeStack's subW/subH) centred
+// on the group position; `slackPx = 1 / zoom` widens the AABB by one screen
+// pixel so the stroke itself counts as inside. Returns the first containing
+// group in iteration order, or null when the point misses every group.
+export function hitTestAggregationGroup(
+	wx: number,
+	wy: number,
+	groups: Iterable<AggregationGroup>,
+	cardW: number,
+	cardH: number,
+	zoom: number,
+): Extract<HoverTarget, { kind: "aggregationGroup" }> | null {
+	const slackPx = 1 / zoom;
+	for (const group of groups) {
+		const left = group.x - cardW / 2 - slackPx;
+		const right = group.x + cardW / 2 + slackPx;
+		const top = group.y - cardH / 2 - slackPx;
+		const bottom = group.y + cardH / 2 + slackPx;
+		if (wx >= left && wx <= right && wy >= top && wy <= bottom) {
+			return { kind: "aggregationGroup", groupKey: group.key, nodeIds: group.nodeIds };
+		}
+	}
+	return null;
 }
 
 // Cards-first hit-test. Picks the smallest-distance card hit so two
@@ -84,6 +112,26 @@ export function hitTest(
 			}
 		}
 	}
-	
+
+	return null;
+}
+
+// One clickable cell rect in the Icon Gallery (Droste) hit region, in device
+// pixels: the AABB spans [x0,x1]×[y0,y1] and carries the cell's node `id`.
+export type DrosteHitRect = { id: string; x0: number; y0: number; x1: number; y1: number };
+
+// Topmost Droste cell under a device-pixel point (dx, dy), or null when the
+// point misses every cell. Scans in REVERSE so a rect painted later (drawn on
+// top) wins over an earlier one it overlaps — matching the inline scan in
+// MiniGraphView.drosteHitTest(). Bounds are inclusive on all four edges.
+export function hitDrosteRect(
+	dx: number,
+	dy: number,
+	rects: readonly DrosteHitRect[],
+): string | null {
+	for (let i = rects.length - 1; i >= 0; i--) {
+		const r = rects[i];
+		if (dx >= r.x0 && dx <= r.x1 && dy >= r.y0 && dy <= r.y1) return r.id;
+	}
 	return null;
 }
