@@ -230,11 +230,45 @@ function evalDateCompare(op: string, rhs: string, actual: unknown): boolean | nu
 	}
 }
 
+// Duration unit aliases → canonical single char.
+const UNIT: Record<string, string> = {
+	y: "y", year: "y", years: "y",
+	M: "M", month: "M", months: "M",
+	w: "w", week: "w", weeks: "w",
+	d: "d", day: "d", days: "d",
+	h: "h", hour: "h", hours: "h",
+	m: "m", minute: "m", minutes: "m",
+	s: "s", second: "s", seconds: "s",
+};
+// Fixed-ms units (calendar units M/y handled separately via Date methods).
+const FIXED_MS: Record<string, number> = {
+	s: 1e3, m: 6e4, h: 36e5, d: 864e5, w: 6048e5,
+};
+
+function applyDuration(base: number, sign: number, n: number, unit: string): number {
+	const u = UNIT[unit] ?? "";
+	if (u === "M" || u === "y") {
+		const dt = new Date(base);
+		if (u === "M") dt.setMonth(dt.getMonth() + sign * n);
+		else dt.setFullYear(dt.getFullYear() + sign * n);
+		return dt.getTime();
+	}
+	const ms = FIXED_MS[u];
+	return ms === undefined ? NaN : base + sign * n * ms;
+}
+
 // Resolve a filter rhs to an epoch-ms number: now()/today()/date("X")/"X"/ISO
-// string, or a bare epoch number. Unparseable → NaN. Date arithmetic is not
-// handled here (out of scope).
+// string, or a bare epoch number. Date arithmetic `<base> ± "<n><unit>"` is
+// applied recursively so `today() - "1M" - "1d"` chains correctly.
+// Unparseable → NaN.
 function coerceDateRhs(rhs: string): number {
 	const s = rhs.trim();
+	// Date arithmetic: `<base> ± "<n><unit>"` — strip the trailing term and recurse.
+	const arith = s.match(/^(.+?)\s*([+-])\s*(["'])\s*(\d+)\s*([A-Za-z]+)\s*\3\s*$/);
+	if (arith) {
+		const base = coerceDateRhs(arith[1]);
+		return Number.isNaN(base) ? NaN : applyDuration(base, arith[2] === "-" ? -1 : 1, Number(arith[4]), arith[5]);
+	}
 	if (s === "now()") return Date.now();
 	if (s === "today()") {
 		const d = new Date();

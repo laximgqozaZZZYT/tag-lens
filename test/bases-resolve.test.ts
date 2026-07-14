@@ -336,4 +336,64 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 	ok(JSON.stringify(a.tags) === JSON.stringify(["keep"]), "tags captured");
 }
 
+// --- date arithmetic: today()/now()/date() ± "<n><unit>" ---
+{
+	const now = Date.now();
+	const todayStart = (() => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
+
+	// today() - "7d": a file modified today should be newer than today minus 7 days.
+	const recent: FileFacts = { ...facts("r.md", []), mtime: now };
+	ok(evalBaseFilter(parseBaseFilter('file.mtime > today() - "7d"'), recent), "mtime=now > today-7d → true");
+	ok(!evalBaseFilter(parseBaseFilter('file.mtime < today() - "7d"'), recent), "mtime=now < today-7d → false");
+
+	// A file from 10 days ago should be older than today minus 7 days.
+	const old10d: FileFacts = { ...facts("o.md", []), mtime: todayStart - 10 * 864e5 };
+	ok(!evalBaseFilter(parseBaseFilter('file.mtime > today() - "7d"'), old10d), "mtime=10d ago > today-7d → false");
+	ok(evalBaseFilter(parseBaseFilter('file.mtime < today() - "7d"'), old10d), "mtime=10d ago < today-7d → true");
+
+	// now() - "2h" vs now() - "48h": use comfortable margins to avoid timing flakiness.
+	const oneHourAgo = now - 36e5;        // 1h ago → clearly within last 2h
+	const threeDaysAgo = now - 72 * 36e5; // 3d ago → clearly older than 2h
+	const fH: FileFacts = { ...facts("h.md", []), mtime: oneHourAgo };
+	ok(!evalBaseFilter(parseBaseFilter('file.mtime < now() - "2h"'), fH), "mtime=1h ago is NOT < now-2h");
+	ok(evalBaseFilter(parseBaseFilter('file.mtime > now() - "48h"'), fH), "mtime=1h ago > now-48h → true");
+	const fD: FileFacts = { ...facts("d.md", []), mtime: threeDaysAgo };
+	ok(evalBaseFilter(parseBaseFilter('file.mtime < now() - "2h"'), fD), "mtime=3d ago < now-2h → true");
+
+	// date("2025-01-01") + "1M" == 2025-02-01
+	const feb2025 = Date.parse("2025-02-01");
+	const fMon: FileFacts = { ...facts("m.md", []), mtime: feb2025 };
+	ok(evalBaseFilter(parseBaseFilter('file.mtime == date("2025-01-01") + "1M"'), fMon), 'date("2025-01-01")+"1M" == 2025-02-01');
+
+	// M (month) vs m (minute) are distinct units.
+	const oneMinuteMs = 6e4;
+	const oneMonthMs = Date.parse("2025-02-01") - Date.parse("2025-01-01");
+	ok(oneMonthMs > oneMinuteMs * 1000, "1M (month) >> 1m (minute) sanity");
+
+	// "1day" alias works same as "1d".
+	const fDay: FileFacts = { ...facts("dd.md", []), mtime: now - 2 * 864e5 };
+	ok(evalBaseFilter(parseBaseFilter('file.mtime < today() - "1day"'), fDay), '"1day" alias = 1d');
+
+	// "1y" calendar year.
+	const nextYear = (() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.getTime(); })();
+	const fY: FileFacts = { ...facts("y.md", []), mtime: nextYear };
+	ok(evalBaseFilter(parseBaseFilter('file.mtime > today() + "1y"'), fY), '"1y" one calendar year forward');
+
+	// Unknown unit → NaN → evalDateCompare returns null → falls through to generic compare → false, no throw.
+	ok(!evalBaseFilter(parseBaseFilter('file.mtime > today() - "1x"'), recent), 'unknown unit "1x" → NaN → no throw, false');
+
+	// Chained arithmetic: today() - "1M" - "1d" (recursive).
+	const oneMonthOneDayAgo = (() => {
+		const d = new Date(); d.setHours(0,0,0,0); d.setMonth(d.getMonth()-1); d.setDate(d.getDate()-1);
+		return d.getTime();
+	})();
+	const fChain: FileFacts = { ...facts("ch.md", []), mtime: oneMonthOneDayAgo - 1 };
+	ok(evalBaseFilter(parseBaseFilter('file.mtime < today() - "1M" - "1d"'), fChain), 'chained today()-"1M"-"1d"');
+
+	// Regression: date("2025-01-01") literal equality still works (no mis-parse as arithmetic).
+	const jan2025 = Date.parse("2025-01-01");
+	const fReg: FileFacts = { ...facts("reg.md", []), mtime: jan2025 };
+	ok(evalBaseFilter(parseBaseFilter('file.mtime == date("2025-01-01")'), fReg), 'regression: date("2025-01-01") literal unaffected');
+}
+
 console.log("bases-resolve tests passed");
