@@ -326,6 +326,33 @@ function facts(path: string, tags: string[], fm: Record<string, unknown> = {}): 
 	ok(evalBaseFilter(parseBaseFilter('!(file.hasTag("x") && file.hasTag("y"))'), oneOnly), "!(x && y): has one → true");
 }
 
+// --- frontmatter date fields: ISO string and epoch vs date expressions ---
+{
+	const now = Date.now();
+	// Far-future/past ISO strings are timezone-safe (no ambiguity on the date boundary).
+	const futureDue = facts("ff.md", [], { due: "2099-12-31" });
+	const pastDue   = facts("fp.md", [], { due: "2000-01-01" });
+
+	ok(evalBaseFilter(parseBaseFilter("note.due > today()"), futureDue),  "note.due=far-future ISO > today() → true");
+	ok(!evalBaseFilter(parseBaseFilter("note.due > today()"), pastDue),   "note.due=far-past ISO > today() → false");
+	ok(evalBaseFilter(parseBaseFilter("note.due < today()"), pastDue),    "note.due=far-past ISO < today() → true");
+	ok(!evalBaseFilter(parseBaseFilter("note.due < today()"), futureDue), "note.due=far-future ISO < today() → false");
+
+	// note.due compared with date() call.
+	ok(evalBaseFilter(parseBaseFilter('note.due > date("2025-01-01")'), futureDue),  'note.due=2099 > date("2025-01-01") → true');
+	ok(!evalBaseFilter(parseBaseFilter('note.due > date("2025-01-01")'), pastDue),   'note.due=2000 > date("2025-01-01") → false');
+
+	// Frontmatter epoch number (e.g. note.timestamp stored as ms-since-epoch).
+	const recent: FileFacts = { ...facts("r2.md", []), frontmatter: { timestamp: now - 36e5 } }; // 1h ago
+	ok(evalBaseFilter(parseBaseFilter('note.timestamp > today() - "7d"'), recent), "note.timestamp (epoch) > today-7d → true");
+	ok(!evalBaseFilter(parseBaseFilter('note.timestamp < now() - "2h"'), recent),  "note.timestamp=1h ago NOT < now-2h → false");
+
+	// Non-date rhs: plain numeric compare is unaffected (doesn't enter date path).
+	const counted = facts("c2.md", [], { count: 200 });
+	ok(evalBaseFilter(parseBaseFilter("note.count > 100"), counted), "note.count > 100 (non-date rhs) unaffected");
+	ok(!evalBaseFilter(parseBaseFilter("note.count < 100"), counted), "note.count < 100 (non-date rhs) false");
+}
+
 // --- unknown operator falls back to false (never throws) ---
 {
 	const f = facts("a.md", ["a"]);

@@ -122,12 +122,11 @@ function evalCondInner(node: { cond: BaseCond }, facts: FileFacts): boolean {
 		return values.includes(String(actual ?? ""));
 	}
 
-	// Date fields (epoch-ms) vs a date-string rhs need epoch coercion, else the
-	// generic compare would string-compare the epoch number.
-	if (lhs === "file.ctime" || lhs === "file.mtime") {
-		const dc = evalDateCompare(op, rhs ?? "", actual);
-		if (dc !== null) return dc;
-	}
+	// Date-aware compare: epoch-ms built-in fields (ctime/mtime) plus any
+	// frontmatter field whose value is a numeric epoch or an ISO-parseable string,
+	// when the rhs is a date expression (now()/today()/date(...)/ISO/arithmetic).
+	const dc = tryDateCompare(op, rhs ?? "", lhs, actual);
+	if (dc !== null) return dc;
 
 	return compare(actual, op, rhs ?? "");
 }
@@ -222,25 +221,40 @@ function arrAwareEq(actual: unknown, rhs: string): boolean {
 	return String(actual ?? "") === rhs;
 }
 
-// Compare an epoch-ms date field against a date-ish rhs. Returns null when either
-// side isn't a usable epoch (→ caller falls back to the generic compare).
-function evalDateCompare(op: string, rhs: string, actual: unknown): boolean | null {
-	const a = typeof actual === "number" ? actual : NaN;
+// True when `s` is a date expression: now()/today(), date(...), ISO YYYY-MM-DD,
+// or any of these as the base of a date arithmetic chain.
+function isDateExpression(s: string): boolean {
+	return /^(?:now|today)\(\)|^date\(|^\d{4}-\d{2}-\d{2}/.test(s);
+}
+
+// Date-aware compare gate: triggers for ctime/mtime (always epoch) or when the rhs
+// is a date expression and actual is a numeric epoch or an ISO-parseable string.
+// Returns null → caller falls back to the generic compare.
+function tryDateCompare(op: string, rhs: string, lhs: string, actual: unknown): boolean | null {
+	if (!isDateExpression(rhs) && lhs !== "file.ctime" && lhs !== "file.mtime") return null;
+	const epoch = typeof actual === "number" ? actual
+		: typeof actual === "string" ? Date.parse(actual) : NaN;
+	return Number.isNaN(epoch) ? null : evalDateCompare(op, rhs, epoch);
+}
+
+// Compare a pre-computed epoch-ms value against a date-ish rhs string.
+// Returns null when the rhs doesn't resolve to a usable epoch.
+function evalDateCompare(op: string, rhs: string, epoch: number): boolean | null {
 	const b = coerceDateRhs(rhs);
-	if (Number.isNaN(a) || Number.isNaN(b)) return null;
+	if (Number.isNaN(b)) return null;
 	switch (op) {
 		case "==":
-			return a === b;
+			return epoch === b;
 		case "!=":
-			return a !== b;
+			return epoch !== b;
 		case ">":
-			return a > b;
+			return epoch > b;
 		case "<":
-			return a < b;
+			return epoch < b;
 		case ">=":
-			return a >= b;
+			return epoch >= b;
 		case "<=":
-			return a <= b;
+			return epoch <= b;
 		default:
 			return null;
 	}
