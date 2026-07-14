@@ -588,6 +588,20 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         populated slot→false, and present-but-empty slots→still empty. Sibling of the
         `computeGlobalFallbackPlan`/`figure`-shaped draw seams; behaviour-identical.
         view.ts 4110 → 4103; ratchet tightened. — 137bc0d
+  - [x] UpSet column signature-key dedup → `upsetColumnKey(signature)`
+        (`src/layout/upset-layout.ts`, next to `layoutUpset`) +
+        `test/upset-column-key.test.ts`. The `signature.join("|")` column-identity
+        key was re-derived at three sites in three files — the layout bucketing pass
+        (`upset-layout.ts`), the `draw-upset.ts` highlight match, and the view's
+        `clearStaleSelection` stale-selection guard — that MUST produce byte-identical
+        keys or a selected column can't be re-found (or dropped) after a relayout. Now
+        one pure builder carrying the {ab,c}/{a,bc}-collision-avoiding "|" contract
+        (documented once, at the function). Test locks the pipe join, empty/single,
+        the collision-avoidance, and order-sensitivity (callers pre-sort). Mirrors the
+        `undirectedPairKey`/`stripTabPrefix` idiom dedups; a correctness-relevant
+        contract, not just a chrome seam. view.ts held at 4103 (the new import offset
+        by tightening the now-`upsetColumnKey`-referencing field comment).
+        Behaviour-identical. — 6529f89
   - [ ] next seams to peel (pure builders, one per iteration): the numeric parse/clamp
         blocks in `settings-sections.ts` / `settings-tabs.ts` are now all extracted
         (min-font, heatmap-min-tag, node-size, jaccard) and the inherit-from option list
