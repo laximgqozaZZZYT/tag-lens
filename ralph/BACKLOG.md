@@ -1180,7 +1180,7 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         pan. Test locks identity/HiDPI-zoom, no-shear, dpr-premultiplied translation,
         the tile-offset-in-pan equivalence, and zero-pan pure-scale. Mirrors the
         `canvasBackingSize` geometry seam + the util-dedup idiom. Behaviour-identical.
-        view.ts 4102 → 4091; ratchet tightened. — <PENDING>
+        view.ts 4102 → 4091; ratchet tightened. — f48c02f
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
