@@ -35,6 +35,7 @@ import { clusterHue, createStripeGradient, membershipStripeHues } from "./draw/c
 import { resolveTheme, setTheme, theme, colorAlpha } from "./draw/theme";
 import { canvasBackingSize } from "./draw/canvas-backing";
 import { figureIsEmpty } from "./draw/figure-empty";
+import { worldTransform } from "./draw/world-transform";
 import { expandClustersByInheritance, computeClusterBBoxes } from "./layout/cluster-bbox";
 import { contentBounds } from "./layout/content-bounds";
 import { contentFit } from "./layout/content-fit";
@@ -2123,7 +2124,7 @@ export class MiniGraphView extends ItemView {
 			);
 			return;
 		}
-		ctx.setTransform(dpr * this.zoom, 0, 0, dpr * this.zoom, dpr * this.panX, dpr * this.panY);
+		ctx.setTransform(...worldTransform(dpr, this.zoom, this.panX, this.panY));
 
 		// Excel-style row/column underlay. Drawn first so enclosures, edges,
 		// trunks, and cards all sit on top. Cells follow card geometry and
@@ -2164,12 +2165,7 @@ export class MiniGraphView extends ItemView {
 				const offX = ti * periodX;
 				const offY = tj * periodY;
 				ctx.setTransform(
-					dpr * this.zoom,
-					0,
-					0,
-					dpr * this.zoom,
-					dpr * (this.panX + this.zoom * offX),
-					dpr * (this.panY + this.zoom * offY),
+					...worldTransform(dpr, this.zoom, this.panX + this.zoom * offX, this.panY + this.zoom * offY),
 				);
 				this.drawBodyTile(ctx, hasHighlight, skipNode);
 			}
@@ -2177,14 +2173,7 @@ export class MiniGraphView extends ItemView {
 
 		// Restore the world transform so the cluster labels (above) and
 		// header (below) draw in the canonical (0,0)-tile.
-		ctx.setTransform(
-			dpr * this.zoom,
-			0,
-			0,
-			dpr * this.zoom,
-			dpr * this.panX,
-			dpr * this.panY,
-		);
+		ctx.setTransform(...worldTransform(dpr, this.zoom, this.panX, this.panY));
 		if (this.settings.showEnclosures) {
 			this.drawClusterLabels(ctx);
 		}

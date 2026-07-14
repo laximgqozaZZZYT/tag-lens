@@ -125,6 +125,7 @@ import "./lattice-key-prune.test";
 import "./upset-fit.test";
 import "./heatmap-fit.test";
 import "./canvas-backing.test";
+import "./world-transform.test";
 import "./visible-fit-width.test";
 import "./droste-fit.test";
 import "./locate-fit.test";

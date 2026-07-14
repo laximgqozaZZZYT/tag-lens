@@ -1167,6 +1167,20 @@ whole. Check off `- [x]` with the commit short-hash; append discovered follow-up
         sink→outDeg 0, absent→undefined, presence-keys-off-total (a directional-only
         ghost → undefined), and zero-total-still-present. Behaviour-identical.
         view.ts 4123 → 4110; ratchet tightened.
+  - [x] world→device-pixel transform matrix dedup → `worldTransform(dpr, zoom, panX,
+        panY)` (`src/draw/world-transform.ts`) + `test/world-transform.test.ts`. The
+        `setTransform(dpr*zoom, 0, 0, dpr*zoom, dpr*panX, dpr*panY)` 6-tuple that maps
+        world coords → device pixels was re-derived inline at three world-space passes
+        in `draw()` (`view.ts`): the pre-tiling card-grid transform, the per-tile body
+        transform (with a `panX + zoom*offX` tile offset folded into the pan), and the
+        post-tile label/header restore. All three must be the SAME matrix or the layers
+        drift apart; now one pure builder returning the tuple (uniform scale dpr*zoom,
+        no shear, translation dpr*pan). The two 8-line spelled-out `setTransform(...)`
+        calls collapse to one-liners via spread; the offset pass threads a pre-offset
+        pan. Test locks identity/HiDPI-zoom, no-shear, dpr-premultiplied translation,
+        the tile-offset-in-pan equivalence, and zero-pan pure-scale. Mirrors the
+        `canvasBackingSize` geometry seam + the util-dedup idiom. Behaviour-identical.
+        view.ts 4102 → 4091; ratchet tightened. — <PENDING>
 
 - [ ] **F2 — first-class scatter mode.** 2D quantitative axes + zoom/pan as a proper
       view mode. Plan written: **`docs/0.3.21/f2-scatter-mode.md`**. Key finding —
